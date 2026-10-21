@@ -24,6 +24,7 @@ on frameworks, databases or OpenCode.
 Common/   AggregateRoot, IDomainEvent, DomainException
 Offices/  Office (aggregate) > Room > Desk, AgentProfile
 Roles/    Role (aggregate), RolePermissions, PermissionLevel
+Reports/  Report (aggregate)
 Work/     WorkTask (aggregate), Epic (aggregate), TaskNote, NoteAuthor, AgentRun, AuditEntry
 ```
 
@@ -83,6 +84,13 @@ Any open status ──discard──▶ Discarded
 A larger request split into tasks: its title, the request in the words of whoever
 asked, who and when. Tasks may belong to one epic of their own office. Event:
 `EpicOpened`.
+
+### Report
+
+A written account of work, kept as written: of a period of an office (usually a
+day) or of an epic. Its body is Markdown; `WrittenByAi` is false when the model
+was unavailable and the report lists the recorded facts only. Event:
+`ReportWritten`.
 
 ### AuditEntry
 

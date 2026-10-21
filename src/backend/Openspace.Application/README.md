@@ -27,6 +27,8 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `QueueDispatcher` | Hands free seats to queued tasks (see below) |
 | `Supervisor` | Splits a request into proposed tasks for the office's desks. Desk names are the only allowed values in the schema; since OpenCode does not enforce schemas strictly, tasks that still lack a valid desk get a short follow-up question (one desk per task). With a single desk everything goes to it; a task left without one says what was suggested (the model reads the repository, read-only, and answers with JSON matching a schema); approves all proposals of an epic at once |
 | `EpicQueries` | Epics of an office, newest first |
+| `ReportWriter` | Builds the facts of a day or an epic from the audit log (`ReportFacts`), asks the model to write them up for people in a chosen language, falls back to the facts when it cannot, and keeps the report |
+| `ReportQueries` | Reports of an office, one report |
 | `RoleCommands` | Define, change and delete roles (not while desks use them); draft instructions with AI |
 | `RoleQueries` | List roles |
 | `TaskRunner` | Gives started tasks a worktree, a session and a brief; builds the `AgentSetup` from the desk and its role |

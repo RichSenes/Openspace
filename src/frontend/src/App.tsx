@@ -6,6 +6,7 @@ import { BuildingView } from './building/BuildingView'
 import { Sidebar } from './layout/Sidebar'
 import { TopBar, type View } from './layout/TopBar'
 import { useBuildingHub } from './realtime/useBuildingHub'
+import { ReportsPanel } from './reports/ReportsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
@@ -44,6 +45,8 @@ export default function App() {
             <Board key={office.id} office={office} />
           ) : view === 'rooms' ? (
             <RoomsPanel key={office.id} office={office} />
+          ) : view === 'reports' ? (
+            <ReportsPanel key={office.id} office={office} />
           ) : (
             <BuildingView office={office} onOpenRooms={() => setView('rooms')} />
           )}

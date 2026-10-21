@@ -77,4 +77,21 @@ public sealed class SupervisorApiTests : IDisposable
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Reports_are_written_listed_and_downloaded_over_http()
+    {
+        var office = (await PostAsync("/api/offices", new { name = "E Corp" })).GetProperty("id").GetGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        // This runtime cannot draft: the report falls back to the facts.
+        var report = await PostAsync($"/api/offices/{office}/reports", new { from = now.AddHours(-1), to = now.AddHours(1), scope = "today", language = "Italian" });
+        var listed = await _http.GetFromJsonAsync<JsonElement>($"/api/offices/{office}/reports");
+        var download = await _http.GetAsync($"/api/reports/{report.GetProperty("id").GetGuid()}/download");
+
+        Assert.Equal(("E Corp: today", false), (report.GetProperty("title").GetString(), report.GetProperty("writtenByAi").GetBoolean()));
+        Assert.Equal(1, listed.GetArrayLength());
+        Assert.Equal("text/markdown", download.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("No task was worked on", await download.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 }

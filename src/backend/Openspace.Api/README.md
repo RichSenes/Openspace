@@ -34,6 +34,10 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
 | GET | `/api/epics?officeId=` | Epics of an office |
 | POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |
+| POST | `/api/offices/{id}/reports` | `{ from, to, scope, language }`: report of what happened in that period |
+| POST | `/api/epics/{id}/report` | `{ language }`: report of an epic |
+| GET | `/api/offices/{id}/reports` | Reports of an office, newest first |
+| GET | `/api/reports/{id}/download` | The report as a Markdown file |
 | GET | `/api/roles` | All roles |
 | POST | `/api/roles` | Define a role: `{ name, description?, instructions?, model?, edit, bash, web }` with `Allow`, `Ask` or `Deny` |
 | PUT | `/api/roles/{id}` | Change a role (same body) |
@@ -79,6 +83,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
 | `EpicsChanged` | none | the supervisor opened an epic |
+| `ReportsChanged` | none | a report was written |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity` carries the data itself,

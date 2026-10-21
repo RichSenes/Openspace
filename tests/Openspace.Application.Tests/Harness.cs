@@ -35,6 +35,8 @@ internal sealed class Harness
 
     public InMemoryEpics Epics { get; } = new();
 
+    public InMemoryReports Reports { get; } = new();
+
     public ActivityBoard Activity { get; }
 
     public Office Office { get; }
@@ -73,6 +75,9 @@ internal sealed class Harness
     public AgentSignals Signals() => new(Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
     public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
+
+    public Application.Reports.ReportWriter ReportWriter() => new(
+        Offices, Epics, Tasks, Audit, Reports, UnitOfWork, Runtime, Clock, NullLogger<Application.Reports.ReportWriter>.Instance);
 
     public Supervisor Supervisor() => new(Offices, Roles, Epics, Tasks, UnitOfWork, Runtime, Clock);
 

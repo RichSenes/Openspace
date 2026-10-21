@@ -89,10 +89,12 @@ internal sealed class FakeRuntime : IAgentRuntime
         return Task.FromResult(Plans.Count > 0 ? Plans.Dequeue() : Plan);
     }
 
+    public Exception? FailOnDraft { get; set; }
+
     public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
     {
         DraftRequests.Add((instructions, text));
-        return Task.FromResult(Draft);
+        return FailOnDraft is null ? Task.FromResult(Draft) : throw FailOnDraft;
     }
 
     public List<string> Aborted { get; } = [];
@@ -253,6 +255,9 @@ internal sealed class InMemoryAuditLog : IAuditLog
     public Task<bool> ContainsAsync(WorkTaskId taskId, string externalId, CancellationToken cancellationToken) =>
         Task.FromResult(Items.Exists(e => e.TaskId == taskId && e.ExternalId == externalId));
 
+    public Task<IReadOnlyList<WorkTaskId>> TasksActiveBetweenAsync(DateTimeOffset since, DateTimeOffset until, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<WorkTaskId>>([.. Items.Where(e => e.At >= since && e.At < until).Select(e => e.TaskId).Distinct()]);
+
     public void Add(AuditEntry entry) => Items.Add(entry);
 }
 
@@ -281,4 +286,17 @@ internal sealed class InMemoryEpics : IEpicRepository
         Task.FromResult<IReadOnlyList<Epic>>([.. Items.Where(e => e.OfficeId == officeId)]);
 
     public void Add(Epic epic) => Items.Add(epic);
+}
+
+internal sealed class InMemoryReports : IReportRepository
+{
+    public List<Domain.Reports.Report> Items { get; } = [];
+
+    public Task<Domain.Reports.Report?> FindAsync(Domain.Reports.ReportId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Find(r => r.Id == id));
+
+    public Task<IReadOnlyList<Domain.Reports.Report>> ListAsync(OfficeId officeId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Domain.Reports.Report>>([.. Items.Where(r => r.OfficeId == officeId)]);
+
+    public void Add(Domain.Reports.Report report) => Items.Add(report);
 }

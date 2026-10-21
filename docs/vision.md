@@ -100,7 +100,9 @@ Later, in rough order of appearance:
 - **Merge requests** for repositories with a remote: push the task branch and
   open a pull request instead of merging locally.
 
-Out of scope for now: the reporter agent, skin import,
+Done since: the reporter writes day and epic reports from the audit log.
+
+Out of scope for now: skin import,
 creating agents with AI help, authentication and multiple users.
 
 ## Work tracking

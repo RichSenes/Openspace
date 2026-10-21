@@ -264,4 +264,21 @@ public sealed class PersistenceTests : IAsyncLifetime
         Assert.Equal([(1, (string?)null), (2, "CHANGES.md updated")], view.Procedure.Select(s => (s.Number, s.Evidence)));
         Assert.Contains(log, e => e.Summary == "Procedure step 2 done: Log the change");
     }
+
+    [Fact]
+    public async Task Reports_are_written_from_the_log_and_kept()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var since = _db.Clock.GetUtcNow();
+        await InScope(sp => sp.GetRequiredService<WorkTaskCommands>().AssignAsync(office, frontend, "Add a logout button", null, "elliot", default));
+
+        // OpenCode is not reachable in tests: the report falls back to the facts.
+        var report = await InScope(sp => sp.GetRequiredService<Application.Reports.ReportWriter>()
+            .WriteForPeriodAsync(office, since, since.AddDays(1), "24 June", "English", "elliot", default));
+        var listed = await InScope(sp => sp.GetRequiredService<Application.Reports.ReportQueries>().ListAsync(office, default));
+
+        Assert.False(report.WrittenByAi);
+        Assert.Contains("## Add a logout button", report.Body, StringComparison.Ordinal);
+        Assert.Equal(report.Id, Assert.Single(listed).Id);
+    }
 }

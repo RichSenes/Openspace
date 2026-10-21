@@ -7,6 +7,7 @@ import type {
   EpicView,
   OfficeView,
   PlanView,
+  ReportView,
   RoleInput,
   RoleView,
   WorkTaskView,
@@ -23,6 +24,8 @@ export const keys = {
   roles: ['roles'] as const,
   epics: ['epics'] as const,
   officeEpics: (officeId: string) => ['epics', officeId] as const,
+  reports: ['reports'] as const,
+  officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
 }
 
@@ -250,5 +253,23 @@ export function useSetRoomProcedure(officeId: string) {
     (input: { roomId: string; steps: string[] }) =>
       request<void>('PUT', `/api/offices/${officeId}/rooms/${input.roomId}/procedure`, { steps: input.steps }),
     keys.offices,
+  )
+}
+
+export function useReports(officeId: string) {
+  return useQuery({
+    queryKey: keys.officeReports(officeId),
+    queryFn: () => request<ReportView[]>('GET', `/api/offices/${officeId}/reports`),
+  })
+}
+
+/** Writes a report of a day or of an epic. The AI part can take a minute. */
+export function useWriteReport(officeId: string) {
+  return useWrite(
+    (input: { kind: 'day'; from: string; to: string; scope: string; language: string } | { kind: 'epic'; epicId: string; language: string }) =>
+      input.kind === 'day'
+        ? request<ReportView>('POST', `/api/offices/${officeId}/reports`, input)
+        : request<ReportView>('POST', `/api/epics/${input.epicId}/report`, { language: input.language }),
+    keys.reports,
   )
 }

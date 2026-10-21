@@ -194,4 +194,47 @@ public sealed class PersistenceTests : IAsyncLifetime
         Assert.Equal((Domain.Roles.PermissionLevel.Ask, Domain.Roles.PermissionLevel.Deny, Domain.Roles.PermissionLevel.Allow), (role.Edit, role.Bash, role.Web));
         Assert.Equal(roleId.Value, view.Rooms[0].Desks.Single(d => d.Id == frontend.Value).RoleId);
     }
+
+    [Fact]
+    public async Task Epics_and_their_tasks_survive_a_round_trip()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var epicId = await InScope(async sp =>
+        {
+            var offices = sp.GetRequiredService<Application.Abstractions.IOfficeRepository>();
+            var e = (await offices.FindAsync(office, default))!;
+            var epic = Epic.Open(e, "Contact page", "Add a contact page.", "elliot", _db.Clock.GetUtcNow());
+            sp.GetRequiredService<Application.Abstractions.IEpicRepository>().Add(epic);
+            var task = WorkTask.Propose(e, "Build the form", null, "elliot", _db.Clock.GetUtcNow(), epic);
+            task.AssignTo(e, frontend);
+            sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().Add(task);
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+            return epic.Id;
+        });
+
+        var epics = await InScope(sp => sp.GetRequiredService<EpicQueries>().ListAsync(office, default));
+        var approved = await InScope(sp => sp.GetRequiredService<Supervisor>().ApproveAllAsync(epicId, default));
+        var tasks = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().ListAsync(office, null, default));
+
+        Assert.Equal(("Contact page", "Add a contact page."), (epics[0].Title, epics[0].Request));
+        Assert.Equal(1, approved);
+        Assert.Equal((WorkTaskStatus.Queued, (Guid?)epicId.Value), (tasks[0].Status, tasks[0].EpicId));
+    }
+
+    [Fact]
+    public async Task Several_tasks_with_system_notes_can_be_saved_together()
+    {
+        var (office, frontend, backend) = await FurnishECorpAsync();
+        foreach (var desk in new[] { frontend, backend })
+        {
+            await InScope(sp => sp.GetRequiredService<WorkTaskCommands>().AssignAsync(office, desk, "Work", null, "elliot", default));
+        }
+
+        // Starting both, then recovering both, writes two system notes in one save.
+        await InScope(sp => sp.GetRequiredService<Application.Queue.QueueDispatcher>().DispatchAsync(default));
+        await InScope(sp => sp.GetRequiredService<Application.Agents.TaskRunner>().RecoverAsync(default));
+
+        var tasks = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().ListAsync(office, null, default));
+        Assert.All(tasks, t => Assert.Equal(NoteAuthorKind.System, Assert.Single(t.Notes).AuthorKind));
+    }
 }

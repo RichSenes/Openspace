@@ -15,5 +15,7 @@ internal static class IdConverters
 
     internal sealed class RoleIdConverter() : ValueConverter<RoleId, Guid>(id => id.Value, value => new RoleId(value));
 
+    internal sealed class EpicIdConverter() : ValueConverter<EpicId, Guid>(id => id.Value, value => new EpicId(value));
+
     internal sealed class WorkTaskIdConverter() : ValueConverter<WorkTaskId, Guid>(id => id.Value, value => new WorkTaskId(value));
 }

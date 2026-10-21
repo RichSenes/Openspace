@@ -30,6 +30,9 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
+| POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
+| GET | `/api/epics?officeId=` | Epics of an office |
+| POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |
 | GET | `/api/roles` | All roles |
 | POST | `/api/roles` | Define a role: `{ name, description?, instructions?, model?, edit, bash, web }` with `Allow`, `Ask` or `Deny` |
 | PUT | `/api/roles/{id}` | Change a role (same body) |
@@ -72,6 +75,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
+| `EpicsChanged` | none | the supervisor opened an epic |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity` carries the data itself,
@@ -105,7 +109,7 @@ On startup it applies pending database migrations.
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
-| `OpenCode:DraftModel` | none | Model for AI drafts (role instructions); none means OpenCode's default |
+| `OpenCode:DraftModel` | none | Model for AI drafts and supervisor plans; none means OpenCode's default |
 | `OpenCode:ToolsUrl` | `http://127.0.0.1:5145/mcp` | Where OpenCode reaches this API's MCP tools; change it with the port |
 | `Workspaces:Root` | `~/.local/share/openspace/worktrees` | One git worktree per task lives here |
 

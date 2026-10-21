@@ -53,7 +53,8 @@ themselves run in OpenCode: Openspace is the director, not the actor.
 | **Desk** | A seat in a room, bound to an OpenCode agent and optionally to a role. |
 | **Role** | A reusable kind of agent: instructions, preferred model and what it may do without asking. |
 | **Task** | A unit of work assigned to a desk. Has a status, a requester and notes. `WorkTask` in code. |
-| **Supervisor** | A special desk that breaks a request down into tasks and proposes assignments. |
+| **Supervisor** | Reads the project and breaks a request down into tasks proposed for the right desks. |
+| **Epic** | A larger request and the tasks it was split into. |
 | **Queue** | Orders runnable tasks and hands them to free seats. |
 | **Seat** | One of the N execution slots. A desk is "awake" only while holding a seat. |
 | **Bubble** | A short, human sentence describing what a desk is doing right now. |
@@ -101,7 +102,7 @@ Later, in rough order of appearance:
 - **Merge requests** for repositories with a remote: push the task branch and
   open a pull request instead of merging locally.
 
-Out of scope for now: epics and proposals, supervisor decomposition, the reporter agent, skin import,
+Out of scope for now: the reporter agent, skin import,
 creating agents with AI help, authentication and multiple users.
 
 ## Work tracking

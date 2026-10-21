@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, COLUMNS, groupByColumn } from './taskRules'
+import { actionsFor, COLUMNS, filterByEpic, groupByColumn } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -13,6 +13,7 @@ const task = (title: string, status: TaskStatus): WorkTaskView => ({
   createdAt: '2015-06-24T09:00:00Z',
   branch: null,
   mergedInto: null,
+  epicId: null,
   notes: [],
 })
 
@@ -47,5 +48,16 @@ describe('actionsFor', () => {
   it('offers nothing on closed tasks', () => {
     expect(actionsFor('Done')).toEqual([])
     expect(actionsFor('Discarded')).toEqual([])
+  })
+})
+
+describe('filterByEpic', () => {
+  const inEpic = { ...task('form', 'Proposed'), epicId: 'contact' }
+  const loose = task('logout', 'Queued')
+
+  it('keeps everything, one epic, or what has no epic', () => {
+    expect(filterByEpic([inEpic, loose], 'all')).toHaveLength(2)
+    expect(filterByEpic([inEpic, loose], 'contact').map((t) => t.title)).toEqual(['form'])
+    expect(filterByEpic([inEpic, loose], 'none').map((t) => t.title)).toEqual(['logout'])
   })
 })

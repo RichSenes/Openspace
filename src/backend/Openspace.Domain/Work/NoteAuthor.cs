@@ -26,7 +26,11 @@ public sealed record NoteAuthor
 
     public DeskId? DeskId { get; }
 
-    public static NoteAuthor System { get; } = new(NoteAuthorKind.System, null, null);
+    /// <summary>
+    /// A fresh instance on every call: persistence stores authors as part of each note,
+    /// and one shared instance cannot belong to several notes at once.
+    /// </summary>
+    public static NoteAuthor System => new(NoteAuthorKind.System, null, null);
 
     public static NoteAuthor Human(string name) =>
         new(NoteAuthorKind.Human, Guard.NotBlank(name, "Author name", 80), null);

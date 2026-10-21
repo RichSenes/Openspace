@@ -34,3 +34,23 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+.plan-title {
+  font-size: 15px;
+}
+
+.plan-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.plan-list li {
+  display: grid;
+  gap: 2px;
+}
+
+.plan-task {
+  font-weight: 600;
+}

@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
-import type { AuditEntryView, BranchList, DeskActivity, OfficeView, RoleInput, RoleView, WorkTaskView } from './types'
+import type {
+  AuditEntryView,
+  BranchList,
+  DeskActivity,
+  EpicView,
+  OfficeView,
+  PlanView,
+  RoleInput,
+  RoleView,
+  WorkTaskView,
+} from './types'
 
 export const keys = {
   offices: ['offices'] as const,
@@ -11,6 +21,8 @@ export const keys = {
   log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
   roles: ['roles'] as const,
+  epics: ['epics'] as const,
+  officeEpics: (officeId: string) => ['epics', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
 }
 
@@ -196,5 +208,31 @@ export function useSetDeskRole(officeId: string) {
     (input: { deskId: string; roleId: string | null }) =>
       request<void>('PUT', `/api/offices/${officeId}/desks/${input.deskId}/role`, { roleId: input.roleId }),
     keys.offices,
+  )
+}
+
+export function useEpics(officeId: string) {
+  return useQuery({
+    queryKey: keys.officeEpics(officeId),
+    queryFn: () => request<EpicView[]>('GET', `/api/epics?officeId=${officeId}`),
+  })
+}
+
+/** Asks the supervisor to split a request into proposed tasks. Can take a minute. */
+export function usePlan(officeId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (text: string) => request<PlanView>('POST', `/api/offices/${officeId}/plan`, { request: text }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.tasks })
+      void client.invalidateQueries({ queryKey: keys.epics })
+    },
+  })
+}
+
+export function useApproveEpic() {
+  return useWrite(
+    (epicId: string) => request<{ approved: number }>('POST', `/api/epics/${epicId}/approve`, {}),
+    keys.tasks,
   )
 }

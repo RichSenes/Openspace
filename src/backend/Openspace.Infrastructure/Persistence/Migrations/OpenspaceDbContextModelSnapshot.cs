@@ -99,6 +99,36 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("AuditEntries", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Work.Epic", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Request")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfficeId", "CreatedAt");
+
+                    b.ToTable("Epics", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.WorkTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -112,6 +142,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("DeskId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("EpicId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("MergedInto")
@@ -133,6 +166,8 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EpicId");
 
                     b.HasIndex("OfficeId");
 
@@ -267,8 +302,22 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Work.Epic", b =>
+                {
+                    b.HasOne("Openspace.Domain.Offices.Office", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.WorkTask", b =>
                 {
+                    b.HasOne("Openspace.Domain.Work.Epic", null)
+                        .WithMany()
+                        .HasForeignKey("EpicId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Openspace.Domain.Offices.Office", null)
                         .WithMany()
                         .HasForeignKey("OfficeId")

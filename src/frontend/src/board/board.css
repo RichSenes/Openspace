@@ -34,6 +34,7 @@
 }
 
 .column {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -86,6 +87,16 @@
 
 .card-title {
   font-weight: 600;
+}
+
+.card-title,
+.card-meta,
+.card-epic {
+  overflow-wrap: anywhere;
+}
+
+.board-head select {
+  max-width: 260px;
 }
 
 .drawer {
@@ -355,4 +366,8 @@
 
 .log-failed {
   color: var(--danger);
+}
+
+.card-epic {
+  font-size: 12px;
 }

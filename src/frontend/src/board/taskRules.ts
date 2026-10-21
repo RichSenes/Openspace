@@ -44,3 +44,12 @@ export function actionsFor(status: TaskStatus): TaskAction[] {
       return []
   }
 }
+
+export type EpicFilter = 'all' | 'none' | string
+
+/** Keeps the tasks of one epic, the tasks outside any epic, or everything. */
+export function filterByEpic(tasks: WorkTaskView[], filter: EpicFilter): WorkTaskView[] {
+  if (filter === 'all') return tasks
+  if (filter === 'none') return tasks.filter((t) => t.epicId === null)
+  return tasks.filter((t) => t.epicId === filter)
+}

@@ -33,6 +33,8 @@ internal sealed class Harness
 
     public InMemoryRoles Roles { get; } = new();
 
+    public InMemoryEpics Epics { get; } = new();
+
     public ActivityBoard Activity { get; }
 
     public Office Office { get; }
@@ -71,6 +73,8 @@ internal sealed class Harness
     public AgentSignals Signals() => new(Offices, Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
     public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
+
+    public Supervisor Supervisor() => new(Offices, Roles, Epics, Tasks, UnitOfWork, Runtime, Clock);
 
     public Roles.RoleCommands RoleCommands() => new(Roles, Offices, UnitOfWork, Runtime, Clock);
 

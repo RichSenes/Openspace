@@ -192,4 +192,40 @@ public class OpenCodeRuntimeTests
         Assert.Equal(new PermissionRequest("per_1", "ses_1", "bash ls -la, ls wp-content/themes"), Assert.Single(pending));
         Assert.Equal("/permission?directory=%2Fsrv%2Fworktrees%2Fabc", server.Requests[0].PathAndQuery);
     }
+
+    [Fact]
+    public async Task A_plan_asks_for_structured_json_in_a_read_only_session_and_returns_it()
+    {
+        var (runtime, server) = Create(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/session" => (HttpStatusCode.OK, """{"id":"ses_plan"}"""),
+            "/session/ses_plan/message" => (HttpStatusCode.OK, """{"info":{"role":"assistant","structured":{"title":"Contact","tasks":[]}},"parts":[]}"""),
+            _ => (HttpStatusCode.OK, "true"),
+        });
+
+        var json = await runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request: contact page", """{"type":"object"}""", default);
+
+        Assert.Equal("""{"title":"Contact","tasks":[]}""", json);
+        Assert.StartsWith("/session?directory=%2Fsrv%2Frepos%2Fe-corp", server.Requests[0].PathAndQuery, StringComparison.Ordinal);
+        Assert.Contains("\"deny\"", server.Requests[0].Body, StringComparison.Ordinal);
+        using var body = JsonDocument.Parse(server.Requests[1].Body!);
+        Assert.Equal("json_schema", body.RootElement.GetProperty("format").GetProperty("type").GetString());
+        Assert.Equal(HttpMethod.Delete, server.Requests[^1].Method);
+    }
+
+    [Fact]
+    public async Task A_plan_without_structured_answer_reports_the_model_error()
+    {
+        var (runtime, _) = Create(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/session" => (HttpStatusCode.OK, """{"id":"ses_plan"}"""),
+            "/session/ses_plan/message" => (HttpStatusCode.OK, """{"info":{"role":"assistant","error":{"name":"StructuredOutputError","data":{"message":"schema mismatch","retries":2}}},"parts":[]}"""),
+            _ => (HttpStatusCode.OK, "true"),
+        });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request", """{"type":"object"}""", default));
+
+        Assert.Contains("schema mismatch", error.Message, StringComparison.Ordinal);
+    }
 }

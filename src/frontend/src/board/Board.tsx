@@ -1,29 +1,53 @@
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
-import { useOfficeTasks } from '../api/hooks'
+import { Plus, Sparkles } from 'lucide-react'
+import { useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { desksOf } from './deskLookup'
 import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
-import { COLUMNS, groupByColumn } from './taskRules'
+import { SupervisorDialog } from './SupervisorDialog'
+import { COLUMNS, filterByEpic, groupByColumn, type EpicFilter } from './taskRules'
 import './board.css'
 
 export function Board({ office }: { office: OfficeView }) {
   const tasks = useOfficeTasks(office.id)
   const [creating, setCreating] = useState(false)
+  const [planning, setPlanning] = useState(false)
+  const [epicFilter, setEpicFilter] = useState<EpicFilter>('all')
+  const epics = useEpics(office.id)
+  const epicTitle = (id: string | null) => epics.data?.find((e) => e.id === id)?.title
   const [openTaskId, setOpenTaskId] = useState<string>()
   const desks = useMemo(() => desksOf(office), [office])
-  const groups = useMemo(() => groupByColumn(tasks.data ?? []), [tasks.data])
+  const groups = useMemo(() => groupByColumn(filterByEpic(tasks.data ?? [], epicFilter)), [tasks.data, epicFilter])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
 
   return (
     <section className="board">
       <header className="board-head">
         <h1>{office.name}</h1>
-        <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-          <Plus size={16} /> New task
-        </button>
+        <div className="row">
+          {(epics.data?.length ?? 0) > 0 && (
+            <label>
+              <span className="sr-only">Show</span>
+              <select className="input" value={epicFilter} onChange={(e) => setEpicFilter(e.target.value)}>
+                <option value="all">All work</option>
+                {epics.data?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.title}
+                  </option>
+                ))}
+                <option value="none">Tasks outside any request</option>
+              </select>
+            </label>
+          )}
+          <button type="button" className="btn" onClick={() => setPlanning(true)}>
+            <Sparkles size={16} /> Ask the supervisor
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            <Plus size={16} /> New task
+          </button>
+        </div>
       </header>
 
       {tasks.error && <p className="error board-error">Could not load tasks: {tasks.error.message}</p>}
@@ -51,6 +75,7 @@ export function Board({ office }: { office: OfficeView }) {
                           aria-current={task.id === openTaskId ? 'true' : undefined}
                           onClick={() => setOpenTaskId(task.id)}
                         >
+                          {epicTitle(task.epicId) && <span className="card-epic hint">{epicTitle(task.epicId)}</span>}
                           <span className="card-title">{task.title}</span>
                           <span className="card-meta hint">
                             {desk ? `${desk.roomName} · ${desk.name}` : 'No desk yet'}
@@ -69,6 +94,13 @@ export function Board({ office }: { office: OfficeView }) {
       </div>
 
       <NewTaskDialog office={office} desks={desks} open={creating} onClose={() => setCreating(false)} />
+      <SupervisorDialog
+        office={office}
+        desks={desks}
+        open={planning}
+        onClose={() => setPlanning(false)}
+        onShowEpic={(id) => setEpicFilter(id)}
+      />
       {openTask && <TaskDrawer task={openTask} desks={desks} onClose={() => setOpenTaskId(undefined)} />}
     </section>
   )

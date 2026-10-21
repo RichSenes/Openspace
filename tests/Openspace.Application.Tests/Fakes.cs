@@ -36,6 +36,9 @@ internal sealed class InMemoryTasks : IWorkTaskRepository
     public Task<WorkTask?> FindBySessionAsync(string sessionId, CancellationToken cancellationToken) =>
         Task.FromResult(Items.Find(t => t.Run?.SessionId == sessionId));
 
+    public Task<IReadOnlyList<WorkTask>> ListByEpicAsync(EpicId epicId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<WorkTask>>([.. Items.Where(t => t.EpicId == epicId).OrderBy(t => t.CreatedAt)]);
+
     public void Add(WorkTask task) => Items.Add(task);
 }
 
@@ -62,6 +65,23 @@ internal sealed class FakeRuntime : IAgentRuntime
     public string Draft { get; set; } = "- Write tests first.";
 
     public List<(string Instructions, string Text)> DraftRequests { get; } = [];
+
+    public string Plan { get; set; } = "{}";
+
+    public Exception? FailOnPlan { get; set; }
+
+    public List<(string Folder, string Text)> PlanRequests { get; } = [];
+
+    public Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    {
+        if (FailOnPlan is not null)
+        {
+            throw FailOnPlan;
+        }
+
+        PlanRequests.Add((folder, text));
+        return Task.FromResult(Plan);
+    }
 
     public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
     {
@@ -243,4 +263,16 @@ internal sealed class InMemoryRoles : IRoleRepository
     public void Add(Domain.Roles.Role role) => Items.Add(role);
 
     public void Remove(Domain.Roles.Role role) => Items.Remove(role);
+}
+
+internal sealed class InMemoryEpics : IEpicRepository
+{
+    public List<Epic> Items { get; } = [];
+
+    public Task<Epic?> FindAsync(EpicId id, CancellationToken cancellationToken) => Task.FromResult(Items.Find(e => e.Id == id));
+
+    public Task<IReadOnlyList<Epic>> ListAsync(OfficeId officeId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Epic>>([.. Items.Where(e => e.OfficeId == officeId)]);
+
+    public void Add(Epic epic) => Items.Add(epic);
 }

@@ -53,6 +53,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapOfficeEndpoints();
 app.MapTaskEndpoints();
 app.MapRoleEndpoints();
+app.MapEpicEndpoints();
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");
 

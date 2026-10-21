@@ -179,4 +179,17 @@ public class OpenCodeRuntimeTests
         Assert.Contains("\"plan\"", server.Requests[1].Body, StringComparison.Ordinal);
         Assert.Equal(HttpMethod.Delete, server.Requests[^1].Method);
     }
+
+    [Fact]
+    public async Task Pending_permissions_are_read_from_the_workspace()
+    {
+        var (runtime, server) = Create(_ => (HttpStatusCode.OK, """
+            [{"id":"per_1","sessionID":"ses_1","permission":"bash","patterns":["ls -la","ls wp-content/themes"],"metadata":{},"always":[]}]
+            """));
+
+        var pending = await runtime.PendingPermissionsAsync(Workspace, default);
+
+        Assert.Equal(new PermissionRequest("per_1", "ses_1", "bash ls -la, ls wp-content/themes"), Assert.Single(pending));
+        Assert.Equal("/permission?directory=%2Fsrv%2Fworktrees%2Fabc", server.Requests[0].PathAndQuery);
+    }
 }

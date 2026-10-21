@@ -123,6 +123,11 @@ internal sealed class FakeRuntime : IAgentRuntime
     public Task<string?> GetLastReplyAsync(string sessionId, string workspacePath, CancellationToken cancellationToken) =>
         Task.FromResult(LastReply);
 
+    public List<PermissionRequest> Pending { get; } = [];
+
+    public Task<IReadOnlyList<PermissionRequest>> PendingPermissionsAsync(string workspacePath, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PermissionRequest>>(Pending);
+
     public Task ReplyToPermissionAsync(string permissionId, string workspacePath, bool allow, CancellationToken cancellationToken)
     {
         PermissionReplies.Add((permissionId, allow));

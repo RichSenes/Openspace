@@ -100,11 +100,35 @@ public sealed partial class TaskRunner(
             await runtime
                 .PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, setup, message, cancellationToken)
                 .ConfigureAwait(false);
+            await RestorePendingPermissionAsync(task, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogLaunchFailed(logger, ex, task.Id.Value);
             await FailAsync(task, $"The agent could not start: {ex.Message}", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// A resumed session may still be blocked on a permission asked before Openspace
+    /// restarted; OpenCode will not ask again, so the wait is picked up from it.
+    /// </summary>
+    private async Task RestorePendingPermissionAsync(WorkTask task, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
+            if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId) is { } permission)
+            {
+                await activity.UpdateAsync(
+                    new DeskActivity(task.OfficeId.Value, task.DeskId!.Value.Value, task.Id.Value, ActivityKind.Waiting, null,
+                        $"Wants to {permission.Description}", permission.Id, clock.GetUtcNow()),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogPendingUnknown(logger, ex, task.Id.Value);
         }
     }
 
@@ -141,6 +165,9 @@ public sealed partial class TaskRunner(
         task.Fail(reason, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not check pending permissions of task {TaskId}")]
+    private static partial void LogPendingUnknown(ILogger logger, Exception exception, Guid taskId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Openspace tools are not available to the agent of task {TaskId}")]
     private static partial void LogToolsUnavailable(ILogger logger, Exception exception, Guid taskId);

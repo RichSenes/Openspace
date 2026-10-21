@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DeskActivity } from '../api/types'
-import { activityByDesk, isActive, mergeActivity } from './activity'
+import { activityByDesk, isActive, mergeActivity, waitingDesks } from './activity'
 
 const activity = (deskId: string, headline: string, kind: DeskActivity['kind'] = 'Working', officeId = 'e-corp'): DeskActivity => ({
   officeId,
@@ -38,5 +38,18 @@ describe('isActive', () => {
     expect(isActive(activity('d', 'x', 'Waiting'))).toBe(true)
     expect(isActive(activity('d', 'x', 'Stopped'))).toBe(false)
     expect(isActive(undefined)).toBe(false)
+  })
+})
+
+describe('waitingDesks', () => {
+  it('lists only waiting desks, named after their office and desk', () => {
+    const offices = [
+      { id: 'e-corp', name: 'E Corp', repositoryPath: null, rooms: [{ id: 'web', name: 'Web', context: '', desks: [{ id: 'frontend', name: 'Frontend', agentName: 'build', model: null, roleId: null }] }] },
+    ]
+    const list = [activity('frontend', 'Wants to bash ls -la', 'Waiting'), activity('tester', 'Testing', 'Working')]
+
+    expect(waitingDesks(list, offices)).toEqual([
+      { taskId: 't1', officeName: 'E Corp', deskName: 'Frontend', request: 'Wants to bash ls -la' },
+    ])
   })
 })

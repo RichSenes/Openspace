@@ -149,4 +149,15 @@ public class OpenCodeEventTranslatorTests
         Assert.Null(Translate(Tool("openspace_announce", "running", """{"text":"Adding the button"}""")));
         Assert.Null(Translate(Done("openspace_add_task_note", "completed", """{"text":"Found it"}""", ",\"output\":\"Note added\"")));
     }
+
+    [Theory]
+    [InlineData("once", true)]
+    [InlineData("always", true)]
+    [InlineData("reject", false)]
+    public void A_permission_reply_is_recognised(string reply, bool allowed)
+    {
+        var signal = Translate("{\"type\":\"permission.replied\",\"properties\":{\"sessionID\":\"ses_1\",\"requestID\":\"per_1\",\"reply\":\"" + reply + "\"}}");
+
+        Assert.Equal(new AgentSignal.PermissionReplied("ses_1", allowed), signal);
+    }
 }

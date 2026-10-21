@@ -169,4 +169,19 @@ public class TaskRunnerTests
         Assert.Null(byAgent["build"].Instructions);
         Assert.Equal((null, null, null), (byAgent["frontend-dev"].Model, byAgent["frontend-dev"].Instructions, byAgent["frontend-dev"].Permissions));
     }
+
+    [Fact]
+    public async Task A_resumed_task_picks_up_a_permission_still_waiting_in_OpenCode()
+    {
+        var task = _h.Enqueue();
+        await _h.Runner().RunQueueAsync(default);
+        await _h.Runner().RecoverAsync(default);
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_9", "ses_1", "bash php -l index.php"));
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_other", "ses_someone_else", "bash rm -rf /"));
+
+        await _h.Runner().RunQueueAsync(default);
+
+        var activity = _h.Activity.ForTask(task.Id.Value);
+        Assert.Equal((Agents.ActivityKind.Waiting, "per_9", "Wants to bash php -l index.php"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
+    }
 }

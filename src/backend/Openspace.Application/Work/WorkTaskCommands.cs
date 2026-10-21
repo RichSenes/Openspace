@@ -132,9 +132,8 @@ public sealed class WorkTaskCommands(
         await runtime.ReplyToPermissionAsync(permissionId, task.Run.WorkspacePath, allow, cancellationToken).ConfigureAwait(false);
         audit.Add(AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, allow ? "Permission granted once" : "Permission refused"));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await activity.UpdateAsync(
-            waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = allow ? "Permission granted" : "Permission refused", At = clock.GetUtcNow() },
-            cancellationToken).ConfigureAwait(false);
+        await activity.ResumeAsync(task.Id.Value, allow ? "Permission granted" : "Permission refused", clock.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task AddNoteAsync(WorkTaskId taskId, string author, string text, CancellationToken cancellationToken) =>

@@ -35,6 +35,9 @@ src/
 | Rooms | Set the office repository, open rooms, write their context, add desks bound to OpenCode agents and give them roles |
 | Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking |
 
+While any agent waits for a permission, a "Needs you" strip sits on top of every
+view with Allow once and Refuse.
+
 Confirmations appear as short toasts at the bottom; errors stay next to the form
 that caused them, with the server's reason.
 

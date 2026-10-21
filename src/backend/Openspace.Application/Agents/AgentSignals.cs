@@ -95,6 +95,17 @@ public sealed class AgentSignals(
             .ConfigureAwait(false);
     }
 
+    /// <summary>A permission was answered (here or in OpenCode itself): the agent works again.</summary>
+    public async Task PermissionRepliedAsync(string sessionId, bool allowed, CancellationToken cancellationToken)
+    {
+        var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is not null)
+        {
+            await activity.ResumeAsync(task.Id.Value, allowed ? "Permission granted" : "Permission refused", clock.GetUtcNow(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
     /// <summary>The agent stopped talking: its work goes to review with its summary as a note.</summary>
     public async Task FinishedAsync(string sessionId, CancellationToken cancellationToken)
     {

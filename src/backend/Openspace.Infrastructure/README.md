@@ -69,10 +69,15 @@ Events become speech bubbles like this:
 | --- | --- |
 | `todo.updated` | The item `in_progress`, in the agent's words: the bubble headline |
 | `message.part.updated`, tool running | A short phrase: `Editing header.php`, `Running npm test`, `Searching the code` |
-| `permission.asked` | The desk waits for you, with Allow once / Refuse |
+| `permission.asked` | The desk waits for you, with Allow once / Refuse. OpenCode then reports the blocked tool as running: that does not end the wait |
+| `permission.replied` | The wait ends, also when the answer came from OpenCode itself |
 | `session.idle` | The task goes to review; the agent's last answer becomes a note |
 | `session.error` | The task fails with the reason (except aborts Openspace asked for) |
 | `message.part.updated`, tool completed or error | An audit log line: `Changed header.php` with the diff, `Ran npm test` with the command, its output and whether it exited 0, `Read index.html`, `Searched the code for …` |
+
+When a task resumes (after a restart or a send-back), pending permissions of its
+session are read back with `GET /permission?directory=`, since OpenCode does not
+ask twice.
 
 Calls to Openspace's own tools (`openspace_*`) are skipped here: their effect
 (a note, a step) is what gets logged.

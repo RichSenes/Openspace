@@ -26,6 +26,12 @@ public interface IAgentRuntime
     /// <summary>The text of the agent's last answer, usually its summary of the work.</summary>
     Task<string?> GetLastReplyAsync(string sessionId, string workspacePath, CancellationToken cancellationToken);
 
+    /// <summary>Permission requests still waiting for an answer in this folder.</summary>
+    Task<IReadOnlyList<PermissionRequest>> PendingPermissionsAsync(string workspacePath, CancellationToken cancellationToken);
+
     Task ReplyToPermissionAsync(
         string permissionId, string workspacePath, bool allow, CancellationToken cancellationToken);
 }
+
+/// <param name="Description">What is asked, e.g. "bash ls -la".</param>
+public sealed record PermissionRequest(string Id, string SessionId, string Description);

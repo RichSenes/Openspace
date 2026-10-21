@@ -15,7 +15,7 @@ internal static class TaskEndpoints
 
     public sealed record TextRequest(string Text);
 
-    public sealed record PermissionRequest(bool Allow);
+    public sealed record PermissionAnswer(bool Allow);
 
     public sealed record MergeRequest(string Target);
 
@@ -42,7 +42,7 @@ internal static class TaskEndpoints
                 $"task-{taskId.ToString("N")[..8]}.md"));
 
         tasks.MapPost("/{taskId:guid}/permission", (
-            Guid taskId, PermissionRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            Guid taskId, PermissionAnswer request, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.ReplyToPermissionAsync(new WorkTaskId(taskId), request.Allow, ct)));
 
         tasks.MapPost("/{taskId:guid}/merge", (

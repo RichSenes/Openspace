@@ -129,6 +129,15 @@ internal sealed class OpenCodeRuntime(
         return texts.Count > 0 ? texts[^1] : null;
     }
 
+    public async Task<IReadOnlyList<PermissionRequest>> PendingPermissionsAsync(string workspacePath, CancellationToken cancellationToken)
+    {
+        using var pending = await GetJsonAsync(In("permission", workspacePath), cancellationToken).ConfigureAwait(false);
+        return [.. pending.RootElement.EnumerateArray().Select(p => new PermissionRequest(
+            p.GetProperty("id").GetString()!,
+            p.GetProperty("sessionID").GetString()!,
+            OpenCodeEventTranslator.DescribePermission(p)))];
+    }
+
     public async Task ReplyToPermissionAsync(
         string permissionId, string workspacePath, bool allow, CancellationToken cancellationToken)
     {

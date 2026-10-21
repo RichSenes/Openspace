@@ -11,6 +11,8 @@ internal abstract record AgentSignal(string SessionId)
 
     public sealed record Finished(string SessionId) : AgentSignal(SessionId);
 
+    public sealed record PermissionReplied(string SessionId, bool Allowed) : AgentSignal(SessionId);
+
     /// <summary>A tool call ended; what goes in the task's audit log.</summary>
     public sealed record ToolFinished(
         string SessionId, string CallId, AuditKind Kind, string Summary, string? Detail, bool Succeeded) : AgentSignal(SessionId);

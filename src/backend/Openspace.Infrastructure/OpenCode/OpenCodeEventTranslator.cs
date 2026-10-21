@@ -24,6 +24,9 @@ internal static class OpenCodeEventTranslator
             "todo.updated" => FromTodos(props),
             "message.part.updated" => FromPart(props),
             "permission.asked" => FromPermission(props),
+            "permission.replied" => Text(props, "sessionID") is { } replied
+                ? new AgentSignal.PermissionReplied(replied, Text(props, "reply") is not "reject")
+                : null,
             "session.idle" => new AgentSignal.Finished(Text(props, "sessionID")!),
             "session.error" => FromError(props),
             _ => null,
@@ -123,16 +126,17 @@ internal static class OpenCodeEventTranslator
         return new AgentSignal.ToolFinished(sessionId, callId, kind, Shorten(summary), detail, !failed);
     }
 
-    private static AgentSignal.PermissionAsked FromPermission(JsonElement props)
+    private static AgentSignal.PermissionAsked FromPermission(JsonElement props) =>
+        new(Text(props, "sessionID")!, Text(props, "id")!, DescribePermission(props));
+
+    /// <summary>"bash ls -la, ls wp-content/themes": what a permission request asks for.</summary>
+    public static string DescribePermission(JsonElement request)
     {
-        var what = Text(props, "permission") ?? "an action";
-        var patterns = props.TryGetProperty("patterns", out var p) && p.ValueKind == JsonValueKind.Array
+        var what = Text(request, "permission") ?? "an action";
+        var patterns = request.TryGetProperty("patterns", out var p) && p.ValueKind == JsonValueKind.Array
             ? string.Join(", ", p.EnumerateArray().Select(x => x.GetString()))
             : string.Empty;
-        return new AgentSignal.PermissionAsked(
-            Text(props, "sessionID")!,
-            Text(props, "id")!,
-            Shorten(patterns.Length > 0 ? $"{what} {patterns}" : what));
+        return Shorten(patterns.Length > 0 ? $"{what} {patterns}" : what);
     }
 
     private static AgentSignal.Failed? FromError(JsonElement props)

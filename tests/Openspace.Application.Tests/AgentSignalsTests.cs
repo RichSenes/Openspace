@@ -89,4 +89,40 @@ public class AgentSignalsTests
         Assert.Equal(WorkTaskStatus.Review, task.Status);
         Assert.Equal(notes, task.Notes.Count);
     }
+
+    [Fact]
+    public async Task A_wait_for_permission_survives_the_blocked_tool_reporting_itself_as_running()
+    {
+        var task = await RunningTaskAsync();
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+
+        // OpenCode reports the very tool that waits as running, right after asking.
+        await _h.Signals().ProgressAsync("ses_1", null, "Running ls -la", default);
+
+        var activity = _h.Activity.ForTask(task.Id.Value);
+        Assert.Equal((ActivityKind.Waiting, "per_1", "Wants to bash ls -la"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
+    }
+
+    [Fact]
+    public async Task A_permission_answered_in_OpenCode_itself_ends_the_wait()
+    {
+        var task = await RunningTaskAsync();
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+
+        await _h.Signals().PermissionRepliedAsync("ses_1", allowed: false, default);
+
+        var activity = _h.Activity.ForTask(task.Id.Value);
+        Assert.Equal((ActivityKind.Working, null, "Permission refused"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
+    }
+
+    [Fact]
+    public async Task Finishing_or_failing_still_ends_a_wait()
+    {
+        var task = await RunningTaskAsync();
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+
+        await _h.Signals().FinishedAsync("ses_1", default);
+
+        Assert.Equal(ActivityKind.Stopped, _h.Activity.ForTask(task.Id.Value)?.Kind);
+    }
 }

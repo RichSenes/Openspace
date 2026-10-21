@@ -24,10 +24,33 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
         }
     }
 
+    /// <summary>
+    /// Ends a wait for permission: the agent goes back to work. Plain progress cannot do
+    /// this, because OpenCode keeps reporting the blocked tool as running while it waits.
+    /// </summary>
+    public async Task ResumeAsync(Guid taskId, string doing, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (ForTask(taskId) is { Kind: ActivityKind.Waiting } waiting)
+        {
+            var resumed = waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = doing, At = now };
+            _byDesk[waiting.DeskId] = resumed;
+            await publisher.PublishAsync(resumed, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Merges an update into the desk's current activity and publishes it if anything changed.</summary>
     public async Task UpdateAsync(DeskActivity update, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(update);
+        if (_byDesk.TryGetValue(update.DeskId, out var blocked)
+            && blocked is { Kind: ActivityKind.Waiting }
+            && blocked.TaskId == update.TaskId
+            && update.Kind == ActivityKind.Working)
+        {
+            // Still waiting for a person: only ResumeAsync ends it.
+            return;
+        }
+
         var merged = _byDesk.TryGetValue(update.DeskId, out var current) && current.TaskId == update.TaskId
             ? update with
             {

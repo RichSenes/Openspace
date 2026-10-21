@@ -1,3 +1,4 @@
+import { NeedsYou } from './activity/NeedsYou'
 import { AgentsPanel } from './agents/AgentsPanel'
 import { useOffices } from './api/hooks'
 import { Board } from './board/Board'
@@ -22,6 +23,7 @@ export default function App() {
       <div className="body">
         <Sidebar offices={offices.data ?? []} selectedId={office?.id} onSelect={setSelectedId} />
         <main className="main">
+          <NeedsYou />
           {view === 'agents' ? (
             <AgentsPanel />
           ) : offices.isPending ? (

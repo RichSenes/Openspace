@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Openspace.Api;
 using Openspace.Api.Endpoints;
+using Openspace.Api.Mcp;
 using Openspace.Api.Realtime;
 using Openspace.Application;
 using Openspace.Application.Abstractions;
@@ -35,6 +36,10 @@ builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection(Ope
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ErrorHandling>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMcpServer(o => o.ServerInfo = new() { Name = "openspace", Version = "1.0.0" })
+    .WithHttpTransport(o => o.Stateless = true)
+    .WithTools<OpenspaceTools>();
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -48,6 +53,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapOfficeEndpoints();
 app.MapTaskEndpoints();
 app.MapHub<BuildingHub>(BuildingHub.Path);
+app.MapMcp("/mcp");
 
 // Hello, friend.
 app.MapGet("/", () => "Openspace is running.");

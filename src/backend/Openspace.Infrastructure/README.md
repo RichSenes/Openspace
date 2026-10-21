@@ -11,7 +11,7 @@ Adapters that connect the application to the outside world.
 | Workspaces | `Git/GitWorkspaceManager`: one git worktree per task (done) |
 | Queue | `Hosting/QueueRunnerService`: recovers at startup, fills seats every few seconds (done) |
 | Persistence | SQLite via EF Core (done) |
-| Agent tools | MCP server exposing `add_task_note`, `announce`, … (next) |
+| Agent tools | `OpenCodeRuntime.ConnectToolsAsync`: registers the API's MCP server in OpenCode per worktree (done; the server itself lives in the API) |
 
 ## Rules
 
@@ -51,7 +51,7 @@ dotnet ef migrations add <Name> --project src/backend/Openspace.Infrastructure -
 
 Openspace talks to one `opencode serve`, using its long-standing endpoints:
 `POST /session`, `POST /session/{id}/prompt_async`, `POST /session/{id}/abort`,
-`GET /session/{id}/message`, `GET /agent`, `POST /permission/{id}/reply` and the
+`GET /session/{id}/message`, `GET /agent`, `POST /permission/{id}/reply`, `POST /mcp` and the
 server-sent events of `GET /global/event`. Every call passes `?directory=` with
 the task's worktree, so a single server serves every task.
 
@@ -65,6 +65,9 @@ Events become speech bubbles like this:
 | `session.idle` | The task goes to review; the agent's last answer becomes a note |
 | `session.error` | The task fails with the reason (except aborts Openspace asked for) |
 | `message.part.updated`, tool completed or error | An audit log line: `Changed header.php` with the diff, `Ran npm test` with the command, its output and whether it exited 0, `Read index.html`, `Searched the code for …` |
+
+Calls to Openspace's own tools (`openspace_*`) are skipped here: their effect
+(a note, a step) is what gets logged.
 
 Audit lines from tool calls carry the OpenCode call id; a unique index on
 (task, call id) records each call once even if OpenCode repeats the event. Lines
@@ -90,4 +93,4 @@ Each task gets `git worktree add -b openspace/<title>-<key>` from the repository
 
 ## Status
 
-Persistence, OpenCode, workspaces and queue are done. MCP is next.
+Persistence, OpenCode, workspaces, queue and agent tools are done.

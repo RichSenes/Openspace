@@ -66,7 +66,7 @@ internal sealed class Harness
         new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
         Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
-    public AgentSignals Signals() => new(Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
+    public AgentSignals Signals() => new(Offices, Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
     public OfficeCommands OfficeCommands() => new(Offices, UnitOfWork, Workspaces, Clock);
 

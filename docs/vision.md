@@ -115,8 +115,8 @@ It is the single source of truth for:
 - **Notes**: what an agent did, found or left open, attached to a task.
 
 Agents keep it up to date themselves. Openspace exposes an **MCP server** that
-OpenCode agents connect to, with tools such as `get_task`, `update_task_status`,
-`add_task_note` and `announce`. This is how "what was done and what was not"
+OpenCode agents connect to, with the tools `get_task`, `add_task_note` and
+`announce` (done). This is how "what was done and what was not"
 stays tracked without a human copying it anywhere.
 
 Each room keeps **context notes** (conventions, paths, do and don't) that are

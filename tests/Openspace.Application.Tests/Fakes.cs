@@ -84,6 +84,21 @@ internal sealed class FakeRuntime : IAgentRuntime
         return Task.CompletedTask;
     }
 
+    public List<(string Workspace, Guid TaskId)> ToolConnections { get; } = [];
+
+    public Exception? FailOnConnect { get; set; }
+
+    public Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken)
+    {
+        if (FailOnConnect is not null)
+        {
+            throw FailOnConnect;
+        }
+
+        ToolConnections.Add((workspacePath, taskId));
+        return Task.CompletedTask;
+    }
+
     public Task AbortAsync(string sessionId, string workspacePath, CancellationToken cancellationToken)
     {
         Aborted.Add(sessionId);

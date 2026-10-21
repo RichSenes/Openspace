@@ -5,5 +5,9 @@
     <ProjectReference Include="..\Openspace.Infrastructure\Openspace.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+  </ItemGroup>
+
 
 </Project>

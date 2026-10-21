@@ -14,6 +14,9 @@ public interface IAgentRuntime
     Task PromptAsync(
         string sessionId, string workspacePath, AgentProfile agent, string text, CancellationToken cancellationToken);
 
+    /// <summary>Gives agents working in this folder the Openspace tools, tied to this task.</summary>
+    Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken);
+
     Task AbortAsync(string sessionId, string workspacePath, CancellationToken cancellationToken);
 
     /// <summary>The text of the agent's last answer, usually its summary of the work.</summary>

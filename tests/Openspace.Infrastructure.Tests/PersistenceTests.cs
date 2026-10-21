@@ -115,4 +115,29 @@ public sealed class PersistenceTests : IAsyncLifetime
         Assert.Equal(2, started.Count);
         Assert.Equal(["A", "C"], running.Select(t => t.Title));
     }
+
+    [Fact]
+    public async Task Repository_path_and_agent_run_survive_a_round_trip()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().SetRepositoryAsync(office, "/srv/repos/e-corp", default));
+        var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
+            .AssignAsync(office, frontend, "Add a logout button", null, "elliot", default));
+        await InScope(async sp =>
+        {
+            var tasks = sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>();
+            var task = (await tasks.FindAsync(taskId, default))!;
+            task.Start(_db.Clock.GetUtcNow());
+            task.AttachRun(AgentRun.Create("ses_fsociety", "/srv/worktrees/abc", "openspace/add-a-logout-button-abc"));
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        });
+
+        var found = await InScope(sp => sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>()
+            .FindBySessionAsync("ses_fsociety", default));
+        var view = await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default));
+
+        Assert.Equal(taskId, found?.Id);
+        Assert.Equal("/srv/worktrees/abc", found?.Run?.WorkspacePath);
+        Assert.Equal("/srv/repos/e-corp", view.RepositoryPath);
+    }
 }

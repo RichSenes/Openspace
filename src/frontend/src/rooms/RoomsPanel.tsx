@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
-import { useAddDesk, useOpenRoom, useUpdateRoomContext } from '../api/hooks'
+import { useAddDesk, useOpenRoom, useSetRepository, useUpdateRoomContext } from '../api/hooks'
 import type { OfficeView, RoomView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import './rooms.css'
@@ -27,6 +27,8 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
         <p className="hint">Each room is an area of competence. Its desks are the agents that work there.</p>
       </header>
 
+      <RepositoryForm office={office} />
+
       <form className="room-new" onSubmit={submit}>
         <label className="field">
           <span>New room</span>
@@ -48,6 +50,39 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
         </div>
       )}
     </section>
+  )
+}
+
+function RepositoryForm({ office }: { office: OfficeView }) {
+  const [path, setPath] = useState(office.repositoryPath ?? '')
+  const setRepository = useSetRepository(office.id)
+  const toast = useToast()
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    setRepository.mutate(path, { onSuccess: () => toast('Repository saved') })
+  }
+
+  return (
+    <form className="room-new" onSubmit={submit}>
+      <label className="field">
+        <span>Repository folder (absolute path of the git repo agents work on)</span>
+        <input
+          className="input mono"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+          placeholder="/home/you/repos/project"
+          required
+        />
+      </label>
+      <button type="submit" className="btn" disabled={path === (office.repositoryPath ?? '') || setRepository.isPending}>
+        Save repository
+      </button>
+      {setRepository.error && <p className="error">{setRepository.error.message}</p>}
+      {!office.repositoryPath && !setRepository.error && (
+        <p className="hint">Until this is set, tasks of this office cannot start.</p>
+      )}
+    </form>
   )
 }
 

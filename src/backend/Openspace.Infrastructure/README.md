@@ -6,10 +6,12 @@ Adapters that connect the application to the outside world.
 
 | Port | Adapter |
 | --- | --- |
-| Agent runtime | HTTP client and event stream for `opencode serve` |
-| Agent tools | MCP server exposing `get_task`, `update_task_status`, `add_task_note`, `announce` |
-| Workspaces | git worktrees, one per running task |
+| Agent runtime | `OpenCode/OpenCodeRuntime`: HTTP client for `opencode serve` (done) |
+| Agent signals | `OpenCode/OpenCodeEventListener` + `OpenCodeEventTranslator`: global event stream to progress, permission, finished, failed (done) |
+| Workspaces | `Git/GitWorkspaceManager`: one git worktree per task (done) |
+| Queue | `Hosting/QueueRunnerService`: recovers at startup, fills seats every few seconds (done) |
 | Persistence | SQLite via EF Core (done) |
+| Agent tools | MCP server exposing `add_task_note`, `announce`, … (next) |
 
 ## Rules
 
@@ -44,6 +46,34 @@ dotnet tool restore
 dotnet ef migrations add <Name> --project src/backend/Openspace.Infrastructure --output-dir Persistence/Migrations
 ```
 
+## OpenCode
+
+Openspace talks to one `opencode serve`, using its long-standing endpoints:
+`POST /session`, `POST /session/{id}/prompt_async`, `POST /session/{id}/abort`,
+`GET /session/{id}/message`, `GET /agent`, `POST /permission/{id}/reply` and the
+server-sent events of `GET /global/event`. Every call passes `?directory=` with
+the task's worktree, so a single server serves every task.
+
+Events become speech bubbles like this:
+
+| OpenCode event | Becomes |
+| --- | --- |
+| `todo.updated` | The item `in_progress`, in the agent's words: the bubble headline |
+| `message.part.updated`, tool running | A short phrase: `Editing header.php`, `Running npm test`, `Searching the code` |
+| `permission.asked` | The desk waits for you, with Allow once / Refuse |
+| `session.idle` | The task goes to review; the agent's last answer becomes a note |
+| `session.error` | The task fails with the reason (except aborts Openspace asked for) |
+
+## Workspaces
+
+Each task gets `git worktree add -b openspace/<title>-<key>` from the repository's
+`HEAD`, under `Workspaces:Root`. Your checkout and branch are never touched.
+
+- Diff: `git add --intent-to-add --all` then `git diff HEAD`, so new files show.
+- Accept: commit on the task branch (with the repository's identity, or
+  `Openspace` if none), then remove the worktree. The branch stays for you to merge.
+- Discard: remove worktree and branch.
+
 ## Status
 
-Persistence done. OpenCode, MCP and git adapters are next.
+Persistence, OpenCode, workspaces and queue are done. MCP is next.

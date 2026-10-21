@@ -15,6 +15,7 @@ The pixel-art building and the panels around it.
 
 ```
 src/
+  activity/   Desk activity: merge and lookup helpers for speech bubbles (tested)
   api/        Types, fetch client (problem details to readable errors), query hooks
   realtime/   SignalR connection: refetches what the server says changed
   layout/     Top bar with views, office sidebar
@@ -28,9 +29,9 @@ src/
 
 | View | What it shows |
 | --- | --- |
-| Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its task runs |
-| Board | Tasks in columns by status. Click a card for details, actions and notes |
-| Rooms | Open rooms, write their context, add desks bound to OpenCode agents |
+| Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
+| Board | Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, actions and notes |
+| Rooms | Set the office repository, open rooms, write their context, add desks bound to OpenCode agents |
 
 Confirmations appear as short toasts at the bottom; errors stay next to the form
 that caused them, with the server's reason.
@@ -47,5 +48,5 @@ npm test        # Vitest
 
 ## Status
 
-Offices, rooms, desks and tasks can be managed end to end. Agents and sprites
-are next.
+Agents run end to end through OpenCode, with live bubbles, review and diff.
+Sprites and the design pass come later.

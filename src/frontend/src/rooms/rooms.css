@@ -16,13 +16,14 @@
 
 .room-new {
   display: grid;
-  grid-template-columns: minmax(0, 360px) auto;
+  grid-template-columns: minmax(0, 480px) auto;
   justify-content: start;
   align-items: end;
   gap: 8px;
 }
 
-.room-new .error {
+.room-new .error,
+.room-new .hint {
   grid-column: 1 / -1;
 }
 

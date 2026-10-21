@@ -9,6 +9,8 @@ internal static class OfficeEndpoints
 
     public sealed record ContextRequest(string? Context);
 
+    public sealed record RepositoryRequest(string Path);
+
     public sealed record DeskRequest(string Name, string AgentName, string? Model);
 
     public static void MapOfficeEndpoints(this IEndpointRouteBuilder app)
@@ -24,6 +26,13 @@ internal static class OfficeEndpoints
         {
             var id = await commands.OpenOfficeAsync(request.Name, ct);
             return Results.Created($"/api/offices/{id.Value}", new { id = id.Value });
+        });
+
+        offices.MapPut("/{officeId:guid}/repository", async (
+            Guid officeId, RepositoryRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetRepositoryAsync(new OfficeId(officeId), request.Path, ct);
+            return Results.NoContent();
         });
 
         offices.MapPost("/{officeId:guid}/rooms", async (

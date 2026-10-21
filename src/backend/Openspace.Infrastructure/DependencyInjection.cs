@@ -1,7 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
+using Openspace.Application.Queue;
+using Openspace.Infrastructure.Git;
+using Openspace.Infrastructure.Hosting;
+using Openspace.Infrastructure.OpenCode;
 using Openspace.Infrastructure.Persistence;
 
 namespace Openspace.Infrastructure;
@@ -15,7 +21,31 @@ public static class DependencyInjection
         services.AddScoped<IOfficeRepository, OfficeRepository>();
         services.AddScoped<IWorkTaskRepository, WorkTaskRepository>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
+        services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
+        services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();
         return services;
+    }
+
+    /// <summary>Connects agents: the OpenCode server, its event stream and the background queue.</summary>
+    public static IServiceCollection AddAgents(this IServiceCollection services)
+    {
+        services.AddHttpClient<IAgentRuntime, OpenCodeRuntime>(ConfigureOpenCode);
+        services.AddHttpClient(OpenCodeEventListener.HttpClientName, ConfigureOpenCode)
+            .ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
+        // Plain AddSingleton: AddHostedService would deduplicate two factories of the same return type.
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<OpenCodeOptions>>().Value.ListenToEvents
+            ? ActivatorUtilities.CreateInstance<OpenCodeEventListener>(sp)
+            : new IdleService());
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<QueueOptions>>().Value.Enabled
+            ? ActivatorUtilities.CreateInstance<QueueRunnerService>(sp)
+            : new IdleService());
+        return services;
+    }
+
+    private static void ConfigureOpenCode(IServiceProvider services, HttpClient http)
+    {
+        var baseUrl = services.GetRequiredService<IOptions<OpenCodeOptions>>().Value.BaseUrl.ToString();
+        http.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
     }
 
     /// <summary>Creates the database or brings it up to the latest migration.</summary>

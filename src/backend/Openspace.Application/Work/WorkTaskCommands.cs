@@ -1,4 +1,5 @@
 using Openspace.Application.Abstractions;
+using Openspace.Application.Agents;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
@@ -9,6 +10,9 @@ public sealed class WorkTaskCommands(
     IOfficeRepository offices,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
+    IAgentRuntime runtime,
+    IWorkspaceManager workspaces,
+    ActivityBoard activity,
     TimeProvider clock)
 {
     public async Task<WorkTaskId> AssignAsync(
@@ -50,8 +54,22 @@ public sealed class WorkTaskCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public Task AcceptAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
-        UpdateAsync(taskId, (task, now) => task.Accept(now), cancellationToken);
+    /// <summary>Accepts the work: the agent's changes are committed on the task branch.</summary>
+    public async Task AcceptAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        task.Accept(now);
+
+        if (task.Run is { } run)
+        {
+            var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+            await workspaces.CommitAsync(office.RepositoryPath!, run.WorkspacePath, task.Title, cancellationToken).ConfigureAwait(false);
+            task.AddNote(NoteAuthor.System, $"Changes committed on branch {run.Branch}.", now);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     public Task SendBackAsync(
         WorkTaskId taskId, string reviewer, string feedback, CancellationToken cancellationToken) =>
@@ -60,8 +78,42 @@ public sealed class WorkTaskCommands(
     public Task RetryAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.Requeue(now), cancellationToken);
 
-    public Task DiscardAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
-        UpdateAsync(taskId, (task, now) => task.Discard(now), cancellationToken);
+    /// <summary>Drops the task, stopping its agent and throwing its working copy away.</summary>
+    public async Task DiscardAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var wasRunning = task.Status == WorkTaskStatus.Running;
+        task.Discard(clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        if (task.Run is { } run)
+        {
+            if (wasRunning)
+            {
+                await runtime.AbortAsync(run.SessionId, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
+            }
+
+            var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+            await workspaces.DiscardAsync(office.RepositoryPath!, new Workspace(run.WorkspacePath, run.Branch), cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Answers an agent waiting for permission.</summary>
+    public async Task ReplyToPermissionAsync(WorkTaskId taskId, bool allow, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var waiting = activity.ForTask(task.Id.Value);
+        if (task.Run is null || waiting is not { Kind: ActivityKind.Waiting, PermissionId: { } permissionId })
+        {
+            throw new Domain.Common.DomainException("This task is not waiting for a permission.");
+        }
+
+        await runtime.ReplyToPermissionAsync(permissionId, task.Run.WorkspacePath, allow, cancellationToken).ConfigureAwait(false);
+        await activity.UpdateAsync(
+            waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = allow ? "Permission granted" : "Permission refused", At = clock.GetUtcNow() },
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public Task AddNoteAsync(WorkTaskId taskId, string author, string text, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.AddNote(NoteAuthor.Human(author), text, now), cancellationToken);

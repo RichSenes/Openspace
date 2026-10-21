@@ -27,6 +27,7 @@ export interface RoomView {
 export interface OfficeView {
   id: string
   name: string
+  repositoryPath: string | null
   rooms: RoomView[]
 }
 
@@ -47,5 +48,19 @@ export interface WorkTaskView {
   requestedBy: string
   status: TaskStatus
   createdAt: string
+  branch: string | null
   notes: TaskNoteView[]
+}
+
+/** What a desk is doing right now: the data behind a speech bubble. */
+export interface DeskActivity {
+  officeId: string
+  deskId: string
+  taskId: string
+  kind: 'Working' | 'Waiting' | 'Stopped'
+  step: string | null
+  doing: string | null
+  permissionId: string | null
+  at: string
+  headline: string
 }

@@ -9,7 +9,7 @@ const room = (name: string, desks: number): RoomView => ({
   desks: Array.from({ length: desks }, (_, i) => ({ id: `${name}-${i}`, name: `Desk ${i}`, agentName: 'agent', model: null })),
 })
 
-const office = (...rooms: RoomView[]): OfficeView => ({ id: 'e-corp', name: 'E Corp', rooms })
+const office = (...rooms: RoomView[]): OfficeView => ({ id: 'e-corp', name: 'E Corp', repositoryPath: null, rooms })
 
 describe('layoutOffice', () => {
   it('is empty for an office without rooms', () => {

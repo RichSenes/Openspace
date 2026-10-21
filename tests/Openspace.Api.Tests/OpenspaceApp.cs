@@ -26,6 +26,8 @@ public sealed class OpenspaceApp : WebApplicationFactory<Program>
     {
         builder.UseSetting("ConnectionStrings:Openspace", _connectionString);
         builder.UseSetting("Operator:Name", "elliot");
+        builder.UseSetting("Queue:Enabled", "false");
+        builder.UseSetting("OpenCode:ListenToEvents", "false");
         builder.UseEnvironment("Testing");
     }
 

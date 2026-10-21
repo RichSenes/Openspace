@@ -26,6 +26,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RepositoryPath")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("Offices", (string)null);
@@ -158,6 +161,36 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.OwnsOne("Openspace.Domain.Work.AgentRun", "Run", b1 =>
+                        {
+                            b1.Property<Guid>("WorkTaskId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("Branch")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("RunBranch");
+
+                            b1.Property<string>("SessionId")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("RunSessionId");
+
+                            b1.Property<string>("WorkspacePath")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("RunWorkspacePath");
+
+                            b1.HasKey("WorkTaskId");
+
+                            b1.HasIndex("SessionId");
+
+                            b1.ToTable("WorkTasks");
+
+                            b1.WithOwner()
+                                .HasForeignKey("WorkTaskId");
+                        });
+
                     b.OwnsMany("Openspace.Domain.Work.TaskNote", "Notes", b1 =>
                         {
                             b1.Property<int>("Id")
@@ -214,6 +247,8 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Notes");
+
+                    b.Navigation("Run");
                 });
 #pragma warning restore 612, 618
         }

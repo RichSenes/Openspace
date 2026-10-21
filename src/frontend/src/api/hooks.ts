@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
-import type { OfficeView, WorkTaskView } from './types'
+import type { DeskActivity, OfficeView, WorkTaskView } from './types'
 
 export const keys = {
   offices: ['offices'] as const,
   office: (id: string) => ['offices', id] as const,
   tasks: ['tasks'] as const,
   officeTasks: (officeId: string) => ['tasks', 'office', officeId] as const,
+  diff: (taskId: string) => ['tasks', 'diff', taskId] as const,
+  activity: ['activity'] as const,
 }
 
 interface Created {
@@ -96,5 +98,36 @@ export function useTaskText(kind: 'notes' | 'send-back') {
     (input: { taskId: string; text: string }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/${kind}`, { text: input.text }),
     keys.tasks,
+  )
+}
+
+export function useSetRepository(officeId: string) {
+  return useWrite(
+    (path: string) => request<void>('PUT', `/api/offices/${officeId}/repository`, { path }),
+    keys.offices,
+  )
+}
+
+/** Every desk's current activity. Kept fresh by SignalR, which writes into this cache. */
+export function useActivity() {
+  return useQuery({ queryKey: keys.activity, queryFn: () => request<DeskActivity[]>('GET', '/api/activity') })
+}
+
+export function useTaskDiff(taskId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.diff(taskId),
+    queryFn: async () => {
+      const response = await fetch(`/api/tasks/${taskId}/diff`)
+      return response.ok ? response.text() : ''
+    },
+    enabled,
+  })
+}
+
+export function useAnswerPermission() {
+  return useWrite(
+    (input: { taskId: string; allow: boolean }) =>
+      request<void>('POST', `/api/tasks/${input.taskId}/permission`, { allow: input.allow }),
+    keys.activity,
   )
 }

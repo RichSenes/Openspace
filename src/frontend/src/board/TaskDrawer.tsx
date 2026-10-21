@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
-import { useApproveTask, useTaskCommand, useTaskText } from '../api/hooks'
+import { useActivity, useAnswerPermission, useApproveTask, useTaskCommand, useTaskDiff, useTaskText } from '../api/hooks'
 import type { WorkTaskView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
@@ -22,6 +22,11 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
   const approve = useApproveTask()
   const sendBack = useTaskText('send-back')
   const addNote = useTaskText('notes')
+  const answer = useAnswerPermission()
+  const activity = useActivity().data?.find((a) => a.taskId === task.id)
+  const [showDiff, setShowDiff] = useState(task.status === 'Review')
+  const canDiff = task.branch !== null && (task.status === 'Running' || task.status === 'Review' || task.status === 'Failed')
+  const diff = useTaskDiff(task.id, canDiff && showDiff)
   const [approveDesk, setApproveDesk] = useState(task.deskId ?? '')
   const [feedback, setFeedback] = useState('')
   const [writingFeedback, setWritingFeedback] = useState(false)
@@ -30,7 +35,7 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
   const actions = actionsFor(task.status)
   const desk = desks.find((d) => d.id === task.deskId)
   const deskName = (id: string | null) => desks.find((d) => d.id === id)?.name ?? 'an agent'
-  const error = command.error ?? approve.error ?? sendBack.error ?? addNote.error
+  const error = command.error ?? approve.error ?? sendBack.error ?? addNote.error ?? answer.error
 
   const run = (name: 'accept' | 'retry' | 'discard', done: string) =>
     command.mutate({ taskId: task.id, command: name }, { onSuccess: () => toast(done) })
@@ -72,8 +77,42 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
           <dd>{task.requestedBy}</dd>
           <dt>Created</dt>
           <dd>{when(task.createdAt)}</dd>
+          {task.branch && (
+            <>
+              <dt>Branch</dt>
+              <dd className="mono">{task.branch}</dd>
+            </>
+          )}
         </dl>
         {task.description && <p className="description">{task.description}</p>}
+
+        {task.status === 'Running' && activity && (
+          <section className={`now now-${activity.kind.toLowerCase()}`} aria-label="What the agent is doing">
+            <h3 className="pixel now-title">{activity.kind === 'Waiting' ? 'Needs you' : 'Now'}</h3>
+            {activity.step && <p className="now-step">{activity.step}</p>}
+            {activity.doing && <p className="hint">{activity.doing}</p>}
+            {activity.kind === 'Waiting' && (
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={answer.isPending}
+                  onClick={() => answer.mutate({ taskId: task.id, allow: true }, { onSuccess: () => toast('Allowed once') })}
+                >
+                  Allow once
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={answer.isPending}
+                  onClick={() => answer.mutate({ taskId: task.id, allow: false }, { onSuccess: () => toast('Refused') })}
+                >
+                  Refuse
+                </button>
+              </div>
+            )}
+          </section>
+        )}
 
         {actions.length > 0 && (
           <div className="drawer-actions">
@@ -147,6 +186,32 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
         )}
         {error && <p className="error">{error.message}</p>}
 
+        {canDiff && (
+          <section className="changes" aria-label="Changes">
+            <div className="changes-head">
+              <h3 className="pixel notes-title">Changes</h3>
+              <button type="button" className="btn btn-quiet" onClick={() => setShowDiff(!showDiff)}>
+                {showDiff ? 'Hide changes' : 'Show changes'}
+              </button>
+            </div>
+            {showDiff &&
+              (diff.isPending ? (
+                <p className="hint">Reading the changes…</p>
+              ) : diff.data ? (
+                <pre className="diff mono">
+                  {diff.data.split('\n').map((line, i) => (
+                    <span key={i} className={diffClass(line)}>
+                      {line}
+                      {'\n'}
+                    </span>
+                  ))}
+                </pre>
+              ) : (
+                <p className="hint">No changes yet.</p>
+              ))}
+          </section>
+        )}
+
         <section className="notes" aria-label="Notes">
           <h3 className="pixel notes-title">Notes</h3>
           {task.notes.length === 0 ? (
@@ -180,4 +245,12 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
       </div>
     </aside>
   )
+}
+
+function diffClass(line: string): string | undefined {
+  if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')) return 'diff-meta'
+  if (line.startsWith('@@')) return 'diff-hunk'
+  if (line.startsWith('+')) return 'diff-add'
+  if (line.startsWith('-')) return 'diff-del'
+  return undefined
 }

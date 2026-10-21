@@ -22,7 +22,8 @@ public class WorkTaskCommandsTests
         var room = _office.OpenRoom("Web", _clock.GetUtcNow());
         _desk = _office.AddDesk(room.Id, "Frontend", AgentProfile.Create("frontend-dev"), _clock.GetUtcNow());
         _offices.Add(_office);
-        _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, _clock);
+        _commands = new WorkTaskCommands(
+            _offices, _tasks, _unitOfWork, new FakeRuntime(), new FakeWorkspaces(), new Agents.ActivityBoard(new RecordingPublisher()), _clock);
     }
 
     [Fact]
@@ -75,5 +76,44 @@ public class WorkTaskCommandsTests
         await Assert.ThrowsAsync<NotFoundException>(() =>
             _commands.AssignAsync(OfficeId.New(), _desk.Id, "Anything", null, "elliot", default));
         await Assert.ThrowsAsync<NotFoundException>(() => _commands.DiscardAsync(WorkTaskId.New(), default));
+    }
+
+    [Fact]
+    public async Task Accepting_commits_the_agent_work_on_its_branch()
+    {
+        var h = new Harness();
+        var task = h.Enqueue();
+        await h.Runner().RunQueueAsync(default);
+        await h.Signals().FinishedAsync("ses_1", default);
+
+        await h.Commands().AcceptAsync(task.Id, default);
+
+        Assert.Equal(WorkTaskStatus.Done, task.Status);
+        Assert.Equal((task.Run!.WorkspacePath, "Add a logout button"), Assert.Single(h.Workspaces.Commits));
+        Assert.Contains(task.Run.Branch, task.Notes[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Discarding_a_running_task_stops_the_agent_and_cleans_up()
+    {
+        var h = new Harness();
+        var task = h.Enqueue();
+        await h.Runner().RunQueueAsync(default);
+
+        await h.Commands().DiscardAsync(task.Id, default);
+
+        Assert.Equal(WorkTaskStatus.Discarded, task.Status);
+        Assert.Equal(["ses_1"], h.Runtime.Aborted);
+        Assert.Single(h.Workspaces.Discarded);
+    }
+
+    [Fact]
+    public async Task Answering_a_permission_nobody_asked_for_is_refused()
+    {
+        var h = new Harness();
+        var task = h.Enqueue();
+        await h.Runner().RunQueueAsync(default);
+
+        await Assert.ThrowsAsync<DomainException>(() => h.Commands().ReplyToPermissionAsync(task.Id, true, default));
     }
 }

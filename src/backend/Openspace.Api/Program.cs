@@ -6,22 +6,37 @@ using Openspace.Application;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Queue;
 using Openspace.Infrastructure;
+using Openspace.Infrastructure.Git;
+using Openspace.Infrastructure.OpenCode;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddSingleton<IDomainEventPublisher, SignalRDomainEventPublisher>();
+builder.Services.AddSingleton<IActivityPublisher, SignalRActivityPublisher>();
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration.GetConnectionString("Openspace")
-        ?? throw new InvalidOperationException("Missing connection string 'Openspace'."));
+        ?? throw new InvalidOperationException("Missing connection string 'Openspace'."))
+    .AddAgents();
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
+builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
+builder.Services.Configure<WorkspaceOptions>(options =>
+{
+    builder.Configuration.GetSection(WorkspaceOptions.SectionName).Bind(options);
+    if (string.IsNullOrWhiteSpace(options.Root))
+    {
+        options.Root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "openspace", "worktrees");
+    }
+});
 builder.Services.Configure<OperatorOptions>(builder.Configuration.GetSection(OperatorOptions.SectionName));
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ErrorHandling>();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var app = builder.Build();
 await app.Services.MigrateDatabaseAsync();

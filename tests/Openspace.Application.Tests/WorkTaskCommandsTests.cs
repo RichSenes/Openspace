@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using Openspace.Application.Agents;
 using Openspace.Application.Work;
 using Openspace.Domain.Common;
 using Openspace.Domain.Offices;
@@ -115,5 +116,25 @@ public class WorkTaskCommandsTests
         await h.Runner().RunQueueAsync(default);
 
         await Assert.ThrowsAsync<DomainException>(() => h.Commands().ReplyToPermissionAsync(task.Id, true, default));
+    }
+
+    [Fact]
+    public async Task Accepting_or_discarding_clears_the_desk_bubble()
+    {
+        var h = new Harness();
+        var accepted = h.Enqueue("First");
+        await h.Runner().RunQueueAsync(default);
+        await h.Signals().FinishedAsync("ses_1", default);
+
+        await h.Commands().AcceptAsync(accepted.Id, default);
+        var afterAccept = h.Activity.ForTask(accepted.Id.Value);
+
+        var discarded = h.Enqueue("Second");
+        await h.Runner().RunQueueAsync(default);
+        await h.Commands().DiscardAsync(discarded.Id, default);
+        var afterDiscard = h.Activity.ForTask(discarded.Id.Value);
+
+        Assert.Equal((ActivityKind.Stopped, string.Empty), (afterAccept?.Kind, afterAccept?.Headline));
+        Assert.Equal((ActivityKind.Stopped, string.Empty), (afterDiscard?.Kind, afterDiscard?.Headline));
     }
 }

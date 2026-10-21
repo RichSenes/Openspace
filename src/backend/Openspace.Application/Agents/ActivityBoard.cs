@@ -13,6 +13,17 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
 
     public DeskActivity? ForTask(Guid taskId) => _byDesk.Values.FirstOrDefault(a => a.TaskId == taskId);
 
+    /// <summary>The task left the desk (accepted or discarded): its bubble goes away.</summary>
+    public async Task ClearTaskAsync(Guid taskId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (ForTask(taskId) is { } current)
+        {
+            await UpdateAsync(
+                current with { Kind = ActivityKind.Stopped, Step = null, Doing = null, PermissionId = null, At = now },
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Merges an update into the desk's current activity and publishes it if anything changed.</summary>
     public async Task UpdateAsync(DeskActivity update, CancellationToken cancellationToken)
     {

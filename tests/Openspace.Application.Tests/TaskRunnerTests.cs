@@ -19,7 +19,7 @@ public class TaskRunnerTests
         Assert.Equal("ses_1", task.Run?.SessionId);
         Assert.Equal(_h.Workspaces.Prepared[0].Path, task.Run?.WorkspacePath);
         var prompt = Assert.Single(_h.Runtime.Prompts);
-        Assert.Equal("frontend-dev", prompt.Agent.AgentName);
+        Assert.Equal("frontend-dev", prompt.Setup.AgentName);
         Assert.Contains("Add a logout button", prompt.Text, StringComparison.Ordinal);
         Assert.Contains("Never touch the payments module.", prompt.Text, StringComparison.Ordinal);
     }
@@ -134,5 +134,39 @@ public class TaskRunnerTests
 
         Assert.Equal(WorkTaskStatus.Running, task.Status);
         Assert.Single(_h.Runtime.Prompts);
+    }
+
+    [Fact]
+    public async Task A_desk_role_brings_its_instructions_permissions_and_model()
+    {
+        var careful = new Domain.Roles.RolePermissions(Domain.Roles.PermissionLevel.Ask, Domain.Roles.PermissionLevel.Deny, Domain.Roles.PermissionLevel.Deny);
+        var role = Domain.Roles.Role.Define("Auditor", null, "Never change code.", "opencode/careful", careful, Harness.Start);
+        _h.Roles.Add(role);
+        _h.Office.SetDeskRole(_h.Desk.Id, role.Id, Harness.Start);
+        _h.Enqueue();
+
+        await _h.Runner().RunQueueAsync(default);
+
+        var setup = Assert.Single(_h.Runtime.Prompts).Setup;
+        Assert.Equal(("frontend-dev", "opencode/careful", "Never change code.", careful), (setup.AgentName, setup.Model, setup.Instructions, setup.Permissions));
+        Assert.Equal(careful, Assert.Single(_h.Runtime.SessionSetups).Permissions);
+    }
+
+    [Fact]
+    public async Task The_desk_model_wins_over_the_role_model_and_no_role_means_plain_OpenCode()
+    {
+        var role = Domain.Roles.Role.Define("Writer", null, null, "opencode/role-model", Domain.Roles.RolePermissions.Default, Harness.Start);
+        _h.Roles.Add(role);
+        var room = _h.Office.Rooms[0];
+        var pinned = _h.Office.AddDesk(room.Id, "Pinned", Domain.Offices.AgentProfile.Create("build", "opencode/desk-model"), Harness.Start, role.Id);
+        _h.Tasks.Add(WorkTask.Assign(_h.Office, pinned.Id, "With role", null, "elliot", Harness.Start));
+        _h.Enqueue("Without role");
+
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+
+        var byAgent = _h.Runtime.Prompts.ToDictionary(p => p.Setup.AgentName, p => p.Setup);
+        Assert.Equal("opencode/desk-model", byAgent["build"].Model);
+        Assert.Null(byAgent["build"].Instructions);
+        Assert.Equal((null, null, null), (byAgent["frontend-dev"].Model, byAgent["frontend-dev"].Instructions, byAgent["frontend-dev"].Permissions));
     }
 }

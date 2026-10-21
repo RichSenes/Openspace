@@ -27,6 +27,7 @@ EF Core on SQLite.
 | Table | Content |
 | --- | --- |
 | `Offices` | Offices |
+| `Roles` | Roles, with their three permissions as text columns |
 | `Rooms` | Rooms, owned by an office |
 | `Desks` | Desks with their agent profile, owned by a room |
 | `WorkTasks` | Tasks; status stored as text |
@@ -54,6 +55,13 @@ Openspace talks to one `opencode serve`, using its long-standing endpoints:
 `GET /session/{id}/message`, `GET /agent`, `POST /permission/{id}/reply`, `POST /mcp` and the
 server-sent events of `GET /global/event`. Every call passes `?directory=` with
 the task's worktree, so a single server serves every task.
+
+Roles need no OpenCode configuration: their permissions become the session's
+rules at creation (`edit`, `bash` and `webfetch`, each `allow`, `ask` or `deny`
+for every pattern) and their instructions travel as `system` with every prompt.
+Drafts run in an empty scratch folder, in a `plan` session that may not edit,
+run commands or use the web, answered synchronously with
+`POST /session/{id}/message`; the session is deleted afterwards.
 
 Events become speech bubbles like this:
 

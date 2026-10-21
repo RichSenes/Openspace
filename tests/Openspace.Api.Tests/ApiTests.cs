@@ -216,4 +216,26 @@ public sealed class ApiTests : IDisposable
         Assert.Contains("attachment", report.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
         Assert.Contains("# Patch the VPN", await report.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Roles_are_managed_over_http_and_given_to_desks()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+
+        var created = await PostAsync<Created>("/api/roles", new
+        {
+            name = "Auditor", description = "Reviews changes", instructions = "Never change code.", edit = "Ask", bash = "Deny", web = "Deny",
+        });
+        var duplicate = await _http.PostAsJsonAsync("/api/roles", new { name = "auditor" });
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/desks/{deskId}/role", new { roleId = created.Id })).EnsureSuccessStatusCode();
+        var inUse = await _http.DeleteAsync($"/api/roles/{created.Id}");
+
+        var roles = await GetAsync<List<JsonElement>>("/api/roles");
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, duplicate.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, inUse.StatusCode);
+        Assert.Equal(("Auditor", "Ask", "Deny"), (roles[0].GetProperty("name").GetString(), roles[0].GetProperty("edit").GetString(), roles[0].GetProperty("bash").GetString()));
+        Assert.Equal(created.Id, office.GetProperty("rooms")[0].GetProperty("desks")[0].GetProperty("roleId").GetGuid());
+    }
 }

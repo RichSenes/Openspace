@@ -10,6 +10,7 @@ namespace Openspace.Application.Agents;
 public sealed partial class TaskRunner(
     QueueDispatcher dispatcher,
     IOfficeRepository offices,
+    IRoleRepository roles,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
@@ -62,6 +63,7 @@ public sealed partial class TaskRunner(
                 return;
             }
 
+            var setup = await SetupAsync(desk, cancellationToken).ConfigureAwait(false);
             string message;
             if (task.Run is null)
             {
@@ -69,7 +71,7 @@ public sealed partial class TaskRunner(
                     .PrepareAsync(office.RepositoryPath!, task.Id.Value.ToString("N")[..8], task.Title, cancellationToken)
                     .ConfigureAwait(false);
                 var sessionId = await runtime
-                    .CreateSessionAsync(workspace.Path, task.Title, cancellationToken)
+                    .CreateSessionAsync(workspace.Path, task.Title, setup, cancellationToken)
                     .ConfigureAwait(false);
 
                 // Saved before prompting, so the agent's first events can find their task.
@@ -96,7 +98,7 @@ public sealed partial class TaskRunner(
                 new DeskActivity(office.Id.Value, desk.Id.Value, task.Id.Value, ActivityKind.Working, null, "Reading the brief", null, clock.GetUtcNow()),
                 cancellationToken).ConfigureAwait(false);
             await runtime
-                .PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, desk.Agent, message, cancellationToken)
+                .PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, setup, message, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -104,6 +106,17 @@ public sealed partial class TaskRunner(
             LogLaunchFailed(logger, ex, task.Id.Value);
             await FailAsync(task, $"The agent could not start: {ex.Message}", cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>The desk's agent and model, completed by its role: the desk's own model wins over the role's.</summary>
+    private async Task<AgentSetup> SetupAsync(Desk desk, CancellationToken cancellationToken)
+    {
+        var role = desk.RoleId is { } id ? await roles.FindAsync(id, cancellationToken).ConfigureAwait(false) : null;
+        return new AgentSetup(
+            desk.Agent.AgentName,
+            desk.Agent.Model ?? role?.Model,
+            string.IsNullOrEmpty(role?.Instructions) ? null : role.Instructions,
+            role?.Permissions);
     }
 
     private async Task<string?> CheckAsync(Office office, Desk desk, CancellationToken cancellationToken)

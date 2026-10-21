@@ -55,7 +55,19 @@ internal sealed class FakeRuntime : IAgentRuntime
 {
     public HashSet<string> Agents { get; } = ["build", "frontend-dev"];
 
-    public List<(string SessionId, AgentProfile Agent, string Text)> Prompts { get; } = [];
+    public List<(string SessionId, AgentSetup Setup, string Text)> Prompts { get; } = [];
+
+    public List<AgentSetup> SessionSetups { get; } = [];
+
+    public string Draft { get; set; } = "- Write tests first.";
+
+    public List<(string Instructions, string Text)> DraftRequests { get; } = [];
+
+    public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
+    {
+        DraftRequests.Add((instructions, text));
+        return Task.FromResult(Draft);
+    }
 
     public List<string> Aborted { get; } = [];
 
@@ -70,17 +82,20 @@ internal sealed class FakeRuntime : IAgentRuntime
     public Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken) =>
         Task.FromResult(Agents.Contains(agentName));
 
-    public Task<string> CreateSessionAsync(string workspacePath, string title, CancellationToken cancellationToken) =>
-        Task.FromResult($"ses_{++_sessions}");
+    public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
+    {
+        SessionSetups.Add(setup);
+        return Task.FromResult($"ses_{++_sessions}");
+    }
 
-    public Task PromptAsync(string sessionId, string workspacePath, AgentProfile agent, string text, CancellationToken cancellationToken)
+    public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken)
     {
         if (FailOnPrompt is not null)
         {
             throw FailOnPrompt;
         }
 
-        Prompts.Add((sessionId, agent, text));
+        Prompts.Add((sessionId, setup, text));
         return Task.CompletedTask;
     }
 
@@ -208,4 +223,19 @@ internal sealed class InMemoryAuditLog : IAuditLog
         Task.FromResult(Items.Exists(e => e.TaskId == taskId && e.ExternalId == externalId));
 
     public void Add(AuditEntry entry) => Items.Add(entry);
+}
+
+internal sealed class InMemoryRoles : IRoleRepository
+{
+    public List<Domain.Roles.Role> Items { get; } = [];
+
+    public Task<Domain.Roles.Role?> FindAsync(Domain.Roles.RoleId id, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Find(r => r.Id == id));
+
+    public Task<IReadOnlyList<Domain.Roles.Role>> ListAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Domain.Roles.Role>>(Items);
+
+    public void Add(Domain.Roles.Role role) => Items.Add(role);
+
+    public void Remove(Domain.Roles.Role role) => Items.Remove(role);
 }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { ApiError } from '../api/client'
-import { INITIALIZABLE, useAddDesk, useOpenRoom, useSetRepository, useUpdateRoomContext } from '../api/hooks'
+import { INITIALIZABLE, useAddDesk, useOpenRoom, useRoles, useSetDeskRole, useSetRepository, useUpdateRoomContext } from '../api/hooks'
 import type { OfficeView, RoomView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import './rooms.css'
@@ -109,9 +109,11 @@ function RepositoryForm({ office }: { office: OfficeView }) {
 
 function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
   const [context, setContext] = useState(room.context)
-  const [desk, setDesk] = useState({ name: '', agentName: '', model: '' })
+  const [desk, setDesk] = useState({ name: '', agentName: 'build', model: '', roleId: '' })
   const updateContext = useUpdateRoomContext(officeId)
   const addDesk = useAddDesk(officeId)
+  const roles = useRoles()
+  const setDeskRole = useSetDeskRole(officeId)
   const toast = useToast()
 
   const saveContext = (e: FormEvent) => {
@@ -122,11 +124,11 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
   const submitDesk = (e: FormEvent) => {
     e.preventDefault()
     addDesk.mutate(
-      { roomId: room.id, name: desk.name, agentName: desk.agentName, model: desk.model.trim() || null },
+      { roomId: room.id, name: desk.name, agentName: desk.agentName, model: desk.model.trim() || null, roleId: desk.roleId || null },
       {
         onSuccess: () => {
           toast(`${desk.name.trim()} added to ${room.name}`)
-          setDesk({ name: '', agentName: '', model: '' })
+          setDesk({ name: '', agentName: 'build', model: '', roleId: '' })
         },
       },
     )
@@ -156,17 +158,41 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
 
       <section className="desks" aria-label={`Desks in ${room.name}`}>
         <h3 className="pixel desks-title">Desks</h3>
+        {setDeskRole.error && <p className="error">{setDeskRole.error.message}</p>}
         {room.desks.length === 0 ? (
           <p className="hint">No desks yet: nobody works here.</p>
         ) : (
           <ul className="desk-list">
             {room.desks.map((d) => (
               <li key={d.id}>
-                <span>{d.name}</span>
-                <span className="mono hint">
-                  {d.agentName}
-                  {d.model && ` · ${d.model}`}
-                </span>
+                <div className="desk-line">
+                  <span>{d.name}</span>
+                  <span className="mono hint">
+                    {d.agentName}
+                    {d.model && ` · ${d.model}`}
+                  </span>
+                </div>
+                <label className="desk-role">
+                  <span className="sr-only">Role of {d.name}</span>
+                  <select
+                    className="input"
+                    value={d.roleId ?? ''}
+                    disabled={setDeskRole.isPending}
+                    onChange={(e) =>
+                      setDeskRole.mutate(
+                        { deskId: d.id, roleId: e.target.value || null },
+                        { onSuccess: () => toast(`${d.name}: role changed, from its next task`) },
+                      )
+                    }
+                  >
+                    <option value="">No role</option>
+                    {roles.data?.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </li>
             ))}
           </ul>
@@ -186,6 +212,17 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
               placeholder="frontend-dev"
               required
             />
+          </label>
+          <label className="field">
+            <span>Role</span>
+            <select className="input" value={desk.roleId} onChange={(e) => setDesk({ ...desk, roleId: e.target.value })}>
+              <option value="">No role</option>
+              {roles.data?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>Model (optional)</span>

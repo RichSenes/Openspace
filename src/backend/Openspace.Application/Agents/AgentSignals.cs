@@ -91,7 +91,7 @@ public sealed class AgentSignals(
         await LogAsync(
             AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked permission: {description}", externalId: permissionId),
             cancellationToken).ConfigureAwait(false);
-        await ShowAsync(task, ActivityKind.Waiting, null, $"Asks permission: {description}", permissionId, cancellationToken)
+        await ShowAsync(task, ActivityKind.Waiting, null, $"Wants to {description}", permissionId, cancellationToken)
             .ConfigureAwait(false);
     }
 

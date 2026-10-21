@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Openspace.Application.Abstractions;
 using Openspace.Domain.Common;
 using Openspace.Domain.Offices;
+using Openspace.Domain.Roles;
 using Openspace.Domain.Work;
 
 namespace Openspace.Api.Realtime;
@@ -22,6 +23,11 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         {
             await hub.Clients.All.SendAsync("TaskChanged", task.Value, cancellationToken).ConfigureAwait(false);
         }
+
+        if (events.Any(e => e is RoleDefined or RoleChanged))
+        {
+            await hub.Clients.All.SendAsync("RolesChanged", cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static OfficeId? OfficeOf(IDomainEvent e) => e switch
@@ -33,6 +39,7 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         RoomContextUpdated x => x.OfficeId,
         DeskAdded x => x.OfficeId,
         DeskReassigned x => x.OfficeId,
+        DeskRoleChanged x => x.OfficeId,
         _ => null,
     };
 

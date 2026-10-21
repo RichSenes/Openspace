@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
-using Openspace.Domain.Offices;
+using Openspace.Domain.Roles;
 
 namespace Openspace.Infrastructure.OpenCode;
 
@@ -10,7 +10,8 @@ namespace Openspace.Infrastructure.OpenCode;
 /// Talks to <c>opencode serve</c> over its HTTP API. Every call names the folder it
 /// is about, so one server serves every task's working copy.
 /// </summary>
-internal sealed class OpenCodeRuntime(HttpClient http, IOptions<OpenCodeOptions> options) : IAgentRuntime
+internal sealed class OpenCodeRuntime(
+    HttpClient http, IOptions<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces) : IAgentRuntime
 {
     public async Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken)
     {
@@ -19,10 +20,18 @@ internal sealed class OpenCodeRuntime(HttpClient http, IOptions<OpenCodeOptions>
         return agents.RootElement.EnumerateArray().Any(a => a.GetProperty("name").GetString() == agentName);
     }
 
-    public async Task<string> CreateSessionAsync(string workspacePath, string title, CancellationToken cancellationToken)
+    public async Task<string> CreateSessionAsync(
+        string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(setup);
+        var body = new Dictionary<string, object> { ["title"] = title };
+        if (setup.Permissions is { } permissions)
+        {
+            body["permission"] = Rules(permissions);
+        }
+
         using var response = await http
-            .PostAsJsonAsync(In("session", workspacePath), new { title }, cancellationToken)
+            .PostAsJsonAsync(In("session", workspacePath), body, cancellationToken)
             .ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         using var session = await JsonDocument
@@ -33,24 +42,45 @@ internal sealed class OpenCodeRuntime(HttpClient http, IOptions<OpenCodeOptions>
     }
 
     public async Task PromptAsync(
-        string sessionId, string workspacePath, AgentProfile agent, string text, CancellationToken cancellationToken)
+        string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(agent);
-        var body = new Dictionary<string, object>
-        {
-            ["agent"] = agent.AgentName,
-            ["parts"] = new[] { new { type = "text", text } },
-        };
-        if (agent.Model is { } model)
-        {
-            var slash = model.IndexOf('/', StringComparison.Ordinal);
-            body["model"] = new { providerID = model[..slash], modelID = model[(slash + 1)..] };
-        }
-
+        ArgumentNullException.ThrowIfNull(setup);
+        var body = Message(setup.AgentName, setup.Model, setup.Instructions, text);
         using var response = await http
             .PostAsJsonAsync(In($"session/{sessionId}/prompt_async", workspacePath), body, cancellationToken)
             .ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
+    {
+        // A scratch folder with nothing in it, and a session that may not touch anything.
+        var folder = Path.Combine(workspaces.Value.Root, "drafts");
+        Directory.CreateDirectory(folder);
+        var sessionId = await CreateSessionAsync(
+            folder,
+            "Openspace draft",
+            new AgentSetup("plan", null, null, new RolePermissions(PermissionLevel.Deny, PermissionLevel.Deny, PermissionLevel.Deny)),
+            cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var response = await http
+                .PostAsJsonAsync(In($"session/{sessionId}/message", folder), Message("plan", options.Value.DraftModel, instructions, text), cancellationToken)
+                .ConfigureAwait(false);
+            await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+            using var reply = await JsonDocument
+                .ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            return string.Join(
+                "\n",
+                reply.RootElement.GetProperty("parts").EnumerateArray()
+                    .Where(p => p.GetProperty("type").GetString() == "text")
+                    .Select(p => p.GetProperty("text").GetString()));
+        }
+        finally
+        {
+            using var _ = await http.DeleteAsync(In($"session/{sessionId}", folder), CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     /// <summary>The header that tells the Openspace tools which task a call belongs to.</summary>
@@ -107,6 +137,42 @@ internal sealed class OpenCodeRuntime(HttpClient http, IOptions<OpenCodeOptions>
             .ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
+
+    private static Dictionary<string, object> Message(string agent, string? model, string? instructions, string text)
+    {
+        var body = new Dictionary<string, object>
+        {
+            ["agent"] = agent,
+            ["parts"] = new[] { new { type = "text", text } },
+        };
+        if (model is not null)
+        {
+            var slash = model.IndexOf('/', StringComparison.Ordinal);
+            body["model"] = new { providerID = model[..slash], modelID = model[(slash + 1)..] };
+        }
+
+        if (instructions is not null)
+        {
+            body["system"] = instructions;
+        }
+
+        return body;
+    }
+
+    /// <summary>OpenCode permission rules for a role: one rule per capability, for every pattern.</summary>
+    private static object[] Rules(RolePermissions permissions) =>
+    [
+        new { permission = "edit", pattern = "*", action = Action(permissions.Edit) },
+        new { permission = "bash", pattern = "*", action = Action(permissions.Bash) },
+        new { permission = "webfetch", pattern = "*", action = Action(permissions.Web) },
+    ];
+
+    private static string Action(PermissionLevel level) => level switch
+    {
+        PermissionLevel.Allow => "allow",
+        PermissionLevel.Ask => "ask",
+        _ => "deny",
+    };
 
     private static string In(string path, string workspacePath) => $"{path}?directory={Uri.EscapeDataString(workspacePath)}";
 

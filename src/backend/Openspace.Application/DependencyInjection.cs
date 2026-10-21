@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.Agents;
 using Openspace.Application.Offices;
 using Openspace.Application.Queue;
+using Openspace.Application.Roles;
 using Openspace.Application.Work;
 
 namespace Openspace.Application;
@@ -16,6 +17,8 @@ public static class DependencyInjection
         services.AddScoped<WorkTaskCommands>();
         services.AddScoped<WorkTaskQueries>();
         services.AddScoped<QueueDispatcher>();
+        services.AddScoped<RoleCommands>();
+        services.AddScoped<RoleQueries>();
         services.AddScoped<TaskRunner>();
         services.AddScoped<AgentSignals>();
         services.AddSingleton<ActivityBoard>();

@@ -25,6 +25,10 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `WorkTaskCommands` | Assign, propose, approve (optionally choosing the desk), accept, send back, retry, discard, add a note |
 | `WorkTaskQueries` | List tasks by office and status, oldest first; get one with its notes |
 | `QueueDispatcher` | Hands free seats to queued tasks (see below) |
+| `RoleCommands` | Define, change and delete roles (not while desks use them); draft instructions with AI |
+| `RoleQueries` | List roles |
+| `TaskRunner` | Gives started tasks a worktree, a session and a brief; builds the `AgentSetup` from the desk and its role |
+| `AgentSignals` | Reacts to what agents report (progress, tools, permissions, finish, failure) and to the Openspace tools |
 
 Commands load an aggregate, call one domain method and save. Queries return
 read-only views (`OfficeView`, `WorkTaskView`), never domain objects.
@@ -48,6 +52,13 @@ It is not thread-safe by design: a single queue runner will call it.
 | --- | --- |
 | `IOfficeRepository`, `IWorkTaskRepository` | Infrastructure (EF Core) |
 | `IUnitOfWork` | Infrastructure (`OpenspaceDbContext`) |
+| `IRoleRepository`, `IAuditLog` | Infrastructure (EF Core) |
+| `IAgentRuntime` | Infrastructure (`OpenCodeRuntime`) |
+| `IWorkspaceManager` | Infrastructure (`GitWorkspaceManager`) |
+
+`AgentSetup` is what decides how an agent behaves in a session: the desk's
+OpenCode agent, the desk's model or else the role's, the role's instructions and
+the role's permissions.
 
 The clock is injected as `TimeProvider`, so tests control time.
 

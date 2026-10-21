@@ -30,6 +30,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                 desk.HasKey(d => d.Id);
                 desk.Property(d => d.Id).ValueGeneratedNever();
                 desk.Property(d => d.Name).IsRequired();
+                desk.Property(d => d.RoleId);
                 desk.OwnsOne(d => d.Agent, agent =>
                 {
                     agent.Property(a => a.AgentName).HasColumnName("AgentName").IsRequired();

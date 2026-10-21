@@ -1,7 +1,8 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Openspace.Domain.Offices;
+using Openspace.Application.Abstractions;
+using Openspace.Domain.Roles;
 using Openspace.Infrastructure.OpenCode;
 
 namespace Openspace.Infrastructure.Tests;
@@ -27,7 +28,8 @@ public class OpenCodeRuntimeTests
         var server = new FakeServer(answer);
         var http = new HttpClient(server) { BaseAddress = new Uri("http://opencode.test/") };
         var options = Microsoft.Extensions.Options.Options.Create(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp") });
-        return (new OpenCodeRuntime(http, options), server);
+        var workspaces = Microsoft.Extensions.Options.Options.Create(new Git.WorkspaceOptions { Root = Path.Combine(Path.GetTempPath(), "openspace-runtime-tests") });
+        return (new OpenCodeRuntime(http, options, workspaces), server);
     }
 
     private const string Workspace = "/srv/worktrees/abc";
@@ -37,7 +39,7 @@ public class OpenCodeRuntimeTests
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.NoContent, ""));
 
-        await runtime.PromptAsync("ses_1", Workspace, AgentProfile.Create("build", "opencode/deepseek-v4.1-flash-free"), "Do it", default);
+        await runtime.PromptAsync("ses_1", Workspace, new AgentSetup("build", "opencode/deepseek-v4.1-flash-free", null, null), "Do it", default);
 
         var (method, path, body) = Assert.Single(server.Requests);
         Assert.Equal(HttpMethod.Post, method);
@@ -54,7 +56,7 @@ public class OpenCodeRuntimeTests
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.NoContent, ""));
 
-        await runtime.PromptAsync("ses_1", Workspace, AgentProfile.Create("build"), "Do it", default);
+        await runtime.PromptAsync("ses_1", Workspace, new AgentSetup("build", null, null, null), "Do it", default);
 
         Assert.DoesNotContain("\"model\"", server.Requests[0].Body, StringComparison.Ordinal);
     }
@@ -64,7 +66,7 @@ public class OpenCodeRuntimeTests
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.OK, """{"id":"ses_fsociety","title":"Logout"}"""));
 
-        var id = await runtime.CreateSessionAsync(Workspace, "Logout", default);
+        var id = await runtime.CreateSessionAsync(Workspace, "Logout", new AgentSetup("build", null, null, null), default);
 
         Assert.Equal("ses_fsociety", id);
         Assert.StartsWith("/session?directory=", server.Requests[0].PathAndQuery, StringComparison.Ordinal);
@@ -98,7 +100,7 @@ public class OpenCodeRuntimeTests
         var (runtime, _) = Create(_ => (HttpStatusCode.BadRequest, """{"error":"agent not found"}"""));
 
         var error = await Assert.ThrowsAsync<HttpRequestException>(() =>
-            runtime.PromptAsync("ses_1", Workspace, AgentProfile.Create("build"), "Do it", default));
+            runtime.PromptAsync("ses_1", Workspace, new AgentSetup("build", null, null, null), "Do it", default));
 
         Assert.Contains("400", error.Message, StringComparison.Ordinal);
         Assert.Contains("agent not found", error.Message, StringComparison.Ordinal);
@@ -131,5 +133,50 @@ public class OpenCodeRuntimeTests
         Assert.Equal("openspace", json.RootElement.GetProperty("name").GetString());
         Assert.Equal(("remote", "http://openspace.test/mcp"), (config.GetProperty("type").GetString(), config.GetProperty("url").GetString()));
         Assert.Equal(taskId.ToString(), config.GetProperty("headers").GetProperty("X-Openspace-Task").GetString());
+    }
+
+    [Fact]
+    public async Task A_role_becomes_session_rules_and_system_instructions()
+    {
+        var (runtime, server) = Create(r => (HttpStatusCode.OK, r.RequestUri!.AbsolutePath == "/session" ? """{"id":"ses_1"}""" : ""));
+        var setup = new AgentSetup("build", null, "Never change code.", new RolePermissions(PermissionLevel.Ask, PermissionLevel.Deny, PermissionLevel.Allow));
+
+        await runtime.CreateSessionAsync(Workspace, "Audit", setup, default);
+        await runtime.PromptAsync("ses_1", Workspace, setup, "Do it", default);
+
+        using var session = JsonDocument.Parse(server.Requests[0].Body!);
+        var rules = session.RootElement.GetProperty("permission").EnumerateArray()
+            .Select(r => (r.GetProperty("permission").GetString(), r.GetProperty("pattern").GetString(), r.GetProperty("action").GetString()));
+        Assert.Equal([("edit", "*", "ask"), ("bash", "*", "deny"), ("webfetch", "*", "allow")], rules);
+        using var prompt = JsonDocument.Parse(server.Requests[1].Body!);
+        Assert.Equal("Never change code.", prompt.RootElement.GetProperty("system").GetString());
+    }
+
+    [Fact]
+    public async Task Without_a_role_the_session_keeps_OpenCode_defaults()
+    {
+        var (runtime, server) = Create(_ => (HttpStatusCode.OK, """{"id":"ses_1"}"""));
+
+        await runtime.CreateSessionAsync(Workspace, "Plain", new AgentSetup("build", null, null, null), default);
+
+        Assert.DoesNotContain("permission", server.Requests[0].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_draft_runs_in_a_session_that_may_touch_nothing_and_is_deleted_after()
+    {
+        var (runtime, server) = Create(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/session" => (HttpStatusCode.OK, """{"id":"ses_draft"}"""),
+            "/session/ses_draft/message" => (HttpStatusCode.OK, """{"info":{"role":"assistant"},"parts":[{"type":"step-start"},{"type":"text","text":"- Check every form."}]}"""),
+            _ => (HttpStatusCode.OK, "true"),
+        });
+
+        var draft = await runtime.DraftAsync("You write instructions.", "Role: tester", default);
+
+        Assert.Equal("- Check every form.", draft);
+        Assert.DoesNotContain("\"allow\"", server.Requests[0].Body, StringComparison.Ordinal);
+        Assert.Contains("\"plan\"", server.Requests[1].Body, StringComparison.Ordinal);
+        Assert.Equal(HttpMethod.Delete, server.Requests[^1].Method);
     }
 }

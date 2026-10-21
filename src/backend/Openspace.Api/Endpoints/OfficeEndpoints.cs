@@ -1,5 +1,6 @@
 using Openspace.Application.Offices;
 using Openspace.Domain.Offices;
+using Openspace.Domain.Roles;
 
 namespace Openspace.Api.Endpoints;
 
@@ -12,7 +13,9 @@ internal static class OfficeEndpoints
     /// <param name="Initialize">Turn the folder into a git repository if it is not one yet.</param>
     public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
-    public sealed record DeskRequest(string Name, string AgentName, string? Model);
+    public sealed record DeskRequest(string Name, string AgentName, string? Model, Guid? RoleId = null);
+
+    public sealed record DeskRoleRequest(Guid? RoleId);
 
     public static void MapOfficeEndpoints(this IEndpointRouteBuilder app)
     {
@@ -57,8 +60,17 @@ internal static class OfficeEndpoints
             Guid officeId, Guid roomId, DeskRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             var id = await commands.AddDeskAsync(
-                new OfficeId(officeId), new RoomId(roomId), request.Name, request.AgentName, request.Model, ct);
+                new OfficeId(officeId), new RoomId(roomId), request.Name, request.AgentName, request.Model,
+                request.RoleId is { } role ? new RoleId(role) : null, ct);
             return Results.Ok(new { id = id.Value });
+        });
+
+        offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/role", async (
+            Guid officeId, Guid deskId, DeskRoleRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetDeskRoleAsync(
+                new OfficeId(officeId), new DeskId(deskId), request.RoleId is { } role ? new RoleId(role) : null, ct);
+            return Results.NoContent();
         });
     }
 }

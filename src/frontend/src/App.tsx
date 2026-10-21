@@ -1,3 +1,4 @@
+import { AgentsPanel } from './agents/AgentsPanel'
 import { useOffices } from './api/hooks'
 import { Board } from './board/Board'
 import { BuildingView } from './building/BuildingView'
@@ -21,7 +22,9 @@ export default function App() {
       <div className="body">
         <Sidebar offices={offices.data ?? []} selectedId={office?.id} onSelect={setSelectedId} />
         <main className="main">
-          {offices.isPending ? (
+          {view === 'agents' ? (
+            <AgentsPanel />
+          ) : offices.isPending ? (
             <div className="empty">
               <p>Opening the building…</p>
             </div>

@@ -15,6 +15,7 @@ export interface DeskView {
   name: string
   agentName: string
   model: string | null
+  roleId: string | null
 }
 
 export interface RoomView {
@@ -81,3 +82,18 @@ export interface DeskActivity {
   at: string
   headline: string
 }
+
+export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'
+
+export interface RoleView {
+  id: string
+  name: string
+  description: string
+  instructions: string
+  model: string | null
+  edit: PermissionLevel
+  bash: PermissionLevel
+  web: PermissionLevel
+}
+
+export type RoleInput = Omit<RoleView, 'id'>

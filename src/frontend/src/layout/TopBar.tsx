@@ -1,12 +1,13 @@
 import type { LinkState } from '../realtime/useBuildingHub'
 import './layout.css'
 
-export type View = 'building' | 'board' | 'rooms'
+export type View = 'building' | 'board' | 'rooms' | 'agents'
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'building', label: 'Building' },
   { id: 'board', label: 'Board' },
   { id: 'rooms', label: 'Rooms' },
+  { id: 'agents', label: 'Agents' },
 ]
 
 const LINK_LABEL: Record<LinkState, string> = {

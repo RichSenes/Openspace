@@ -10,9 +10,9 @@ assign tasks, review changes and read reports, instead of scrolling a terminal.
 
 ## Concepts
 
-| Building | Office | Room | Desk |
-| --- | --- | --- | --- |
-| The whole instance | A project | An area of competence | An OpenCode agent with a role |
+| Building | Office | Room | Desk | Role |
+| --- | --- | --- | --- | --- |
+| The whole instance | A project | An area of competence | A seat for an OpenCode agent | How that agent works and what it may do alone |
 
 The full picture, glossary and first-prototype scope are in
 [docs/vision.md](docs/vision.md).

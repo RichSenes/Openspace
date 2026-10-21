@@ -15,6 +15,7 @@ The pixel-art building and the panels around it.
 
 ```
 src/
+  agents/     Roles view and role form helpers (tested)
   activity/   Desk activity: merge and lookup helpers for speech bubbles (tested)
   api/        Types, fetch client (problem details to readable errors), query hooks
   realtime/   SignalR connection: refetches what the server says changed
@@ -31,7 +32,8 @@ src/
 | --- | --- |
 | Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
 | Board | Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
-| Rooms | Set the office repository, open rooms, write their context, add desks bound to OpenCode agents |
+| Rooms | Set the office repository, open rooms, write their context, add desks bound to OpenCode agents and give them roles |
+| Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking |
 
 Confirmations appear as short toasts at the bottom; errors stay next to the form
 that caused them, with the server's reason.

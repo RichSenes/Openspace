@@ -23,6 +23,7 @@ on frameworks, databases or OpenCode.
 ```
 Common/   AggregateRoot, IDomainEvent, DomainException
 Offices/  Office (aggregate) > Room > Desk, AgentProfile
+Roles/    Role (aggregate), RolePermissions, PermissionLevel
 Work/     WorkTask (aggregate), TaskNote, NoteAuthor, AgentRun, AuditEntry
 ```
 
@@ -36,6 +37,15 @@ An aggregate holding its rooms and their desks.
 - A desk is bound to an `AgentProfile`: the OpenCode agent name
   (`lowercase-with-dashes`) and an optional model override (`provider/model`).
 - Events: `RoomOpened`, `DeskAdded`.
+
+### Role
+
+A reusable kind of agent: name (unique), one-line description, instructions
+(given to the agent as system instructions in every session), optional preferred
+model, and permissions for changing files, running commands and using the web,
+each `Allow`, `Ask` or `Deny`. A desk may reference a role; a desk without one
+runs its OpenCode agent as it is. Events: `RoleDefined`, `RoleChanged`,
+`DeskRoleChanged`.
 
 ### WorkTask
 

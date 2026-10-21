@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
-import type { AuditEntryView, BranchList, DeskActivity, OfficeView, WorkTaskView } from './types'
+import type { AuditEntryView, BranchList, DeskActivity, OfficeView, RoleInput, RoleView, WorkTaskView } from './types'
 
 export const keys = {
   offices: ['offices'] as const,
@@ -10,6 +10,7 @@ export const keys = {
   diff: (taskId: string) => ['tasks', 'diff', taskId] as const,
   log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
+  roles: ['roles'] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
 }
 
@@ -59,11 +60,12 @@ export function useUpdateRoomContext(officeId: string) {
 
 export function useAddDesk(officeId: string) {
   return useWrite(
-    (input: { roomId: string; name: string; agentName: string; model: string | null }) =>
+    (input: { roomId: string; name: string; agentName: string; model: string | null; roleId: string | null }) =>
       request<Created>('POST', `/api/offices/${officeId}/rooms/${input.roomId}/desks`, {
         name: input.name,
         agentName: input.agentName,
         model: input.model,
+        roleId: input.roleId,
       }),
     keys.offices,
   )
@@ -161,4 +163,38 @@ export function useTaskLog(taskId: string, enabled: boolean) {
     queryFn: () => request<AuditEntryView[]>('GET', `/api/tasks/${taskId}/log`),
     enabled,
   })
+}
+
+export function useRoles() {
+  return useQuery({ queryKey: keys.roles, queryFn: () => request<RoleView[]>('GET', '/api/roles') })
+}
+
+export function useSaveRole() {
+  return useWrite(
+    (input: { id: string | null; role: RoleInput }) =>
+      input.id
+        ? request<void>('PUT', `/api/roles/${input.id}`, input.role).then(() => ({ id: input.id! }))
+        : request<Created>('POST', '/api/roles', input.role),
+    keys.roles,
+  )
+}
+
+export function useDeleteRole() {
+  return useWrite((id: string) => request<void>('DELETE', `/api/roles/${id}`), keys.roles)
+}
+
+/** Asks the AI for role instructions; nothing is saved until the person uses the draft. */
+export function useDraftRole() {
+  return useMutation({
+    mutationFn: (input: { name: string; description: string }) =>
+      request<{ instructions: string }>('POST', '/api/roles/draft', input).then((r) => r.instructions),
+  })
+}
+
+export function useSetDeskRole(officeId: string) {
+  return useWrite(
+    (input: { deskId: string; roleId: string | null }) =>
+      request<void>('PUT', `/api/offices/${officeId}/desks/${input.deskId}/role`, { roleId: input.roleId }),
+    keys.offices,
+  )
 }

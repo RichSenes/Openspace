@@ -85,6 +85,21 @@ Later, in rough order of appearance:
 
 - **Mouse navigation** of the building: wheel to zoom, left-drag to pan, click
   an office or a room to fly into it, with animated transitions.
+- **Audit log.** Every tool call an agent makes (files read and changed, commands
+  run, with their output) stored per task and readable as a timeline, plus an
+  exportable report of what changed and when. The events already flow through
+  Openspace; they only need to be kept.
+- **Servers as rooms.** A room can target a remote machine instead of a git
+  repository: its desks work over SSH with the room's host, user and key
+  reference (keys stay in the SSH agent or OpenCode's configuration, never in
+  Openspace). Such rooms ask permission for every command by default.
+- **Procedures.** Steps a room requires around every task, such as "back up the
+  files you will touch to /backup/<date> before changing them" or "log every
+  change to the change register". Openspace puts them in the brief, shows them
+  as a checklist on the task, and refuses to send the work to review until the
+  agent has reported each step as done.
+- **Merge requests** for repositories with a remote: push the task branch and
+  open a pull request instead of merging locally.
 
 Out of scope for now: epics and proposals, supervisor decomposition, the reporter agent, skin import,
 creating agents with AI help, authentication and multiple users.
@@ -122,6 +137,5 @@ not a dependency.
 
 ## Open questions
 
-- How a task's changes reach the real repository (merge, patch, pull request).
 - Which events are worth showing in the activity feed and which are noise.
 - How offices talk to each other when one project depends on another.

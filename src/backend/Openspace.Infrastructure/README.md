@@ -74,6 +74,11 @@ Each task gets `git worktree add -b openspace/<title>-<key>` from the repository
 - Diff: `git add --intent-to-add --all` then `git diff HEAD`, so new files show.
 - Accept: commit on the task branch (with the repository's identity, or
   `Openspace` if none), then remove the worktree. The branch stays for you to merge.
+- Merge: into the checked-out branch only when it has no uncommitted changes;
+  into any other branch inside a temporary worktree, so your checkout never moves.
+  Always `--no-ff` with message `Merge task: <title>`. A conflict is aborted and
+  nothing changes. Afterwards the task branch is deleted, once git confirms it is
+  contained in the target.
 - Discard: remove worktree and branch.
 
 ## Status

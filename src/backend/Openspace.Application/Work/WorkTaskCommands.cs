@@ -79,6 +79,22 @@ public sealed class WorkTaskCommands(
     public Task RetryAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.Requeue(now), cancellationToken);
 
+    /// <summary>Brings accepted work into one of your branches.</summary>
+    public async Task MergeAsync(WorkTaskId taskId, string targetBranch, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        task.RecordMerge(targetBranch, now);
+
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        await workspaces
+            .MergeAsync(office.RepositoryPath!, task.Run!.Branch, task.MergedInto!, $"Merge task: {task.Title}", cancellationToken)
+            .ConfigureAwait(false);
+
+        task.AddNote(NoteAuthor.System, $"Merged into {task.MergedInto}; branch {task.Run.Branch} deleted.", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Drops the task, stopping its agent and throwing its working copy away.</summary>
     public async Task DiscardAsync(WorkTaskId taskId, CancellationToken cancellationToken)
     {

@@ -49,7 +49,13 @@ export interface WorkTaskView {
   status: TaskStatus
   createdAt: string
   branch: string | null
+  mergedInto: string | null
   notes: TaskNoteView[]
+}
+
+export interface BranchList {
+  current: string | null
+  branches: string[]
 }
 
 /** What a desk is doing right now: the data behind a speech bubble. */

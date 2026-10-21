@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
-import type { DeskActivity, OfficeView, WorkTaskView } from './types'
+import type { BranchList, DeskActivity, OfficeView, WorkTaskView } from './types'
 
 export const keys = {
   offices: ['offices'] as const,
@@ -9,6 +9,7 @@ export const keys = {
   officeTasks: (officeId: string) => ['tasks', 'office', officeId] as const,
   diff: (taskId: string) => ['tasks', 'diff', taskId] as const,
   activity: ['activity'] as const,
+  branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
 }
 
 interface Created {
@@ -133,5 +134,21 @@ export function useAnswerPermission() {
     (input: { taskId: string; allow: boolean }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/permission`, { allow: input.allow }),
     keys.activity,
+  )
+}
+
+export function useBranches(officeId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.branches(officeId),
+    queryFn: () => request<BranchList>('GET', `/api/offices/${officeId}/branches`),
+    enabled,
+  })
+}
+
+export function useMergeTask() {
+  return useWrite(
+    (input: { taskId: string; target: string }) =>
+      request<void>('POST', `/api/tasks/${input.taskId}/merge`, { target: input.target }),
+    keys.tasks,
   )
 }

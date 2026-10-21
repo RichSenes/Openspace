@@ -270,4 +270,30 @@ public class WorkTaskTests
         Assert.Throws<DomainException>(() => AgentRun.Create("s", " ", "b"));
         Assert.Throws<DomainException>(() => AgentRun.Create("s", "/w", ""));
     }
+
+    [Fact]
+    public void Accepted_agent_work_can_be_merged_once()
+    {
+        var task = TaskIn(WorkTaskStatus.Running);
+        task.AttachRun(SomeRun());
+        task.SubmitForReview(Now);
+        task.Accept(Now);
+
+        task.RecordMerge("main", Now);
+
+        Assert.Equal("main", task.MergedInto);
+        Assert.IsType<WorkTaskMerged>(task.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => task.RecordMerge("develop", Now));
+    }
+
+    [Fact]
+    public void Work_that_is_not_accepted_or_has_no_agent_cannot_be_merged()
+    {
+        var review = TaskIn(WorkTaskStatus.Running);
+        review.AttachRun(SomeRun());
+        review.SubmitForReview(Now);
+
+        Assert.Throws<DomainException>(() => review.RecordMerge("main", Now));
+        Assert.Throws<DomainException>(() => TaskIn(WorkTaskStatus.Done).RecordMerge("main", Now));
+    }
 }

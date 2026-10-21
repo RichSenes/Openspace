@@ -4,6 +4,10 @@ namespace Openspace.Application.Abstractions;
 /// <param name="CanInitialize">Whether <see cref="IWorkspaceManager.InitializeRepositoryAsync"/> would fix it.</param>
 public sealed record RepositoryProblem(string Code, string Message, bool CanInitialize);
 
+/// <param name="Current">The branch checked out in the repository folder; null when detached.</param>
+/// <param name="Branches">Local branches work can be merged into (task branches excluded).</param>
+public sealed record BranchList(string? Current, IReadOnlyList<string> Branches);
+
 /// <summary>A private working copy for one task, on its own branch.</summary>
 public sealed record Workspace(string Path, string Branch);
 
@@ -23,6 +27,16 @@ public interface IWorkspaceManager
 
     /// <summary>Commits the changes on the task branch and removes the working copy. The branch stays.</summary>
     Task CommitAsync(string repositoryPath, string workspacePath, string message, CancellationToken cancellationToken);
+
+    Task<BranchList> ListBranchesAsync(string repositoryPath, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Merges a task branch into <paramref name="targetBranch"/> without switching your checkout,
+    /// then deletes the task branch. Throws <see cref="RejectedException"/> when it cannot be done
+    /// safely (uncommitted changes, conflicts); in that case nothing is changed.
+    /// </summary>
+    Task MergeAsync(
+        string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken);
 
     /// <summary>Removes the working copy and its branch.</summary>
     Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken);

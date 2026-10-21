@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Options;
+using Openspace.Application;
 using Openspace.Application.Abstractions;
 
 namespace Openspace.Infrastructure.Git;
@@ -10,6 +11,7 @@ namespace Openspace.Infrastructure.Git;
 /// </summary>
 internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : IWorkspaceManager
 {
+    private const string TaskBranchPrefix = "openspace/";
     private const string FallbackAuthor = "Openspace";
     private const string FallbackEmail = "openspace@localhost";
 
@@ -66,7 +68,7 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
 
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, taskKey);
-        var branch = $"openspace/{Slug(title)}-{taskKey}";
+        var branch = $"{TaskBranchPrefix}{Slug(title)}-{taskKey}";
         await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", "-b", branch, path, "HEAD").ConfigureAwait(false);
         return new Workspace(path, branch);
     }
@@ -95,6 +97,82 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         }
 
         await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "remove", "--force", workspacePath).ConfigureAwait(false);
+    }
+
+    public async Task<BranchList> ListBranchesAsync(string repositoryPath, CancellationToken cancellationToken)
+    {
+        var current = (await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "--show-current").ConfigureAwait(false)).Trim();
+        var all = await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "--format=%(refname:short)").ConfigureAwait(false);
+        var branches = all.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(b => !b.StartsWith(TaskBranchPrefix, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        return new BranchList(current.Length > 0 ? current : null, branches);
+    }
+
+    public async Task MergeAsync(
+        string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken)
+    {
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{sourceBranch}").ConfigureAwait(false))
+        {
+            throw new RejectedException("branch-missing", $"The task branch {sourceBranch} no longer exists.");
+        }
+
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{targetBranch}").ConfigureAwait(false))
+        {
+            throw new RejectedException("branch-missing", $"There is no branch named {targetBranch}.");
+        }
+
+        var current = (await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "--show-current").ConfigureAwait(false)).Trim();
+        if (current == targetBranch)
+        {
+            // Your own checkout: only merge into it when nothing of yours could be mixed in.
+            var changes = await GitCli.RunAsync(repositoryPath, cancellationToken, "status", "--porcelain", "--untracked-files=no").ConfigureAwait(false);
+            if (changes.Trim().Length > 0)
+            {
+                throw new RejectedException(
+                    "uncommitted-changes",
+                    $"'{repositoryPath}' has uncommitted changes on {targetBranch}. Commit or stash them, then merge again.");
+            }
+
+            await MergeInAsync(repositoryPath, sourceBranch, targetBranch, message, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            // Another branch: merge it in a throwaway worktree, so your checkout never moves.
+            var scratch = Path.Combine(options.Value.Root, $"merge-{Guid.NewGuid():N}");
+            await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", scratch, targetBranch).ConfigureAwait(false);
+            try
+            {
+                await MergeInAsync(scratch, sourceBranch, targetBranch, message, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                await GitCli.RunAsync(repositoryPath, CancellationToken.None, "worktree", "remove", "--force", scratch).ConfigureAwait(false);
+            }
+        }
+
+        // git branch -d only checks the checked-out branch; check the actual target instead.
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "merge-base", "--is-ancestor", sourceBranch, targetBranch).ConfigureAwait(false);
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "-D", sourceBranch).ConfigureAwait(false);
+    }
+
+    private static async Task MergeInAsync(
+        string path, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken)
+    {
+        var identity = await IdentityArgsAsync(path, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await GitCli.RunAsync(path, cancellationToken, [.. identity, "merge", "--no-ff", "--no-edit", "--message", message, sourceBranch])
+                .ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            await SucceedsAsync(path, CancellationToken.None, "merge", "--abort").ConfigureAwait(false);
+            throw new RejectedException(
+                "merge-conflict",
+                $"The work conflicts with {targetBranch}. Nothing was changed: send the task back so the agent can adapt it, or merge it by hand.");
+        }
     }
 
     public async Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)

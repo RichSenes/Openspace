@@ -202,6 +202,14 @@
   margin: 0;
 }
 
+.merge {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
 .changes {
   display: grid;
   gap: 8px;

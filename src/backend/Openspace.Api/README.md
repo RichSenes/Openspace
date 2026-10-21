@@ -24,6 +24,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks/{id}/notes` | Add a note as the operator: `{ text }` |
 | GET | `/api/tasks/{id}/diff` | What the agent changed, as a unified diff (plain text) |
 | POST | `/api/tasks/{id}/permission` | Answer an agent waiting for permission: `{ allow }` |
+| POST | `/api/tasks/{id}/merge` | Merge accepted work into one of your branches: `{ target }`. `422` with code `uncommitted-changes`, `merge-conflict` or `branch-missing` when it cannot be done safely |
+| GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 

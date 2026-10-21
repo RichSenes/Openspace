@@ -23,6 +23,9 @@ internal static class OfficeEndpoints
         offices.MapGet("/{officeId:guid}", (Guid officeId, OfficeQueries queries, CancellationToken ct) =>
             queries.GetAsync(new OfficeId(officeId), ct));
 
+        offices.MapGet("/{officeId:guid}/branches", (Guid officeId, OfficeQueries queries, CancellationToken ct) =>
+            queries.BranchesAsync(new OfficeId(officeId), ct));
+
         offices.MapPost("/", async (NameRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             var id = await commands.OpenOfficeAsync(request.Name, ct);

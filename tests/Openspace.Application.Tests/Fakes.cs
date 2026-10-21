@@ -129,6 +129,24 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
         return Task.FromResult(workspace);
     }
 
+    public List<(string Source, string Target)> Merges { get; } = [];
+
+    public RejectedException? MergeProblem { get; set; }
+
+    public Task<BranchList> ListBranchesAsync(string repositoryPath, CancellationToken cancellationToken) =>
+        Task.FromResult(new BranchList("main", ["develop", "main"]));
+
+    public Task MergeAsync(string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken)
+    {
+        if (MergeProblem is not null)
+        {
+            throw MergeProblem;
+        }
+
+        Merges.Add((sourceBranch, targetBranch));
+        return Task.CompletedTask;
+    }
+
     public Task<string> DiffAsync(string workspacePath, CancellationToken cancellationToken) =>
         Task.FromResult("+<button>Logout</button>");
 

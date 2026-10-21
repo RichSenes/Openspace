@@ -13,3 +13,5 @@ public sealed record WorkTaskStatusChanged(
     DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record WorkTaskNoteAdded(WorkTaskId TaskId, TaskNote Note, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record WorkTaskMerged(WorkTaskId TaskId, string TargetBranch, DateTimeOffset OccurredAt) : IDomainEvent;

@@ -132,4 +132,79 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
 
         Assert.Equal("Initial", (await Git("log", "-1", "--format=%s")).Trim());
     }
+
+    private async Task<string> AcceptedBranchAsync(string file = "logout.js", string content = "logout();\n")
+    {
+        var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, file), content);
+        await _manager.CommitAsync(Repo, workspace.Path, "Add logout", default);
+        return workspace.Branch;
+    }
+
+    [Fact]
+    public async Task Branches_list_yours_and_hide_task_branches()
+    {
+        await AcceptedBranchAsync();
+        await Git("branch", "develop");
+
+        var list = await _manager.ListBranchesAsync(Repo, default);
+
+        Assert.Equal("main", list.Current);
+        Assert.Equal(["develop", "main"], list.Branches);
+    }
+
+    [Fact]
+    public async Task Merging_into_the_checked_out_branch_updates_your_folder_and_deletes_the_task_branch()
+    {
+        var branch = await AcceptedBranchAsync();
+
+        await _manager.MergeAsync(Repo, branch, "main", "Merge task: Logout", default);
+
+        Assert.True(File.Exists(Path.Combine(Repo, "logout.js")));
+        Assert.Equal("Merge task: Logout", (await Git("log", "-1", "--format=%s")).Trim());
+        Assert.Equal(string.Empty, (await Git("branch", "--list", branch)).Trim());
+    }
+
+    [Fact]
+    public async Task Merging_into_another_branch_never_moves_your_checkout()
+    {
+        await Git("branch", "develop");
+        var branch = await AcceptedBranchAsync();
+
+        await _manager.MergeAsync(Repo, branch, "develop", "Merge task: Logout", default);
+
+        Assert.Equal("main", (await Git("branch", "--show-current")).Trim());
+        Assert.False(File.Exists(Path.Combine(Repo, "logout.js")));
+        Assert.Contains("logout.js", await Git("ls-tree", "--name-only", "develop"), StringComparison.Ordinal);
+        Assert.DoesNotContain("merge-", await Git("worktree", "list"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Uncommitted_changes_in_your_branch_stop_the_merge()
+    {
+        var branch = await AcceptedBranchAsync();
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<p>work in progress</p>\n");
+
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() =>
+            _manager.MergeAsync(Repo, branch, "main", "Merge", default));
+
+        Assert.Equal("uncommitted-changes", error.Code);
+        Assert.NotEqual(string.Empty, (await Git("branch", "--list", branch)).Trim());
+    }
+
+    [Fact]
+    public async Task A_conflict_is_aborted_and_leaves_everything_as_it_was()
+    {
+        var branch = await AcceptedBranchAsync("index.html", "<header>from the agent</header>\n");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<header>from you</header>\n");
+        await Git("commit", "--quiet", "--all", "--message", "Your change");
+
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() =>
+            _manager.MergeAsync(Repo, branch, "main", "Merge", default));
+
+        Assert.Equal("merge-conflict", error.Code);
+        Assert.Equal(string.Empty, (await Git("status", "--porcelain")).Trim());
+        Assert.Equal("<header>from you</header>\n", await File.ReadAllTextAsync(Path.Combine(Repo, "index.html")));
+        Assert.NotEqual(string.Empty, (await Git("branch", "--list", branch)).Trim());
+    }
 }

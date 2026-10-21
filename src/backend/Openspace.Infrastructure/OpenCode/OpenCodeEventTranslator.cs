@@ -24,8 +24,8 @@ internal static class OpenCodeEventTranslator
             "todo.updated" => FromTodos(props),
             "message.part.updated" => FromPart(props),
             "permission.asked" => FromPermission(props),
-            "permission.replied" => Text(props, "sessionID") is { } replied
-                ? new AgentSignal.PermissionReplied(replied, Text(props, "reply") is not "reject")
+            "permission.replied" => Text(props, "sessionID") is { } replied && Text(props, "requestID") is { } request
+                ? new AgentSignal.PermissionReplied(replied, request, Text(props, "reply") is not "reject")
                 : null,
             "session.idle" => new AgentSignal.Finished(Text(props, "sessionID")!),
             "session.error" => FromError(props),
@@ -129,14 +129,25 @@ internal static class OpenCodeEventTranslator
     private static AgentSignal.PermissionAsked FromPermission(JsonElement props) =>
         new(Text(props, "sessionID")!, Text(props, "id")!, DescribePermission(props));
 
-    /// <summary>"bash ls -la, ls wp-content/themes": what a permission request asks for.</summary>
+    /// <summary>
+    /// What a permission request asks for, to follow "Wants to": "run ls -la, git status",
+    /// "edit header.php", "go outside its folder: /srv/other".
+    /// </summary>
     public static string DescribePermission(JsonElement request)
     {
         var what = Text(request, "permission") ?? "an action";
         var patterns = request.TryGetProperty("patterns", out var p) && p.ValueKind == JsonValueKind.Array
             ? string.Join(", ", p.EnumerateArray().Select(x => x.GetString()))
             : string.Empty;
-        return Shorten(patterns.Length > 0 ? $"{what} {patterns}" : what);
+        var verb = what switch
+        {
+            "bash" => "run",
+            "edit" => "edit",
+            "external_directory" => "go outside its folder:",
+            "webfetch" => "fetch",
+            _ => $"use {what}",
+        };
+        return Shorten(patterns.Length > 0 ? $"{verb} {patterns}" : verb.TrimEnd(':'));
     }
 
     private static AgentSignal.Failed? FromError(JsonElement props)

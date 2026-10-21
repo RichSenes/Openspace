@@ -78,5 +78,5 @@ internal sealed class Harness
 
     public Roles.RoleCommands RoleCommands() => new(Roles, Offices, UnitOfWork, Runtime, Clock);
 
-    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Clock);
+    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Signals(), Clock);
 }

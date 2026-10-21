@@ -23,8 +23,11 @@ public class WorkTaskCommandsTests
         var room = _office.OpenRoom("Web", _clock.GetUtcNow());
         _desk = _office.AddDesk(room.Id, "Frontend", AgentProfile.Create("frontend-dev"), _clock.GetUtcNow());
         _offices.Add(_office);
-        _commands = new WorkTaskCommands(
-            _offices, _tasks, _unitOfWork, new FakeRuntime(), new FakeWorkspaces(), new Agents.ActivityBoard(new RecordingPublisher()), new InMemoryAuditLog(), _clock);
+        var runtime = new FakeRuntime();
+        var board = new Agents.ActivityBoard(new RecordingPublisher());
+        var audit = new InMemoryAuditLog();
+        var signals = new Agents.AgentSignals(_offices, _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), _clock);
+        _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, runtime, new FakeWorkspaces(), board, audit, signals, _clock);
     }
 
     [Fact]

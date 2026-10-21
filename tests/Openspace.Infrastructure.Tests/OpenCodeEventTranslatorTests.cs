@@ -94,7 +94,7 @@ public class OpenCodeEventTranslatorTests
             {"type":"permission.asked","properties":{"id":"per_1","sessionID":"ses_1","permission":"bash","patterns":["rm -rf build"],"metadata":{},"always":[]}}
             """);
 
-        Assert.Equal(new AgentSignal.PermissionAsked("ses_1", "per_1", "bash rm -rf build"), signal);
+        Assert.Equal(new AgentSignal.PermissionAsked("ses_1", "per_1", "run rm -rf build"), signal);
     }
 
     [Fact]
@@ -158,6 +158,20 @@ public class OpenCodeEventTranslatorTests
     {
         var signal = Translate("{\"type\":\"permission.replied\",\"properties\":{\"sessionID\":\"ses_1\",\"requestID\":\"per_1\",\"reply\":\"" + reply + "\"}}");
 
-        Assert.Equal(new AgentSignal.PermissionReplied("ses_1", allowed), signal);
+        Assert.Equal(new AgentSignal.PermissionReplied("ses_1", "per_1", allowed), signal);
+    }
+
+    [Theory]
+    [InlineData("edit", "header.php", "edit header.php")]
+    [InlineData("external_directory", "/srv/other", "go outside its folder: /srv/other")]
+    [InlineData("webfetch", "https://example.org", "fetch https://example.org")]
+    [InlineData("question", "", "use question")]
+    public void Permission_requests_read_as_plain_verbs(string permission, string pattern, string expected)
+    {
+        var patterns = pattern.Length > 0 ? "[\"" + pattern + "\"]" : "[]";
+        var signal = (AgentSignal.PermissionAsked?)Translate(
+            "{\"type\":\"permission.asked\",\"properties\":{\"id\":\"per_1\",\"sessionID\":\"ses_1\",\"permission\":\"" + permission + "\",\"patterns\":" + patterns + ",\"metadata\":{},\"always\":[]}}");
+
+        Assert.Equal(expected, signal?.Description);
     }
 }

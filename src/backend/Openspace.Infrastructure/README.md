@@ -59,6 +59,9 @@ the task's worktree, so a single server serves every task.
 Roles need no OpenCode configuration: their permissions become the session's
 rules at creation (`edit`, `bash` and `webfetch`, each `allow`, `ask` or `deny`
 for every pattern) and their instructions travel as `system` with every prompt.
+Every working session also gets `external_directory: ask`, so an agent never
+reads or works outside its own worktree without a person agreeing; read-only
+sessions (supervisor, drafts) get `deny`.
 Supervisor plans run in the office repository in the same kind of read-only
 `plan` session, with `format: { type: "json_schema", schema, retryCount: 2 }`;
 the answer is read from the message's `info.structured`.
@@ -74,7 +77,12 @@ Events become speech bubbles like this:
 | `todo.updated` | The item `in_progress`, in the agent's words: the bubble headline |
 | `message.part.updated`, tool running | A short phrase: `Editing header.php`, `Running npm test`, `Searching the code` |
 | `permission.asked` | The desk waits for you, with Allow once / Refuse. OpenCode then reports the blocked tool as running: that does not end the wait |
-| `permission.replied` | The wait ends, also when the answer came from OpenCode itself |
+| `permission.replied` | That wait ends, also when the answer came from OpenCode itself |
+
+An agent can ask several things at once, but a desk shows one request at a time:
+after each answer Openspace reads `GET /permission?directory=` and shows the next
+request of the same session, if any. OpenCode is the source of truth for what is
+still waiting.
 | `session.idle` | The task goes to review; the agent's last answer becomes a note |
 | `session.error` | The task fails with the reason (except aborts Openspace asked for) |
 | `message.part.updated`, tool completed or error | An audit log line: `Changed header.php` with the diff, `Ran npm test` with the command, its output and whether it exited 0, `Read index.html`, `Searched the code for …` |

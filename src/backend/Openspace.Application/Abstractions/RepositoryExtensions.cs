@@ -1,0 +1,17 @@
+using Openspace.Domain.Offices;
+using Openspace.Domain.Work;
+
+namespace Openspace.Application.Abstractions;
+
+internal static class RepositoryExtensions
+{
+    public static async Task<Office> GetAsync(
+        this IOfficeRepository offices, OfficeId id, CancellationToken cancellationToken) =>
+        await offices.FindAsync(id, cancellationToken).ConfigureAwait(false)
+        ?? throw new NotFoundException("Office", id.Value);
+
+    public static async Task<WorkTask> GetAsync(
+        this IWorkTaskRepository tasks, WorkTaskId id, CancellationToken cancellationToken) =>
+        await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false)
+        ?? throw new NotFoundException("Task", id.Value);
+}

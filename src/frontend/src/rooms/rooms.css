@@ -93,9 +93,33 @@
 }
 
 .desk-new .field:first-child,
+.desk-new .advanced,
 .desk-new .row,
 .desk-new .error {
   grid-column: 1 / -1;
+}
+
+.advanced {
+  display: grid;
+  gap: 8px;
+}
+
+.advanced summary {
+  cursor: pointer;
+}
+
+.desk-line {
+  align-items: center;
+}
+
+.desk-rename-btn {
+  min-height: 26px;
+  padding: 0 8px;
+}
+
+.desk-rename {
+  display: flex;
+  gap: 6px;
 }
 
 @media (max-width: 760px) {

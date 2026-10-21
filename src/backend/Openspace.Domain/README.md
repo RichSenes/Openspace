@@ -32,7 +32,8 @@ Work/     WorkTask (aggregate), Epic (aggregate), TaskNote, NoteAuthor, AgentRun
 An aggregate holding its rooms and their desks.
 
 - Room names are unique within an office, desk names within a room
-  (case-insensitive, trimmed).
+  (case-insensitive, trimmed). Desks can be renamed; their name is free text,
+  separate from the OpenCode agent that runs them.
 - A room has free-text **context**, injected into every agent working there.
 - A desk is bound to an `AgentProfile`: the OpenCode agent name
   (`lowercase-with-dashes`) and an optional model override (`provider/model`).

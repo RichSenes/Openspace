@@ -25,7 +25,7 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `WorkTaskCommands` | Assign, propose, approve (optionally choosing the desk), accept, send back, retry, discard, add a note |
 | `WorkTaskQueries` | List tasks by office and status, oldest first; get one with its notes |
 | `QueueDispatcher` | Hands free seats to queued tasks (see below) |
-| `Supervisor` | Splits a request into proposed tasks for the office's desks (the model reads the repository, read-only, and answers with JSON matching a schema); approves all proposals of an epic at once |
+| `Supervisor` | Splits a request into proposed tasks for the office's desks, matched by desk name, or by role or room name when only one desk fits (the model reads the repository, read-only, and answers with JSON matching a schema); approves all proposals of an epic at once |
 | `EpicQueries` | Epics of an office, newest first |
 | `RoleCommands` | Define, change and delete roles (not while desks use them); draft instructions with AI |
 | `RoleQueries` | List roles |

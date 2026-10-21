@@ -236,3 +236,11 @@ export function useApproveEpic() {
     keys.tasks,
   )
 }
+
+export function useRenameDesk(officeId: string) {
+  return useWrite(
+    (input: { deskId: string; name: string }) =>
+      request<void>('PUT', `/api/offices/${officeId}/desks/${input.deskId}/name`, { name: input.name }),
+    keys.offices,
+  )
+}

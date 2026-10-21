@@ -18,3 +18,5 @@ public sealed record DeskReassigned(OfficeId OfficeId, DeskId DeskId, AgentProfi
 public sealed record OfficeRepositorySet(OfficeId OfficeId, string Path, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record DeskRoleChanged(OfficeId OfficeId, DeskId DeskId, RoleId? RoleId, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record DeskRenamed(OfficeId OfficeId, DeskId DeskId, string Name, DateTimeOffset OccurredAt) : IDomainEvent;

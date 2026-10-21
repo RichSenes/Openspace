@@ -85,6 +85,13 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new DeskReassigned(Id, deskId, agent, now));
     }
 
+    public void RenameDesk(DeskId deskId, string name, DateTimeOffset now)
+    {
+        var (room, desk) = Locate(deskId);
+        room.RenameDesk(desk, name);
+        Raise(new DeskRenamed(Id, deskId, desk.Name, now));
+    }
+
     public void SetDeskRole(DeskId deskId, RoleId? roleId, DateTimeOffset now)
     {
         FindDesk(deskId).GiveRole(roleId);

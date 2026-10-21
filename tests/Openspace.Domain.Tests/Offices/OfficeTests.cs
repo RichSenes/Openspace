@@ -147,4 +147,18 @@ public class OfficeTests
         Assert.Same(desk, found);
         Assert.Throws<DomainException>(() => office.Locate(DeskId.New()));
     }
+
+    [Fact]
+    public void A_desk_can_be_renamed_but_not_to_a_name_taken_in_its_room()
+    {
+        var (office, desk) = ECorpWithDesk();
+        var other = office.AddDesk(office.Rooms[0].Id, "Tester", AgentProfile.Create("build"), Now);
+
+        office.RenameDesk(desk.Id, " Theme developer ", Now);
+
+        Assert.Equal("Theme developer", desk.Name);
+        Assert.IsType<DeskRenamed>(office.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => office.RenameDesk(other.Id, "theme DEVELOPER", Now));
+        office.RenameDesk(desk.Id, "Theme developer", Now);
+    }
 }

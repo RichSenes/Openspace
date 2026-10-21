@@ -67,6 +67,13 @@ internal static class OpenCodeEventTranslator
         }
 
         var tool = Text(part, "tool") ?? "a tool";
+
+        // Calls to Openspace's own tools are logged through what they do (a note, a step).
+        if (tool.StartsWith("openspace_", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
         var input = state.TryGetProperty("input", out var i) ? i : default;
         var sessionId = Text(part, "sessionID")!;
         switch (Text(state, "status"))

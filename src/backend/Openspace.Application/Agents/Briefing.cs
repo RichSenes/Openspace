@@ -43,6 +43,7 @@ public static class Briefing
             .AppendLine("How to report:")
             .AppendLine("- Keep a todo list and update it before each step. Write each item as a short sentence a person understands, saying what you change and why, e.g. \"Adding the logout button to the header\". The team sees your current item live.")
             .AppendLine("- Do not commit: Openspace commits your work once it is accepted.")
+            .AppendLine("- If the openspace tools are available: use add_task_note to leave the team decisions, findings or open questions worth keeping, and get_task to re-read this brief with the latest notes.")
             .Append("- When you are done, answer with a short summary of what you changed and anything left open.")
             .ToString();
     }

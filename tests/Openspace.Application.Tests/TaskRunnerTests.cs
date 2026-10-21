@@ -113,4 +113,26 @@ public class TaskRunnerTests
         Assert.Contains("is not a git repository yet", task.Notes[^1].Text, StringComparison.Ordinal);
         Assert.Empty(_h.Workspaces.Prepared);
     }
+
+    [Fact]
+    public async Task The_agent_gets_the_Openspace_tools_for_its_own_task()
+    {
+        var task = _h.Enqueue();
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal((task.Run!.WorkspacePath, task.Id.Value), Assert.Single(_h.Runtime.ToolConnections));
+    }
+
+    [Fact]
+    public async Task Without_the_tools_the_agent_still_starts()
+    {
+        _h.Runtime.FailOnConnect = new HttpRequestException("mcp unavailable");
+        var task = _h.Enqueue();
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal(WorkTaskStatus.Running, task.Status);
+        Assert.Single(_h.Runtime.Prompts);
+    }
 }

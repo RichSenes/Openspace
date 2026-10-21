@@ -8,6 +8,7 @@ namespace Openspace.Application.Agents;
 /// did not start (e.g. someone using OpenCode directly) are ignored.
 /// </summary>
 public sealed class AgentSignals(
+    IOfficeRepository offices,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
@@ -26,12 +27,32 @@ public sealed class AgentSignals(
             return;
         }
 
-        if (step is not null && activity.ForTask(task.Id.Value)?.Step != step)
-        {
-            await LogAsync(AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Step, step), cancellationToken).ConfigureAwait(false);
-        }
+        await ShowProgressAsync(task, step, doing, cancellationToken).ConfigureAwait(false);
+    }
 
-        await ShowAsync(task, ActivityKind.Working, step, doing, null, cancellationToken).ConfigureAwait(false);
+    /// <summary>The agent said, through the Openspace tools, what it is doing.</summary>
+    public async Task AnnounceAsync(WorkTaskId taskId, string text, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var step = Guard(text, "Announcement", 200);
+        await ShowProgressAsync(task, step, null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The agent left a note on its task, through the Openspace tools.</summary>
+    public async Task NoteAsync(WorkTaskId taskId, string text, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        task.AddNote(NoteAuthor.FromDesk(task.DeskId!.Value), Guard(text, "Note", 4000), clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The brief again, with the notes written since: what the agent reads to get its bearings.</summary>
+    public async Task<string> DescribeAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var (room, desk) = office.Locate(task.DeskId!.Value);
+        return Briefing.ForNewTask(office, room, desk, task);
     }
 
     /// <summary>A tool call ended: it goes in the task's log, once, with its evidence.</summary>
@@ -106,6 +127,36 @@ public sealed class AgentSignals(
         task.Fail(reason, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await ShowAsync(task, ActivityKind.Stopped, null, "Stuck: needs a look", null, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ShowProgressAsync(WorkTask task, string? step, string? doing, CancellationToken cancellationToken)
+    {
+        if (step is not null && activity.ForTask(task.Id.Value)?.Step != step)
+        {
+            await LogAsync(AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Step, step), cancellationToken).ConfigureAwait(false);
+        }
+
+        await ShowAsync(task, ActivityKind.Working, step, doing, null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Tools only act on a task while its agent is working on it.</summary>
+    private async Task<WorkTask> WorkingTaskAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        return task is { Status: WorkTaskStatus.Running, DeskId: not null, Run: not null }
+            ? task
+            : throw new RejectedException("task-not-running", $"Task '{task.Title}' is {task.Status}: Openspace tools only work while its agent is working on it.");
+    }
+
+    private static string Guard(string? text, string what, int max)
+    {
+        var trimmed = text?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            throw new RejectedException("empty-text", $"{what} cannot be empty.");
+        }
+
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
     }
 
     private async Task LogAsync(AuditEntry entry, CancellationToken cancellationToken)

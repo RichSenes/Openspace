@@ -82,6 +82,16 @@ public sealed partial class TaskRunner(
                 message = Briefing.ForResume(task);
             }
 
+            try
+            {
+                await runtime.ConnectToolsAsync(task.Run!.WorkspacePath, task.Id.Value, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The tools help but are not required: the agent still works without them.
+                LogToolsUnavailable(logger, ex, task.Id.Value);
+            }
+
             await activity.UpdateAsync(
                 new DeskActivity(office.Id.Value, desk.Id.Value, task.Id.Value, ActivityKind.Working, null, "Reading the brief", null, clock.GetUtcNow()),
                 cancellationToken).ConfigureAwait(false);
@@ -118,6 +128,9 @@ public sealed partial class TaskRunner(
         task.Fail(reason, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Openspace tools are not available to the agent of task {TaskId}")]
+    private static partial void LogToolsUnavailable(ILogger logger, Exception exception, Guid taskId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not launch an agent for task {TaskId}")]
     private static partial void LogLaunchFailed(ILogger logger, Exception exception, Guid taskId);

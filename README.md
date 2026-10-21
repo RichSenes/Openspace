@@ -39,6 +39,8 @@ Each project has its own README with detailed specifications.
    `openspace/...` branch and opens an OpenCode session there, briefing the agent
    with the room's rules, the task and the team's notes.
 3. While it works, the agent's todo list and tool calls become speech bubbles.
+   Through Openspace's own MCP tools it can also leave notes on the task,
+   announce what it is doing and re-read its brief.
    If it asks for a permission, the desk waits for your answer.
 4. When it stops, the task goes to review with the agent's summary as a note and
    the diff of its changes.

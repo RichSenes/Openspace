@@ -26,7 +26,8 @@ public class OpenCodeRuntimeTests
     {
         var server = new FakeServer(answer);
         var http = new HttpClient(server) { BaseAddress = new Uri("http://opencode.test/") };
-        return (new OpenCodeRuntime(http), server);
+        var options = Microsoft.Extensions.Options.Options.Create(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp") });
+        return (new OpenCodeRuntime(http, options), server);
     }
 
     private const string Workspace = "/srv/worktrees/abc";
@@ -113,5 +114,22 @@ public class OpenCodeRuntimeTests
         await runtime.ReplyToPermissionAsync("per_1", Workspace, allow, default);
 
         Assert.Contains($"\"reply\":\"{reply}\"", server.Requests[0].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Tools_are_registered_in_the_workspace_with_the_task_header()
+    {
+        var (runtime, server) = Create(_ => (HttpStatusCode.OK, "{}"));
+        var taskId = Guid.NewGuid();
+
+        await runtime.ConnectToolsAsync(Workspace, taskId, default);
+
+        var (method, path, body) = Assert.Single(server.Requests);
+        Assert.Equal((HttpMethod.Post, "/mcp?directory=%2Fsrv%2Fworktrees%2Fabc"), (method, path));
+        using var json = JsonDocument.Parse(body!);
+        var config = json.RootElement.GetProperty("config");
+        Assert.Equal("openspace", json.RootElement.GetProperty("name").GetString());
+        Assert.Equal(("remote", "http://openspace.test/mcp"), (config.GetProperty("type").GetString(), config.GetProperty("url").GetString()));
+        Assert.Equal(taskId.ToString(), config.GetProperty("headers").GetProperty("X-Openspace-Task").GetString());
     }
 }

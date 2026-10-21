@@ -37,6 +37,24 @@ Enums travel as strings (`"Queued"`). Errors are
 offer a fix, the problem also carries a `code`: `folder-missing`,
 `not-a-repository` or `no-commits` for repositories.
 
+## Tools for agents (MCP)
+
+`/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server
+(streamable HTTP, stateless). When a task starts, Openspace registers it in
+OpenCode for that task's worktree as the remote server `openspace`, with the
+header `X-Openspace-Task: <task id>`, so every call is tied to its task without
+the agent having to name it.
+
+| Tool | What it does |
+| --- | --- |
+| `get_task` | Returns the brief again: room rules, request, team notes |
+| `add_task_note` | `{ text }`: a note on the task signed by the desk |
+| `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
+
+Tools only act on tasks whose agent is working; otherwise they answer with an
+error the agent can read. There is no authentication: the endpoint is meant for
+OpenCode running on the same machine.
+
 ## Live updates
 
 SignalR hub at `/hubs/building`, server to client only:
@@ -80,6 +98,7 @@ On startup it applies pending database migrations.
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
+| `OpenCode:ToolsUrl` | `http://127.0.0.1:5145/mcp` | Where OpenCode reaches this API's MCP tools; change it with the port |
 | `Workspaces:Root` | `~/.local/share/openspace/worktrees` | One git worktree per task lives here |
 
 `appsettings.json` holds non-secret defaults. Local overrides go in

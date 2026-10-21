@@ -142,4 +142,11 @@ public class OpenCodeEventTranslatorTests
     {
         Assert.Null(Translate(Done("todowrite", "completed", "{}", ",\"output\":\"[]\"")));
     }
+
+    [Fact]
+    public void Calls_to_the_Openspace_tools_are_not_logged_twice()
+    {
+        Assert.Null(Translate(Tool("openspace_announce", "running", """{"text":"Adding the button"}""")));
+        Assert.Null(Translate(Done("openspace_add_task_note", "completed", """{"text":"Found it"}""", ",\"output\":\"Note added\"")));
+    }
 }

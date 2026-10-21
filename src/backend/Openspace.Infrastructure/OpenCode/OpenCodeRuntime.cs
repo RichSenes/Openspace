@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Domain.Offices;
 
@@ -9,7 +10,7 @@ namespace Openspace.Infrastructure.OpenCode;
 /// Talks to <c>opencode serve</c> over its HTTP API. Every call names the folder it
 /// is about, so one server serves every task's working copy.
 /// </summary>
-internal sealed class OpenCodeRuntime(HttpClient http) : IAgentRuntime
+internal sealed class OpenCodeRuntime(HttpClient http, IOptions<OpenCodeOptions> options) : IAgentRuntime
 {
     public async Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken)
     {
@@ -49,6 +50,27 @@ internal sealed class OpenCodeRuntime(HttpClient http) : IAgentRuntime
         using var response = await http
             .PostAsJsonAsync(In($"session/{sessionId}/prompt_async", workspacePath), body, cancellationToken)
             .ConfigureAwait(false);
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The header that tells the Openspace tools which task a call belongs to.</summary>
+    public const string TaskHeader = "X-Openspace-Task";
+
+    public async Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken)
+    {
+        var body = new
+        {
+            name = "openspace",
+            config = new Dictionary<string, object>
+            {
+                ["type"] = "remote",
+                ["url"] = options.Value.ToolsUrl.ToString(),
+                ["enabled"] = true,
+                ["oauth"] = false,
+                ["headers"] = new Dictionary<string, string> { [TaskHeader] = taskId.ToString() },
+            },
+        };
+        using var response = await http.PostAsJsonAsync(In("mcp", workspacePath), body, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
 

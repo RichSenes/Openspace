@@ -7,5 +7,7 @@ namespace Openspace.Infrastructure.Persistence;
 internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<OpenspaceDbContext>
 {
     public OpenspaceDbContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<OpenspaceDbContext>().UseSqlite("Data Source=design-time.db").Options);
+        new(
+            new DbContextOptionsBuilder<OpenspaceDbContext>().UseSqlite("Data Source=design-time.db").Options,
+            NullDomainEventPublisher.Instance);
 }

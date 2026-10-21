@@ -8,11 +8,12 @@ namespace Openspace.Application.Tests;
 
 public class WorkTaskCommandsTests
 {
-    private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2015, 6, 24, 9, 0, 0, TimeSpan.Zero));
+    private static readonly DateTimeOffset Start = new(2015, 6, 24, 9, 0, 0, TimeSpan.Zero);
+    private readonly FakeTimeProvider _clock = new(Start);
     private readonly InMemoryOffices _offices = new();
     private readonly InMemoryTasks _tasks = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
-    private readonly Office _office = Office.Open("E Corp");
+    private readonly Office _office = Office.Open("E Corp", Start);
     private readonly Desk _desk;
     private readonly WorkTaskCommands _commands;
 

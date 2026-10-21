@@ -8,10 +8,11 @@ namespace Openspace.Application.Tests;
 
 public class QueueDispatcherTests
 {
-    private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2015, 6, 24, 9, 0, 0, TimeSpan.Zero));
+    private static readonly DateTimeOffset Start = new(2015, 6, 24, 9, 0, 0, TimeSpan.Zero);
+    private readonly FakeTimeProvider _clock = new(Start);
     private readonly InMemoryTasks _tasks = new();
     private readonly CountingUnitOfWork _unitOfWork = new();
-    private readonly Office _office = Office.Open("Allsafe");
+    private readonly Office _office = Office.Open("Allsafe", Start);
     private readonly Desk _alice;
     private readonly Desk _bob;
 

@@ -8,7 +8,7 @@ public sealed class OfficeCommands(IOfficeRepository offices, IUnitOfWork unitOf
 {
     public async Task<OfficeId> OpenOfficeAsync(string name, CancellationToken cancellationToken)
     {
-        var office = Office.Open(name);
+        var office = Office.Open(name, clock.GetUtcNow());
         offices.Add(office);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return office.Id;
@@ -26,7 +26,7 @@ public sealed class OfficeCommands(IOfficeRepository offices, IUnitOfWork unitOf
         OfficeId officeId, RoomId roomId, string? context, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
-        office.UpdateRoomContext(roomId, context);
+        office.UpdateRoomContext(roomId, context, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

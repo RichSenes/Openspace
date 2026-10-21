@@ -1,0 +1,45 @@
+using Microsoft.AspNetCore.SignalR;
+using Openspace.Application.Abstractions;
+using Openspace.Domain.Common;
+using Openspace.Domain.Offices;
+using Openspace.Domain.Work;
+
+namespace Openspace.Api.Realtime;
+
+internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) : IDomainEventPublisher
+{
+    public async Task PublishAsync(IReadOnlyList<IDomainEvent> events, CancellationToken cancellationToken)
+    {
+        var offices = events.Select(OfficeOf).OfType<OfficeId>().Distinct();
+        var tasks = events.Select(TaskOf).OfType<WorkTaskId>().Distinct();
+
+        foreach (var office in offices)
+        {
+            await hub.Clients.All.SendAsync("OfficeChanged", office.Value, cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var task in tasks)
+        {
+            await hub.Clients.All.SendAsync("TaskChanged", task.Value, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static OfficeId? OfficeOf(IDomainEvent e) => e switch
+    {
+        OfficeOpened x => x.OfficeId,
+        OfficeRenamed x => x.OfficeId,
+        RoomOpened x => x.OfficeId,
+        RoomContextUpdated x => x.OfficeId,
+        DeskAdded x => x.OfficeId,
+        DeskReassigned x => x.OfficeId,
+        _ => null,
+    };
+
+    private static WorkTaskId? TaskOf(IDomainEvent e) => e switch
+    {
+        WorkTaskCreated x => x.TaskId,
+        WorkTaskStatusChanged x => x.TaskId,
+        WorkTaskNoteAdded x => x.TaskId,
+        _ => null,
+    };
+}

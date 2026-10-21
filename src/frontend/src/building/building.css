@@ -1,0 +1,15 @@
+.building {
+  position: relative;
+  height: 100%;
+  min-height: 320px;
+}
+
+.building-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.building-canvas canvas {
+  display: block;
+  image-rendering: pixelated;
+}

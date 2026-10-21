@@ -9,7 +9,27 @@ public class OfficeTests
     [Fact]
     public void Opening_an_office_trims_its_name()
     {
-        Assert.Equal("Allsafe", Office.Open("  Allsafe ").Name);
+        Assert.Equal("Allsafe", Office.Open("  Allsafe ", Now).Name);
+    }
+
+    [Fact]
+    public void Opening_an_office_raises_an_event()
+    {
+        var office = Office.Open("Allsafe", Now);
+
+        var opened = Assert.IsType<OfficeOpened>(Assert.Single(office.DomainEvents));
+        Assert.Equal((office.Id, "Allsafe"), (opened.OfficeId, opened.Name));
+    }
+
+    [Fact]
+    public void Renaming_an_office_raises_an_event()
+    {
+        var office = ECorp();
+
+        office.Rename(" Evil Corp ", Now);
+
+        Assert.Equal("Evil Corp", office.Name);
+        Assert.IsType<OfficeRenamed>(office.DomainEvents[^1]);
     }
 
     [Theory]
@@ -17,7 +37,7 @@ public class OfficeTests
     [InlineData("  ")]
     public void Office_needs_a_name(string name)
     {
-        Assert.Throws<DomainException>(() => Office.Open(name));
+        Assert.Throws<DomainException>(() => Office.Open(name, Now));
     }
 
     [Fact]
@@ -28,7 +48,7 @@ public class OfficeTests
         var room = office.OpenRoom("Identity", Now);
 
         Assert.Single(office.Rooms);
-        var opened = Assert.IsType<RoomOpened>(Assert.Single(office.DomainEvents));
+        var opened = Assert.IsType<RoomOpened>(office.DomainEvents[^1]);
         Assert.Equal(room.Id, opened.RoomId);
         Assert.Equal(Now, opened.OccurredAt);
     }
@@ -85,9 +105,10 @@ public class OfficeTests
         var (office, desk) = ECorpWithDesk();
         var replacement = AgentProfile.Create("frontend-dev", "local/bigger-model");
 
-        office.ReassignDesk(desk.Id, replacement);
+        office.ReassignDesk(desk.Id, replacement, Now);
 
         Assert.Equal(replacement, desk.Agent);
+        Assert.IsType<DeskReassigned>(office.DomainEvents[^1]);
     }
 
     [Fact]
@@ -96,8 +117,9 @@ public class OfficeTests
         var office = ECorp();
         var room = office.OpenRoom("Web", Now);
 
-        office.UpdateRoomContext(room.Id, "  Never touch the production database.  ");
+        office.UpdateRoomContext(room.Id, "  Never touch the production database.  ", Now);
 
         Assert.Equal("Never touch the production database.", room.Context);
+        Assert.IsType<RoomContextUpdated>(office.DomainEvents[^1]);
     }
 }

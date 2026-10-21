@@ -13,6 +13,43 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
     private const string FallbackAuthor = "Openspace";
     private const string FallbackEmail = "openspace@localhost";
 
+    public async Task<RepositoryProblem?> CheckRepositoryAsync(string repositoryPath, CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(repositoryPath))
+        {
+            return new RepositoryProblem("folder-missing", $"The folder '{repositoryPath}' does not exist.", false);
+        }
+
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--is-inside-work-tree").ConfigureAwait(false))
+        {
+            return new RepositoryProblem(
+                "not-a-repository", $"'{repositoryPath}' is not a git repository yet. Openspace can initialize one there.", true);
+        }
+
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", "HEAD").ConfigureAwait(false))
+        {
+            return new RepositoryProblem(
+                "no-commits", $"'{repositoryPath}' has no commits yet. Openspace can create an empty first commit.", true);
+        }
+
+        return null;
+    }
+
+    public async Task InitializeRepositoryAsync(string repositoryPath, CancellationToken cancellationToken)
+    {
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--is-inside-work-tree").ConfigureAwait(false))
+        {
+            await GitCli.RunAsync(repositoryPath, cancellationToken, "init", "--quiet").ConfigureAwait(false);
+        }
+
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", "HEAD").ConfigureAwait(false))
+        {
+            var identity = await IdentityArgsAsync(repositoryPath, cancellationToken).ConfigureAwait(false);
+            await GitCli.RunAsync(repositoryPath, cancellationToken, [.. identity, "commit", "--allow-empty", "--message", "Initial commit"])
+                .ConfigureAwait(false);
+        }
+    }
+
     public async Task<Workspace> PrepareAsync(
         string repositoryPath, string taskKey, string title, CancellationToken cancellationToken)
     {
@@ -53,9 +90,7 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         var staged = await GitCli.RunAsync(workspacePath, cancellationToken, "diff", "--cached", "--name-only").ConfigureAwait(false);
         if (staged.Length > 0)
         {
-            var identity = await HasIdentityAsync(workspacePath, cancellationToken).ConfigureAwait(false)
-                ? Array.Empty<string>()
-                : ["-c", $"user.name={FallbackAuthor}", "-c", $"user.email={FallbackEmail}"];
+            var identity = await IdentityArgsAsync(workspacePath, cancellationToken).ConfigureAwait(false);
             await GitCli.RunAsync(workspacePath, cancellationToken, [.. identity, "commit", "--message", message]).ConfigureAwait(false);
         }
 
@@ -78,11 +113,18 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         }
     }
 
-    private static async Task<bool> HasIdentityAsync(string path, CancellationToken cancellationToken)
+    /// <summary>Uses the repository's own identity, or Openspace's when git has none configured.</summary>
+    private static async Task<string[]> IdentityArgsAsync(string path, CancellationToken cancellationToken) =>
+        await SucceedsAsync(path, cancellationToken, "config", "user.email").ConfigureAwait(false)
+            ? []
+            : ["-c", $"user.name={FallbackAuthor}", "-c", $"user.email={FallbackEmail}"];
+
+    private static async Task<bool> SucceedsAsync(string path, CancellationToken cancellationToken, params string[] args)
     {
         try
         {
-            return (await GitCli.RunAsync(path, cancellationToken, "config", "user.email").ConfigureAwait(false)).Trim().Length > 0;
+            await GitCli.RunAsync(path, cancellationToken, args).ConfigureAwait(false);
+            return true;
         }
         catch (InvalidOperationException)
         {

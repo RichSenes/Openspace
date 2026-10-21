@@ -83,17 +83,6 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
         Assert.Equal(string.Empty, (await Git("branch", "--list", workspace.Branch)).Trim());
     }
 
-    [Fact]
-    public async Task A_folder_that_is_not_a_repository_is_reported()
-    {
-        var plain = Path.Combine(_root, "plain");
-        Directory.CreateDirectory(plain);
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => _manager.PrepareAsync(plain, "a1b2c3d4", "Logout", default));
-
-        Assert.Contains("git worktree add", error.Message, StringComparison.Ordinal);
-    }
-
     [Theory]
     [InlineData("Add a logout button!", "add-a-logout-button")]
     [InlineData("  ¿Qué?  ", "qu")]
@@ -101,5 +90,46 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
     public void Slugs_are_branch_safe(string title, string expected)
     {
         Assert.Equal(expected, GitWorkspaceManager.Slug(title));
+    }
+
+    [Fact]
+    public async Task A_repository_with_commits_has_no_problem()
+    {
+        Assert.Null(await _manager.CheckRepositoryAsync(Repo, default));
+    }
+
+    [Fact]
+    public async Task Missing_folders_plain_folders_and_empty_repositories_are_told_apart()
+    {
+        var plain = Path.Combine(_root, "plain");
+        var empty = Path.Combine(_root, "empty");
+        Directory.CreateDirectory(plain);
+        Directory.CreateDirectory(empty);
+        await GitCli.RunAsync(empty, default, "init", "--quiet");
+
+        Assert.Equal("folder-missing", (await _manager.CheckRepositoryAsync(Path.Combine(_root, "nowhere"), default))?.Code);
+        Assert.Equal("not-a-repository", (await _manager.CheckRepositoryAsync(plain, default))?.Code);
+        Assert.Equal("no-commits", (await _manager.CheckRepositoryAsync(empty, default))?.Code);
+    }
+
+    [Fact]
+    public async Task Initializing_a_plain_folder_makes_it_ready_for_worktrees()
+    {
+        var plain = Path.Combine(_root, "plain");
+        Directory.CreateDirectory(plain);
+
+        await _manager.InitializeRepositoryAsync(plain, default);
+
+        Assert.Null(await _manager.CheckRepositoryAsync(plain, default));
+        var workspace = await _manager.PrepareAsync(plain, "e5f6a7b8", "First file", default);
+        Assert.True(Directory.Exists(workspace.Path));
+    }
+
+    [Fact]
+    public async Task Initializing_keeps_an_existing_history()
+    {
+        await _manager.InitializeRepositoryAsync(Repo, default);
+
+        Assert.Equal("Initial", (await Git("log", "-1", "--format=%s")).Trim());
     }
 }

@@ -9,7 +9,8 @@ internal static class OfficeEndpoints
 
     public sealed record ContextRequest(string? Context);
 
-    public sealed record RepositoryRequest(string Path);
+    /// <param name="Initialize">Turn the folder into a git repository if it is not one yet.</param>
+    public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
     public sealed record DeskRequest(string Name, string AgentName, string? Model);
 
@@ -31,7 +32,7 @@ internal static class OfficeEndpoints
         offices.MapPut("/{officeId:guid}/repository", async (
             Guid officeId, RepositoryRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
-            await commands.SetRepositoryAsync(new OfficeId(officeId), request.Path, ct);
+            await commands.SetRepositoryAsync(new OfficeId(officeId), request.Path, request.Initialize, ct);
             return Results.NoContent();
         });
 

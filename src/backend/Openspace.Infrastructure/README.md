@@ -69,6 +69,8 @@ Events become speech bubbles like this:
 Each task gets `git worktree add -b openspace/<title>-<key>` from the repository's
 `HEAD`, under `Workspaces:Root`. Your checkout and branch are never touched.
 
+- Check: the repository folder must exist, be inside a git work tree and have a
+  `HEAD`. Initialize fixes the last two with `git init` and an empty first commit.
 - Diff: `git add --intent-to-add --all` then `git diff HEAD`, so new files show.
 - Accept: commit on the task branch (with the repository's identity, or
   `Openspace` if none), then remove the worktree. The branch stays for you to merge.

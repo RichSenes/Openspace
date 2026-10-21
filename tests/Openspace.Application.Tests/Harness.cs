@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Openspace.Application.Agents;
+using Openspace.Application.Offices;
 using Openspace.Application.Queue;
 using Openspace.Application.Work;
 using Openspace.Domain.Offices;
@@ -64,6 +65,8 @@ internal sealed class Harness
         Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
     public AgentSignals Signals() => new(Tasks, UnitOfWork, Runtime, Activity, Clock);
+
+    public OfficeCommands OfficeCommands() => new(Offices, UnitOfWork, Workspaces, Clock);
 
     public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock);
 }

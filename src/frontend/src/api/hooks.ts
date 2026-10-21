@@ -103,10 +103,14 @@ export function useTaskText(kind: 'notes' | 'send-back') {
 
 export function useSetRepository(officeId: string) {
   return useWrite(
-    (path: string) => request<void>('PUT', `/api/offices/${officeId}/repository`, { path }),
+    (input: { path: string; initialize: boolean }) =>
+      request<void>('PUT', `/api/offices/${officeId}/repository`, input),
     keys.offices,
   )
 }
+
+/** Problems with a repository folder that Openspace can fix by initializing git there. */
+export const INITIALIZABLE = new Set(['not-a-repository', 'no-commits'])
 
 /** Every desk's current activity. Kept fresh by SignalR, which writes into this cache. */
 export function useActivity() {

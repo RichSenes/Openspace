@@ -9,6 +9,12 @@ describe('readError', () => {
     expect(error.message).toBe('Room already exists.')
   })
 
+  it('keeps the reason code when there is one', async () => {
+    const response = new Response(JSON.stringify({ detail: 'Not a git repository yet.', code: 'not-a-repository' }), { status: 422 })
+    expect((await readError(response)).code).toBe('not-a-repository')
+    expect((await readError(new Response('{}', { status: 422 }))).code).toBeUndefined()
+  })
+
   it('falls back to the title, then to the status text', async () => {
     expect((await readError(new Response(JSON.stringify({ title: 'Not found' }), { status: 404 }))).message).toBe('Not found')
     expect((await readError(new Response('oops', { status: 500, statusText: 'Server Error' }))).message).toBe('Server Error')

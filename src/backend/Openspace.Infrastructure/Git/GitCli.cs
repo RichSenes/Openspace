@@ -19,8 +19,11 @@ internal static class GitCli
             start.ArgumentList.Add(arg);
         }
 
-        // Never wait for a person to type something.
+        // Never wait for a person to type something, and never let an inherited
+        // GIT_DIR or GIT_WORK_TREE point git somewhere other than the working directory.
         start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        start.Environment.Remove("GIT_DIR");
+        start.Environment.Remove("GIT_WORK_TREE");
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start git.");
         var output = process.StandardOutput.ReadToEndAsync(cancellationToken);

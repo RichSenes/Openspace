@@ -120,7 +120,8 @@ public sealed class PersistenceTests : IAsyncLifetime
     public async Task Repository_path_and_agent_run_survive_a_round_trip()
     {
         var (office, frontend, _) = await FurnishECorpAsync();
-        await InScope(sp => sp.GetRequiredService<OfficeCommands>().SetRepositoryAsync(office, "/srv/repos/e-corp", default));
+        var repository = Directory.CreateTempSubdirectory("openspace-repo-").FullName;
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().SetRepositoryAsync(office, repository, initialize: true, default));
         var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
             .AssignAsync(office, frontend, "Add a logout button", null, "elliot", default));
         await InScope(async sp =>
@@ -138,6 +139,7 @@ public sealed class PersistenceTests : IAsyncLifetime
 
         Assert.Equal(taskId, found?.Id);
         Assert.Equal("/srv/worktrees/abc", found?.Run?.WorkspacePath);
-        Assert.Equal("/srv/repos/e-corp", view.RepositoryPath);
+        Assert.Equal(repository, view.RepositoryPath);
+        Directory.Delete(repository, recursive: true);
     }
 }

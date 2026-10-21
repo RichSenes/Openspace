@@ -103,6 +103,11 @@ public sealed partial class TaskRunner(
             return $"Office '{office.Name}' has no repository yet. Set its folder in Rooms, then try again.";
         }
 
+        if (await workspaces.CheckRepositoryAsync(office.RepositoryPath, cancellationToken).ConfigureAwait(false) is { } problem)
+        {
+            return $"{problem.Message} Fix the repository in Rooms, then try again.";
+        }
+
         return await runtime.HasAgentAsync(desk.Agent.AgentName, office.RepositoryPath, cancellationToken).ConfigureAwait(false)
             ? null
             : $"OpenCode has no agent named '{desk.Agent.AgentName}'. Create it in OpenCode or give the desk another agent, then try again.";

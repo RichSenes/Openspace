@@ -100,4 +100,17 @@ public class TaskRunnerTests
         Assert.Equal(NoteAuthorKind.System, task.Notes[^1].Author.Kind);
         Assert.NotNull(task.Run);
     }
+
+    [Fact]
+    public async Task A_repository_that_broke_since_it_was_set_fails_the_task_before_any_git_work()
+    {
+        _h.Workspaces.Problem = new Abstractions.RepositoryProblem("not-a-repository", "'/srv/repos/e-corp' is not a git repository yet.", true);
+        var task = _h.Enqueue();
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal(WorkTaskStatus.Failed, task.Status);
+        Assert.Contains("is not a git repository yet", task.Notes[^1].Text, StringComparison.Ordinal);
+        Assert.Empty(_h.Workspaces.Prepared);
+    }
 }

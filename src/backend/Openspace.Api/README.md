@@ -24,12 +24,14 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks/{id}/notes` | Add a note as the operator: `{ text }` |
 | GET | `/api/tasks/{id}/diff` | What the agent changed, as a unified diff (plain text) |
 | POST | `/api/tasks/{id}/permission` | Answer an agent waiting for permission: `{ allow }` |
-| PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path }` (absolute) |
+| PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 
 Enums travel as strings (`"Queued"`). Errors are
 [problem details](https://www.rfc-editor.org/rfc/rfc9457): `404` for unknown ids,
-`422` when a domain rule says no, with the reason in `detail`.
+`422` when a rule says no, with the reason in `detail`. When the interface can
+offer a fix, the problem also carries a `code`: `folder-missing`,
+`not-a-repository` or `no-commits` for repositories.
 
 ## Live updates
 
@@ -51,7 +53,14 @@ because activity is not stored.
 dotnet run --project src/backend/Openspace.Api
 ```
 
-Listens on `http://localhost:5145` in development.
+Listens on `http://localhost:5145` in development. To run a second instance next
+to it (for example for experiments), skip the launch profile, which would force
+port 5145, and give it its own database:
+
+```bash
+ConnectionStrings__Openspace="Data Source=/tmp/other.db" ASPNETCORE_URLS=http://localhost:5245 \
+  dotnet run --no-launch-profile --project src/backend/Openspace.Api
+```
 
 On startup it applies pending database migrations.
 

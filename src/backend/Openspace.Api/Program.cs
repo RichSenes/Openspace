@@ -54,6 +54,7 @@ app.MapOfficeEndpoints();
 app.MapTaskEndpoints();
 app.MapRoleEndpoints();
 app.MapEpicEndpoints();
+app.MapReportEndpoints();
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");
 

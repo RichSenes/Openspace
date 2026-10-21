@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IEpicRepository, EpicRepository>();
+        services.AddScoped<IReportRepository, ReportRepository>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();

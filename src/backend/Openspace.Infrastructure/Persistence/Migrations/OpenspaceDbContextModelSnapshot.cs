@@ -34,6 +34,54 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("Offices", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Reports.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("EpicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("From")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("To")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("WrittenByAi")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EpicId");
+
+                    b.HasIndex("OfficeId", "CreatedAt");
+
+                    b.ToTable("Reports", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Roles.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -264,6 +312,20 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rooms");
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Reports.Report", b =>
+                {
+                    b.HasOne("Openspace.Domain.Work.Epic", null)
+                        .WithMany()
+                        .HasForeignKey("EpicId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Openspace.Domain.Offices.Office", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Openspace.Domain.Roles.Role", b =>

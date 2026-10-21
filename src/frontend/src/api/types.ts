@@ -121,3 +121,17 @@ export interface PlanView {
   epic: EpicView
   tasks: WorkTaskView[]
 }
+
+export interface ReportView {
+  id: string
+  officeId: string
+  kind: 'Period' | 'Epic'
+  title: string
+  body: string
+  requestedBy: string
+  createdAt: string
+  periodStart: string | null
+  periodEnd: string | null
+  epicId: string | null
+  writtenByAi: boolean
+}

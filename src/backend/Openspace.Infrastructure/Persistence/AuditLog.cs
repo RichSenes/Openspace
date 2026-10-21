@@ -13,5 +13,10 @@ internal sealed class AuditLog(OpenspaceDbContext db) : IAuditLog
     public Task<bool> ContainsAsync(WorkTaskId taskId, string externalId, CancellationToken cancellationToken) =>
         db.AuditEntries.AnyAsync(e => e.TaskId == taskId && e.ExternalId == externalId, cancellationToken);
 
+    public async Task<IReadOnlyList<WorkTaskId>> TasksActiveBetweenAsync(
+        DateTimeOffset since, DateTimeOffset until, CancellationToken cancellationToken) =>
+        await db.AuditEntries.Where(e => e.At >= since && e.At < until).Select(e => e.TaskId).Distinct()
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public void Add(AuditEntry entry) => db.AuditEntries.Add(entry);
 }

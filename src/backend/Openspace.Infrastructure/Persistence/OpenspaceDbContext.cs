@@ -24,6 +24,8 @@ public sealed class OpenspaceDbContext(
 
     public DbSet<Epic> Epics => Set<Epic>();
 
+    public DbSet<Domain.Reports.Report> Reports => Set<Domain.Reports.Report>();
+
     /// <summary>Saves, then publishes the events raised by the saved aggregates.</summary>
     async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
     {
@@ -57,6 +59,7 @@ public sealed class OpenspaceDbContext(
         configurationBuilder.Properties<WorkTaskId>().HaveConversion<IdConverters.WorkTaskIdConverter>();
         configurationBuilder.Properties<RoleId>().HaveConversion<IdConverters.RoleIdConverter>();
         configurationBuilder.Properties<EpicId>().HaveConversion<IdConverters.EpicIdConverter>();
+        configurationBuilder.Properties<Domain.Reports.ReportId>().HaveConversion<IdConverters.ReportIdConverter>();
 
         // SQLite cannot order or compare DateTimeOffset natively: store it as a sortable 64-bit number.
         configurationBuilder.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();

@@ -32,7 +32,13 @@ public sealed class SqliteFixture : IAsyncLifetime
             o.Seats = 2;
             o.Enabled = false;
         });
-        services.Configure<OpenCode.OpenCodeOptions>(o => o.ListenToEvents = false);
+        services.Configure<OpenCode.OpenCodeOptions>(o =>
+        {
+            o.ListenToEvents = false;
+
+            // Never reach a real OpenCode from tests: port 9 refuses at once.
+            o.BaseUrl = new Uri("http://127.0.0.1:9");
+        });
         _services = services.BuildServiceProvider();
 
         await _services.MigrateDatabaseAsync();

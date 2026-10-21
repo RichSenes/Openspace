@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.Agents;
 using Openspace.Application.Offices;
 using Openspace.Application.Queue;
+using Openspace.Application.Reports;
 using Openspace.Application.Roles;
 using Openspace.Application.Work;
 
@@ -18,6 +19,8 @@ public static class DependencyInjection
         services.AddScoped<WorkTaskQueries>();
         services.AddScoped<Supervisor>();
         services.AddScoped<EpicQueries>();
+        services.AddScoped<ReportWriter>();
+        services.AddScoped<ReportQueries>();
         services.AddScoped<QueueDispatcher>();
         services.AddScoped<RoleCommands>();
         services.AddScoped<RoleQueries>();

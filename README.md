@@ -53,7 +53,9 @@ Each project has its own README with detailed specifications.
    not reach review until all of them are done.
 7. Every step, file change, command (with its output), permission and note is
    kept in the task's audit log, and can be downloaded as a Markdown report.
-8. Accepted work can then be merged into the branch you choose, from the task
+8. Reports of a day or of an epic are written from the audit log in the
+   language you choose, ready to copy into an email or a chat.
+9. Accepted work can then be merged into the branch you choose, from the task
    itself. Your checkout never moves, and nothing is touched if you have
    uncommitted changes or the work conflicts.
 

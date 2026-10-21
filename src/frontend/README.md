@@ -9,6 +9,7 @@ The pixel-art building and the panels around it.
   antialiasing so pixel art stays crisp
 - TanStack Query for server data, refreshed by SignalR messages
 - Fonts bundled locally (Silkscreen, IBM Plex), so it works offline
+- Markdown rendered with marked and sanitised with DOMPurify
 - Sprites (planned): PNG sheets with Aseprite JSON
 
 ## Structure
@@ -33,6 +34,7 @@ src/
 | Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
 | Board | Ask the supervisor to split a request into proposed tasks, then approve them all at once or one by one; filter by epic. Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
 | Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
+| Reports | Write a report of a day or of an epic in a chosen language, read it rendered, copy it or download it as Markdown |
 | Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking |
 
 While agents wait for a permission, "Needs you" cards pop up at the bottom right

@@ -10,5 +10,8 @@ public interface IAuditLog
     /// <summary>Whether an entry from this source event was already recorded.</summary>
     Task<bool> ContainsAsync(WorkTaskId taskId, string externalId, CancellationToken cancellationToken);
 
+    /// <summary>Tasks with at least one line recorded in [since, until).</summary>
+    Task<IReadOnlyList<WorkTaskId>> TasksActiveBetweenAsync(DateTimeOffset since, DateTimeOffset until, CancellationToken cancellationToken);
+
     void Add(AuditEntry entry);
 }

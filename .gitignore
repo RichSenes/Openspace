@@ -1,0 +1,28 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Node
+node_modules/
+dist/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+*.local.json
+
+# Runtime data
+*.db
+*.db-shm
+*.db-wal
+worktrees/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store

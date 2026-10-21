@@ -1,0 +1,103 @@
+using Openspace.Domain.Common;
+using Openspace.Domain.Offices;
+using static Openspace.Domain.Tests.TestData;
+
+namespace Openspace.Domain.Tests.Offices;
+
+public class OfficeTests
+{
+    [Fact]
+    public void Opening_an_office_trims_its_name()
+    {
+        Assert.Equal("Allsafe", Office.Open("  Allsafe ").Name);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Office_needs_a_name(string name)
+    {
+        Assert.Throws<DomainException>(() => Office.Open(name));
+    }
+
+    [Fact]
+    public void Opening_a_room_adds_it_and_raises_an_event()
+    {
+        var office = ECorp();
+
+        var room = office.OpenRoom("Identity", Now);
+
+        Assert.Single(office.Rooms);
+        var opened = Assert.IsType<RoomOpened>(Assert.Single(office.DomainEvents));
+        Assert.Equal(room.Id, opened.RoomId);
+        Assert.Equal(Now, opened.OccurredAt);
+    }
+
+    [Fact]
+    public void Room_names_are_unique_ignoring_case()
+    {
+        var office = ECorp();
+        office.OpenRoom("Web", Now);
+
+        Assert.Throws<DomainException>(() => office.OpenRoom(" web ", Now));
+    }
+
+    [Fact]
+    public void Desks_are_added_to_their_room()
+    {
+        var office = ECorp();
+        var web = office.OpenRoom("Web", Now);
+        var identity = office.OpenRoom("Identity", Now);
+
+        var desk = office.AddDesk(web.Id, "Frontend", AgentProfile.Create("frontend-dev"), Now);
+
+        Assert.Same(desk, Assert.Single(web.Desks));
+        Assert.Empty(identity.Desks);
+        Assert.True(office.HasDesk(desk.Id));
+        Assert.IsType<DeskAdded>(office.DomainEvents[^1]);
+    }
+
+    [Fact]
+    public void Desk_names_are_unique_within_a_room_only()
+    {
+        var office = ECorp();
+        var web = office.OpenRoom("Web", Now);
+        var tests = office.OpenRoom("Tests", Now);
+        office.AddDesk(web.Id, "Lead", AgentProfile.Create("web-lead"), Now);
+
+        office.AddDesk(tests.Id, "Lead", AgentProfile.Create("test-lead"), Now);
+        Assert.Throws<DomainException>(() =>
+            office.AddDesk(web.Id, "LEAD", AgentProfile.Create("other"), Now));
+    }
+
+    [Fact]
+    public void Adding_a_desk_to_an_unknown_room_fails()
+    {
+        var office = ECorp();
+
+        Assert.Throws<DomainException>(() =>
+            office.AddDesk(RoomId.New(), "Frontend", AgentProfile.Create("frontend-dev"), Now));
+    }
+
+    [Fact]
+    public void A_desk_can_get_a_different_agent()
+    {
+        var (office, desk) = ECorpWithDesk();
+        var replacement = AgentProfile.Create("frontend-dev", "local/bigger-model");
+
+        office.ReassignDesk(desk.Id, replacement);
+
+        Assert.Equal(replacement, desk.Agent);
+    }
+
+    [Fact]
+    public void Room_context_is_stored_trimmed()
+    {
+        var office = ECorp();
+        var room = office.OpenRoom("Web", Now);
+
+        office.UpdateRoomContext(room.Id, "  Never touch the production database.  ");
+
+        Assert.Equal("Never touch the production database.", room.Context);
+    }
+}

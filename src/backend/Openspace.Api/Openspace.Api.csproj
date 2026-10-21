@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Openspace.Application\Openspace.Application.csproj" />
+    <ProjectReference Include="..\Openspace.Infrastructure\Openspace.Infrastructure.csproj" />
+  </ItemGroup>
+
+
+</Project>

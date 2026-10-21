@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Openspace.Domain\Openspace.Domain.csproj" />
+  </ItemGroup>
+
+
+</Project>

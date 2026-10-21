@@ -1,0 +1,219 @@
+using Openspace.Domain.Common;
+using Openspace.Domain.Offices;
+using Openspace.Domain.Work;
+using static Openspace.Domain.Tests.TestData;
+
+namespace Openspace.Domain.Tests.Work;
+
+public class WorkTaskTests
+{
+    private const string Requester = "elliot";
+
+    private static WorkTask QueuedTask(out Office office, out Desk desk)
+    {
+        (office, desk) = ECorpWithDesk();
+        return WorkTask.Assign(office, desk.Id, "Add a logout button to the header", null, Requester, Now);
+    }
+
+    private static WorkTask TaskIn(WorkTaskStatus status)
+    {
+        if (status == WorkTaskStatus.Proposed)
+        {
+            return WorkTask.Propose(ECorp(), "Rotate the certificates", null, Requester, Now);
+        }
+
+        var task = QueuedTask(out _, out _);
+        switch (status)
+        {
+            case WorkTaskStatus.Queued:
+                break;
+            case WorkTaskStatus.Running:
+                task.Start(Now);
+                break;
+            case WorkTaskStatus.Review:
+                task.Start(Now);
+                task.SubmitForReview(Now);
+                break;
+            case WorkTaskStatus.Failed:
+                task.Start(Now);
+                task.Fail("Tests did not compile.", Now);
+                break;
+            case WorkTaskStatus.Done:
+                task.Start(Now);
+                task.SubmitForReview(Now);
+                task.Accept(Now);
+                break;
+            case WorkTaskStatus.Discarded:
+                task.Discard(Now);
+                break;
+        }
+
+        return task;
+    }
+
+    [Fact]
+    public void Assigning_a_task_puts_it_straight_in_the_queue()
+    {
+        var task = QueuedTask(out var office, out var desk);
+
+        Assert.Equal(WorkTaskStatus.Queued, task.Status);
+        Assert.Equal(desk.Id, task.DeskId);
+        Assert.Equal(office.Id, task.OfficeId);
+        Assert.IsType<WorkTaskCreated>(task.DomainEvents[0]);
+        var queued = Assert.IsType<WorkTaskStatusChanged>(task.DomainEvents[^1]);
+        Assert.Equal(WorkTaskStatus.Queued, queued.To);
+    }
+
+    [Fact]
+    public void A_proposed_task_needs_a_desk_before_approval()
+    {
+        var (office, desk) = ECorpWithDesk();
+        var task = WorkTask.Propose(office, "Harden the login page", "See the audit", Requester, Now);
+
+        Assert.Throws<DomainException>(() => task.Approve(Now));
+
+        task.AssignTo(office, desk.Id);
+        task.Approve(Now);
+        Assert.Equal(WorkTaskStatus.Queued, task.Status);
+    }
+
+    [Fact]
+    public void Happy_path_ends_in_done()
+    {
+        var task = QueuedTask(out _, out _);
+
+        task.Start(Now);
+        task.SubmitForReview(Now);
+        task.Accept(Now);
+
+        Assert.Equal(WorkTaskStatus.Done, task.Status);
+        Assert.True(task.IsClosed);
+    }
+
+    [Fact]
+    public void Failing_records_the_reason_as_a_system_note()
+    {
+        var task = TaskIn(WorkTaskStatus.Failed);
+
+        var note = Assert.Single(task.Notes);
+        Assert.Equal(NoteAuthorKind.System, note.Author.Kind);
+        Assert.Equal("Tests did not compile.", note.Text);
+    }
+
+    [Fact]
+    public void Sending_back_requeues_with_the_reviewer_feedback()
+    {
+        var task = TaskIn(WorkTaskStatus.Review);
+
+        task.SendBack(NoteAuthor.Human(Requester), "The button is on the wrong side.", Now);
+
+        Assert.Equal(WorkTaskStatus.Queued, task.Status);
+        Assert.Equal(NoteAuthorKind.Human, task.Notes[^1].Author.Kind);
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Running)]
+    [InlineData(WorkTaskStatus.Failed)]
+    public void Running_and_failed_tasks_can_be_requeued(WorkTaskStatus status)
+    {
+        var task = TaskIn(status);
+
+        task.Requeue(Now);
+
+        Assert.Equal(WorkTaskStatus.Queued, task.Status);
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Proposed)]
+    [InlineData(WorkTaskStatus.Queued)]
+    [InlineData(WorkTaskStatus.Running)]
+    [InlineData(WorkTaskStatus.Review)]
+    [InlineData(WorkTaskStatus.Failed)]
+    public void Open_tasks_can_be_discarded(WorkTaskStatus status)
+    {
+        var task = TaskIn(status);
+
+        task.Discard(Now);
+
+        Assert.Equal(WorkTaskStatus.Discarded, task.Status);
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Done)]
+    [InlineData(WorkTaskStatus.Discarded)]
+    public void Closed_tasks_cannot_move(WorkTaskStatus status)
+    {
+        var task = TaskIn(status);
+
+        Assert.Throws<DomainException>(() => task.Discard(Now));
+        Assert.Throws<DomainException>(() => task.Requeue(Now));
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Proposed)]
+    [InlineData(WorkTaskStatus.Running)]
+    [InlineData(WorkTaskStatus.Review)]
+    public void Only_queued_tasks_can_start(WorkTaskStatus status)
+    {
+        Assert.Throws<DomainException>(() => TaskIn(status).Start(Now));
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Queued)]
+    [InlineData(WorkTaskStatus.Running)]
+    [InlineData(WorkTaskStatus.Failed)]
+    public void Only_reviewed_tasks_can_be_accepted(WorkTaskStatus status)
+    {
+        Assert.Throws<DomainException>(() => TaskIn(status).Accept(Now));
+    }
+
+    [Fact]
+    public void A_running_task_cannot_change_desk()
+    {
+        var task = QueuedTask(out var office, out var desk);
+        task.Start(Now);
+
+        Assert.Throws<DomainException>(() => task.AssignTo(office, desk.Id));
+    }
+
+    [Fact]
+    public void A_task_cannot_go_to_a_desk_of_another_office()
+    {
+        var task = QueuedTask(out _, out _);
+        var (otherOffice, otherDesk) = ECorpWithDesk();
+
+        Assert.Throws<DomainException>(() => task.AssignTo(otherOffice, otherDesk.Id));
+    }
+
+    [Fact]
+    public void A_task_cannot_go_to_an_unknown_desk()
+    {
+        var task = QueuedTask(out var office, out _);
+
+        Assert.Throws<DomainException>(() => task.AssignTo(office, DeskId.New()));
+    }
+
+    [Fact]
+    public void Agents_can_leave_notes()
+    {
+        var task = QueuedTask(out _, out var desk);
+        task.Start(Now);
+
+        task.AddNote(NoteAuthor.FromDesk(desk.Id), "Header lives in partials/header.php.", Now);
+
+        var note = Assert.Single(task.Notes);
+        Assert.Equal(desk.Id, note.Author.DeskId);
+        Assert.IsType<WorkTaskNoteAdded>(task.DomainEvents[^1]);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Tasks_and_notes_need_text(string text)
+    {
+        var task = QueuedTask(out var office, out var desk);
+
+        Assert.Throws<DomainException>(() => WorkTask.Assign(office, desk.Id, text, null, Requester, Now));
+        Assert.Throws<DomainException>(() => task.AddNote(NoteAuthor.System, text, Now));
+    }
+}

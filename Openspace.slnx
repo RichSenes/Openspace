@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/Openspace.Api/Openspace.Api.csproj" />
+    <Project Path="src/backend/Openspace.Application/Openspace.Application.csproj" />
+    <Project Path="src/backend/Openspace.Domain/Openspace.Domain.csproj" />
+    <Project Path="src/backend/Openspace.Infrastructure/Openspace.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Openspace.ArchitectureTests/Openspace.ArchitectureTests.csproj" />
+    <Project Path="tests/Openspace.Domain.Tests/Openspace.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

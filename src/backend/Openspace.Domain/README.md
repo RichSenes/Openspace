@@ -1,0 +1,66 @@
+# Openspace.Domain
+
+The heart of Openspace: the business model of the building, with no dependency
+on frameworks, databases or OpenCode.
+
+## Responsibilities
+
+- Aggregates and entities: `Office`, `Room`, `Desk`, `Task` (see the glossary in
+  [docs/vision.md](../../../docs/vision.md)).
+- Invariants and state transitions, e.g. which task statuses can follow which.
+- Domain events raised when something meaningful happens (a task starts, a desk
+  falls asleep).
+
+## Rules
+
+- References nothing but the .NET base library. Enforced by
+  `Openspace.ArchitectureTests`.
+- No public setters on aggregates: state changes through intention-revealing
+  methods.
+
+## Model
+
+```
+Common/   AggregateRoot, IDomainEvent, DomainException
+Offices/  Office (aggregate) > Room > Desk, AgentProfile
+Work/     WorkTask (aggregate), TaskNote, NoteAuthor
+```
+
+### Office
+
+An aggregate holding its rooms and their desks.
+
+- Room names are unique within an office, desk names within a room
+  (case-insensitive, trimmed).
+- A room has free-text **context**, injected into every agent working there.
+- A desk is bound to an `AgentProfile`: the OpenCode agent name
+  (`lowercase-with-dashes`) and an optional model override (`provider/model`).
+- Events: `RoomOpened`, `DeskAdded`.
+
+### WorkTask
+
+"Task" in the glossary; named `WorkTask` in code to avoid clashing with
+`System.Threading.Tasks.Task`. It is its own aggregate and references its office
+and desk by id.
+
+```
+Proposed ──approve──▶ Queued ──start──▶ Running ──submit──▶ Review ──accept──▶ Done
+                        ▲                  │ │                 │
+                        ├────requeue───────┘ └──fail──▶ Failed │
+                        ├────requeue─────────────────────┘     │
+                        └────send back (with feedback)─────────┘
+
+Any open status ──discard──▶ Discarded
+```
+
+- `Propose` creates a task waiting for approval, possibly without a desk.
+  `Assign` creates it for a desk and queues it at once.
+- A task needs a desk to be queued, and can change desk only while
+  proposed, queued or failed. The desk must belong to the task's office.
+- `Fail` stores the reason as a system note; `SendBack` stores the reviewer's
+  feedback as a note.
+- Notes can be written by a human, by a desk (the agent) or by the system.
+- Events: `WorkTaskCreated`, `WorkTaskStatusChanged`, `WorkTaskNoteAdded`.
+
+Time is always passed in (`DateTimeOffset now`): the domain never reads the
+clock, which keeps it deterministic in tests.

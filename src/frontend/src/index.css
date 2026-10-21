@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+  --floor: #1b1d24;
+  --ink: #e6e2d8;
+  font-family: system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--floor);
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}

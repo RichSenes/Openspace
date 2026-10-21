@@ -85,8 +85,12 @@ In scope:
 
 Later, in rough order of appearance:
 
-- **Mouse navigation** of the building: wheel to zoom, left-drag to pan, click
-  an office or a room to fly into it, with animated transitions.
+- **Notification sounds.** A sound when an agent needs you, when work reaches
+  review, when a task fails, and other moments worth hearing. Customisable per
+  kind of event, per room or per single desk, with sensible defaults and a quick
+  way to mute.
+- ~~**Mouse navigation**~~ Done: wheel to zoom at the cursor, left-drag to pan,
+  double-click a room to fly into it, Fit to see everything again.
 - ~~**Audit log.**~~ Done: every tool call, step, permission, note and status
   change is stored per task, shown as a live timeline and exported as a Markdown
   report.

@@ -21,7 +21,7 @@ src/
   api/        Types, fetch client (problem details to readable errors), query hooks
   realtime/   SignalR connection: refetches what the server says changed
   layout/     Top bar with views, office sidebar
-  building/   Floor plan layout (pure, tested) and its PixiJS rendering
+  building/   Floor plan layout and camera maths (pure, tested) and their PixiJS rendering
   board/      Task board, new task dialog, task drawer, board rules (tested)
   rooms/      Rooms, room context and desks of an office
   ui/         Toasts, dialog, status pill
@@ -31,7 +31,7 @@ src/
 
 | View | What it shows |
 | --- | --- |
-| Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
+| Building | The office as a pixel floor plan: scroll to zoom at the cursor, drag to move, double-click a room to fly into it, Fit to see it all. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
 | Board | Ask the supervisor to split a request into proposed tasks, then approve them all at once or one by one; filter by epic. Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
 | Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
 | Reports | Write a report of a day or of an epic in a chosen language, read it rendered, copy it or download it as Markdown |

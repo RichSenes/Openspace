@@ -23,7 +23,7 @@ on frameworks, databases or OpenCode.
 ```
 Common/   AggregateRoot, IDomainEvent, DomainException
 Offices/  Office (aggregate) > Room > Desk, AgentProfile
-Work/     WorkTask (aggregate), TaskNote, NoteAuthor
+Work/     WorkTask (aggregate), TaskNote, NoteAuthor, AgentRun, AuditEntry
 ```
 
 ### Office
@@ -61,6 +61,14 @@ Any open status ──discard──▶ Discarded
   feedback as a note.
 - Notes can be written by a human, by a desk (the agent) or by the system.
 - Events: `WorkTaskCreated`, `WorkTaskStatusChanged`, `WorkTaskNoteAdded`.
+
+### AuditEntry
+
+One line of a task's audit log: when, what kind (`Lifecycle`, `Step`, `Read`,
+`Change`, `Command`, `Search`, `Permission`, `Note`, `Other`), a one-sentence
+summary, the evidence (diff, command output, error; cut beyond 16,000
+characters), whether it worked, and the id of its source event. Entries are only
+ever added.
 
 Time is always passed in (`DateTimeOffset now`): the domain never reads the
 clock, which keeps it deterministic in tests.

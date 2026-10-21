@@ -224,7 +224,7 @@ public class WorkTaskTests
     {
         var task = TaskIn(WorkTaskStatus.Running);
 
-        task.AttachRun(SomeRun());
+        task.AttachRun(SomeRun(), Now);
 
         Assert.Equal("ses_fsociety", task.Run?.SessionId);
     }
@@ -234,14 +234,14 @@ public class WorkTaskTests
     [InlineData(WorkTaskStatus.Review)]
     public void Only_running_tasks_get_an_agent_run(WorkTaskStatus status)
     {
-        Assert.Throws<DomainException>(() => TaskIn(status).AttachRun(SomeRun()));
+        Assert.Throws<DomainException>(() => TaskIn(status).AttachRun(SomeRun(), Now));
     }
 
     [Fact]
     public void The_run_survives_a_send_back_so_the_agent_can_resume()
     {
         var task = TaskIn(WorkTaskStatus.Running);
-        task.AttachRun(SomeRun());
+        task.AttachRun(SomeRun(), Now);
         task.SubmitForReview(Now);
 
         task.SendBack(NoteAuthor.Human(Requester), "Wrong colour.", Now);
@@ -256,7 +256,7 @@ public class WorkTaskTests
         var other = office.AddDesk(office.Rooms[0].Id, "Backend", AgentProfile.Create("backend-dev"), Now);
         var task = WorkTask.Assign(office, desk.Id, "Fix the footer", null, Requester, Now);
         task.Start(Now);
-        task.AttachRun(SomeRun());
+        task.AttachRun(SomeRun(), Now);
         task.Fail("Crashed.", Now);
 
         Assert.Throws<DomainException>(() => task.AssignTo(office, other.Id));
@@ -275,7 +275,7 @@ public class WorkTaskTests
     public void Accepted_agent_work_can_be_merged_once()
     {
         var task = TaskIn(WorkTaskStatus.Running);
-        task.AttachRun(SomeRun());
+        task.AttachRun(SomeRun(), Now);
         task.SubmitForReview(Now);
         task.Accept(Now);
 
@@ -290,7 +290,7 @@ public class WorkTaskTests
     public void Work_that_is_not_accepted_or_has_no_agent_cannot_be_merged()
     {
         var review = TaskIn(WorkTaskStatus.Running);
-        review.AttachRun(SomeRun());
+        review.AttachRun(SomeRun(), Now);
         review.SubmitForReview(Now);
 
         Assert.Throws<DomainException>(() => review.RecordMerge("main", Now));

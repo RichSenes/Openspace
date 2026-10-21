@@ -34,6 +34,46 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("Offices", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("At")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("Succeeded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId", "At");
+
+                    b.HasIndex("TaskId", "ExternalId")
+                        .IsUnique()
+                        .HasFilter("ExternalId IS NOT NULL");
+
+                    b.ToTable("AuditEntries", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.WorkTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -154,6 +194,15 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rooms");
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>
+                {
+                    b.HasOne("Openspace.Domain.Work.WorkTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Openspace.Domain.Work.WorkTask", b =>

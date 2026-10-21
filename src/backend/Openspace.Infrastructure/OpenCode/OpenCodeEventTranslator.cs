@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Openspace.Domain.Work;
 
 namespace Openspace.Infrastructure.OpenCode;
 
@@ -57,17 +58,62 @@ internal static class OpenCodeEventTranslator
             : null;
     }
 
-    private static AgentSignal.Progress? FromPart(JsonElement props)
+    private static AgentSignal? FromPart(JsonElement props)
     {
         var part = props.GetProperty("part");
-        if (Text(part, "type") != "tool" || !part.TryGetProperty("state", out var state) || Text(state, "status") != "running")
+        if (Text(part, "type") != "tool" || !part.TryGetProperty("state", out var state))
         {
             return null;
         }
 
+        var tool = Text(part, "tool") ?? "a tool";
         var input = state.TryGetProperty("input", out var i) ? i : default;
-        var doing = DescribeTool(Text(part, "tool") ?? "a tool", input, Text(state, "title"));
-        return doing is null ? null : new AgentSignal.Progress(Text(part, "sessionID")!, null, doing);
+        var sessionId = Text(part, "sessionID")!;
+        switch (Text(state, "status"))
+        {
+            case "running":
+                var doing = DescribeTool(tool, input, Text(state, "title"));
+                return doing is null ? null : new AgentSignal.Progress(sessionId, null, doing);
+            case "completed" or "error" when Text(part, "callID") is { } callId && tool is not ("todowrite" or "todoread"):
+                return Finished(sessionId, callId, tool, input, state);
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>What a finished tool call leaves in the audit log: a past-tense summary and its evidence.</summary>
+    private static AgentSignal.ToolFinished Finished(string sessionId, string callId, string tool, JsonElement input, JsonElement state)
+    {
+        var failed = Text(state, "status") == "error";
+        var metadata = state.TryGetProperty("metadata", out var m) ? m : default;
+        var output = Text(state, "output");
+        string? File(string name) => Text(input, name);
+        string Name(string? path) => path is null ? "a file" : Path.GetFileName(path);
+
+        var (kind, summary, detail) = tool switch
+        {
+            "read" => (AuditKind.Read, $"Read {Name(File("filePath"))}", File("filePath")),
+            "edit" or "multiedit" or "patch" => (AuditKind.Change, $"Changed {Name(File("filePath"))}", Text(metadata, "diff") ?? File("filePath")),
+            "write" => (AuditKind.Change, $"Wrote {Name(File("filePath"))}", Text(metadata, "diff") ?? File("filePath")),
+            "bash" => (AuditKind.Command, $"Ran {Text(state, "title") ?? Text(input, "command") ?? "a command"}", $"$ {Text(input, "command")}\n{output}"),
+            "glob" or "grep" or "list" or "codesearch" =>
+                (AuditKind.Search, Text(input, "pattern") is { } pattern ? $"Searched the code for {pattern}" : "Searched the code", output),
+            "webfetch" or "websearch" => (AuditKind.Other, $"Looked up {Text(input, "url") ?? Text(input, "query") ?? "something online"}", null),
+            _ => (AuditKind.Other, $"Used {tool}", output),
+        };
+
+        if (tool == "bash" && metadata.ValueKind == JsonValueKind.Object
+            && metadata.TryGetProperty("exit", out var exit) && exit.ValueKind == JsonValueKind.Number && exit.GetInt32() != 0)
+        {
+            failed = true;
+        }
+
+        if (failed && Text(state, "error") is { } error)
+        {
+            detail = detail is null ? error : $"{detail}\n{error}";
+        }
+
+        return new AgentSignal.ToolFinished(sessionId, callId, kind, Shorten(summary), detail, !failed);
     }
 
     private static AgentSignal.PermissionAsked FromPermission(JsonElement props)

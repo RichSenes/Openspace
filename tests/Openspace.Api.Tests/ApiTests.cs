@@ -200,4 +200,20 @@ public sealed class ApiTests : IDisposable
         Assert.Equal("Stopped", activity.GetProperty("kind").GetString());
         Assert.Equal("Done: waiting for review", activity.GetProperty("headline").GetString());
     }
+
+    [Fact]
+    public async Task A_task_has_a_log_and_a_downloadable_report()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN", description = "Before Monday." });
+
+        var log = await GetAsync<List<JsonElement>>($"/api/tasks/{task.Id}/log");
+        var report = await _http.GetAsync($"/api/tasks/{task.Id}/report");
+
+        Assert.Equal("Lifecycle", log[0].GetProperty("kind").GetString());
+        Assert.Equal("Task created", log[0].GetProperty("summary").GetString());
+        Assert.Equal("text/markdown", report.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("attachment", report.Content.Headers.ContentDisposition?.ToString(), StringComparison.Ordinal);
+        Assert.Contains("# Patch the VPN", await report.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 }

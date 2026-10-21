@@ -85,10 +85,9 @@ Later, in rough order of appearance:
 
 - **Mouse navigation** of the building: wheel to zoom, left-drag to pan, click
   an office or a room to fly into it, with animated transitions.
-- **Audit log.** Every tool call an agent makes (files read and changed, commands
-  run, with their output) stored per task and readable as a timeline, plus an
-  exportable report of what changed and when. The events already flow through
-  Openspace; they only need to be kept.
+- ~~**Audit log.**~~ Done: every tool call, step, permission, note and status
+  change is stored per task, shown as a live timeline and exported as a Markdown
+  report.
 - **Servers as rooms.** A room can target a remote machine instead of a git
   repository: its desks work over SSH with the room's host, user and key
   reference (keys stay in the SSH agent or OpenCode's configuration, never in

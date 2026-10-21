@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Openspace.Domain.Work;
 using Openspace.Infrastructure.OpenCode;
 
 namespace Openspace.Infrastructure.Tests;
@@ -101,5 +102,44 @@ public class OpenCodeEventTranslatorTests
     {
         Assert.Null(Translate("""{"type":"server.heartbeat","properties":{}}"""));
         Assert.Null(Translate("""{"type":"file.edited","properties":{"file":"/a/b"}}"""));
+    }
+
+    private static string Done(string tool, string status, string input, string extra) =>
+        "{\"type\":\"message.part.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"part\":{\"type\":\"tool\",\"tool\":\""
+        + tool + "\",\"callID\":\"call_7\",\"sessionID\":\"ses_1\",\"state\":{\"status\":\"" + status + "\",\"input\":" + input + extra + "}}}}";
+
+    [Fact]
+    public void A_finished_edit_is_logged_as_a_change_with_its_diff()
+    {
+        var signal = Translate(Done("edit", "completed", """{"filePath":"/srv/worktrees/abc/header.php"}""",
+            ""","output":"Edit applied.","metadata":{"diff":"-old\n+new"}"""));
+
+        Assert.Equal(new AgentSignal.ToolFinished("ses_1", "call_7", AuditKind.Change, "Changed header.php", "-old\n+new", true), signal);
+    }
+
+    [Fact]
+    public void A_command_keeps_its_line_and_output_and_fails_on_a_nonzero_exit()
+    {
+        var signal = (AgentSignal.ToolFinished?)Translate(Done("bash", "completed", """{"command":"npm test"}""",
+            ""","title":"npm test","output":"1 failing","metadata":{"exit":1}"""));
+
+        Assert.Equal((AuditKind.Command, "Ran npm test", "$ npm test\n1 failing", false),
+            (signal?.Kind, signal?.Summary, signal?.Detail, signal?.Succeeded));
+    }
+
+    [Fact]
+    public void A_tool_error_is_logged_as_failed_with_the_error()
+    {
+        var signal = (AgentSignal.ToolFinished?)Translate(Done("read", "error", """{"filePath":"/srv/worktrees/abc/missing.php"}""",
+            ",\"error\":\"File not found\""));
+
+        Assert.False(signal?.Succeeded);
+        Assert.Contains("File not found", signal?.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Todo_list_writes_are_not_logged_as_tools()
+    {
+        Assert.Null(Translate(Done("todowrite", "completed", "{}", ",\"output\":\"[]\"")));
     }
 }

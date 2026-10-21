@@ -32,6 +32,15 @@ internal static class TaskEndpoints
         tasks.MapGet("/{taskId:guid}/diff", async (Guid taskId, WorkTaskQueries queries, CancellationToken ct) =>
             Results.Text(await queries.DiffAsync(new WorkTaskId(taskId), ct), "text/plain"));
 
+        tasks.MapGet("/{taskId:guid}/log", (Guid taskId, WorkTaskQueries queries, CancellationToken ct) =>
+            queries.LogAsync(new WorkTaskId(taskId), ct));
+
+        tasks.MapGet("/{taskId:guid}/report", async (Guid taskId, WorkTaskQueries queries, CancellationToken ct) =>
+            Results.File(
+                System.Text.Encoding.UTF8.GetBytes(await queries.ReportAsync(new WorkTaskId(taskId), ct)),
+                "text/markdown; charset=utf-8",
+                $"task-{taskId.ToString("N")[..8]}.md"));
+
         tasks.MapPost("/{taskId:guid}/permission", (
             Guid taskId, PermissionRequest request, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.ReplyToPermissionAsync(new WorkTaskId(taskId), request.Allow, ct)));

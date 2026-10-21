@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<OpenspaceDbContext>());
         services.AddScoped<IOfficeRepository, OfficeRepository>();
         services.AddScoped<IWorkTaskRepository, WorkTaskRepository>();
+        services.AddScoped<IAuditLog, AuditLog>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();

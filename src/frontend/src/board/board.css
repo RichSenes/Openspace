@@ -91,9 +91,9 @@
 .drawer {
   position: absolute;
   inset: 0 0 0 auto;
-  width: min(440px, 100%);
+  width: min(480px, 100%);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   border-left: 1px solid var(--line);
   background: var(--panel);
   box-shadow: -16px 0 32px rgb(0 0 0 / 0.35);
@@ -245,4 +245,114 @@
 
 .diff-meta {
   color: var(--mute);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-tabs button {
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+}
+
+.drawer-tabs button[aria-selected='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.log {
+  display: grid;
+  gap: 12px;
+}
+
+.log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.segmented button {
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.log-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-entry {
+  display: grid;
+  grid-template-columns: auto 72px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.log-time {
+  color: var(--mute);
+}
+
+.log-kind {
+  font-size: 10px;
+  color: var(--mute);
+}
+
+.log-change .log-kind { color: var(--st-running); }
+.log-command .log-kind { color: var(--st-queued); }
+.log-permission .log-kind { color: var(--accent); }
+.log-lifecycle .log-kind { color: var(--st-proposed); }
+
+.log-body p,
+.log-body summary {
+  margin: 0;
+  cursor: default;
+}
+
+.log-body summary {
+  cursor: pointer;
+}
+
+.log-body pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 280px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--bg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-failed {
+  color: var(--danger);
 }

@@ -9,4 +9,7 @@ internal sealed class SignalRActivityPublisher(IHubContext<BuildingHub> hub) : I
 {
     public Task PublishAsync(DeskActivity activity, CancellationToken cancellationToken) =>
         hub.Clients.All.SendAsync("DeskActivity", activity, cancellationToken);
+
+    public Task LogChangedAsync(Guid taskId, CancellationToken cancellationToken) =>
+        hub.Clients.All.SendAsync("TaskLogChanged", taskId, cancellationToken);
 }

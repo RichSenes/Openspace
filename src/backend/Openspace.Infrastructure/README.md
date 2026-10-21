@@ -31,6 +31,7 @@ EF Core on SQLite.
 | `Desks` | Desks with their agent profile, owned by a room |
 | `WorkTasks` | Tasks; status stored as text |
 | `TaskNotes` | Notes, owned by a task |
+| `AuditEntries` | The audit log: one row per thing that happened, numbered in recording order |
 
 - Rooms, desks and notes are mapped as owned entities, so they are always loaded
   and saved with their aggregate.
@@ -63,6 +64,12 @@ Events become speech bubbles like this:
 | `permission.asked` | The desk waits for you, with Allow once / Refuse |
 | `session.idle` | The task goes to review; the agent's last answer becomes a note |
 | `session.error` | The task fails with the reason (except aborts Openspace asked for) |
+| `message.part.updated`, tool completed or error | An audit log line: `Changed header.php` with the diff, `Ran npm test` with the command, its output and whether it exited 0, `Read index.html`, `Searched the code for …` |
+
+Audit lines from tool calls carry the OpenCode call id; a unique index on
+(task, call id) records each call once even if OpenCode repeats the event. Lines
+about the task's own life (created, started, merged, notes…) come from domain
+events and are written in the same `SaveChanges` as the change they describe.
 
 ## Workspaces
 

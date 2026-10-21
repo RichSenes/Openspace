@@ -129,7 +129,7 @@ public sealed class PersistenceTests : IAsyncLifetime
             var tasks = sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>();
             var task = (await tasks.FindAsync(taskId, default))!;
             task.Start(_db.Clock.GetUtcNow());
-            task.AttachRun(AgentRun.Create("ses_fsociety", "/srv/worktrees/abc", "openspace/add-a-logout-button-abc"));
+            task.AttachRun(AgentRun.Create("ses_fsociety", "/srv/worktrees/abc", "openspace/add-a-logout-button-abc"), _db.Clock.GetUtcNow());
             await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
         });
 
@@ -141,5 +141,39 @@ public sealed class PersistenceTests : IAsyncLifetime
         Assert.Equal("/srv/worktrees/abc", found?.Run?.WorkspacePath);
         Assert.Equal(repository, view.RepositoryPath);
         Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public async Task The_audit_trail_is_saved_with_the_changes_it_describes()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
+            .AssignAsync(office, frontend, "Add a logout button", null, "elliot", default));
+        await InScope(sp => sp.GetRequiredService<WorkTaskCommands>().AddNoteAsync(taskId, "darlene", "Top right.", default));
+
+        var log = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().LogAsync(taskId, default));
+
+        Assert.Equal(["Task created", "Queued for its desk", "Note from darlene"], log.Select(e => e.Summary));
+        Assert.Equal("Top right.", log[^1].Detail);
+    }
+
+    [Fact]
+    public async Task The_same_source_event_cannot_be_stored_twice()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
+            .AssignAsync(office, frontend, "Add a logout button", null, "elliot", default));
+
+        await InScope(async sp =>
+        {
+            var audit = sp.GetRequiredService<Application.Abstractions.IAuditLog>();
+            audit.Add(AuditEntry.Record(taskId, _db.Clock.GetUtcNow(), AuditKind.Command, "Ran ls", externalId: "call_1"));
+            audit.Add(AuditEntry.Record(taskId, _db.Clock.GetUtcNow(), AuditKind.Command, "Ran ls", externalId: "call_1"));
+            await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() =>
+                sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default));
+        });
+        var contains = await InScope(sp => sp.GetRequiredService<Application.Abstractions.IAuditLog>().ContainsAsync(taskId, "call_1", default));
+
+        Assert.False(contains);
     }
 }

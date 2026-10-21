@@ -29,6 +29,8 @@ internal sealed class Harness
 
     public RecordingPublisher Publisher { get; } = new();
 
+    public InMemoryAuditLog Audit { get; } = new();
+
     public ActivityBoard Activity { get; }
 
     public Office Office { get; }
@@ -64,9 +66,9 @@ internal sealed class Harness
         new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
         Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
-    public AgentSignals Signals() => new(Tasks, UnitOfWork, Runtime, Activity, Clock);
+    public AgentSignals Signals() => new(Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
     public OfficeCommands OfficeCommands() => new(Offices, UnitOfWork, Workspaces, Clock);
 
-    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock);
+    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Clock);
 }

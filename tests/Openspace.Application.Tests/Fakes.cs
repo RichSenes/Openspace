@@ -172,4 +172,25 @@ internal sealed class RecordingPublisher : IActivityPublisher
         Published.Add(activity);
         return Task.CompletedTask;
     }
+
+    public List<Guid> LogChanges { get; } = [];
+
+    public Task LogChangedAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        LogChanges.Add(taskId);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryAuditLog : IAuditLog
+{
+    public List<AuditEntry> Items { get; } = [];
+
+    public Task<IReadOnlyList<AuditEntry>> ForTaskAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AuditEntry>>([.. Items.Where(e => e.TaskId == taskId).OrderBy(e => e.At)]);
+
+    public Task<bool> ContainsAsync(WorkTaskId taskId, string externalId, CancellationToken cancellationToken) =>
+        Task.FromResult(Items.Exists(e => e.TaskId == taskId && e.ExternalId == externalId));
+
+    public void Add(AuditEntry entry) => Items.Add(entry);
 }

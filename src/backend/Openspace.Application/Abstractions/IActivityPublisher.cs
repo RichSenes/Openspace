@@ -6,4 +6,7 @@ namespace Openspace.Application.Abstractions;
 public interface IActivityPublisher
 {
     Task PublishAsync(DeskActivity activity, CancellationToken cancellationToken);
+
+    /// <summary>New lines were added to a task's audit log.</summary>
+    Task LogChangedAsync(Guid taskId, CancellationToken cancellationToken);
 }

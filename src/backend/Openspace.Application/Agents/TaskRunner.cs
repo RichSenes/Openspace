@@ -73,7 +73,7 @@ public sealed partial class TaskRunner(
                     .ConfigureAwait(false);
 
                 // Saved before prompting, so the agent's first events can find their task.
-                task.AttachRun(AgentRun.Create(sessionId, workspace.Path, workspace.Branch));
+                task.AttachRun(AgentRun.Create(sessionId, workspace.Path, workspace.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 message = Briefing.ForNewTask(office, room, desk, task);
             }

@@ -24,7 +24,7 @@ public class WorkTaskCommandsTests
         _desk = _office.AddDesk(room.Id, "Frontend", AgentProfile.Create("frontend-dev"), _clock.GetUtcNow());
         _offices.Add(_office);
         _commands = new WorkTaskCommands(
-            _offices, _tasks, _unitOfWork, new FakeRuntime(), new FakeWorkspaces(), new Agents.ActivityBoard(new RecordingPublisher()), _clock);
+            _offices, _tasks, _unitOfWork, new FakeRuntime(), new FakeWorkspaces(), new Agents.ActivityBoard(new RecordingPublisher()), new InMemoryAuditLog(), _clock);
     }
 
     [Fact]

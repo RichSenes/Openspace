@@ -23,6 +23,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks/{id}/discard` | Drop an open task |
 | POST | `/api/tasks/{id}/notes` | Add a note as the operator: `{ text }` |
 | GET | `/api/tasks/{id}/diff` | What the agent changed, as a unified diff (plain text) |
+| GET | `/api/tasks/{id}/log` | The task's audit log, oldest first |
+| GET | `/api/tasks/{id}/report` | A Markdown report of the task, as a download |
 | POST | `/api/tasks/{id}/permission` | Answer an agent waiting for permission: `{ allow }` |
 | POST | `/api/tasks/{id}/merge` | Merge accepted work into one of your branches: `{ target }`. `422` with code `uncommitted-changes`, `merge-conflict` or `branch-missing` when it cannot be done safely |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
@@ -44,6 +46,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `OfficeChanged` | office id | an office, room or desk changes |
 | `TaskChanged` | task id | a task is created, changes status or gets a note |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
+| `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity` carries the data itself,

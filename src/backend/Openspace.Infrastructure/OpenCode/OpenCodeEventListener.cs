@@ -84,6 +84,7 @@ internal sealed partial class OpenCodeEventListener(
                 AgentSignal.Progress p => signals.ProgressAsync(p.SessionId, p.Step, p.Doing, cancellationToken),
                 AgentSignal.PermissionAsked p => signals.PermissionAskedAsync(p.SessionId, p.PermissionId, p.Description, cancellationToken),
                 AgentSignal.Finished f => signals.FinishedAsync(f.SessionId, cancellationToken),
+                AgentSignal.ToolFinished t => signals.ToolFinishedAsync(t.SessionId, t.CallId, t.Kind, t.Summary, t.Detail, t.Succeeded, cancellationToken),
                 AgentSignal.Failed f => signals.FailedAsync(f.SessionId, f.Reason, cancellationToken),
                 _ => Task.CompletedTask,
             };

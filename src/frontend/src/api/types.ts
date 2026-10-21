@@ -53,6 +53,17 @@ export interface WorkTaskView {
   notes: TaskNoteView[]
 }
 
+export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Other'
+
+export interface AuditEntryView {
+  id: number
+  at: string
+  kind: AuditKind
+  summary: string
+  detail: string | null
+  succeeded: boolean | null
+}
+
 export interface BranchList {
   current: string | null
   branches: string[]

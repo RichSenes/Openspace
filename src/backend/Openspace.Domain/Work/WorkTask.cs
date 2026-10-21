@@ -142,7 +142,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     }
 
     /// <summary>Records where the agent works. Kept across retries so the agent can resume.</summary>
-    public void AttachRun(AgentRun run)
+    public void AttachRun(AgentRun run, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(run);
         if (Status != WorkTaskStatus.Running)
@@ -151,6 +151,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         Run = run;
+        Raise(new WorkTaskRunAttached(Id, run.Branch, run.WorkspacePath, now));
     }
 
     public void SubmitForReview(DateTimeOffset now)

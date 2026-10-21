@@ -90,6 +90,11 @@ h3 {
   transition: border-color 120ms ease, background 120ms ease;
 }
 
+a.btn {
+  color: var(--ink);
+  text-decoration: none;
+}
+
 .btn:hover:not(:disabled) {
   border-color: var(--mute);
 }

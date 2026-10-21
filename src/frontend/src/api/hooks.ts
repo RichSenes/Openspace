@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
-import type { BranchList, DeskActivity, OfficeView, WorkTaskView } from './types'
+import type { AuditEntryView, BranchList, DeskActivity, OfficeView, WorkTaskView } from './types'
 
 export const keys = {
   offices: ['offices'] as const,
@@ -8,6 +8,7 @@ export const keys = {
   tasks: ['tasks'] as const,
   officeTasks: (officeId: string) => ['tasks', 'office', officeId] as const,
   diff: (taskId: string) => ['tasks', 'diff', taskId] as const,
+  log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
 }
@@ -151,4 +152,13 @@ export function useMergeTask() {
       request<void>('POST', `/api/tasks/${input.taskId}/merge`, { target: input.target }),
     keys.tasks,
   )
+}
+
+/** A task's audit log. Refetched when the task changes or its log grows. */
+export function useTaskLog(taskId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.log(taskId),
+    queryFn: () => request<AuditEntryView[]>('GET', `/api/tasks/${taskId}/log`),
+    enabled,
+  })
 }

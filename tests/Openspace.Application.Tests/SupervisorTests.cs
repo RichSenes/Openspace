@@ -55,13 +55,69 @@ public class SupervisorTests
     }
 
     [Fact]
-    public async Task A_task_for_an_unknown_desk_is_proposed_without_one()
+    public async Task A_task_for_an_unknown_desk_is_proposed_without_one_saying_what_was_suggested()
     {
-        _h.Runtime.Plan = Plan("Logout", ("Add a logout button", "Mobile"));
+        _h.Runtime.Plans.Enqueue(Plan("Logout", ("Add a logout button", "Mobile")));
+        _h.Runtime.Plans.Enqueue("""{"desks":["Nobody"]}""");
 
         await _h.Supervisor().PlanAsync(_h.Office.Id, "Add logout.", "elliot", default);
 
-        Assert.Null(Assert.Single(_h.Tasks.Items).DeskId);
+        var task = Assert.Single(_h.Tasks.Items);
+        Assert.Null(task.DeskId);
+        Assert.Contains("suggested a desk named \"Mobile\"", task.Notes[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_schema_lists_the_desks_as_the_only_allowed_values()
+    {
+        _h.Runtime.Plan = Plan("Logout", ("Add a logout button", "Frontend"));
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Add logout.", "elliot", default);
+
+        using var schema = JsonDocument.Parse(Assert.Single(_h.Runtime.PlanSchemas));
+        var desk = schema.RootElement.GetProperty("properties").GetProperty("tasks").GetProperty("items").GetProperty("properties").GetProperty("desk");
+        Assert.Equal(["Frontend", "Tester"], desk.GetProperty("enum").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal("desk", schema.RootElement.GetProperty("properties").GetProperty("tasks").GetProperty("items").GetProperty("properties").EnumerateObject().First().Name);
+    }
+
+    [Fact]
+    public async Task Missing_or_wrong_desks_are_filled_in_by_a_short_follow_up_question()
+    {
+        _h.Runtime.Plans.Enqueue(Plan("Logout", ("Add a logout button", "Sviluppatore"), ("Check it", ""), ("Style it", "Frontend")));
+        _h.Runtime.Plans.Enqueue("""{"desks":["Frontend","Tester","Tester"]}""");
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Add logout.", "elliot", default);
+
+        Assert.Equal(2, _h.Runtime.PlanRequests.Count);
+        var question = _h.Runtime.PlanRequests[1].Text;
+        Assert.Contains("1. Add a logout button", question, StringComparison.Ordinal);
+        Assert.Contains("exactly 3 desk names", question, StringComparison.Ordinal);
+        Assert.Equal([_h.Desk.Id, _tester.Id, _h.Desk.Id], _h.Tasks.Items.Select(t => t.DeskId!.Value));
+    }
+
+    [Fact]
+    public async Task A_useless_follow_up_answer_keeps_the_plan_and_explains()
+    {
+        _h.Runtime.Plans.Enqueue(Plan("Logout", ("Add a logout button", "")));
+        _h.Runtime.Plans.Enqueue("not json");
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Add logout.", "elliot", default);
+
+        var task = Assert.Single(_h.Tasks.Items);
+        Assert.Null(task.DeskId);
+        Assert.Contains("did not name a desk", task.Notes[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_a_single_desk_everything_goes_to_it_without_asking_again()
+    {
+        var single = new Harness();
+        single.Runtime.Plan = Plan("Phone field", ("Add the phone field", ""), ("Write the checklist", "Sviluppatore"));
+
+        await single.Supervisor().PlanAsync(single.Office.Id, "Aggiungi il telefono.", "elliot", default);
+
+        Assert.Single(single.Runtime.PlanRequests);
+        Assert.All(single.Tasks.Items, t => Assert.Equal(single.Desk.Id, t.DeskId));
     }
 
     [Fact]

@@ -57,6 +57,7 @@ public sealed class SupervisorApiTests : IDisposable
             (await _http.PutAsJsonAsync($"/api/offices/{office}/repository", new { path = folder, initialize = true })).EnsureSuccessStatusCode();
             var room = (await PostAsync($"/api/offices/{office}/rooms", new { name = "Web" })).GetProperty("id").GetGuid();
             await PostAsync($"/api/offices/{office}/rooms/{room}/desks", new { name = "Frontend", agentName = "build" });
+            await PostAsync($"/api/offices/{office}/rooms/{room}/desks", new { name = "Tester", agentName = "build" });
 
             var plan = await PostAsync($"/api/offices/{office}/plan", new { request = "Add a contact page." });
             var epicId = plan.GetProperty("epic").GetProperty("id").GetGuid();

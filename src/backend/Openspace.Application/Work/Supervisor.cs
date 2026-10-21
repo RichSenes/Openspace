@@ -23,27 +23,39 @@ public sealed class Supervisor(
     /// <summary>The supervisor never proposes more than this; larger plans are cut.</summary>
     public const int MaxTasks = 12;
 
-    private const string Schema = """
+    private static readonly string[] TaskFields = ["desk", "title", "description"];
+    private static readonly string[] AssignmentFields = ["desks"];
+    private static readonly string[] PlanFields = ["title", "tasks"];
+
+    /// <summary>
+    /// The answer's shape. Desk names are listed as the only allowed values; OpenCode does
+    /// not enforce schemas strictly, so the plan is checked again on arrival.
+    /// </summary>
+    private static string Schema(IEnumerable<string> deskNames) => JsonSerializer.Serialize(new
+    {
+        type = "object",
+        properties = new
         {
-          "type": "object",
-          "properties": {
-            "title": { "type": "string", "description": "A short title for the whole request" },
-            "tasks": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "title": { "type": "string", "description": "What to do, as a short imperative sentence" },
-                  "description": { "type": "string", "description": "Everything the desk needs to do it alone: files, rules, what done means" },
-                  "desk": { "type": "string", "description": "The exact name of the desk that should do it" }
+            title = new { type = "string", description = "A short title for the whole request" },
+            tasks = new
+            {
+                type = "array",
+                items = new
+                {
+                    type = "object",
+                    // Desk first: small models tend to drop a field that comes after a long description.
+                    properties = new
+                    {
+                        desk = new { type = "string", description = "The exact name of the desk that should do it", @enum = deskNames.ToArray() },
+                        title = new { type = "string", description = "What to do, as a short imperative sentence" },
+                        description = new { type = "string", description = "Everything the desk needs to do it alone: files, rules, what done means" },
+                    },
+                    required = TaskFields,
                 },
-                "required": ["title", "description", "desk"]
-              }
-            }
-          },
-          "required": ["title", "tasks"]
-        }
-        """;
+            },
+        },
+        required = PlanFields,
+    });
 
     private const string Instructions = """
         You are the supervisor of an office of AI agents working on one software project.
@@ -73,18 +85,16 @@ public sealed class Supervisor(
             throw new RejectedException("no-desks", $"Office '{office.Name}' has no desks yet: add some in Rooms first.");
         }
 
-        string json;
-        try
+        var prompt = Prompt(office, desks, request.Trim());
+        var (title, planned) = await AskAsync(office.RepositoryPath, prompt, desks, cancellationToken).ConfigureAwait(false);
+
+        // Small models sometimes drop or misspell the desk. The plan itself is fine, so
+        // instead of planning again ask one short question: which desk for each task.
+        if (desks.Count > 1 && planned.Any(p => Match(desks, p.Desk) is null))
         {
-            json = await runtime.PlanAsync(
-                office.RepositoryPath, Instructions, Prompt(office, desks, request.Trim()), Schema, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
-        {
-            throw new RejectedException("planning-failed", $"The supervisor could not plan this: {ex.Message}");
+            planned = await AssignDesksAsync(office.RepositoryPath, planned, desks, cancellationToken).ConfigureAwait(false);
         }
 
-        var (title, planned) = Read(json);
         if (planned.Count == 0)
         {
             throw new RejectedException("planning-failed", "The supervisor did not propose any task. Try describing the request in more detail.");
@@ -98,12 +108,16 @@ public sealed class Supervisor(
         foreach (var item in planned.Take(MaxTasks))
         {
             var task = WorkTask.Propose(office, item.Title, item.Description, requestedBy, now, epic);
-            if (Match(desks, item.Desk) is { } desk)
+            var desk = desks.Count == 1 ? desks[0].Id : Match(desks, item.Desk);
+            if (desk is { } chosen)
             {
-                task.AssignTo(office, desk);
+                task.AssignTo(office, chosen);
             }
 
-            task.AddNote(NoteAuthor.System, $"Proposed by the supervisor as part of \"{epic.Title}\".", now);
+            var why = desk is not null
+                ? string.Empty
+                : item.Desk.Length == 0 ? " It did not name a desk." : $" It suggested a desk named \"{item.Desk}\", which does not exist.";
+            task.AddNote(NoteAuthor.System, $"Proposed by the supervisor as part of \"{epic.Title}\".{why}", now);
             tasks.Add(task);
             created.Add(task);
         }
@@ -123,6 +137,78 @@ public sealed class Supervisor(
         proposed.ForEach(t => t.Approve(now));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return proposed.Count;
+    }
+
+    /// <summary>Fills in the desk of tasks that have none, with a short answer limited to real desk names.</summary>
+    private async Task<List<Planned>> AssignDesksAsync(
+        string folder, List<Planned> planned, List<DeskInfo> desks, CancellationToken cancellationToken)
+    {
+        var names = desks.Select(d => d.Name).ToArray();
+        var schema = JsonSerializer.Serialize(new
+        {
+            type = "object",
+            properties = new
+            {
+                desks = new
+                {
+                    type = "array",
+                    description = "One desk name per task, in the same order as the tasks",
+                    items = new { type = "string", @enum = names },
+                    minItems = planned.Count,
+                    maxItems = planned.Count,
+                },
+            },
+            required = AssignmentFields,
+        });
+        var question = new StringBuilder().AppendLine("Desks:");
+        foreach (var desk in desks)
+        {
+            question.AppendLine(CultureInfo.InvariantCulture, $"- {desk.Name} (room {desk.Room}): {desk.About}");
+        }
+
+        question.AppendLine().AppendLine("Tasks:");
+        for (var i = 0; i < planned.Count; i++)
+        {
+            var about = planned[i].Description.Length > 300 ? planned[i].Description[..300] : planned[i].Description;
+            question.AppendLine(CultureInfo.InvariantCulture, $"{i + 1}. {planned[i].Title}: {about}");
+        }
+
+        question.Append(CultureInfo.InvariantCulture, $"Answer with exactly {planned.Count} desk names, one per task, in order, chosen only from: {string.Join(", ", names)}.");
+
+        try
+        {
+            var json = await runtime
+                .PlanAsync(folder, "You assign tasks to the desks of a team of AI agents, by what each desk is for.", question.ToString(), schema, cancellationToken)
+                .ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var chosen = doc.RootElement.TryGetProperty("desks", out var list) && list.ValueKind == JsonValueKind.Array
+                ? list.EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetString()! : string.Empty).ToList()
+                : [];
+            // Only a real desk replaces the original suggestion, which notes keep otherwise.
+            return [.. planned.Select((p, i) =>
+                Match(desks, p.Desk) is null && i < chosen.Count && Match(desks, chosen[i]) is not null ? p with { Desk = chosen[i] } : p)];
+        }
+        catch (Exception ex) when (ex is RejectedException or JsonException)
+        {
+            // Keep the plan; the tasks without a desk say so in their notes.
+            return planned;
+        }
+    }
+
+    private async Task<(string Title, List<Planned> Tasks)> AskAsync(
+        string folder, string prompt, List<DeskInfo> desks, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var json = await runtime
+                .PlanAsync(folder, Instructions, prompt, Schema(desks.Select(d => d.Name)), cancellationToken)
+                .ConfigureAwait(false);
+            return Read(json);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            throw new RejectedException("planning-failed", $"The supervisor could not plan this: {ex.Message}");
+        }
     }
 
     private sealed record DeskInfo(DeskId Id, string Name, string Room, string? Role, string About, string RoomRules);

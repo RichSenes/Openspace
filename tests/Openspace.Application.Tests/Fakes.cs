@@ -68,6 +68,11 @@ internal sealed class FakeRuntime : IAgentRuntime
 
     public string Plan { get; set; } = "{}";
 
+    /// <summary>Answers for successive plans; when empty, <see cref="Plan"/> is used.</summary>
+    public Queue<string> Plans { get; } = new();
+
+    public List<string> PlanSchemas { get; } = [];
+
     public Exception? FailOnPlan { get; set; }
 
     public List<(string Folder, string Text)> PlanRequests { get; } = [];
@@ -80,7 +85,8 @@ internal sealed class FakeRuntime : IAgentRuntime
         }
 
         PlanRequests.Add((folder, text));
-        return Task.FromResult(Plan);
+        PlanSchemas.Add(jsonSchema);
+        return Task.FromResult(Plans.Count > 0 ? Plans.Dequeue() : Plan);
     }
 
     public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)

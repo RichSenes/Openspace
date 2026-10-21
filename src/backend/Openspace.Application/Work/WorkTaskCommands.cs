@@ -69,6 +69,7 @@ public sealed class WorkTaskCommands(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
     }
 
     public Task SendBackAsync(
@@ -83,8 +84,10 @@ public sealed class WorkTaskCommands(
     {
         var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
         var wasRunning = task.Status == WorkTaskStatus.Running;
-        task.Discard(clock.GetUtcNow());
+        var now = clock.GetUtcNow();
+        task.Discard(now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
 
         if (task.Run is { } run)
         {

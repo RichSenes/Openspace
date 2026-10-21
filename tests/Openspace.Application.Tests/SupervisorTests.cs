@@ -139,4 +139,35 @@ public class SupervisorTests
         Assert.Equal(1, approved);
         Assert.Equal([WorkTaskStatus.Queued, WorkTaskStatus.Proposed], _h.Tasks.Items.Select(t => t.Status));
     }
+
+    [Theory]
+    [InlineData("WordPress Developer")]
+    [InlineData("Web")]
+    [InlineData("Web / WordPress Developer")]
+    public async Task A_desk_named_after_its_engine_is_still_found_by_role_or_room(string written)
+    {
+        var role = Role.Define("WordPress Developer", "Develops the theme", null, null, RolePermissions.Default, Harness.Start);
+        _h.Roles.Add(role);
+        _h.Office.RenameDesk(_h.Desk.Id, "build", Harness.Start);
+        _h.Office.SetDeskRole(_h.Desk.Id, role.Id, Harness.Start);
+        _h.Runtime.Plan = Plan("Contact page", ("Build the form", written));
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Add a contact page.", "elliot", default);
+
+        Assert.Equal(_h.Desk.Id, _h.Tasks.Items[0].DeskId);
+    }
+
+    [Fact]
+    public async Task A_role_or_room_shared_by_several_desks_is_too_vague_to_assign()
+    {
+        var role = Role.Define("Developer", null, null, null, RolePermissions.Default, Harness.Start);
+        _h.Roles.Add(role);
+        _h.Office.SetDeskRole(_h.Desk.Id, role.Id, Harness.Start);
+        _h.Office.SetDeskRole(_tester.Id, role.Id, Harness.Start);
+        _h.Runtime.Plan = Plan("Contact page", ("Build the form", "Developer"));
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Add a contact page.", "elliot", default);
+
+        Assert.Null(_h.Tasks.Items[0].DeskId);
+    }
 }

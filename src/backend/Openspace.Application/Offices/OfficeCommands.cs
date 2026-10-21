@@ -53,6 +53,13 @@ public sealed class OfficeCommands(
         return room.Id;
     }
 
+    public async Task RenameDeskAsync(OfficeId officeId, DeskId deskId, string name, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.RenameDesk(deskId, name, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Gives a desk a role, or takes it away with null. Applies from the desk's next task.</summary>
     public async Task SetDeskRoleAsync(OfficeId officeId, DeskId deskId, RoleId? roleId, CancellationToken cancellationToken)
     {

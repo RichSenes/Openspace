@@ -65,6 +65,13 @@ internal static class OfficeEndpoints
             return Results.Ok(new { id = id.Value });
         });
 
+        offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/name", async (
+            Guid officeId, Guid deskId, NameRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.RenameDeskAsync(new OfficeId(officeId), new DeskId(deskId), request.Name, ct);
+            return Results.NoContent();
+        });
+
         offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/role", async (
             Guid officeId, Guid deskId, DeskRoleRequest request, OfficeCommands commands, CancellationToken ct) =>
         {

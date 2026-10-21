@@ -20,7 +20,7 @@ public sealed class Desk
 
     public DeskId Id { get; }
 
-    public string Name { get; }
+    public string Name { get; private set; }
 
     public AgentProfile Agent { get; private set; }
 
@@ -30,4 +30,6 @@ public sealed class Desk
     internal void Reassign(AgentProfile agent) => Agent = agent;
 
     internal void GiveRole(RoleId? roleId) => RoleId = roleId;
+
+    internal void Rename(string name) => Name = name;
 }

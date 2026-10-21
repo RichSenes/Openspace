@@ -1,8 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { ApiError } from '../api/client'
-import { INITIALIZABLE, useAddDesk, useOpenRoom, useRoles, useSetDeskRole, useSetRepository, useUpdateRoomContext } from '../api/hooks'
-import type { OfficeView, RoomView } from '../api/types'
+import {
+  INITIALIZABLE,
+  useAddDesk,
+  useOpenRoom,
+  useRenameDesk,
+  useRoles,
+  useSetDeskRole,
+  useSetRepository,
+  useUpdateRoomContext,
+} from '../api/hooks'
+import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import './rooms.css'
 
@@ -113,7 +122,6 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
   const updateContext = useUpdateRoomContext(officeId)
   const addDesk = useAddDesk(officeId)
   const roles = useRoles()
-  const setDeskRole = useSetDeskRole(officeId)
   const toast = useToast()
 
   const saveContext = (e: FormEvent) => {
@@ -158,58 +166,24 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
 
       <section className="desks" aria-label={`Desks in ${room.name}`}>
         <h3 className="pixel desks-title">Desks</h3>
-        {setDeskRole.error && <p className="error">{setDeskRole.error.message}</p>}
         {room.desks.length === 0 ? (
           <p className="hint">No desks yet: nobody works here.</p>
         ) : (
           <ul className="desk-list">
             {room.desks.map((d) => (
-              <li key={d.id}>
-                <div className="desk-line">
-                  <span>{d.name}</span>
-                  <span className="mono hint">
-                    {d.agentName}
-                    {d.model && ` · ${d.model}`}
-                  </span>
-                </div>
-                <label className="desk-role">
-                  <span className="sr-only">Role of {d.name}</span>
-                  <select
-                    className="input"
-                    value={d.roleId ?? ''}
-                    disabled={setDeskRole.isPending}
-                    onChange={(e) =>
-                      setDeskRole.mutate(
-                        { deskId: d.id, roleId: e.target.value || null },
-                        { onSuccess: () => toast(`${d.name}: role changed, from its next task`) },
-                      )
-                    }
-                  >
-                    <option value="">No role</option>
-                    {roles.data?.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </li>
+              <DeskItem key={d.id} officeId={officeId} desk={d} roles={roles.data ?? []} />
             ))}
           </ul>
         )}
 
         <form className="desk-new" onSubmit={submitDesk}>
           <label className="field">
-            <span>Desk name</span>
-            <input className="input" value={desk.name} onChange={(e) => setDesk({ ...desk, name: e.target.value })} required />
-          </label>
-          <label className="field">
-            <span>OpenCode agent</span>
+            <span>Desk name: who sits here, in words you like</span>
             <input
-              className="input mono"
-              value={desk.agentName}
-              onChange={(e) => setDesk({ ...desk, agentName: e.target.value })}
-              placeholder="frontend-dev"
+              className="input"
+              value={desk.name}
+              onChange={(e) => setDesk({ ...desk, name: e.target.value })}
+              placeholder="e.g. Theme developer"
               required
             />
           </label>
@@ -224,15 +198,27 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
               ))}
             </select>
           </label>
-          <label className="field">
-            <span>Model (optional)</span>
-            <input
-              className="input mono"
-              value={desk.model}
-              onChange={(e) => setDesk({ ...desk, model: e.target.value })}
-              placeholder="provider/model"
-            />
-          </label>
+          <details className="advanced">
+            <summary className="hint">Advanced: OpenCode engine and model</summary>
+            <label className="field">
+              <span>OpenCode agent that runs the desk (build works, plan only reads)</span>
+              <input
+                className="input mono"
+                value={desk.agentName}
+                onChange={(e) => setDesk({ ...desk, agentName: e.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Model (optional, wins over the role&apos;s)</span>
+              <input
+                className="input mono"
+                value={desk.model}
+                onChange={(e) => setDesk({ ...desk, model: e.target.value })}
+                placeholder="provider/model"
+              />
+            </label>
+          </details>
           <div className="row">
             <button type="submit" className="btn" disabled={addDesk.isPending}>
               <Plus size={16} /> Add desk
@@ -242,5 +228,76 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
         </form>
       </section>
     </article>
+  )
+}
+
+function DeskItem({ officeId, desk, roles }: { officeId: string; desk: DeskView; roles: RoleView[] }) {
+  const [renaming, setRenaming] = useState(false)
+  const [name, setName] = useState(desk.name)
+  const rename = useRenameDesk(officeId)
+  const setRole = useSetDeskRole(officeId)
+  const toast = useToast()
+  const role = roles.find((r) => r.id === desk.roleId)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    rename.mutate(
+      { deskId: desk.id, name },
+      {
+        onSuccess: () => {
+          toast(`Renamed to ${name.trim()}`)
+          setRenaming(false)
+        },
+      },
+    )
+  }
+
+  return (
+    <li>
+      {renaming ? (
+        <form className="desk-rename" onSubmit={submit}>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} aria-label="Desk name" required autoFocus />
+          <button type="submit" className="btn btn-primary" disabled={rename.isPending}>
+            Save
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => { setRenaming(false); setName(desk.name) }}>
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className="desk-line">
+          <span>{desk.name}</span>
+          <button type="button" className="btn btn-quiet desk-rename-btn" onClick={() => setRenaming(true)}>
+            Rename
+          </button>
+        </div>
+      )}
+      <span className="hint">
+        {role ? role.name : 'No role'} · engine <span className="mono">{desk.agentName}</span>
+        {desk.model && <span className="mono"> · {desk.model}</span>}
+      </span>
+      <label className="desk-role">
+        <span className="sr-only">Role of {desk.name}</span>
+        <select
+          className="input"
+          value={desk.roleId ?? ''}
+          disabled={setRole.isPending}
+          onChange={(e) =>
+            setRole.mutate(
+              { deskId: desk.id, roleId: e.target.value || null },
+              { onSuccess: () => toast(`${desk.name}: role changed, from its next task`) },
+            )
+          }
+        >
+          <option value="">No role</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(rename.error ?? setRole.error) && <p className="error">{(rename.error ?? setRole.error)!.message}</p>}
+    </li>
   )
 }

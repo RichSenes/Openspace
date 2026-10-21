@@ -26,14 +26,22 @@ public sealed class Room
 
     internal Desk AddDesk(string name, AgentProfile agent)
     {
+        var deskName = UniqueDeskName(name, null);
+        var desk = new Desk(DeskId.New(), deskName, agent);
+        _desks.Add(desk);
+        return desk;
+    }
+
+    internal void RenameDesk(Desk desk, string name) => desk.Rename(UniqueDeskName(name, desk.Id));
+
+    private string UniqueDeskName(string name, DeskId? self)
+    {
         var deskName = Guard.NotBlank(name, "Desk name", Office.MaxNameLength);
-        if (_desks.Exists(d => string.Equals(d.Name, deskName, StringComparison.OrdinalIgnoreCase)))
+        if (_desks.Exists(d => d.Id != self && string.Equals(d.Name, deskName, StringComparison.OrdinalIgnoreCase)))
         {
             throw new DomainException($"Room '{Name}' already has a desk named '{deskName}'.");
         }
 
-        var desk = new Desk(DeskId.New(), deskName, agent);
-        _desks.Add(desk);
-        return desk;
+        return deskName;
     }
 }

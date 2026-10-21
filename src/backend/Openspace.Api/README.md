@@ -38,6 +38,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | PUT | `/api/roles/{id}` | Change a role (same body) |
 | DELETE | `/api/roles/{id}` | Delete a role; `422` with code `role-in-use` while desks use it |
 | POST | `/api/roles/draft` | `{ name, description }` → `{ instructions }` drafted by the AI, not saved |
+| PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/role` | `{ roleId }` (null to remove); applies from the desk's next task |
 
 Enums travel as strings (`"Queued"`). Errors are

@@ -125,7 +125,7 @@ public sealed class Supervisor(
         return proposed.Count;
     }
 
-    private sealed record DeskInfo(DeskId Id, string Name, string Room, string About, string RoomRules);
+    private sealed record DeskInfo(DeskId Id, string Name, string Room, string? Role, string About, string RoomRules);
 
     private sealed record Planned(string Title, string Description, string Desk);
 
@@ -138,7 +138,7 @@ public sealed class Supervisor(
             var about = role is null
                 ? $"general agent ({desk.Agent.AgentName})"
                 : $"{role.Name}{(role.Description.Length > 0 ? $": {role.Description}" : string.Empty)}{Limits(role.Permissions)}";
-            return new DeskInfo(desk.Id, desk.Name, room.Name, about, room.Context);
+            return new DeskInfo(desk.Id, desk.Name, room.Name, role?.Name, about, room.Context);
         }))];
     }
 
@@ -187,10 +187,25 @@ public sealed class Supervisor(
     private static string Text(JsonElement item, string name) =>
         item.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()!.Trim() : string.Empty;
 
-    /// <summary>Finds the desk by name, forgiving case and an optional "Room / Desk" or "Desk (room …)" form.</summary>
+    /// <summary>
+    /// Finds the desk the model meant: by desk name first (forgiving case and "Room / Desk"
+    /// or "Desk (room …)" forms), else by role or room name when only one desk fits.
+    /// </summary>
     private static DeskId? Match(List<DeskInfo> desks, string name)
     {
-        var wanted = name.Split('(')[0].Split('/')[^1].Trim();
-        return desks.FirstOrDefault(d => string.Equals(d.Name, wanted, StringComparison.OrdinalIgnoreCase))?.Id;
+        var parts = name.Split('(')[0].Split('/').Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+        if (parts.Count == 0)
+        {
+            return null;
+        }
+
+        bool Same(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        DeskId? Only(Func<DeskInfo, bool> fits) => desks.Where(fits).ToList() is [var one] ? one.Id : null;
+
+        var wanted = parts[^1];
+        return desks.FirstOrDefault(d => Same(d.Name, wanted))?.Id
+            ?? Only(d => Same(d.Role, wanted))
+            ?? Only(d => Same(d.Room, wanted))
+            ?? Only(d => parts.Any(p => Same(d.Room, p)) && parts.Any(p => Same(d.Role, p)));
     }
 }

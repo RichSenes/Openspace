@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Openspace.Application.Agents;
 using Openspace.Application.Work;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
@@ -14,6 +15,8 @@ internal static class TaskEndpoints
 
     public sealed record TextRequest(string Text);
 
+    public sealed record PermissionRequest(bool Allow);
+
     public static void MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
         var tasks = app.MapGroup("/api/tasks").WithTags("Tasks");
@@ -23,6 +26,15 @@ internal static class TaskEndpoints
 
         tasks.MapGet("/{taskId:guid}", (Guid taskId, WorkTaskQueries queries, CancellationToken ct) =>
             queries.GetAsync(new WorkTaskId(taskId), ct));
+
+        tasks.MapGet("/{taskId:guid}/diff", async (Guid taskId, WorkTaskQueries queries, CancellationToken ct) =>
+            Results.Text(await queries.DiffAsync(new WorkTaskId(taskId), ct), "text/plain"));
+
+        tasks.MapPost("/{taskId:guid}/permission", (
+            Guid taskId, PermissionRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            NoContent(commands.ReplyToPermissionAsync(new WorkTaskId(taskId), request.Allow, ct)));
+
+        app.MapGet("/api/activity", (Guid? officeId, ActivityBoard board) => board.Snapshot(officeId)).WithTags("Activity");
 
         tasks.MapPost("/", async (
             CreateTaskRequest request,

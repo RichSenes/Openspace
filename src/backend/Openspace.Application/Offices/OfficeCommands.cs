@@ -14,6 +14,13 @@ public sealed class OfficeCommands(IOfficeRepository offices, IUnitOfWork unitOf
         return office.Id;
     }
 
+    public async Task SetRepositoryAsync(OfficeId officeId, string path, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetRepository(path, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<RoomId> OpenRoomAsync(OfficeId officeId, string name, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

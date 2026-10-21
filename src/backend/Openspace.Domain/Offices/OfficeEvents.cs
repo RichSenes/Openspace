@@ -13,3 +13,5 @@ public sealed record DeskAdded(OfficeId OfficeId, RoomId RoomId, DeskId DeskId, 
 public sealed record RoomContextUpdated(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record DeskReassigned(OfficeId OfficeId, DeskId DeskId, AgentProfile Agent, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record OfficeRepositorySet(OfficeId OfficeId, string Path, DateTimeOffset OccurredAt) : IDomainEvent;

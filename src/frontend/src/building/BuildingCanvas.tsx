@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Application, Container, Graphics, Text } from 'pixi.js'
-import type { OfficeView } from '../api/types'
+import type { DeskActivity, OfficeView } from '../api/types'
 import { bestLayout, TILE, type BuildingLayout } from './layout'
 
 const COLORS = {
@@ -15,16 +15,23 @@ const COLORS = {
   screenOn: 0x8fd282,
   label: 0xece8df,
   mute: 0xa3a8b6,
+  bubble: 0xece8df,
+  bubbleText: 0x14161c,
+  waiting: 0xf2b84b,
 }
+
+const BUBBLE_WIDTH = 132
 
 interface Props {
   office: OfficeView
   /** Desks with a running task: their screens are lit. */
   busyDeskIds: ReadonlySet<string>
+  /** What each desk is doing, by desk id: shown as speech bubbles. */
+  activities: ReadonlyMap<string, DeskActivity>
 }
 
 /** Draws the selected office as a pixel-art floor plan. Sprites will replace the placeholder shapes. */
-export function BuildingCanvas({ office, busyDeskIds }: Props) {
+export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
@@ -40,7 +47,7 @@ export function BuildingCanvas({ office, busyDeskIds }: Props) {
         width: Math.max(1, app.screen.width - margin),
         height: Math.max(1, app.screen.height - margin),
       })
-      const world = drawBuilding(layout, busyDeskIds)
+      const world = drawBuilding(layout, busyDeskIds, activities)
       world.scale.set(scale)
       world.position.set(
         Math.round((app.screen.width - layout.width * TILE * scale) / 2),
@@ -79,13 +86,18 @@ export function BuildingCanvas({ office, busyDeskIds }: Props) {
     }
   }, [])
 
-  useEffect(() => draw.current(), [office, busyDeskIds])
+  useEffect(() => draw.current(), [office, busyDeskIds, activities])
 
   return <div ref={host} className="building-canvas" />
 }
 
-function drawBuilding(layout: BuildingLayout, busy: ReadonlySet<string>): Container {
+function drawBuilding(
+  layout: BuildingLayout,
+  busy: ReadonlySet<string>,
+  activities: ReadonlyMap<string, DeskActivity>,
+): Container {
   const world = new Container()
+  const bubbles = new Container()
 
   for (const room of layout.rooms) {
     const g = new Graphics()
@@ -114,10 +126,48 @@ function drawBuilding(layout: BuildingLayout, busy: ReadonlySet<string>): Contai
     world.addChild(label(room.name, px + TILE, py + TILE + 2, COLORS.label, 8))
     for (const desk of room.desks) {
       world.addChild(label(desk.name, desk.x * TILE + TILE, desk.y * TILE + TILE + 8, COLORS.mute, 8, true))
+      const activity = activities.get(desk.id)
+      if (activity?.headline) {
+        bubbles.addChild(bubble(activity, desk.x * TILE + TILE, desk.y * TILE - 10))
+      }
     }
   }
 
+  // Bubbles go on top of every room, so they can spill over walls.
+  world.addChild(bubbles)
   return world
+}
+
+/** A speech bubble whose tail points at (x, y). */
+function bubble(activity: DeskActivity, x: number, y: number): Container {
+  const waiting = activity.kind === 'Waiting'
+  const text = new Text({
+    text: waiting ? `Needs you: ${activity.headline}` : activity.headline,
+    style: {
+      fontFamily: 'IBM Plex Sans',
+      fontSize: 7,
+      lineHeight: 9,
+      fill: COLORS.bubbleText,
+      wordWrap: true,
+      wordWrapWidth: BUBBLE_WIDTH - 8,
+    },
+  })
+  text.resolution = 6
+
+  const width = Math.min(BUBBLE_WIDTH, Math.ceil(text.width) + 8)
+  const height = Math.ceil(text.height) + 6
+  const left = Math.round(x - width / 2)
+  const top = Math.round(y - 4 - height)
+  const fill = waiting ? COLORS.waiting : activity.kind === 'Stopped' ? COLORS.mute : COLORS.bubble
+
+  const shape = new Graphics()
+  shape.roundRect(left, top, width, height, 3).fill(fill)
+  shape.poly([x - 3, top + height, x + 3, top + height, x, y]).fill(fill)
+  text.position.set(left + 4, top + 3)
+
+  const group = new Container()
+  group.addChild(shape, text)
+  return group
 }
 
 function label(text: string, x: number, y: number, fill: number, size: number, centered = false): Text {

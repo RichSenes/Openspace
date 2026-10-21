@@ -20,6 +20,14 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.HasOne<Office>().WithMany().HasForeignKey(t => t.OfficeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(t => new { t.Status, t.CreatedAt });
 
+        builder.OwnsOne(t => t.Run, run =>
+        {
+            run.Property(r => r.SessionId).HasColumnName("RunSessionId");
+            run.Property(r => r.WorkspacePath).HasColumnName("RunWorkspacePath");
+            run.Property(r => r.Branch).HasColumnName("RunBranch");
+            run.HasIndex(r => r.SessionId);
+        });
+
         builder.OwnsMany(t => t.Notes, note =>
         {
             note.ToTable("TaskNotes");

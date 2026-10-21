@@ -25,8 +25,14 @@ public sealed class SqliteFixture : IAsyncLifetime
         var services = new ServiceCollection()
             .AddApplication()
             .AddInfrastructure(_connectionString)
+            .AddAgents()
             .AddSingleton<TimeProvider>(Clock);
-        services.Configure<Application.Queue.QueueOptions>(o => o.Seats = 2);
+        services.Configure<Application.Queue.QueueOptions>(o =>
+        {
+            o.Seats = 2;
+            o.Enabled = false;
+        });
+        services.Configure<OpenCode.OpenCodeOptions>(o => o.ListenToEvents = false);
         _services = services.BuildServiceProvider();
 
         await _services.MigrateDatabaseAsync();

@@ -179,3 +179,62 @@
   margin: 2px 0 0;
   white-space: pre-wrap;
 }
+
+.now {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.now-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--st-running);
+}
+
+.now-waiting .now-title {
+  color: var(--accent);
+}
+
+.now-step {
+  margin: 0;
+}
+
+.changes {
+  display: grid;
+  gap: 8px;
+}
+
+.changes-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+.diff-add {
+  color: var(--st-running);
+}
+
+.diff-del {
+  color: var(--danger);
+}
+
+.diff-hunk {
+  color: var(--st-queued);
+}
+
+.diff-meta {
+  color: var(--mute);
+}

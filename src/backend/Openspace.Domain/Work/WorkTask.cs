@@ -60,6 +60,9 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     public IReadOnlyList<TaskNote> Notes => _notes;
 
+    /// <summary>The agent's session and workspace, once the task has started at least once.</summary>
+    public AgentRun? Run { get; private set; }
+
     public bool IsClosed => Status is WorkTaskStatus.Done or WorkTaskStatus.Discarded;
 
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
@@ -107,6 +110,11 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             throw new DomainException($"A {Status} task cannot change desk.");
         }
 
+        if (Run is not null && DeskId != deskId)
+        {
+            throw new DomainException("A task that already has an agent session stays at its desk.");
+        }
+
         DeskId = deskId;
     }
 
@@ -128,6 +136,18 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         MoveTo(WorkTaskStatus.Running, now);
+    }
+
+    /// <summary>Records where the agent works. Kept across retries so the agent can resume.</summary>
+    public void AttachRun(AgentRun run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        if (Status != WorkTaskStatus.Running)
+        {
+            throw new DomainException($"Only a running task can get an agent session, not a {Status} one.");
+        }
+
+        Run = run;
     }
 
     public void SubmitForReview(DateTimeOffset now)

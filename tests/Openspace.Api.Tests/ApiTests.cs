@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Openspace.Application.Agents;
 
 namespace Openspace.Api.Tests;
 
@@ -31,7 +33,7 @@ public sealed class ApiTests : IDisposable
 
     private sealed record Room(Guid Id, string Name, string Context, List<Desk> Desks);
 
-    private sealed record Office(Guid Id, string Name, List<Room> Rooms);
+    private sealed record Office(Guid Id, string Name, string? RepositoryPath, List<Room> Rooms);
 
     private sealed record Note(string AuthorKind, string? AuthorName, string Text);
 
@@ -140,5 +142,51 @@ public sealed class ApiTests : IDisposable
 
         Assert.Equal(officeId, await officeChanged.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(task.Id, await taskChanged.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task An_office_points_to_its_repository_by_absolute_path()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var relative = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = "repos/e-corp" });
+        var absolute = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = "/srv/repos/e-corp" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, relative.StatusCode);
+        absolute.EnsureSuccessStatusCode();
+        Assert.Equal("/srv/repos/e-corp", (await GetAsync<Office>($"/api/offices/{officeId}")).RepositoryPath);
+    }
+
+    [Fact]
+    public async Task Activity_starts_empty_and_a_task_without_agent_has_no_diff()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
+
+        var activity = await GetAsync<List<JsonElement>>($"/api/activity?officeId={officeId}");
+        var diff = await _http.GetStringAsync($"/api/tasks/{task.Id}/diff");
+        var permission = await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/permission", new { allow = true });
+
+        Assert.Empty(activity);
+        Assert.Equal(string.Empty, diff);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, permission.StatusCode);
+    }
+
+    [Fact]
+    public async Task Desk_activity_reaches_browsers_with_readable_kinds()
+    {
+        await using var hub = _app.CreateHubConnection();
+        var received = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        hub.On<JsonElement>("DeskActivity", a => received.TrySetResult(a));
+        await hub.StartAsync();
+        var board = _app.Services.GetRequiredService<ActivityBoard>();
+
+        await board.UpdateAsync(
+            new DeskActivity(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), ActivityKind.Stopped, null, "Done: waiting for review", null, DateTimeOffset.UnixEpoch),
+            default);
+
+        var activity = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("Stopped", activity.GetProperty("kind").GetString());
+        Assert.Equal("Done: waiting for review", activity.GetProperty("headline").GetString());
     }
 }

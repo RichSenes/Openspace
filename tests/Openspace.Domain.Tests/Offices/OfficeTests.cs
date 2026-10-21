@@ -122,4 +122,29 @@ public class OfficeTests
         Assert.Equal("Never touch the production database.", room.Context);
         Assert.IsType<RoomContextUpdated>(office.DomainEvents[^1]);
     }
+
+    [Fact]
+    public void Repository_path_must_be_absolute()
+    {
+        var office = ECorp();
+
+        office.SetRepository("/srv/repos/e-corp", Now);
+
+        Assert.Equal("/srv/repos/e-corp", office.RepositoryPath);
+        Assert.IsType<OfficeRepositorySet>(office.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => office.SetRepository("repos/e-corp", Now));
+        Assert.Throws<DomainException>(() => office.SetRepository(" ", Now));
+    }
+
+    [Fact]
+    public void Locating_a_desk_returns_its_room()
+    {
+        var (office, desk) = ECorpWithDesk();
+
+        var (room, found) = office.Locate(desk.Id);
+
+        Assert.Equal("Web", room.Name);
+        Assert.Same(desk, found);
+        Assert.Throws<DomainException>(() => office.Locate(DeskId.New()));
+    }
 }

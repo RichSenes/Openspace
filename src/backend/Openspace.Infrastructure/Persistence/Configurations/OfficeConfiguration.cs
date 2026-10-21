@@ -12,6 +12,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
         builder.HasKey(o => o.Id);
         builder.Ignore(o => o.DomainEvents);
         builder.Property(o => o.Name).IsRequired();
+        builder.Property(o => o.RepositoryPath);
 
         builder.OwnsMany(o => o.Rooms, room =>
         {

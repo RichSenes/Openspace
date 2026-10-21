@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { useOfficeTasks } from '../api/hooks'
+import { activityByDesk, isActive } from '../activity/activity'
+import { useActivity, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { BuildingCanvas } from './BuildingCanvas'
 import './building.css'
@@ -11,10 +12,13 @@ interface Props {
 
 export function BuildingView({ office, onOpenRooms }: Props) {
   const tasks = useOfficeTasks(office.id)
-  const busy = useMemo(
-    () => new Set((tasks.data ?? []).filter((t) => t.status === 'Running' && t.deskId).map((t) => t.deskId!)),
-    [tasks.data],
-  )
+  const activity = useActivity()
+  const bubbles = useMemo(() => activityByDesk(activity.data, office.id), [activity.data, office.id])
+  const busy = useMemo(() => {
+    const running = (tasks.data ?? []).filter((t) => t.status === 'Running' && t.deskId).map((t) => t.deskId!)
+    const active = [...bubbles.values()].filter(isActive).map((a) => a.deskId)
+    return new Set([...running, ...active])
+  }, [tasks.data, bubbles])
 
   if (office.rooms.length === 0) {
     return (
@@ -30,7 +34,7 @@ export function BuildingView({ office, onOpenRooms }: Props) {
 
   return (
     <div className="building">
-      <BuildingCanvas office={office} busyDeskIds={busy} />
+      <BuildingCanvas office={office} busyDeskIds={busy} activities={bubbles} />
     </div>
   )
 }

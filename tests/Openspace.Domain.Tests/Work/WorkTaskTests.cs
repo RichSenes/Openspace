@@ -216,4 +216,58 @@ public class WorkTaskTests
         Assert.Throws<DomainException>(() => WorkTask.Assign(office, desk.Id, text, null, Requester, Now));
         Assert.Throws<DomainException>(() => task.AddNote(NoteAuthor.System, text, Now));
     }
+
+    private static AgentRun SomeRun() => AgentRun.Create("ses_fsociety", "/srv/worktrees/t1", "openspace/t1");
+
+    [Fact]
+    public void A_running_task_records_its_agent_run()
+    {
+        var task = TaskIn(WorkTaskStatus.Running);
+
+        task.AttachRun(SomeRun());
+
+        Assert.Equal("ses_fsociety", task.Run?.SessionId);
+    }
+
+    [Theory]
+    [InlineData(WorkTaskStatus.Queued)]
+    [InlineData(WorkTaskStatus.Review)]
+    public void Only_running_tasks_get_an_agent_run(WorkTaskStatus status)
+    {
+        Assert.Throws<DomainException>(() => TaskIn(status).AttachRun(SomeRun()));
+    }
+
+    [Fact]
+    public void The_run_survives_a_send_back_so_the_agent_can_resume()
+    {
+        var task = TaskIn(WorkTaskStatus.Running);
+        task.AttachRun(SomeRun());
+        task.SubmitForReview(Now);
+
+        task.SendBack(NoteAuthor.Human(Requester), "Wrong colour.", Now);
+
+        Assert.NotNull(task.Run);
+    }
+
+    [Fact]
+    public void A_task_with_a_run_cannot_move_to_another_desk()
+    {
+        var (office, desk) = ECorpWithDesk();
+        var other = office.AddDesk(office.Rooms[0].Id, "Backend", AgentProfile.Create("backend-dev"), Now);
+        var task = WorkTask.Assign(office, desk.Id, "Fix the footer", null, Requester, Now);
+        task.Start(Now);
+        task.AttachRun(SomeRun());
+        task.Fail("Crashed.", Now);
+
+        Assert.Throws<DomainException>(() => task.AssignTo(office, other.Id));
+        task.AssignTo(office, desk.Id);
+    }
+
+    [Fact]
+    public void Agent_run_needs_all_its_parts()
+    {
+        Assert.Throws<DomainException>(() => AgentRun.Create("", "/w", "b"));
+        Assert.Throws<DomainException>(() => AgentRun.Create("s", " ", "b"));
+        Assert.Throws<DomainException>(() => AgentRun.Create("s", "/w", ""));
+    }
 }

@@ -1,7 +1,9 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { mergeActivity } from '../activity/activity'
 import { keys } from '../api/hooks'
+import type { DeskActivity } from '../api/types'
 
 export type LinkState = 'connecting' | 'live' | 'offline'
 
@@ -19,6 +21,9 @@ export function useBuildingHub(): LinkState {
 
     hub.on('OfficeChanged', () => void client.invalidateQueries({ queryKey: keys.offices }))
     hub.on('TaskChanged', () => void client.invalidateQueries({ queryKey: keys.tasks }))
+    hub.on('DeskActivity', (activity: DeskActivity) =>
+      client.setQueryData<DeskActivity[]>(keys.activity, (list) => mergeActivity(list, activity)),
+    )
     hub.onreconnecting(() => setState('connecting'))
     hub.onreconnected(() => {
       setState('live')

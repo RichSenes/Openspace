@@ -11,6 +11,7 @@ public sealed record WorkTaskView(
     string RequestedBy,
     WorkTaskStatus Status,
     DateTimeOffset CreatedAt,
+    string? Branch,
     IReadOnlyList<TaskNoteView> Notes)
 {
     public static WorkTaskView From(WorkTask task)
@@ -25,6 +26,7 @@ public sealed record WorkTaskView(
             task.RequestedBy,
             task.Status,
             task.CreatedAt,
+            task.Run?.Branch,
             [.. task.Notes.Select(TaskNoteView.From)]);
     }
 }

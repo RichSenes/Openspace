@@ -19,6 +19,9 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public IReadOnlyList<Room> Rooms => _rooms;
 
+    /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
+    public string? RepositoryPath { get; private set; }
+
     public static Office Open(string name, DateTimeOffset now)
     {
         var office = new Office(OfficeId.New(), Guard.NotBlank(name, "Office name", MaxNameLength));
@@ -30,6 +33,18 @@ public sealed class Office : AggregateRoot<OfficeId>
     {
         Name = Guard.NotBlank(name, "Office name", MaxNameLength);
         Raise(new OfficeRenamed(Id, Name, now));
+    }
+
+    public void SetRepository(string path, DateTimeOffset now)
+    {
+        var trimmed = Guard.NotBlank(path, "Repository path", 1024);
+        if (!System.IO.Path.IsPathFullyQualified(trimmed))
+        {
+            throw new DomainException($"Repository path '{trimmed}' must be absolute.");
+        }
+
+        RepositoryPath = trimmed;
+        Raise(new OfficeRepositorySet(Id, trimmed, now));
     }
 
     public Room OpenRoom(string name, DateTimeOffset now)
@@ -69,11 +84,24 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public bool HasDesk(DeskId deskId) => _rooms.Exists(r => r.Desks.Any(d => d.Id == deskId));
 
+    /// <summary>The desk and the room it sits in.</summary>
+    public (Room Room, Desk Desk) Locate(DeskId deskId)
+    {
+        foreach (var room in _rooms)
+        {
+            var desk = room.Desks.FirstOrDefault(d => d.Id == deskId);
+            if (desk is not null)
+            {
+                return (room, desk);
+            }
+        }
+
+        throw new DomainException($"Office '{Name}' has no desk {deskId.Value}.");
+    }
+
     private Room FindRoom(RoomId roomId) =>
         _rooms.Find(r => r.Id == roomId)
         ?? throw new DomainException($"Office '{Name}' has no room {roomId.Value}.");
 
-    private Desk FindDesk(DeskId deskId) =>
-        _rooms.SelectMany(r => r.Desks).FirstOrDefault(d => d.Id == deskId)
-        ?? throw new DomainException($"Office '{Name}' has no desk {deskId.Value}.");
+    private Desk FindDesk(DeskId deskId) => Locate(deskId).Desk;
 }

@@ -20,7 +20,7 @@ The full picture, glossary and first-prototype scope are in
 ## Repository layout
 
 ```
-docs/                          Vision and design notes
+docs/                          Vision, design notes and the sprite format (sprites.md)
 src/backend/
   Openspace.Domain/            Business model, no dependencies
   Openspace.Application/       Use cases and ports

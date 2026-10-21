@@ -9,10 +9,12 @@ import {
   useRoles,
   useSetDeskRole,
   useSetRepository,
+  useSetRoomProcedure,
   useUpdateRoomContext,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { useToast } from '../ui/toastContext'
+import { formatSteps, parseSteps } from './procedure'
 import './rooms.css'
 
 export function RoomsPanel({ office }: { office: OfficeView }) {
@@ -164,6 +166,8 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
         {updateContext.error && <p className="error">{updateContext.error.message}</p>}
       </form>
 
+      <ProcedureForm officeId={officeId} room={room} />
+
       <section className="desks" aria-label={`Desks in ${room.name}`}>
         <h3 className="pixel desks-title">Desks</h3>
         {room.desks.length === 0 ? (
@@ -299,5 +303,38 @@ function DeskItem({ officeId, desk, roles }: { officeId: string; desk: DeskView;
       </label>
       {(rename.error ?? setRole.error) && <p className="error">{(rename.error ?? setRole.error)!.message}</p>}
     </li>
+  )
+}
+
+/** Steps every task of the room must follow; agents report each one and work waits for them. */
+function ProcedureForm({ officeId, room }: { officeId: string; room: RoomView }) {
+  const [text, setText] = useState(formatSteps(room.procedure))
+  const save = useSetRoomProcedure(officeId)
+  const toast = useToast()
+  const changed = formatSteps(parseSteps(text)) !== formatSteps(room.procedure)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    save.mutate({ roomId: room.id, steps: parseSteps(text) }, { onSuccess: () => toast('Procedure saved, for tasks started from now on') })
+  }
+
+  return (
+    <form className="stack" onSubmit={submit}>
+      <label className="field">
+        <span>Required procedure: one step per line. Work does not reach review until the agent reports every step.</span>
+        <textarea
+          className="input"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={'Before changing a file, copy it to /backup/<date>/\nAdd every change to CHANGES.md'}
+        />
+      </label>
+      <div className="row">
+        <button type="submit" className="btn" disabled={!changed || save.isPending}>
+          Save procedure
+        </button>
+      </div>
+      {save.error && <p className="error">{save.error.message}</p>}
+    </form>
   )
 }

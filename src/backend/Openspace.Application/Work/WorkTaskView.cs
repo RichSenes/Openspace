@@ -14,6 +14,7 @@ public sealed record WorkTaskView(
     string? Branch,
     string? MergedInto,
     Guid? EpicId,
+    IReadOnlyList<ProcedureStepView> Procedure,
     IReadOnlyList<TaskNoteView> Notes)
 {
     public static WorkTaskView From(WorkTask task)
@@ -31,6 +32,7 @@ public sealed record WorkTaskView(
             task.Run?.Branch,
             task.MergedInto,
             task.EpicId?.Value,
+            [.. task.Procedure.Select(s => new ProcedureStepView(s.Number, s.Text, s.Evidence, s.CompletedAt))],
             [.. task.Notes.Select(TaskNoteView.From)]);
     }
 }
@@ -40,3 +42,5 @@ public sealed record TaskNoteView(NoteAuthorKind AuthorKind, string? AuthorName,
     public static TaskNoteView From(TaskNote note) =>
         new(note.Author.Kind, note.Author.Name, note.Author.DeskId?.Value, note.Text, note.WrittenAt);
 }
+
+public sealed record ProcedureStepView(int Number, string Text, string? Evidence, DateTimeOffset? CompletedAt);

@@ -24,6 +24,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     };
 
     private readonly List<TaskNote> _notes = [];
+    private readonly List<ProcedureStep> _procedure = [];
 
     private WorkTask(
         WorkTaskId id,
@@ -59,6 +60,14 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     public DateTimeOffset CreatedAt { get; }
 
     public IReadOnlyList<TaskNote> Notes => _notes;
+
+    /// <summary>The steps this task must follow, fixed when it first started.</summary>
+    public IReadOnlyList<ProcedureStep> Procedure => _procedure;
+
+    public IReadOnlyList<ProcedureStep> MissingSteps => [.. _procedure.Where(s => !s.IsDone)];
+
+    /// <summary>How many times the agent was reminded of missing steps since it last started.</summary>
+    public int ProcedureReminders { get; private set; }
 
     /// <summary>The agent's session and workspace, once the task has started at least once.</summary>
     public AgentRun? Run { get; private set; }
@@ -147,6 +156,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             throw InvalidTransition(WorkTaskStatus.Running);
         }
 
+        ProcedureReminders = 0;
         MoveTo(WorkTaskStatus.Running, now);
     }
 
@@ -163,11 +173,58 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         Raise(new WorkTaskRunAttached(Id, run.Branch, run.WorkspacePath, now));
     }
 
+    /// <summary>
+    /// Fixes the room's procedure on the task when it first starts, so later changes to the
+    /// room do not move the goalposts of work already under way.
+    /// </summary>
+    public void AdoptProcedure(IEnumerable<string> steps)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        if (_procedure.Count > 0 || Run is not null)
+        {
+            return;
+        }
+
+        _procedure.AddRange(steps.Select((text, i) => new ProcedureStep(i + 1, text)));
+    }
+
+    public void CompleteStep(int number, string evidence, DateTimeOffset now)
+    {
+        if (Status != WorkTaskStatus.Running)
+        {
+            throw new DomainException($"Procedure steps can only be completed while the task is running, not {Status}.");
+        }
+
+        var step = _procedure.Find(s => s.Number == number)
+            ?? throw new DomainException(_procedure.Count == 0
+                ? "This task has no required procedure."
+                : $"There is no step {number}: the procedure has steps 1 to {_procedure.Count}.");
+        step.Complete(Guard.NotBlank(evidence, "Evidence", 4000), now);
+        Raise(new WorkTaskStepCompleted(Id, step.Number, step.Text, step.Evidence!, now));
+    }
+
+    /// <summary>Counts a reminder; returns false once the allowed reminders are used up.</summary>
+    public bool RemindOfProcedure(int allowed)
+    {
+        if (ProcedureReminders >= allowed)
+        {
+            return false;
+        }
+
+        ProcedureReminders++;
+        return true;
+    }
+
     public void SubmitForReview(DateTimeOffset now)
     {
         if (Status != WorkTaskStatus.Running)
         {
             throw InvalidTransition(WorkTaskStatus.Review);
+        }
+
+        if (MissingSteps.Count > 0)
+        {
+            throw new DomainException($"The required procedure is not complete: step {string.Join(", ", MissingSteps.Select(s => s.Number))} still to do.");
         }
 
         MoveTo(WorkTaskStatus.Review, now);

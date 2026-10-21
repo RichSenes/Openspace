@@ -9,6 +9,7 @@ export const KIND_LABEL: Record<AuditKind, string> = {
   Search: 'Search',
   Permission: 'Permission',
   Note: 'Note',
+  Procedure: 'Procedure',
   Other: 'Tool',
 }
 

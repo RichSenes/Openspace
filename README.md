@@ -48,9 +48,12 @@ Each project has its own README with detailed specifications.
    the diff of its changes.
 5. Accept commits the work on the task branch. Send back resumes the same
    session with your feedback. Discard throws it all away.
-6. Every step, file change, command (with its output), permission and note is
+6. If the room has a required procedure (for example "back up every file before
+   changing it"), the agent reports each step with evidence, and the work does
+   not reach review until all of them are done.
+7. Every step, file change, command (with its output), permission and note is
    kept in the task's audit log, and can be downloaded as a Markdown report.
-7. Accepted work can then be merged into the branch you choose, from the task
+8. Accepted work can then be merged into the branch you choose, from the task
    itself. Your checkout never moves, and nothing is touched if you have
    uncommitted changes or the work conflicts.
 

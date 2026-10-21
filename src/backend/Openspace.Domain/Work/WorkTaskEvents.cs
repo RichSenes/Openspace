@@ -17,3 +17,5 @@ public sealed record WorkTaskNoteAdded(WorkTaskId TaskId, TaskNote Note, DateTim
 public sealed record WorkTaskMerged(WorkTaskId TaskId, string TargetBranch, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record WorkTaskRunAttached(WorkTaskId TaskId, string Branch, string WorkspacePath, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record WorkTaskStepCompleted(WorkTaskId TaskId, int Number, string Text, string Evidence, DateTimeOffset OccurredAt) : IDomainEvent;

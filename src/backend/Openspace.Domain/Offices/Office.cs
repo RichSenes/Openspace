@@ -62,6 +62,13 @@ public sealed class Office : AggregateRoot<OfficeId>
         return room;
     }
 
+    public void SetRoomProcedure(RoomId roomId, IEnumerable<string> steps, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        FindRoom(roomId).SetProcedure(steps);
+        Raise(new RoomProcedureSet(Id, roomId, now));
+    }
+
     public void UpdateRoomContext(RoomId roomId, string? context, DateTimeOffset now)
     {
         FindRoom(roomId).UpdateContext(context);

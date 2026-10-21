@@ -11,6 +11,8 @@ internal static class OfficeEndpoints
     public sealed record ContextRequest(string? Context);
 
     /// <param name="Initialize">Turn the folder into a git repository if it is not one yet.</param>
+    public sealed record ProcedureRequest(IReadOnlyList<string> Steps);
+
     public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
     public sealed record DeskRequest(string Name, string AgentName, string? Model, Guid? RoleId = null);
@@ -53,6 +55,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid roomId, ContextRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.UpdateRoomContextAsync(new OfficeId(officeId), new RoomId(roomId), request.Context, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/procedure", async (
+            Guid officeId, Guid roomId, ProcedureRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetRoomProcedureAsync(new OfficeId(officeId), new RoomId(roomId), request.Steps ?? [], ct);
             return Results.NoContent();
         });
 

@@ -22,7 +22,15 @@ export interface RoomView {
   id: string
   name: string
   context: string
+  procedure: string[]
   desks: DeskView[]
+}
+
+export interface ProcedureStepView {
+  number: number
+  text: string
+  evidence: string | null
+  completedAt: string | null
 }
 
 export interface OfficeView {
@@ -52,10 +60,11 @@ export interface WorkTaskView {
   branch: string | null
   mergedInto: string | null
   epicId: string | null
+  procedure: ProcedureStepView[]
   notes: TaskNoteView[]
 }
 
-export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Other'
+export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Procedure' | 'Other'
 
 export interface AuditEntryView {
   id: number

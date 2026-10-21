@@ -32,7 +32,7 @@ src/
 | --- | --- |
 | Building | The office as a pixel floor plan. Rooms are laid out to get the biggest crisp zoom; a desk's screen lights up while its agent works, and a speech bubble says what it is doing |
 | Board | Ask the supervisor to split a request into proposed tasks, then approve them all at once or one by one; filter by epic. Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
-| Rooms | Set the office repository, open rooms, write their context, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
+| Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
 | Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking |
 
 While any agent waits for a permission, a "Needs you" strip sits on top of every

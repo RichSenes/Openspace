@@ -31,6 +31,8 @@ public static class Briefing
             text.AppendLine(task.Description);
         }
 
+        AppendProcedure(text, task);
+
         var humanNotes = task.Notes.Where(n => n.Author.Kind == NoteAuthorKind.Human).ToList();
         if (humanNotes.Count > 0)
         {
@@ -46,6 +48,39 @@ public static class Briefing
             .AppendLine("- If the openspace tools are available: use add_task_note to leave the team decisions, findings or open questions worth keeping, and get_task to re-read this brief with the latest notes.")
             .Append("- When you are done, answer with a short summary of what you changed and anything left open.")
             .ToString();
+    }
+
+    /// <summary>The message sent when an agent stops with required steps still to do.</summary>
+    public static string ForMissingSteps(WorkTask task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        var text = new StringBuilder()
+            .AppendLine("You stopped, but the required procedure is not complete. Openspace will not send your work to review until it is.")
+            .AppendLine("Still to do:");
+        foreach (var step in task.MissingSteps)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"{step.Number}. {step.Text}");
+        }
+
+        return text
+            .Append("Do them now, report each one with the openspace tool complete_step (step number and evidence), then answer with a short summary.")
+            .ToString();
+    }
+
+    private static void AppendProcedure(StringBuilder text, WorkTask task)
+    {
+        if (task.Procedure.Count == 0)
+        {
+            return;
+        }
+
+        text.AppendLine().AppendLine("Required procedure: Openspace checks it before your work goes to review.");
+        foreach (var step in task.Procedure)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"{step.Number}. {step.Text}{(step.IsDone ? " (done)" : string.Empty)}");
+        }
+
+        text.AppendLine("When you finish a step, call the openspace tool complete_step with its number and the evidence: files, commands, results.");
     }
 
     /// <summary>

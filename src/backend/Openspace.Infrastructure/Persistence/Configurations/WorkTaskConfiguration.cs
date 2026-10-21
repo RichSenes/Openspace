@@ -48,5 +48,20 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         });
 
         builder.Navigation(t => t.Notes).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Property(t => t.ProcedureReminders);
+        builder.Ignore(t => t.MissingSteps);
+        builder.OwnsMany(t => t.Procedure, step =>
+        {
+            step.ToTable("TaskProcedureSteps");
+            step.WithOwner().HasForeignKey("WorkTaskId");
+            step.HasKey("WorkTaskId", nameof(ProcedureStep.Number));
+            step.Property(s => s.Number).ValueGeneratedNever();
+            step.Property(s => s.Text).IsRequired();
+            step.Property(s => s.Evidence);
+            step.Property(s => s.CompletedAt);
+            step.Ignore(s => s.IsDone);
+        });
+        builder.Navigation(t => t.Procedure).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

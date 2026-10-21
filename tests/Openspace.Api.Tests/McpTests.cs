@@ -72,7 +72,7 @@ public sealed class McpTests : IAsyncDisposable
 
         var tools = await client.ListToolsAsync();
 
-        Assert.Equal(["add_task_note", "announce", "get_task"], tools.Select(t => t.Name).Order());
+        Assert.Equal(["add_task_note", "announce", "complete_step", "get_task"], tools.Select(t => t.Name).Order());
     }
 
     [Fact]
@@ -110,5 +110,17 @@ public sealed class McpTests : IAsyncDisposable
 
         Assert.True(result.IsError);
         Assert.Contains("X-Openspace-Task", Text(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_a_procedure_complete_step_explains_there_is_none()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+
+        var result = await client.CallToolAsync("complete_step", new Dictionary<string, object?> { ["step"] = 1, ["evidence"] = "Done" });
+
+        Assert.True(result.IsError);
+        Assert.Contains("no required procedure", Text(result), StringComparison.Ordinal);
     }
 }

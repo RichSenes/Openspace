@@ -43,6 +43,18 @@ internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor 
             return "Announced.";
         });
 
+    [McpServerTool(Name = "complete_step")]
+    [Description("Report a step of your task's required procedure as done. Openspace does not send your work to review until every step is reported.")]
+    public Task<string> CompleteStepAsync(
+        [Description("The step number, as listed in your brief.")] int step,
+        [Description("What you did to satisfy it: files, commands and their results.")] string evidence,
+        CancellationToken cancellationToken) =>
+        RunAsync(async task =>
+        {
+            await signals.CompleteStepAsync(task, step, evidence, cancellationToken);
+            return $"Step {step} recorded.";
+        });
+
     private async Task<string> RunAsync(Func<WorkTaskId, Task<string>> action)
     {
         var header = httpContext.HttpContext?.Request.Headers[TaskHeader].ToString();

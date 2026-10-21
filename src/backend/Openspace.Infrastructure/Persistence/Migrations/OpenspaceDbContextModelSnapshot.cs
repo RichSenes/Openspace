@@ -153,6 +153,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OfficeId")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ProcedureReminders")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("RequestedBy")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -192,6 +195,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .HasColumnType("TEXT");
 
                             b1.Property<Guid>("OfficeId")
+                                .HasColumnType("TEXT");
+
+                            b1.PrimitiveCollection<string>("Procedure")
+                                .IsRequired()
                                 .HasColumnType("TEXT");
 
                             b1.HasKey("Id");
@@ -354,6 +361,32 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .HasForeignKey("WorkTaskId");
                         });
 
+                    b.OwnsMany("Openspace.Domain.Work.ProcedureStep", "Procedure", b1 =>
+                        {
+                            b1.Property<Guid>("WorkTaskId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("Number")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long?>("CompletedAt")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("Evidence")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("Text")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.HasKey("WorkTaskId", "Number");
+
+                            b1.ToTable("TaskProcedureSteps", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("WorkTaskId");
+                        });
+
                     b.OwnsMany("Openspace.Domain.Work.TaskNote", "Notes", b1 =>
                         {
                             b1.Property<int>("Id")
@@ -410,6 +443,8 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Notes");
+
+                    b.Navigation("Procedure");
 
                     b.Navigation("Run");
                 });

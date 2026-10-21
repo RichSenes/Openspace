@@ -237,4 +237,31 @@ public sealed class PersistenceTests : IAsyncLifetime
         var tasks = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().ListAsync(office, null, default));
         Assert.All(tasks, t => Assert.Equal(NoteAuthorKind.System, Assert.Single(t.Notes).AuthorKind));
     }
+
+    [Fact]
+    public async Task Room_procedures_and_task_checklists_survive_a_round_trip()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var roomId = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0].Id;
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>()
+            .SetRoomProcedureAsync(office, new RoomId(roomId), ["Back up first", "Log the change"], default));
+        var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
+            .AssignAsync(office, frontend, "Patch the header", null, "elliot", default));
+        await InScope(async sp =>
+        {
+            var task = (await sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().FindAsync(taskId, default))!;
+            task.Start(_db.Clock.GetUtcNow());
+            task.AdoptProcedure(["Back up first", "Log the change"]);
+            task.CompleteStep(2, "CHANGES.md updated", _db.Clock.GetUtcNow());
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        });
+
+        var room = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0];
+        var view = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().GetAsync(taskId, default));
+        var log = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().LogAsync(taskId, default));
+
+        Assert.Equal(["Back up first", "Log the change"], room.Procedure);
+        Assert.Equal([(1, (string?)null), (2, "CHANGES.md updated")], view.Procedure.Select(s => (s.Number, s.Evidence)));
+        Assert.Contains(log, e => e.Summary == "Procedure step 2 done: Log the change");
+    }
 }

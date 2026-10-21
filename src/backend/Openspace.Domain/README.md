@@ -34,7 +34,8 @@ An aggregate holding its rooms and their desks.
 - Room names are unique within an office, desk names within a room
   (case-insensitive, trimmed). Desks can be renamed; their name is free text,
   separate from the OpenCode agent that runs them.
-- A room has free-text **context**, injected into every agent working there.
+- A room has free-text **context**, injected into every agent working there,
+  and an optional **procedure**: up to 20 steps every task of the room must follow.
 - A desk is bound to an `AgentProfile`: the OpenCode agent name
   (`lowercase-with-dashes`) and an optional model override (`provider/model`).
 - Events: `RoomOpened`, `DeskAdded`.
@@ -71,6 +72,10 @@ Any open status ──discard──▶ Discarded
 - `Fail` stores the reason as a system note; `SendBack` stores the reviewer's
   feedback as a note.
 - Notes can be written by a human, by a desk (the agent) or by the system.
+- When a task first starts it adopts its room's procedure as a numbered
+  checklist, so later changes to the room do not affect it. The agent completes
+  steps with evidence; a task with missing steps cannot go to review. Reminders
+  are counted per run.
 - Events: `WorkTaskCreated`, `WorkTaskStatusChanged`, `WorkTaskNoteAdded`.
 
 ### Epic

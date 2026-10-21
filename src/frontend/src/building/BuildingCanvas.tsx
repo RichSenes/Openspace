@@ -142,7 +142,7 @@ function drawBuilding(
 function bubble(activity: DeskActivity, x: number, y: number): Container {
   const waiting = activity.kind === 'Waiting'
   const text = new Text({
-    text: waiting ? `Needs you: ${activity.headline}` : activity.headline,
+    text: waiting ? `${activity.headline} · needs your OK` : activity.headline,
     style: {
       fontFamily: 'IBM Plex Sans',
       fontSize: 7,

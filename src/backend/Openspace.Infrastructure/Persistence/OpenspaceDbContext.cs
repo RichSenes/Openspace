@@ -4,6 +4,7 @@ using Openspace.Application.Abstractions;
 using Openspace.Application.Work;
 using Openspace.Domain.Common;
 using Openspace.Domain.Offices;
+using Openspace.Domain.Roles;
 using Openspace.Domain.Work;
 
 namespace Openspace.Infrastructure.Persistence;
@@ -18,6 +19,8 @@ public sealed class OpenspaceDbContext(
     public DbSet<WorkTask> WorkTasks => Set<WorkTask>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<Role> Roles => Set<Role>();
 
     /// <summary>Saves, then publishes the events raised by the saved aggregates.</summary>
     async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
@@ -50,6 +53,7 @@ public sealed class OpenspaceDbContext(
         configurationBuilder.Properties<RoomId>().HaveConversion<IdConverters.RoomIdConverter>();
         configurationBuilder.Properties<DeskId>().HaveConversion<IdConverters.DeskIdConverter>();
         configurationBuilder.Properties<WorkTaskId>().HaveConversion<IdConverters.WorkTaskIdConverter>();
+        configurationBuilder.Properties<RoleId>().HaveConversion<IdConverters.RoleIdConverter>();
 
         // SQLite cannot order or compare DateTimeOffset natively: store it as a sortable 64-bit number.
         configurationBuilder.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();

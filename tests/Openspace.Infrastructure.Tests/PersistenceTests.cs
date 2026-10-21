@@ -33,9 +33,9 @@ public sealed class PersistenceTests : IAsyncLifetime
         var office = await InScope(sp => sp.GetRequiredService<OfficeCommands>().OpenOfficeAsync("E Corp", default));
         var room = await InScope(sp => sp.GetRequiredService<OfficeCommands>().OpenRoomAsync(office, "Web", default));
         var frontend = await InScope(sp => sp.GetRequiredService<OfficeCommands>()
-            .AddDeskAsync(office, room, "Frontend", "frontend-dev", null, default));
+            .AddDeskAsync(office, room, "Frontend", "frontend-dev", null, null, default));
         var backend = await InScope(sp => sp.GetRequiredService<OfficeCommands>()
-            .AddDeskAsync(office, room, "Backend", "backend-dev", "local/tiny-model", default));
+            .AddDeskAsync(office, room, "Backend", "backend-dev", "local/tiny-model", null, default));
         return (office, frontend, backend);
     }
 
@@ -175,5 +175,23 @@ public sealed class PersistenceTests : IAsyncLifetime
         var contains = await InScope(sp => sp.GetRequiredService<Application.Abstractions.IAuditLog>().ContainsAsync(taskId, "call_1", default));
 
         Assert.False(contains);
+    }
+
+    [Fact]
+    public async Task Roles_and_desk_roles_survive_a_round_trip()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var careful = new Domain.Roles.RolePermissions(Domain.Roles.PermissionLevel.Ask, Domain.Roles.PermissionLevel.Deny, Domain.Roles.PermissionLevel.Allow);
+        var roleId = await InScope(sp => sp.GetRequiredService<Application.Roles.RoleCommands>()
+            .DefineAsync("Auditor", "Reviews changes", "Never change code.", "opencode/careful", careful, default));
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().SetDeskRoleAsync(office, frontend, roleId, default));
+
+        var roles = await InScope(sp => sp.GetRequiredService<Application.Roles.RoleQueries>().ListAsync(default));
+        var view = await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default));
+
+        var role = Assert.Single(roles);
+        Assert.Equal(("Auditor", "Never change code.", "opencode/careful"), (role.Name, role.Instructions, role.Model));
+        Assert.Equal((Domain.Roles.PermissionLevel.Ask, Domain.Roles.PermissionLevel.Deny, Domain.Roles.PermissionLevel.Allow), (role.Edit, role.Bash, role.Web));
+        Assert.Equal(roleId.Value, view.Rooms[0].Desks.Single(d => d.Id == frontend.Value).RoleId);
     }
 }

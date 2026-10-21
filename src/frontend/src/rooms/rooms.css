@@ -77,9 +77,8 @@
 }
 
 .desk-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: var(--radius);
   background: var(--raised);
@@ -103,4 +102,15 @@
   .room-new {
     grid-template-columns: 1fr;
   }
+}
+
+.desk-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.desk-role select {
+  min-height: 30px;
+  padding: 4px 8px;
 }

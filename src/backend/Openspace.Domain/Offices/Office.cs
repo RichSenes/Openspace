@@ -1,4 +1,5 @@
 using Openspace.Domain.Common;
+using Openspace.Domain.Roles;
 
 namespace Openspace.Domain.Offices;
 
@@ -67,10 +68,12 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new RoomContextUpdated(Id, roomId, now));
     }
 
-    public Desk AddDesk(RoomId roomId, string name, AgentProfile agent, DateTimeOffset now)
+    /// <param name="roleId">Must name an existing role; checked by the application, which sees all roles.</param>
+    public Desk AddDesk(RoomId roomId, string name, AgentProfile agent, DateTimeOffset now, RoleId? roleId = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
         var desk = FindRoom(roomId).AddDesk(name, agent);
+        desk.GiveRole(roleId);
         Raise(new DeskAdded(Id, roomId, desk.Id, agent, now));
         return desk;
     }
@@ -81,6 +84,14 @@ public sealed class Office : AggregateRoot<OfficeId>
         FindDesk(deskId).Reassign(agent);
         Raise(new DeskReassigned(Id, deskId, agent, now));
     }
+
+    public void SetDeskRole(DeskId deskId, RoleId? roleId, DateTimeOffset now)
+    {
+        FindDesk(deskId).GiveRole(roleId);
+        Raise(new DeskRoleChanged(Id, deskId, roleId, now));
+    }
+
+    public bool UsesRole(RoleId roleId) => _rooms.Exists(r => r.Desks.Any(d => d.RoleId == roleId));
 
     public bool HasDesk(DeskId deskId) => _rooms.Exists(r => r.Desks.Any(d => d.Id == deskId));
 

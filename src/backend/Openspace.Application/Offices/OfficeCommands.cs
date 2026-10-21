@@ -1,11 +1,13 @@
 using Openspace.Application.Abstractions;
 using Openspace.Domain.Offices;
+using Openspace.Domain.Roles;
 
 namespace Openspace.Application.Offices;
 
 /// <summary>Creates offices and furnishes them with rooms and desks.</summary>
 public sealed class OfficeCommands(
     IOfficeRepository offices,
+    IRoleRepository roles,
     IUnitOfWork unitOfWork,
     IWorkspaceManager workspaces,
     TimeProvider clock)
@@ -51,6 +53,19 @@ public sealed class OfficeCommands(
         return room.Id;
     }
 
+    /// <summary>Gives a desk a role, or takes it away with null. Applies from the desk's next task.</summary>
+    public async Task SetDeskRoleAsync(OfficeId officeId, DeskId deskId, RoleId? roleId, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        if (roleId is { } role)
+        {
+            await roles.GetAsync(role, cancellationToken).ConfigureAwait(false);
+        }
+
+        office.SetDeskRole(deskId, roleId, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task UpdateRoomContextAsync(
         OfficeId officeId, RoomId roomId, string? context, CancellationToken cancellationToken)
     {
@@ -65,10 +80,16 @@ public sealed class OfficeCommands(
         string name,
         string agentName,
         string? model,
+        RoleId? roleId,
         CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
-        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model), clock.GetUtcNow());
+        if (roleId is { } role)
+        {
+            await roles.GetAsync(role, cancellationToken).ConfigureAwait(false);
+        }
+
+        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model), clock.GetUtcNow(), roleId);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return desk.Id;
     }

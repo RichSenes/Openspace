@@ -1,4 +1,5 @@
 using Openspace.Domain.Common;
+using Openspace.Domain.Roles;
 
 namespace Openspace.Domain.Offices;
 
@@ -15,3 +16,5 @@ public sealed record RoomContextUpdated(OfficeId OfficeId, RoomId RoomId, DateTi
 public sealed record DeskReassigned(OfficeId OfficeId, DeskId DeskId, AgentProfile Agent, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record OfficeRepositorySet(OfficeId OfficeId, string Path, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record DeskRoleChanged(OfficeId OfficeId, DeskId DeskId, RoleId? RoleId, DateTimeOffset OccurredAt) : IDomainEvent;

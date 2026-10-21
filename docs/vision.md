@@ -50,7 +50,8 @@ themselves run in OpenCode: Openspace is the director, not the actor.
 | **Building** | The whole Openspace instance. |
 | **Office** | A project. Owns one or more repositories, its rooms and its work. |
 | **Room** | An area of competence inside an office, with its own context notes and paths. |
-| **Desk** | A seat in a room, bound to one OpenCode agent definition (role, model, tools, prompt). |
+| **Desk** | A seat in a room, bound to an OpenCode agent and optionally to a role. |
+| **Role** | A reusable kind of agent: instructions, preferred model and what it may do without asking. |
 | **Task** | A unit of work assigned to a desk. Has a status, a requester and notes. `WorkTask` in code. |
 | **Supervisor** | A special desk that breaks a request down into tasks and proposes assignments. |
 | **Queue** | Orders runnable tasks and hands them to free seats. |

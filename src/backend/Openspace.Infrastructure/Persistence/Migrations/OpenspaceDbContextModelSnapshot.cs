@@ -34,6 +34,31 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("Offices", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Roles.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Roles", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -152,6 +177,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                         .IsRequired()
                                         .HasColumnType("TEXT");
 
+                                    b2.Property<Guid?>("RoleId")
+                                        .HasColumnType("TEXT");
+
                                     b2.Property<Guid>("RoomId")
                                         .HasColumnType("TEXT");
 
@@ -194,6 +222,40 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rooms");
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Roles.Role", b =>
+                {
+                    b.OwnsOne("Openspace.Domain.Roles.RolePermissions", "Permissions", b1 =>
+                        {
+                            b1.Property<Guid>("RoleId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("Bash")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("CanRunCommands");
+
+                            b1.Property<string>("Edit")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("CanEdit");
+
+                            b1.Property<string>("Web")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("CanUseWeb");
+
+                            b1.HasKey("RoleId");
+
+                            b1.ToTable("Roles");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RoleId");
+                        });
+
+                    b.Navigation("Permissions")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>

@@ -12,7 +12,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices` | Open an office: `{ name }` |
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
-| POST | `/api/offices/{id}/rooms/{roomId}/desks` | Add a desk: `{ name, agentName, model? }` |
+| POST | `/api/offices/{id}/rooms/{roomId}/desks` | Add a desk: `{ name, agentName, model?, roleId? }` |
 | GET | `/api/tasks?officeId=&status=` | Tasks, oldest first, optionally filtered |
 | GET | `/api/tasks/{id}` | One task with its notes |
 | POST | `/api/tasks` | `{ officeId, deskId?, title, description? }`: queued with a desk, proposed without |
@@ -30,6 +30,12 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
+| GET | `/api/roles` | All roles |
+| POST | `/api/roles` | Define a role: `{ name, description?, instructions?, model?, edit, bash, web }` with `Allow`, `Ask` or `Deny` |
+| PUT | `/api/roles/{id}` | Change a role (same body) |
+| DELETE | `/api/roles/{id}` | Delete a role; `422` with code `role-in-use` while desks use it |
+| POST | `/api/roles/draft` | `{ name, description }` → `{ instructions }` drafted by the AI, not saved |
+| PUT | `/api/offices/{id}/desks/{deskId}/role` | `{ roleId }` (null to remove); applies from the desk's next task |
 
 Enums travel as strings (`"Queued"`). Errors are
 [problem details](https://www.rfc-editor.org/rfc/rfc9457): `404` for unknown ids,
@@ -65,6 +71,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `TaskChanged` | task id | a task is created, changes status or gets a note |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
+| `RolesChanged` | none | a role was defined or changed |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity` carries the data itself,
@@ -98,6 +105,7 @@ On startup it applies pending database migrations.
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
+| `OpenCode:DraftModel` | none | Model for AI drafts (role instructions); none means OpenCode's default |
 | `OpenCode:ToolsUrl` | `http://127.0.0.1:5145/mcp` | Where OpenCode reaches this API's MCP tools; change it with the port |
 | `Workspaces:Root` | `~/.local/share/openspace/worktrees` | One git worktree per task lives here |
 

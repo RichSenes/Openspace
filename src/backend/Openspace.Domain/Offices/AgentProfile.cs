@@ -30,13 +30,20 @@ public sealed partial record AgentProfile
                 $"Agent name '{name}' must use lowercase letters, digits and dashes only.");
         }
 
-        var trimmedModel = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
-        if (trimmedModel is not null && !trimmedModel.Contains('/', StringComparison.Ordinal))
+        return new AgentProfile(name, ValidModel(model));
+    }
+
+    /// <summary>A trimmed <c>provider/model</c>, or null when none is given.</summary>
+    internal static string? ValidModel(string? model)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
+        var slash = trimmed?.IndexOf('/', StringComparison.Ordinal) ?? -1;
+        if (trimmed is not null && (slash <= 0 || slash == trimmed.Length - 1))
         {
-            throw new DomainException($"Model '{trimmedModel}' must be in the form provider/model.");
+            throw new DomainException($"Model '{trimmed}' must be in the form provider/model.");
         }
 
-        return new AgentProfile(name, trimmedModel);
+        return trimmed;
     }
 
     [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]

@@ -17,7 +17,7 @@ public sealed record RoomView(Guid Id, string Name, string Context, IReadOnlyLis
         new(room.Id.Value, room.Name, room.Context, [.. room.Desks.Select(DeskView.From)]);
 }
 
-public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model)
+public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId)
 {
-    public static DeskView From(Desk desk) => new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model);
+    public static DeskView From(Desk desk) => new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value);
 }

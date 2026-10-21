@@ -31,6 +31,8 @@ internal sealed class Harness
 
     public InMemoryAuditLog Audit { get; } = new();
 
+    public InMemoryRoles Roles { get; } = new();
+
     public ActivityBoard Activity { get; }
 
     public Office Office { get; }
@@ -64,11 +66,13 @@ internal sealed class Harness
 
     public TaskRunner Runner(int seats = 1) => new(
         new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
-        Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
+        Offices, Roles, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
     public AgentSignals Signals() => new(Offices, Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
-    public OfficeCommands OfficeCommands() => new(Offices, UnitOfWork, Workspaces, Clock);
+    public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
+
+    public Roles.RoleCommands RoleCommands() => new(Roles, Offices, UnitOfWork, Runtime, Clock);
 
     public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Clock);
 }

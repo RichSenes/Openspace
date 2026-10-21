@@ -137,4 +137,39 @@ public class WorkTaskCommandsTests
         Assert.Equal((ActivityKind.Stopped, string.Empty), (afterAccept?.Kind, afterAccept?.Headline));
         Assert.Equal((ActivityKind.Stopped, string.Empty), (afterDiscard?.Kind, afterDiscard?.Headline));
     }
+
+    private static async Task<(Harness H, WorkTask Task)> AcceptedAsync()
+    {
+        var h = new Harness();
+        var task = h.Enqueue();
+        await h.Runner().RunQueueAsync(default);
+        await h.Signals().FinishedAsync("ses_1", default);
+        await h.Commands().AcceptAsync(task.Id, default);
+        return (h, task);
+    }
+
+    [Fact]
+    public async Task Merging_brings_the_task_branch_into_the_chosen_branch()
+    {
+        var (h, task) = await AcceptedAsync();
+
+        await h.Commands().MergeAsync(task.Id, "develop", default);
+
+        Assert.Equal((task.Run!.Branch, "develop"), Assert.Single(h.Workspaces.Merges));
+        Assert.Equal("develop", task.MergedInto);
+        Assert.Contains("Merged into develop", task.Notes[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_refused_merge_changes_nothing()
+    {
+        var (h, task) = await AcceptedAsync();
+        var saves = h.UnitOfWork.Saves;
+        h.Workspaces.MergeProblem = new RejectedException("merge-conflict", "The work conflicts with main.");
+
+        var error = await Assert.ThrowsAsync<RejectedException>(() => h.Commands().MergeAsync(task.Id, "main", default));
+
+        Assert.Equal("merge-conflict", error.Code);
+        Assert.Equal(saves, h.UnitOfWork.Saves);
+    }
 }

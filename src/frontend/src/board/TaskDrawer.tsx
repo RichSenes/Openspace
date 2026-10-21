@@ -1,6 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
-import { useActivity, useAnswerPermission, useApproveTask, useTaskCommand, useTaskDiff, useTaskText } from '../api/hooks'
+import {
+  useActivity,
+  useAnswerPermission,
+  useApproveTask,
+  useBranches,
+  useMergeTask,
+  useTaskCommand,
+  useTaskDiff,
+  useTaskText,
+} from '../api/hooks'
+import { defaultMergeTarget } from './mergeTarget'
 import type { WorkTaskView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
@@ -27,6 +37,11 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
   const [showDiff, setShowDiff] = useState(task.status === 'Review')
   const canDiff = task.branch !== null && (task.status === 'Running' || task.status === 'Review' || task.status === 'Failed')
   const diff = useTaskDiff(task.id, canDiff && showDiff)
+  const canMerge = task.status === 'Done' && task.branch !== null && task.mergedInto === null
+  const branches = useBranches(task.officeId, canMerge)
+  const merge = useMergeTask()
+  const [mergeTarget, setMergeTarget] = useState('')
+  const target = mergeTarget || defaultMergeTarget(branches.data)
   const [approveDesk, setApproveDesk] = useState(task.deskId ?? '')
   const [feedback, setFeedback] = useState('')
   const [writingFeedback, setWritingFeedback] = useState(false)
@@ -35,7 +50,7 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
   const actions = actionsFor(task.status)
   const desk = desks.find((d) => d.id === task.deskId)
   const deskName = (id: string | null) => desks.find((d) => d.id === id)?.name ?? 'an agent'
-  const error = command.error ?? approve.error ?? sendBack.error ?? addNote.error ?? answer.error
+  const error = command.error ?? approve.error ?? sendBack.error ?? addNote.error ?? answer.error ?? merge.error
 
   const run = (name: 'accept' | 'retry' | 'discard', done: string) =>
     command.mutate({ taskId: task.id, command: name }, { onSuccess: () => toast(done) })
@@ -77,11 +92,18 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
           <dd>{task.requestedBy}</dd>
           <dt>Created</dt>
           <dd>{when(task.createdAt)}</dd>
-          {task.branch && (
+          {task.mergedInto ? (
             <>
-              <dt>Branch</dt>
-              <dd className="mono">{task.branch}</dd>
+              <dt>Merged into</dt>
+              <dd className="mono">{task.mergedInto}</dd>
             </>
+          ) : (
+            task.branch && (
+              <>
+                <dt>Branch</dt>
+                <dd className="mono">{task.branch}</dd>
+              </>
+            )
           )}
         </dl>
         {task.description && <p className="description">{task.description}</p>}
@@ -184,6 +206,36 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
             )}
           </div>
         )}
+        {canMerge && (
+          <section className="merge" aria-label="Merge">
+            <label className="field">
+              <span>Bring this work into</span>
+              <select className="input mono" value={target} onChange={(e) => setMergeTarget(e.target.value)}>
+                {(branches.data?.branches ?? []).map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                    {b === branches.data?.current ? ' (checked out)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="row">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!target || merge.isPending}
+                onClick={() => merge.mutate({ taskId: task.id, target }, { onSuccess: () => toast(`Merged into ${target}`) })}
+              >
+                Merge into {target || '…'}
+              </button>
+            </div>
+            <p className="hint">
+              Your checkout never moves: other branches are merged in a temporary copy. With uncommitted changes or
+              conflicts nothing is touched.
+            </p>
+          </section>
+        )}
+
         {error && <p className="error">{error.message}</p>}
 
         {canDiff && (

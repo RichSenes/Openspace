@@ -49,6 +49,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("DeskId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MergedInto")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("OfficeId")
                         .HasColumnType("TEXT");
 

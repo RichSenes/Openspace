@@ -63,6 +63,9 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// <summary>The agent's session and workspace, once the task has started at least once.</summary>
     public AgentRun? Run { get; private set; }
 
+    /// <summary>The branch the accepted work was merged into, if it was.</summary>
+    public string? MergedInto { get; private set; }
+
     public bool IsClosed => Status is WorkTaskStatus.Done or WorkTaskStatus.Discarded;
 
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
@@ -205,6 +208,24 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     }
 
     public void Discard(DateTimeOffset now) => MoveTo(WorkTaskStatus.Discarded, now);
+
+    /// <summary>Records that the accepted work now lives in <paramref name="targetBranch"/>.</summary>
+    public void RecordMerge(string targetBranch, DateTimeOffset now)
+    {
+        var target = Guard.NotBlank(targetBranch, "Target branch", 200);
+        if (Status != WorkTaskStatus.Done || Run is null)
+        {
+            throw new DomainException("Only accepted work done by an agent can be merged.");
+        }
+
+        if (MergedInto is not null)
+        {
+            throw new DomainException($"This work was already merged into {MergedInto}.");
+        }
+
+        MergedInto = target;
+        Raise(new WorkTaskMerged(Id, target, now));
+    }
 
     public void AddNote(NoteAuthor author, string text, DateTimeOffset now)
     {

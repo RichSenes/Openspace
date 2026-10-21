@@ -12,6 +12,7 @@ const task = (title: string, status: TaskStatus): WorkTaskView => ({
   status,
   createdAt: '2015-06-24T09:00:00Z',
   branch: null,
+  mergedInto: null,
   notes: [],
 })
 

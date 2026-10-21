@@ -17,6 +17,8 @@ internal static class TaskEndpoints
 
     public sealed record PermissionRequest(bool Allow);
 
+    public sealed record MergeRequest(string Target);
+
     public static void MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
         var tasks = app.MapGroup("/api/tasks").WithTags("Tasks");
@@ -33,6 +35,10 @@ internal static class TaskEndpoints
         tasks.MapPost("/{taskId:guid}/permission", (
             Guid taskId, PermissionRequest request, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.ReplyToPermissionAsync(new WorkTaskId(taskId), request.Allow, ct)));
+
+        tasks.MapPost("/{taskId:guid}/merge", (
+            Guid taskId, MergeRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            NoContent(commands.MergeAsync(new WorkTaskId(taskId), request.Target, ct)));
 
         app.MapGet("/api/activity", (Guid? officeId, ActivityBoard board) => board.Snapshot(officeId)).WithTags("Activity");
 

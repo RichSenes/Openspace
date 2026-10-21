@@ -12,6 +12,7 @@ public sealed record WorkTaskView(
     WorkTaskStatus Status,
     DateTimeOffset CreatedAt,
     string? Branch,
+    string? MergedInto,
     IReadOnlyList<TaskNoteView> Notes)
 {
     public static WorkTaskView From(WorkTask task)
@@ -27,6 +28,7 @@ public sealed record WorkTaskView(
             task.Status,
             task.CreatedAt,
             task.Run?.Branch,
+            task.MergedInto,
             [.. task.Notes.Select(TaskNoteView.From)]);
     }
 }

@@ -42,8 +42,11 @@ Each project has its own README with detailed specifications.
    If it asks for a permission, the desk waits for your answer.
 4. When it stops, the task goes to review with the agent's summary as a note and
    the diff of its changes.
-5. Accept commits the work on the task branch, ready for you to merge. Send back
-   resumes the same session with your feedback. Discard throws it all away.
+5. Accept commits the work on the task branch. Send back resumes the same
+   session with your feedback. Discard throws it all away.
+6. Accepted work can then be merged into the branch you choose, from the task
+   itself. Your checkout never moves, and nothing is touched if you have
+   uncommitted changes or the work conflicts.
 
 ## Ground rules
 

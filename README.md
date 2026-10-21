@@ -6,7 +6,7 @@ Every project is an office, every area of competence is a room, every agent sits
 at a desk. Walk through the building, see who is working and what they are doing,
 assign tasks, review changes and read reports, instead of scrolling a terminal.
 
-> **Status:** skeleton. The backend and an empty pixel floor run; no agents yet.
+> **Status:** early. Domain, use cases, queue and SQLite storage are in place; no agents or UI yet.
 
 ## Concepts
 

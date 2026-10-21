@@ -19,7 +19,15 @@ dotnet run --project src/backend/Openspace.Api
 
 Listens on `http://localhost:5145` in development.
 
+On startup it applies pending database migrations.
+
 ## Configuration
 
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `ConnectionStrings:Openspace` | `Data Source=openspace.db` | SQLite database file |
+| `Queue:Seats` | `1` | Agents allowed to work at the same time |
+
 `appsettings.json` holds non-secret defaults. Local overrides go in
-`appsettings.Local.json` or environment variables, both ignored by git.
+`appsettings.Local.json` (ignored by git) or environment variables, for example
+`Queue__Seats=2`.

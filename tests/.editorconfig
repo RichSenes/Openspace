@@ -1,3 +1,6 @@
 [*.cs]
 # Test names read as sentences: Subject_does_something_when_condition
 dotnet_diagnostic.CA1707.severity = none
+
+# xUnit fixtures release resources through IAsyncLifetime, which CA1001 does not recognise
+dotnet_diagnostic.CA1001.severity = none

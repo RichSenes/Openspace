@@ -7,7 +7,9 @@
     <Project Path="src/backend/Openspace.Infrastructure/Openspace.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Openspace.Application.Tests/Openspace.Application.Tests.csproj" />
     <Project Path="tests/Openspace.ArchitectureTests/Openspace.ArchitectureTests.csproj" />
     <Project Path="tests/Openspace.Domain.Tests/Openspace.Domain.Tests.csproj" />
+    <Project Path="tests/Openspace.Infrastructure.Tests/Openspace.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

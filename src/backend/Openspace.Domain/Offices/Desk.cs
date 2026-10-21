@@ -10,6 +10,12 @@ public sealed class Desk
         Agent = agent;
     }
 
+    // Used by persistence, which sets Agent right after construction.
+    private Desk(DeskId id, string name)
+        : this(id, name, null!)
+    {
+    }
+
     public DeskId Id { get; }
 
     public string Name { get; }

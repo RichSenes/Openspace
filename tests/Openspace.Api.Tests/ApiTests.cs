@@ -238,4 +238,18 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(("Auditor", "Ask", "Deny"), (roles[0].GetProperty("name").GetString(), roles[0].GetProperty("edit").GetString(), roles[0].GetProperty("bash").GetString()));
         Assert.Equal(created.Id, office.GetProperty("rooms")[0].GetProperty("desks")[0].GetProperty("roleId").GetGuid());
     }
+
+    private static readonly string[] ProcedureSteps = ["Back up first", " ", "Log the change"];
+
+    [Fact]
+    public async Task A_room_procedure_is_set_over_http()
+    {
+        var (officeId, roomId, _) = await FurnishAsync();
+
+        var put = await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/procedure", new { steps = ProcedureSteps });
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+
+        put.EnsureSuccessStatusCode();
+        Assert.Equal(["Back up first", "Log the change"], office.GetProperty("rooms")[0].GetProperty("procedure").EnumerateArray().Select(s => s.GetString()));
+    }
 }

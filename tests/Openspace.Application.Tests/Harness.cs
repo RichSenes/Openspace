@@ -68,9 +68,9 @@ internal sealed class Harness
 
     public TaskRunner Runner(int seats = 1) => new(
         new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
-        Offices, Roles, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
-    public AgentSignals Signals() => new(Offices, Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
+    public AgentSignals Signals() => new(Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
 
     public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
 

@@ -7,8 +7,9 @@ namespace Openspace.Application.Agents;
 /// Reacts to what agents report while they work. Signals for sessions Openspace
 /// did not start (e.g. someone using OpenCode directly) are ignored.
 /// </summary>
-public sealed class AgentSignals(
+public sealed partial class AgentSignals(
     IOfficeRepository offices,
+    AgentSetups setups,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
@@ -139,9 +140,52 @@ public sealed class AgentSignals(
             task.AddNote(NoteAuthor.FromDesk(task.DeskId!.Value), summary, now);
         }
 
+        if (task.MissingSteps.Count > 0)
+        {
+            await HandleMissingStepsAsync(task, now, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         task.SubmitForReview(now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await ShowAsync(task, ActivityKind.Stopped, null, "Done: waiting for review", null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>How many times an agent is sent back to its missing steps before the task fails.</summary>
+    public const int ProcedureReminders = 2;
+
+    /// <summary>
+    /// The agent stopped with required steps missing: remind it, a couple of times, then
+    /// fail the task so a person looks at it. Work never reaches review without them.
+    /// </summary>
+    private async Task HandleMissingStepsAsync(WorkTask task, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var missing = string.Join(", ", task.MissingSteps.Select(s => s.Number));
+        if (!task.RemindOfProcedure(ProcedureReminders))
+        {
+            task.Fail($"The required procedure was not completed (step {missing} still to do) after {ProcedureReminders} reminders.", now);
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await ShowAsync(task, ActivityKind.Stopped, null, "Stuck: procedure not completed", null, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        task.AddNote(NoteAuthor.System, $"The agent stopped with step {missing} of the procedure still to do: reminded it ({task.ProcedureReminders} of {ProcedureReminders}).", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var (_, desk) = office.Locate(task.DeskId!.Value);
+        var setup = await setups.ForDeskAsync(desk, cancellationToken).ConfigureAwait(false);
+        await ShowAsync(task, ActivityKind.Working, null, "Back to the required procedure", null, cancellationToken).ConfigureAwait(false);
+        await runtime.PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, setup, Briefing.ForMissingSteps(task), cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>The agent reported a procedure step as done, through the Openspace tools.</summary>
+    public async Task CompleteStepAsync(WorkTaskId taskId, int number, string evidence, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        task.CompleteStep(number, evidence?.Trim() ?? string.Empty, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task FailedAsync(string sessionId, string reason, CancellationToken cancellationToken)

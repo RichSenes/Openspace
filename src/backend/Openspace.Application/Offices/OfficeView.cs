@@ -11,10 +11,10 @@ public sealed record OfficeView(Guid Id, string Name, string? RepositoryPath, IR
     }
 }
 
-public sealed record RoomView(Guid Id, string Name, string Context, IReadOnlyList<DeskView> Desks)
+public sealed record RoomView(Guid Id, string Name, string Context, IReadOnlyList<string> Procedure, IReadOnlyList<DeskView> Desks)
 {
     public static RoomView From(Room room) =>
-        new(room.Id.Value, room.Name, room.Context, [.. room.Desks.Select(DeskView.From)]);
+        new(room.Id.Value, room.Name, room.Context, [.. room.Procedure], [.. room.Desks.Select(DeskView.From)]);
 }
 
 public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId)

@@ -244,3 +244,11 @@ export function useRenameDesk(officeId: string) {
     keys.offices,
   )
 }
+
+export function useSetRoomProcedure(officeId: string) {
+  return useWrite(
+    (input: { roomId: string; steps: string[] }) =>
+      request<void>('PUT', `/api/offices/${officeId}/rooms/${input.roomId}/procedure`, { steps: input.steps }),
+    keys.offices,
+  )
+}

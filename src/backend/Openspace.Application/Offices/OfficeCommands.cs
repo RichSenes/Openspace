@@ -73,6 +73,15 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Sets the steps every task of the room must follow; applies to tasks started from now on.</summary>
+    public async Task SetRoomProcedureAsync(
+        OfficeId officeId, RoomId roomId, IReadOnlyList<string> steps, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetRoomProcedure(roomId, steps, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task UpdateRoomContextAsync(
         OfficeId officeId, RoomId roomId, string? context, CancellationToken cancellationToken)
     {

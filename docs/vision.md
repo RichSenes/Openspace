@@ -94,11 +94,9 @@ Later, in rough order of appearance:
   repository: its desks work over SSH with the room's host, user and key
   reference (keys stay in the SSH agent or OpenCode's configuration, never in
   Openspace). Such rooms ask permission for every command by default.
-- **Procedures.** Steps a room requires around every task, such as "back up the
-  files you will touch to /backup/<date> before changing them" or "log every
-  change to the change register". Openspace puts them in the brief, shows them
-  as a checklist on the task, and refuses to send the work to review until the
-  agent has reported each step as done.
+- ~~**Procedures.**~~ Done: a room's required steps go into the brief, become a
+  checklist on the task that the agent fills in with evidence through
+  `complete_step`, and work does not reach review until every step is reported.
 - **Merge requests** for repositories with a remote: push the task branch and
   open a pull request instead of merging locally.
 

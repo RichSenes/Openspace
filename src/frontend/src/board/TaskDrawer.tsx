@@ -221,7 +221,28 @@ export function TaskDrawer({ task, desks, onClose }: Props) {
                 )}
               </div>
             )}
-            {canMerge && (
+            {task.procedure.length > 0 && (
+          <section className="procedure" aria-label="Required procedure">
+            <h3 className="pixel notes-title">
+              Procedure · {task.procedure.filter((s) => s.completedAt).length} of {task.procedure.length} done
+            </h3>
+            <ol className="procedure-list">
+              {task.procedure.map((s) => (
+                <li key={s.number} className={s.completedAt ? 'step-done' : 'step-open'}>
+                  <span className="step-mark" aria-hidden="true">
+                    {s.completedAt ? '✓' : '○'}
+                  </span>
+                  <div>
+                    <p>{s.text}</p>
+                    {s.evidence ? <p className="hint">{s.evidence}</p> : <p className="hint">Not reported yet</p>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {canMerge && (
               <section className="merge" aria-label="Merge">
                 <label className="field">
                   <span>Bring this work into</span>

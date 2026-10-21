@@ -44,7 +44,7 @@ describe('isActive', () => {
 describe('waitingDesks', () => {
   it('lists only waiting desks, named after their office and desk', () => {
     const offices = [
-      { id: 'e-corp', name: 'E Corp', repositoryPath: null, rooms: [{ id: 'web', name: 'Web', context: '', desks: [{ id: 'frontend', name: 'Frontend', agentName: 'build', model: null, roleId: null }] }] },
+      { id: 'e-corp', name: 'E Corp', repositoryPath: null, rooms: [{ id: 'web', name: 'Web', context: '', procedure: [], desks: [{ id: 'frontend', name: 'Frontend', agentName: 'build', model: null, roleId: null }] }] },
     ]
     const list = [activity('frontend', 'Wants to bash ls -la', 'Waiting'), activity('tester', 'Testing', 'Working')]
 

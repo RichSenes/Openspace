@@ -22,6 +22,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
             room.Property(r => r.Id).ValueGeneratedNever();
             room.Property(r => r.Name).IsRequired();
             room.Property(r => r.Context).IsRequired();
+            room.PrimitiveCollection(r => r.Procedure).HasField("_procedure").UsePropertyAccessMode(PropertyAccessMode.Field);
 
             room.OwnsMany(r => r.Desks, desk =>
             {

@@ -42,6 +42,7 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         OfficeRepositorySet x => x.OfficeId,
         RoomOpened x => x.OfficeId,
         RoomContextUpdated x => x.OfficeId,
+        RoomProcedureSet x => x.OfficeId,
         DeskAdded x => x.OfficeId,
         DeskReassigned x => x.OfficeId,
         DeskRoleChanged x => x.OfficeId,
@@ -55,6 +56,7 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         WorkTaskStatusChanged x => x.TaskId,
         WorkTaskNoteAdded x => x.TaskId,
         WorkTaskMerged x => x.TaskId,
+        WorkTaskStepCompleted x => x.TaskId,
         _ => null,
     };
 }

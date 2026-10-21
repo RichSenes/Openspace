@@ -10,7 +10,7 @@ namespace Openspace.Application.Agents;
 public sealed partial class TaskRunner(
     QueueDispatcher dispatcher,
     IOfficeRepository offices,
-    IRoleRepository roles,
+    AgentSetups setups,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
@@ -63,7 +63,7 @@ public sealed partial class TaskRunner(
                 return;
             }
 
-            var setup = await SetupAsync(desk, cancellationToken).ConfigureAwait(false);
+            var setup = await setups.ForDeskAsync(desk, cancellationToken).ConfigureAwait(false);
             string message;
             if (task.Run is null)
             {
@@ -75,6 +75,7 @@ public sealed partial class TaskRunner(
                     .ConfigureAwait(false);
 
                 // Saved before prompting, so the agent's first events can find their task.
+                task.AdoptProcedure(room.Procedure);
                 task.AttachRun(AgentRun.Create(sessionId, workspace.Path, workspace.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 message = Briefing.ForNewTask(office, room, desk, task);
@@ -130,17 +131,6 @@ public sealed partial class TaskRunner(
         {
             LogPendingUnknown(logger, ex, task.Id.Value);
         }
-    }
-
-    /// <summary>The desk's agent and model, completed by its role: the desk's own model wins over the role's.</summary>
-    private async Task<AgentSetup> SetupAsync(Desk desk, CancellationToken cancellationToken)
-    {
-        var role = desk.RoleId is { } id ? await roles.FindAsync(id, cancellationToken).ConfigureAwait(false) : null;
-        return new AgentSetup(
-            desk.Agent.AgentName,
-            desk.Agent.Model ?? role?.Model,
-            string.IsNullOrEmpty(role?.Instructions) ? null : role.Instructions,
-            role?.Permissions);
     }
 
     private async Task<string?> CheckAsync(Office office, Desk desk, CancellationToken cancellationToken)

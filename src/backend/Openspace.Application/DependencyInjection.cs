@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<QueueDispatcher>();
         services.AddScoped<RoleCommands>();
         services.AddScoped<RoleQueries>();
+        services.AddScoped<AgentSetups>();
         services.AddScoped<TaskRunner>();
         services.AddScoped<AgentSignals>();
         services.AddSingleton<ActivityBoard>();

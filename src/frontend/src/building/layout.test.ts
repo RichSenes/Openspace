@@ -6,6 +6,7 @@ const room = (name: string, desks: number): RoomView => ({
   id: name,
   name,
   context: '',
+  procedure: [],
   desks: Array.from({ length: desks }, (_, i) => ({ id: `${name}-${i}`, name: `Desk ${i}`, agentName: 'agent', model: null, roleId: null })),
 })
 

@@ -11,6 +11,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/offices/{id}` | One office |
 | POST | `/api/offices` | Open an office: `{ name }` |
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
+| PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
 | POST | `/api/offices/{id}/rooms/{roomId}/desks` | Add a desk: `{ name, agentName, model?, roleId? }` |
 | GET | `/api/tasks?officeId=&status=` | Tasks, oldest first, optionally filtered |
@@ -60,6 +61,7 @@ the agent having to name it.
 | `get_task` | Returns the brief again: room rules, request, team notes |
 | `add_task_note` | `{ text }`: a note on the task signed by the desk |
 | `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
+| `complete_step` | `{ step, evidence }`: reports a step of the task's required procedure as done |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
 error the agent can read. There is no authentication: the endpoint is meant for

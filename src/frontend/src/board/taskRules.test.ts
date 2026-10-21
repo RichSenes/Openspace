@@ -14,6 +14,7 @@ const task = (title: string, status: TaskStatus): WorkTaskView => ({
   branch: null,
   mergedInto: null,
   epicId: null,
+  procedure: [],
   notes: [],
 })
 

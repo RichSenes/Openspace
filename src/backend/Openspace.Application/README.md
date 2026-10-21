@@ -30,7 +30,8 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `RoleCommands` | Define, change and delete roles (not while desks use them); draft instructions with AI |
 | `RoleQueries` | List roles |
 | `TaskRunner` | Gives started tasks a worktree, a session and a brief; builds the `AgentSetup` from the desk and its role |
-| `AgentSignals` | Reacts to what agents report (progress, tools, permissions, finish, failure) and to the Openspace tools |
+| `AgentSignals` | Reacts to what agents report (progress, tools, permissions, finish, failure) and to the Openspace tools. An agent that stops with procedure steps missing is reminded twice, then the task fails |
+| `AgentSetups` | Builds the session setup of a desk's agent from the desk and its role |
 
 Commands load an aggregate, call one domain method and save. Queries return
 read-only views (`OfficeView`, `WorkTaskView`), never domain objects.

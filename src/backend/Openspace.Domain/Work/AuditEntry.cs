@@ -24,6 +24,9 @@ public enum AuditKind
     /// <summary>A note written on the task by a person, the agent or Openspace.</summary>
     Note,
 
+    /// <summary>A required procedure step reported as done, with its evidence.</summary>
+    Procedure,
+
     Other,
 }
 

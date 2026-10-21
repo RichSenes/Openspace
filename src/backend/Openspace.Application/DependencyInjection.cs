@@ -16,6 +16,8 @@ public static class DependencyInjection
         services.AddScoped<OfficeQueries>();
         services.AddScoped<WorkTaskCommands>();
         services.AddScoped<WorkTaskQueries>();
+        services.AddScoped<Supervisor>();
+        services.AddScoped<EpicQueries>();
         services.AddScoped<QueueDispatcher>();
         services.AddScoped<RoleCommands>();
         services.AddScoped<RoleQueries>();

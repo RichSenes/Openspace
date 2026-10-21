@@ -59,6 +59,10 @@ the task's worktree, so a single server serves every task.
 Roles need no OpenCode configuration: their permissions become the session's
 rules at creation (`edit`, `bash` and `webfetch`, each `allow`, `ask` or `deny`
 for every pattern) and their instructions travel as `system` with every prompt.
+Supervisor plans run in the office repository in the same kind of read-only
+`plan` session, with `format: { type: "json_schema", schema, retryCount: 2 }`;
+the answer is read from the message's `info.structured`.
+
 Drafts run in an empty scratch folder, in a `plan` session that may not edit,
 run commands or use the web, answered synchronously with
 `POST /session/{id}/message`; the session is deleted afterwards.

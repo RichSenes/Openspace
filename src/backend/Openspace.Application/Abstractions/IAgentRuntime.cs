@@ -18,6 +18,12 @@ public interface IAgentRuntime
     /// </summary>
     Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Lets a model read a folder (it may not change anything) and answer with JSON that
+    /// matches <paramref name="jsonSchema"/>. Returns that JSON.
+    /// </summary>
+    Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken);
+
     /// <summary>Gives agents working in this folder the Openspace tools, tied to this task.</summary>
     Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken);
 

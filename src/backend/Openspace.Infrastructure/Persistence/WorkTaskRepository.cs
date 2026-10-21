@@ -27,6 +27,9 @@ internal sealed class WorkTaskRepository(OpenspaceDbContext db) : IWorkTaskRepos
         return await query.OrderBy(t => t.CreatedAt).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<WorkTask>> ListByEpicAsync(EpicId epicId, CancellationToken cancellationToken) =>
+        await db.WorkTasks.Where(t => t.EpicId == epicId).OrderBy(t => t.CreatedAt).ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public Task<WorkTask?> FindBySessionAsync(string sessionId, CancellationToken cancellationToken) =>
         db.WorkTasks.FirstOrDefaultAsync(t => t.Run!.SessionId == sessionId, cancellationToken);
 

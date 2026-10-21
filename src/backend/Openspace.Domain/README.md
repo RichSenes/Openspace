@@ -24,7 +24,7 @@ on frameworks, databases or OpenCode.
 Common/   AggregateRoot, IDomainEvent, DomainException
 Offices/  Office (aggregate) > Room > Desk, AgentProfile
 Roles/    Role (aggregate), RolePermissions, PermissionLevel
-Work/     WorkTask (aggregate), TaskNote, NoteAuthor, AgentRun, AuditEntry
+Work/     WorkTask (aggregate), Epic (aggregate), TaskNote, NoteAuthor, AgentRun, AuditEntry
 ```
 
 ### Office
@@ -71,6 +71,12 @@ Any open status ──discard──▶ Discarded
   feedback as a note.
 - Notes can be written by a human, by a desk (the agent) or by the system.
 - Events: `WorkTaskCreated`, `WorkTaskStatusChanged`, `WorkTaskNoteAdded`.
+
+### Epic
+
+A larger request split into tasks: its title, the request in the words of whoever
+asked, who and when. Tasks may belong to one epic of their own office. Event:
+`EpicOpened`.
 
 ### AuditEntry
 

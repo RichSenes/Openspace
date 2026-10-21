@@ -63,6 +63,9 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// <summary>The agent's session and workspace, once the task has started at least once.</summary>
     public AgentRun? Run { get; private set; }
 
+    /// <summary>The larger request this task is part of, if any.</summary>
+    public EpicId? EpicId { get; private set; }
+
     /// <summary>The branch the accepted work was merged into, if it was.</summary>
     public string? MergedInto { get; private set; }
 
@@ -70,8 +73,13 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
-        Office office, string title, string? description, string requestedBy, DateTimeOffset now)
+        Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)
     {
+        if (epic is not null && epic.OfficeId != office?.Id)
+        {
+            throw new DomainException("A task can only be part of an epic of its own office.");
+        }
+
         ArgumentNullException.ThrowIfNull(office);
         var task = new WorkTask(
             WorkTaskId.New(),
@@ -81,6 +89,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             Guard.NotBlank(requestedBy, "Requester", 80),
             WorkTaskStatus.Proposed,
             now);
+        task.EpicId = epic?.Id;
         task.Raise(new WorkTaskCreated(task.Id, office.Id, task.Title, now));
         return task;
     }

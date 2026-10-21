@@ -16,6 +16,11 @@ internal static class RepositoryExtensions
         await roles.FindAsync(id, cancellationToken).ConfigureAwait(false)
         ?? throw new NotFoundException("Role", id.Value);
 
+    public static async Task<Epic> GetAsync(
+        this IEpicRepository epics, EpicId id, CancellationToken cancellationToken) =>
+        await epics.FindAsync(id, cancellationToken).ConfigureAwait(false)
+        ?? throw new NotFoundException("Epic", id.Value);
+
     public static async Task<WorkTask> GetAsync(
         this IWorkTaskRepository tasks, WorkTaskId id, CancellationToken cancellationToken) =>
         await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false)

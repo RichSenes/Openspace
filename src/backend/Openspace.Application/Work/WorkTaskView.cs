@@ -13,6 +13,7 @@ public sealed record WorkTaskView(
     DateTimeOffset CreatedAt,
     string? Branch,
     string? MergedInto,
+    Guid? EpicId,
     IReadOnlyList<TaskNoteView> Notes)
 {
     public static WorkTaskView From(WorkTask task)
@@ -29,6 +30,7 @@ public sealed record WorkTaskView(
             task.CreatedAt,
             task.Run?.Branch,
             task.MergedInto,
+            task.EpicId?.Value,
             [.. task.Notes.Select(TaskNoteView.From)]);
     }
 }

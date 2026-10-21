@@ -24,6 +24,11 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
             await hub.Clients.All.SendAsync("TaskChanged", task.Value, cancellationToken).ConfigureAwait(false);
         }
 
+        if (events.Any(e => e is EpicOpened))
+        {
+            await hub.Clients.All.SendAsync("EpicsChanged", cancellationToken).ConfigureAwait(false);
+        }
+
         if (events.Any(e => e is RoleDefined or RoleChanged))
         {
             await hub.Clients.All.SendAsync("RolesChanged", cancellationToken).ConfigureAwait(false);

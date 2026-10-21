@@ -51,6 +51,7 @@ export interface WorkTaskView {
   createdAt: string
   branch: string | null
   mergedInto: string | null
+  epicId: string | null
   notes: TaskNoteView[]
 }
 
@@ -97,3 +98,17 @@ export interface RoleView {
 }
 
 export type RoleInput = Omit<RoleView, 'id'>
+
+export interface EpicView {
+  id: string
+  officeId: string
+  title: string
+  request: string
+  requestedBy: string
+  createdAt: string
+}
+
+export interface PlanView {
+  epic: EpicView
+  tasks: WorkTaskView[]
+}

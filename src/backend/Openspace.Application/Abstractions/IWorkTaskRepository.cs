@@ -11,6 +11,8 @@ public interface IWorkTaskRepository
     Task<IReadOnlyList<WorkTask>> ListAsync(
         OfficeId? officeId, WorkTaskStatus? status, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<WorkTask>> ListByEpicAsync(EpicId epicId, CancellationToken cancellationToken);
+
     Task<WorkTask?> FindBySessionAsync(string sessionId, CancellationToken cancellationToken);
 
     void Add(WorkTask task);

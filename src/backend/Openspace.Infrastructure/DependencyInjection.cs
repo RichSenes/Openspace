@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkTaskRepository, WorkTaskRepository>();
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IEpicRepository, EpicRepository>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();
@@ -31,7 +32,9 @@ public static class DependencyInjection
     /// <summary>Connects agents: the OpenCode server, its event stream and the background queue.</summary>
     public static IServiceCollection AddAgents(this IServiceCollection services)
     {
-        services.AddHttpClient<IAgentRuntime, OpenCodeRuntime>(ConfigureOpenCode);
+        // Planning and drafting wait for the model to answer: allow minutes, not seconds.
+        services.AddHttpClient<IAgentRuntime, OpenCodeRuntime>(ConfigureOpenCode)
+            .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(5));
         services.AddHttpClient(OpenCodeEventListener.HttpClientName, ConfigureOpenCode)
             .ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
         // Plain AddSingleton: AddHostedService would deduplicate two factories of the same return type.

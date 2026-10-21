@@ -54,28 +54,62 @@ internal sealed class OpenCodeRuntime(
 
     public async Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
     {
-        // A scratch folder with nothing in it, and a session that may not touch anything.
+        // A scratch folder with nothing in it.
         var folder = Path.Combine(workspaces.Value.Root, "drafts");
         Directory.CreateDirectory(folder);
+        using var reply = await AskReadOnlyAsync(folder, "Openspace draft", instructions, text, null, cancellationToken).ConfigureAwait(false);
+        return string.Join(
+            "\n",
+            reply.RootElement.GetProperty("parts").EnumerateArray()
+                .Where(p => p.GetProperty("type").GetString() == "text")
+                .Select(p => p.GetProperty("text").GetString()));
+    }
+
+    public async Task<string> PlanAsync(
+        string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    {
+        using var schema = JsonDocument.Parse(jsonSchema);
+        var format = new { type = "json_schema", schema = schema.RootElement, retryCount = 2 };
+        using var reply = await AskReadOnlyAsync(folder, "Openspace plan", instructions, text, format, cancellationToken).ConfigureAwait(false);
+        var info = reply.RootElement.GetProperty("info");
+        if (info.TryGetProperty("structured", out var structured) && structured.ValueKind == JsonValueKind.Object)
+        {
+            return structured.GetRawText();
+        }
+
+        var error = info.TryGetProperty("error", out var e) && e.TryGetProperty("data", out var data) && data.TryGetProperty("message", out var m)
+            ? m.GetString()
+            : "no structured answer";
+        throw new InvalidOperationException($"The model did not return a plan ({error}).");
+    }
+
+    /// <summary>
+    /// One question, one answer, in a session that may read but not edit, run commands
+    /// or use the web. The session is deleted afterwards.
+    /// </summary>
+    private async Task<JsonDocument> AskReadOnlyAsync(
+        string folder, string title, string instructions, string text, object? format, CancellationToken cancellationToken)
+    {
         var sessionId = await CreateSessionAsync(
             folder,
-            "Openspace draft",
+            title,
             new AgentSetup("plan", null, null, new RolePermissions(PermissionLevel.Deny, PermissionLevel.Deny, PermissionLevel.Deny)),
             cancellationToken).ConfigureAwait(false);
         try
         {
+            var body = Message("plan", options.Value.DraftModel, instructions, text);
+            if (format is not null)
+            {
+                body["format"] = format;
+            }
+
             using var response = await http
-                .PostAsJsonAsync(In($"session/{sessionId}/message", folder), Message("plan", options.Value.DraftModel, instructions, text), cancellationToken)
+                .PostAsJsonAsync(In($"session/{sessionId}/message", folder), body, cancellationToken)
                 .ConfigureAwait(false);
             await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
-            using var reply = await JsonDocument
+            return await JsonDocument
                 .ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            return string.Join(
-                "\n",
-                reply.RootElement.GetProperty("parts").EnumerateArray()
-                    .Where(p => p.GetProperty("type").GetString() == "text")
-                    .Select(p => p.GetProperty("text").GetString()));
         }
         finally
         {

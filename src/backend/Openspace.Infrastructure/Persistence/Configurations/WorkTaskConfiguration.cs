@@ -17,6 +17,8 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Property(t => t.Description).IsRequired();
         builder.Property(t => t.RequestedBy).IsRequired();
         builder.Property(t => t.MergedInto);
+        builder.Property(t => t.EpicId);
+        builder.HasOne<Epic>().WithMany().HasForeignKey(t => t.EpicId).OnDelete(DeleteBehavior.SetNull);
         builder.Property(t => t.Status).HasConversion<string>();
         builder.HasOne<Office>().WithMany().HasForeignKey(t => t.OfficeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(t => new { t.Status, t.CreatedAt });

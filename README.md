@@ -34,7 +34,9 @@ Each project has its own README with detailed specifications.
 
 ## How a task flows
 
-1. You create a task for a desk (or propose it and approve it later).
+1. You create a task for a desk, or ask the supervisor: it reads the project and
+   splits a larger request into tasks proposed for the right desks, which you
+   approve.
 2. When a seat is free, Openspace creates a git worktree on a new
    `openspace/...` branch and opens an OpenCode session there, briefing the agent
    with the room's rules, the task and the team's notes.

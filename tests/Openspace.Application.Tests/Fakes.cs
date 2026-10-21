@@ -102,6 +102,20 @@ internal sealed class FakeRuntime : IAgentRuntime
 
 internal sealed class FakeWorkspaces : IWorkspaceManager
 {
+    public RepositoryProblem? Problem { get; set; }
+
+    public List<string> Initialized { get; } = [];
+
+    public Task<RepositoryProblem?> CheckRepositoryAsync(string repositoryPath, CancellationToken cancellationToken) =>
+        Task.FromResult(Problem);
+
+    public Task InitializeRepositoryAsync(string repositoryPath, CancellationToken cancellationToken)
+    {
+        Initialized.Add(repositoryPath);
+        Problem = null;
+        return Task.CompletedTask;
+    }
+
     public List<Workspace> Prepared { get; } = [];
 
     public List<(string Workspace, string Message)> Commits { get; } = [];

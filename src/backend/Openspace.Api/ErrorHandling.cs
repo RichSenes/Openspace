@@ -14,6 +14,7 @@ internal sealed class ErrorHandling(IProblemDetailsService problemDetails) : IEx
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             DomainException => (StatusCodes.Status422UnprocessableEntity, "Not allowed"),
+            RejectedException => (StatusCodes.Status422UnprocessableEntity, "Not possible"),
             _ => (0, string.Empty),
         };
 
@@ -23,11 +24,17 @@ internal sealed class ErrorHandling(IProblemDetailsService problemDetails) : IEx
         }
 
         httpContext.Response.StatusCode = status;
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
+        var context = new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
             ProblemDetails = { Status = status, Title = title, Detail = exception.Message },
-        }).ConfigureAwait(false);
+        };
+        if (exception is RejectedException rejected)
+        {
+            context.ProblemDetails.Extensions["code"] = rejected.Code;
+        }
+
+        return await problemDetails.TryWriteAsync(context).ConfigureAwait(false);
     }
 }

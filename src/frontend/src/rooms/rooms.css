@@ -22,9 +22,20 @@
   gap: 8px;
 }
 
-.room-new .error,
-.room-new .hint {
+.room-new .error {
   grid-column: 1 / -1;
+}
+
+.repo {
+  display: grid;
+  gap: 8px;
+}
+
+.repo-problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .room-grid {

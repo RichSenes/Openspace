@@ -41,6 +41,7 @@ that caused them, with the server's reason.
 ```bash
 npm install
 npm run dev     # http://localhost:5173, proxies /api and /hubs to the API on 5145
+OPENSPACE_API=http://localhost:5245 npx vite --port 5273   # a second copy against another API
 npm run build
 npm run lint
 npm test        # Vitest

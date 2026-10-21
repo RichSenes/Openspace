@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
-import { useAddDesk, useOpenRoom, useSetRepository, useUpdateRoomContext } from '../api/hooks'
+import { ApiError } from '../api/client'
+import { INITIALIZABLE, useAddDesk, useOpenRoom, useSetRepository, useUpdateRoomContext } from '../api/hooks'
 import type { OfficeView, RoomView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import './rooms.css'
@@ -58,12 +59,22 @@ function RepositoryForm({ office }: { office: OfficeView }) {
   const setRepository = useSetRepository(office.id)
   const toast = useToast()
 
+  const save = (initialize: boolean) =>
+    setRepository.mutate(
+      { path, initialize },
+      { onSuccess: () => toast(initialize ? 'Git initialized and repository saved' : 'Repository saved') },
+    )
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    setRepository.mutate(path, { onSuccess: () => toast('Repository saved') })
+    save(false)
   }
 
+  const error = setRepository.error
+  const canInitialize = error instanceof ApiError && error.code !== undefined && INITIALIZABLE.has(error.code)
+
   return (
+    <div className="repo">
     <form className="room-new" onSubmit={submit}>
       <label className="field">
         <span>Repository folder (absolute path of the git repo agents work on)</span>
@@ -78,11 +89,21 @@ function RepositoryForm({ office }: { office: OfficeView }) {
       <button type="submit" className="btn" disabled={path === (office.repositoryPath ?? '') || setRepository.isPending}>
         Save repository
       </button>
-      {setRepository.error && <p className="error">{setRepository.error.message}</p>}
-      {!office.repositoryPath && !setRepository.error && (
+    </form>
+      {error && (
+        <div className="repo-problem">
+          <p className="error">{error.message}</p>
+          {canInitialize && (
+            <button type="button" className="btn btn-primary" disabled={setRepository.isPending} onClick={() => save(true)}>
+              Initialize git here
+            </button>
+          )}
+        </div>
+      )}
+      {!office.repositoryPath && !error && (
         <p className="hint">Until this is set, tasks of this office cannot start.</p>
       )}
-    </form>
+    </div>
   )
 }
 

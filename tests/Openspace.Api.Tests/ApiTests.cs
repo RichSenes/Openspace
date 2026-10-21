@@ -145,16 +145,27 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
-    public async Task An_office_points_to_its_repository_by_absolute_path()
+    public async Task An_office_points_to_a_repository_and_can_have_one_initialized()
     {
         var (officeId, _, _) = await FurnishAsync();
+        var folder = Directory.CreateTempSubdirectory("openspace-api-").FullName;
+        try
+        {
+            var relative = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = "repos/e-corp" });
+            var plain = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = folder });
+            var initialized = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = folder, initialize = true });
 
-        var relative = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = "repos/e-corp" });
-        var absolute = await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = "/srv/repos/e-corp" });
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, relative.StatusCode);
-        absolute.EnsureSuccessStatusCode();
-        Assert.Equal("/srv/repos/e-corp", (await GetAsync<Office>($"/api/offices/{officeId}")).RepositoryPath);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, relative.StatusCode);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, plain.StatusCode);
+            var problem = await plain.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("not-a-repository", problem.GetProperty("code").GetString());
+            initialized.EnsureSuccessStatusCode();
+            Assert.Equal(folder, (await GetAsync<Office>($"/api/offices/{officeId}")).RepositoryPath);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 
     [Fact]

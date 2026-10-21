@@ -1,7 +1,8 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
-const api = 'http://localhost:5145'
+// Where the Openspace API listens; override to run a second instance side by side.
+const api = process.env.OPENSPACE_API ?? 'http://localhost:5145'
 
 export default defineConfig({
   plugins: [react()],

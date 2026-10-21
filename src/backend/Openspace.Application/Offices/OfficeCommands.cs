@@ -4,7 +4,11 @@ using Openspace.Domain.Offices;
 namespace Openspace.Application.Offices;
 
 /// <summary>Creates offices and furnishes them with rooms and desks.</summary>
-public sealed class OfficeCommands(IOfficeRepository offices, IUnitOfWork unitOfWork, TimeProvider clock)
+public sealed class OfficeCommands(
+    IOfficeRepository offices,
+    IUnitOfWork unitOfWork,
+    IWorkspaceManager workspaces,
+    TimeProvider clock)
 {
     public async Task<OfficeId> OpenOfficeAsync(string name, CancellationToken cancellationToken)
     {
@@ -14,10 +18,28 @@ public sealed class OfficeCommands(IOfficeRepository offices, IUnitOfWork unitOf
         return office.Id;
     }
 
-    public async Task SetRepositoryAsync(OfficeId officeId, string path, CancellationToken cancellationToken)
+    /// <summary>
+    /// Points the office to a git repository. The folder is checked first; with
+    /// <paramref name="initialize"/> a folder that is not a repository yet becomes one.
+    /// </summary>
+    public async Task SetRepositoryAsync(
+        OfficeId officeId, string path, bool initialize, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         office.SetRepository(path, clock.GetUtcNow());
+
+        var problem = await workspaces.CheckRepositoryAsync(office.RepositoryPath!, cancellationToken).ConfigureAwait(false);
+        if (problem is { CanInitialize: true } && initialize)
+        {
+            await workspaces.InitializeRepositoryAsync(office.RepositoryPath!, cancellationToken).ConfigureAwait(false);
+            problem = await workspaces.CheckRepositoryAsync(office.RepositoryPath!, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (problem is not null)
+        {
+            throw new RejectedException(problem.Code, problem.Message);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

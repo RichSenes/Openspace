@@ -35,8 +35,9 @@ src/
 | Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
 | Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking |
 
-While any agent waits for a permission, a "Needs you" strip sits on top of every
-view with Allow once and Refuse.
+While agents wait for a permission, "Needs you" cards pop up at the bottom right
+of every view, one per desk, with Allow once and Refuse, and pop out once answered
+(no motion when the system asks for reduced motion).
 
 Confirmations appear as short toasts at the bottom; errors stay next to the form
 that caused them, with the server's reason.

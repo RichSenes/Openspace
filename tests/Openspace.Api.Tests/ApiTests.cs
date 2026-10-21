@@ -1,0 +1,144 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR.Client;
+
+namespace Openspace.Api.Tests;
+
+public sealed class ApiTests : IDisposable
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    private readonly OpenspaceApp _app = new();
+    private readonly HttpClient _http;
+
+    public ApiTests() => _http = _app.CreateClient();
+
+    public void Dispose()
+    {
+        _http.Dispose();
+        _app.Dispose();
+    }
+
+    private sealed record Created(Guid Id);
+
+    private sealed record Desk(Guid Id, string Name, string AgentName, string? Model);
+
+    private sealed record Room(Guid Id, string Name, string Context, List<Desk> Desks);
+
+    private sealed record Office(Guid Id, string Name, List<Room> Rooms);
+
+    private sealed record Note(string AuthorKind, string? AuthorName, string Text);
+
+    private sealed record WorkTask(Guid Id, Guid? DeskId, string Title, string RequestedBy, string Status, List<Note> Notes);
+
+    private async Task<T> PostAsync<T>(string url, object body)
+    {
+        var response = await _http.PostAsJsonAsync(url, body);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<T>(Json))!;
+    }
+
+    private async Task<T> GetAsync<T>(string url) => (await _http.GetFromJsonAsync<T>(url, Json))!;
+
+    private async Task<(Guid Office, Guid Room, Guid Desk)> FurnishAsync()
+    {
+        var office = await PostAsync<Created>("/api/offices", new { name = "E Corp" });
+        var room = await PostAsync<Created>($"/api/offices/{office.Id}/rooms", new { name = "Web" });
+        var desk = await PostAsync<Created>(
+            $"/api/offices/{office.Id}/rooms/{room.Id}/desks",
+            new { name = "Frontend", agentName = "frontend-dev", model = (string?)null });
+        return (office.Id, room.Id, desk.Id);
+    }
+
+    [Fact]
+    public async Task Health_answers_ok()
+    {
+        Assert.Equal(HttpStatusCode.OK, (await _http.GetAsync("/health")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_office_can_be_furnished_and_read_back()
+    {
+        var (officeId, roomId, deskId) = await FurnishAsync();
+        var put = await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/context", new { context = "No inline styles." });
+        put.EnsureSuccessStatusCode();
+
+        var office = await GetAsync<Office>($"/api/offices/{officeId}");
+        var all = await GetAsync<List<Office>>("/api/offices");
+
+        var room = Assert.Single(office.Rooms);
+        Assert.Equal("No inline styles.", room.Context);
+        Assert.Equal(deskId, Assert.Single(room.Desks).Id);
+        Assert.Single(all);
+    }
+
+    [Fact]
+    public async Task A_task_goes_from_queue_to_discarded_with_notes_by_the_operator()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Add a logout button" });
+
+        (await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/notes", new { text = "Top right." })).EnsureSuccessStatusCode();
+        (await _http.PostAsync($"/api/tasks/{task.Id}/discard", null)).EnsureSuccessStatusCode();
+
+        var read = await GetAsync<WorkTask>($"/api/tasks/{task.Id}");
+        Assert.Equal(("Discarded", "elliot"), (read.Status, read.RequestedBy));
+        Assert.Equal("elliot", Assert.Single(read.Notes).AuthorName);
+    }
+
+    [Fact]
+    public async Task A_task_without_desk_is_proposed_and_approved_later()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, title = "Rotate the certificates" });
+
+        var proposed = await GetAsync<List<WorkTask>>($"/api/tasks?officeId={officeId}&status=Proposed");
+        (await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/approve", new { deskId })).EnsureSuccessStatusCode();
+
+        Assert.Equal(task.Id, Assert.Single(proposed).Id);
+        Assert.Equal("Queued", (await GetAsync<WorkTask>($"/api/tasks/{task.Id}")).Status);
+    }
+
+    [Fact]
+    public async Task Unknown_ids_answer_not_found()
+    {
+        var response = await _http.GetAsync($"/api/offices/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Broken_rules_answer_unprocessable_with_the_reason()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var response = await _http.PostAsJsonAsync($"/api/offices/{officeId}/rooms", new { name = "web" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Contains("already has a room named", problem!.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Browsers_are_told_when_offices_and_tasks_change()
+    {
+        await using var hub = _app.CreateHubConnection();
+        var officeChanged = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var taskChanged = new TaskCompletionSource<Guid>(TaskCreationOptions.RunContinuationsAsynchronously);
+        hub.On<Guid>("OfficeChanged", id => officeChanged.TrySetResult(id));
+        hub.On<Guid>("TaskChanged", id => taskChanged.TrySetResult(id));
+        await hub.StartAsync();
+
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
+
+        Assert.Equal(officeId, await officeChanged.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(task.Id, await taskChanged.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+}

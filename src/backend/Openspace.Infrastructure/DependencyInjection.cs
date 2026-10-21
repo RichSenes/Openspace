@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Openspace.Application.Abstractions;
 using Openspace.Infrastructure.Persistence;
 
@@ -13,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<OpenspaceDbContext>());
         services.AddScoped<IOfficeRepository, OfficeRepository>();
         services.AddScoped<IWorkTaskRepository, WorkTaskRepository>();
+        services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         return services;
     }
 

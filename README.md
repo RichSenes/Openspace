@@ -6,7 +6,7 @@ Every project is an office, every area of competence is a room, every agent sits
 at a desk. Walk through the building, see who is working and what they are doing,
 assign tasks, review changes and read reports, instead of scrolling a terminal.
 
-> **Status:** early. Domain, use cases, queue and SQLite storage are in place; no agents or UI yet.
+> **Status:** early. Offices, rooms, desks and tasks work end to end with live updates; agents are not connected yet.
 
 ## Concepts
 
@@ -49,9 +49,13 @@ Each project has its own README with detailed specifications.
 
 ```bash
 dotnet build && dotnet test
-dotnet run --project src/backend/Openspace.Api
+dotnet run --project src/backend/Openspace.Api     # API on http://localhost:5145
+```
 
+In a second terminal:
+
+```bash
 cd src/frontend
 npm install
-npm run dev
+npm run dev                                         # open http://localhost:5173
 ```

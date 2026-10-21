@@ -1,0 +1,24 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+
+.status-proposed { color: var(--st-proposed); }
+.status-queued { color: var(--st-queued); }
+.status-running { color: var(--st-running); }
+.status-review { color: var(--st-review); }
+.status-failed { color: var(--st-failed); }
+.status-done,
+.status-discarded { color: var(--st-done); }

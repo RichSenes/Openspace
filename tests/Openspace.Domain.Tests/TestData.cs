@@ -7,7 +7,7 @@ internal static class TestData
 {
     public static readonly DateTimeOffset Now = new(2015, 6, 24, 9, 0, 0, TimeSpan.Zero);
 
-    public static Office ECorp() => Office.Open("E Corp");
+    public static Office ECorp() => Office.Open("E Corp", Now);
 
     public static (Office Office, Desk Desk) ECorpWithDesk()
     {

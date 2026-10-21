@@ -4,7 +4,7 @@ namespace Openspace.Domain.Common;
 /// Consistency boundary. Collects domain events until the application layer
 /// publishes them after a successful save.
 /// </summary>
-public abstract class AggregateRoot<TId>(TId id)
+public abstract class AggregateRoot<TId>(TId id) : IHasDomainEvents
     where TId : struct
 {
     private readonly List<IDomainEvent> _domainEvents = [];

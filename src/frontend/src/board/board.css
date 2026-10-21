@@ -1,0 +1,181 @@
+.board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.board-head h1 {
+  font-size: 20px;
+}
+
+.board-error {
+  padding: 0 20px;
+}
+
+.columns {
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(170px, 1fr);
+  gap: 12px;
+  padding: 0 20px 20px;
+  overflow-x: auto;
+  min-height: 0;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.column-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.column-empty {
+  margin: 0;
+}
+
+.cards {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, translate 120ms ease;
+}
+
+.card:hover {
+  border-color: var(--mute);
+  translate: 0 -1px;
+}
+
+.card[aria-current='true'] {
+  border-color: var(--accent);
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.drawer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(440px, 100%);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: -16px 0 32px rgb(0 0 0 / 0.35);
+  animation: drawer-in 180ms ease-out;
+}
+
+@keyframes drawer-in {
+  from {
+    translate: 24px 0;
+    opacity: 0;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 10px 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-body {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.drawer-body h2 {
+  font-size: 18px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--mute);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.description {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.drawer-actions,
+.stack,
+.approve {
+  display: grid;
+  gap: 10px;
+}
+
+.notes {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.notes-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--mute);
+}
+
+.note-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+}

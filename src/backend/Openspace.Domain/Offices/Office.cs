@@ -19,10 +19,18 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public IReadOnlyList<Room> Rooms => _rooms;
 
-    public static Office Open(string name) =>
-        new(OfficeId.New(), Guard.NotBlank(name, "Office name", MaxNameLength));
+    public static Office Open(string name, DateTimeOffset now)
+    {
+        var office = new Office(OfficeId.New(), Guard.NotBlank(name, "Office name", MaxNameLength));
+        office.Raise(new OfficeOpened(office.Id, office.Name, now));
+        return office;
+    }
 
-    public void Rename(string name) => Name = Guard.NotBlank(name, "Office name", MaxNameLength);
+    public void Rename(string name, DateTimeOffset now)
+    {
+        Name = Guard.NotBlank(name, "Office name", MaxNameLength);
+        Raise(new OfficeRenamed(Id, Name, now));
+    }
 
     public Room OpenRoom(string name, DateTimeOffset now)
     {
@@ -38,7 +46,11 @@ public sealed class Office : AggregateRoot<OfficeId>
         return room;
     }
 
-    public void UpdateRoomContext(RoomId roomId, string? context) => FindRoom(roomId).UpdateContext(context);
+    public void UpdateRoomContext(RoomId roomId, string? context, DateTimeOffset now)
+    {
+        FindRoom(roomId).UpdateContext(context);
+        Raise(new RoomContextUpdated(Id, roomId, now));
+    }
 
     public Desk AddDesk(RoomId roomId, string name, AgentProfile agent, DateTimeOffset now)
     {
@@ -48,10 +60,11 @@ public sealed class Office : AggregateRoot<OfficeId>
         return desk;
     }
 
-    public void ReassignDesk(DeskId deskId, AgentProfile agent)
+    public void ReassignDesk(DeskId deskId, AgentProfile agent, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(agent);
         FindDesk(deskId).Reassign(agent);
+        Raise(new DeskReassigned(Id, deskId, agent, now));
     }
 
     public bool HasDesk(DeskId deskId) => _rooms.Exists(r => r.Desks.Any(d => d.Id == deskId));

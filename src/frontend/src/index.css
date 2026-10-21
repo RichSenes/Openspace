@@ -1,10 +1,51 @@
+@import '@fontsource/silkscreen/400.css';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+
 :root {
   color-scheme: dark;
-  --floor: #1b1d24;
-  --ink: #e6e2d8;
-  font-family: system-ui, sans-serif;
+
+  /* Surfaces */
+  --bg: #14161c;
+  --panel: #1b1e26;
+  --raised: #232731;
+  --line: #333948;
+
+  /* Text: ink and mute both pass WCAG AA on every surface above */
+  --ink: #ece8df;
+  --mute: #a3a8b6;
+
+  /* Actions */
+  --accent: #f2b84b;
+  --on-accent: #1a1406;
+  --danger: #f7768e;
+
+  /* Task statuses */
+  --st-proposed: #c3a6f7;
+  --st-queued: #82a8f5;
+  --st-running: #8fd282;
+  --st-review: #f2b84b;
+  --st-failed: #f7768e;
+  --st-done: #a3a8b6;
+
+  --pixel: 'Silkscreen', monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 4px;
+  --gap: 16px;
+
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--ink);
-  background: var(--floor);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--line) transparent;
 }
 
 html,
@@ -12,4 +53,129 @@ body,
 #root {
   margin: 0;
   height: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Buttons name their action; the primary one is the only filled one in a group. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--mute);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field > span {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.pixel {
+  font-family: var(--pixel);
+  letter-spacing: 0.04em;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

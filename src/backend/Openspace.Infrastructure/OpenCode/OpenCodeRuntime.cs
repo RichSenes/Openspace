@@ -24,11 +24,7 @@ internal sealed class OpenCodeRuntime(
         string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(setup);
-        var body = new Dictionary<string, object> { ["title"] = title };
-        if (setup.Permissions is { } permissions)
-        {
-            body["permission"] = Rules(permissions);
-        }
+        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions) };
 
         using var response = await http
             .PostAsJsonAsync(In("session", workspacePath), body, cancellationToken)
@@ -202,13 +198,24 @@ internal sealed class OpenCodeRuntime(
         return body;
     }
 
-    /// <summary>OpenCode permission rules for a role: one rule per capability, for every pattern.</summary>
-    private static object[] Rules(RolePermissions permissions) =>
-    [
-        new { permission = "edit", pattern = "*", action = Action(permissions.Edit) },
-        new { permission = "bash", pattern = "*", action = Action(permissions.Bash) },
-        new { permission = "webfetch", pattern = "*", action = Action(permissions.Web) },
-    ];
+    /// <summary>
+    /// OpenCode permission rules: one per role capability, for every pattern, plus a rule
+    /// that always keeps the agent inside its own folder unless a person agrees.
+    /// Read-only sessions (all denied) may not leave it at all.
+    /// </summary>
+    private static object[] Rules(RolePermissions? permissions)
+    {
+        var outside = permissions is { Edit: PermissionLevel.Deny, Bash: PermissionLevel.Deny, Web: PermissionLevel.Deny } ? "deny" : "ask";
+        var rules = new List<object> { new { permission = "external_directory", pattern = "*", action = outside } };
+        if (permissions is not null)
+        {
+            rules.Add(new { permission = "edit", pattern = "*", action = Action(permissions.Edit) });
+            rules.Add(new { permission = "bash", pattern = "*", action = Action(permissions.Bash) });
+            rules.Add(new { permission = "webfetch", pattern = "*", action = Action(permissions.Web) });
+        }
+
+        return [.. rules];
+    }
 
     private static string Action(PermissionLevel level) => level switch
     {

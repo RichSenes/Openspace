@@ -28,9 +28,10 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
     /// Ends a wait for permission: the agent goes back to work. Plain progress cannot do
     /// this, because OpenCode keeps reporting the blocked tool as running while it waits.
     /// </summary>
-    public async Task ResumeAsync(Guid taskId, string doing, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <param name="permissionId">The request that was answered: a wait for another one is left alone.</param>
+    public async Task ResumeAsync(Guid taskId, string permissionId, string doing, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        if (ForTask(taskId) is { Kind: ActivityKind.Waiting } waiting)
+        if (ForTask(taskId) is { Kind: ActivityKind.Waiting } waiting && waiting.PermissionId == permissionId)
         {
             var resumed = waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = doing, At = now };
             _byDesk[waiting.DeskId] = resumed;
@@ -45,9 +46,11 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
         if (_byDesk.TryGetValue(update.DeskId, out var blocked)
             && blocked is { Kind: ActivityKind.Waiting }
             && blocked.TaskId == update.TaskId
-            && update.Kind == ActivityKind.Working)
+            && (update.Kind == ActivityKind.Working
+                || (update.Kind == ActivityKind.Waiting && update.PermissionId != blocked.PermissionId)))
         {
-            // Still waiting for a person: only ResumeAsync ends it.
+            // Still waiting for a person: only ResumeAsync ends it. A second request
+            // waits its turn in OpenCode and is shown once the first is answered.
             return;
         }
 

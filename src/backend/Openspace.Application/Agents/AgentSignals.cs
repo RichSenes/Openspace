@@ -95,14 +95,31 @@ public sealed class AgentSignals(
             .ConfigureAwait(false);
     }
 
-    /// <summary>A permission was answered (here or in OpenCode itself): the agent works again.</summary>
-    public async Task PermissionRepliedAsync(string sessionId, bool allowed, CancellationToken cancellationToken)
+    /// <summary>A permission was answered in OpenCode itself.</summary>
+    public async Task PermissionRepliedAsync(string sessionId, string permissionId, bool allowed, CancellationToken cancellationToken)
     {
         var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
         if (task is not null)
         {
-            await activity.ResumeAsync(task.Id.Value, allowed ? "Permission granted" : "Permission refused", clock.GetUtcNow(), cancellationToken)
-                .ConfigureAwait(false);
+            await PermissionAnsweredAsync(task, permissionId, allowed, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// After an answer the agent works again, unless OpenCode holds more requests for the
+    /// same session: then the next one is shown. OpenCode is the source of truth here.
+    /// </summary>
+    public async Task PermissionAnsweredAsync(WorkTask task, string permissionId, bool allowed, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        var now = clock.GetUtcNow();
+        await activity.ResumeAsync(task.Id.Value, permissionId, allowed ? "Permission granted" : "Permission refused", now, cancellationToken)
+            .ConfigureAwait(false);
+
+        var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
+        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId) is { } next)
+        {
+            await ShowAsync(task, ActivityKind.Waiting, null, $"Wants to {next.Description}", next.Id, cancellationToken).ConfigureAwait(false);
         }
     }
 

@@ -109,7 +109,7 @@ public class AgentSignalsTests
         var task = await RunningTaskAsync();
         await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
 
-        await _h.Signals().PermissionRepliedAsync("ses_1", allowed: false, default);
+        await _h.Signals().PermissionRepliedAsync("ses_1", "per_1", allowed: false, default);
 
         var activity = _h.Activity.ForTask(task.Id.Value);
         Assert.Equal((ActivityKind.Working, null, "Permission refused"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
@@ -124,5 +124,40 @@ public class AgentSignalsTests
         await _h.Signals().FinishedAsync("ses_1", default);
 
         Assert.Equal(ActivityKind.Stopped, _h.Activity.ForTask(task.Id.Value)?.Kind);
+    }
+
+    [Fact]
+    public async Task Two_requests_at_once_are_answered_one_after_the_other()
+    {
+        var task = await RunningTaskAsync();
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", "bash ls -la ../original"));
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_2", "ses_1", "bash pwd, git status"));
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la ../original", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_2", "bash pwd, git status", default);
+
+        var first = _h.Activity.ForTask(task.Id.Value);
+        _h.Runtime.Pending.RemoveAt(0);
+        await _h.Commands().ReplyToPermissionAsync(task.Id, allow: true, default);
+        var second = _h.Activity.ForTask(task.Id.Value);
+        _h.Runtime.Pending.Clear();
+        await _h.Commands().ReplyToPermissionAsync(task.Id, allow: true, default);
+        var done = _h.Activity.ForTask(task.Id.Value);
+
+        Assert.Equal((ActivityKind.Waiting, "per_1"), (first?.Kind, first?.PermissionId));
+        Assert.Equal((ActivityKind.Waiting, "per_2", "Wants to bash pwd, git status"), (second?.Kind, second?.PermissionId, second?.Doing));
+        Assert.Equal((ActivityKind.Working, null), (done?.Kind, done?.PermissionId));
+        Assert.Equal([("per_1", true), ("per_2", true)], _h.Runtime.PermissionReplies);
+    }
+
+    [Fact]
+    public async Task An_answer_given_in_OpenCode_for_another_request_does_not_end_the_current_wait()
+    {
+        var task = await RunningTaskAsync();
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", "bash ls"));
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls", default);
+
+        await _h.Signals().PermissionRepliedAsync("ses_1", "per_old", allowed: true, default);
+
+        Assert.Equal((ActivityKind.Waiting, "per_1"), (_h.Activity.ForTask(task.Id.Value)?.Kind, _h.Activity.ForTask(task.Id.Value)?.PermissionId));
     }
 }

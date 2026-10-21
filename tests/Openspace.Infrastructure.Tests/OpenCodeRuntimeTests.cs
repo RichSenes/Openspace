@@ -147,19 +147,21 @@ public class OpenCodeRuntimeTests
         using var session = JsonDocument.Parse(server.Requests[0].Body!);
         var rules = session.RootElement.GetProperty("permission").EnumerateArray()
             .Select(r => (r.GetProperty("permission").GetString(), r.GetProperty("pattern").GetString(), r.GetProperty("action").GetString()));
-        Assert.Equal([("edit", "*", "ask"), ("bash", "*", "deny"), ("webfetch", "*", "allow")], rules);
+        Assert.Equal([("external_directory", "*", "ask"), ("edit", "*", "ask"), ("bash", "*", "deny"), ("webfetch", "*", "allow")], rules);
         using var prompt = JsonDocument.Parse(server.Requests[1].Body!);
         Assert.Equal("Never change code.", prompt.RootElement.GetProperty("system").GetString());
     }
 
     [Fact]
-    public async Task Without_a_role_the_session_keeps_OpenCode_defaults()
+    public async Task Without_a_role_the_session_keeps_OpenCode_defaults_but_stays_in_its_folder()
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.OK, """{"id":"ses_1"}"""));
 
         await runtime.CreateSessionAsync(Workspace, "Plain", new AgentSetup("build", null, null, null), default);
 
-        Assert.DoesNotContain("permission", server.Requests[0].Body, StringComparison.Ordinal);
+        using var body = JsonDocument.Parse(server.Requests[0].Body!);
+        var rule = Assert.Single(body.RootElement.GetProperty("permission").EnumerateArray());
+        Assert.Equal(("external_directory", "ask"), (rule.GetProperty("permission").GetString(), rule.GetProperty("action").GetString()));
     }
 
     [Fact]
@@ -176,6 +178,7 @@ public class OpenCodeRuntimeTests
 
         Assert.Equal("- Check every form.", draft);
         Assert.DoesNotContain("\"allow\"", server.Requests[0].Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"ask\"", server.Requests[0].Body, StringComparison.Ordinal);
         Assert.Contains("\"plan\"", server.Requests[1].Body, StringComparison.Ordinal);
         Assert.Equal(HttpMethod.Delete, server.Requests[^1].Method);
     }
@@ -189,7 +192,7 @@ public class OpenCodeRuntimeTests
 
         var pending = await runtime.PendingPermissionsAsync(Workspace, default);
 
-        Assert.Equal(new PermissionRequest("per_1", "ses_1", "bash ls -la, ls wp-content/themes"), Assert.Single(pending));
+        Assert.Equal(new PermissionRequest("per_1", "ses_1", "run ls -la, ls wp-content/themes"), Assert.Single(pending));
         Assert.Equal("/permission?directory=%2Fsrv%2Fworktrees%2Fabc", server.Requests[0].PathAndQuery);
     }
 

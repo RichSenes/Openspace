@@ -23,6 +23,7 @@ export const CHARACTER_COLORS = {
   'eye.glow': '#ffd84a',
   void: '#0b0a0d',
   'coat.shine': '#5c5a68',
+  'eye.dim': '#a8741f',
   'hood.inner': '#2c1418',
 } as const
 
@@ -322,7 +323,9 @@ export const OBJECT_COLORS: Record<string, string> = {
   'walker.dark': '#d9a82a',
   'poster.paper': '#f2f0ea',
   'poster.shade': '#cfccc2',
-  'poster.ink': '#2c4a9e',
+  'poster.ink': '#1c2433',
+  'poster.band': '#3d6fb8',
+  'poster.bandLight': '#7fa6e0',
   'velvet.light': '#c43a46',
   'velvet.dark': '#8e2630',
   'leather.light': '#6b4630',
@@ -388,6 +391,7 @@ export const EMISSIVE: ReadonlySet<string> = new Set([
   'star.light',
   'star.mid',
   'eye.glow',
+  'eye.dim',
   'cabinet.marquee',
   'cabinet.screen',
   'cabinet.pixel',

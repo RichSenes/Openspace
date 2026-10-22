@@ -65,7 +65,7 @@ characters, one per pixel) and where sprites live are described at the end.
 | `reading`: reading, searching | `think` (hand on the chin) | `focused` | on | |
 | `waiting` for a person | `wave` (hand raised) | `neutral` | alert | `question` |
 | `queued`, no seat | `rest` | `asleep` | off | `zz` |
-| `done`: sent to review | `relax` (hands behind the head) | `happy` | on | `check` |
+| `done`: sent to review | `cheer` (both fists raised) | `happy` | on | `check` |
 | `failed` | `stuck` (hands on the cheeks) | `worried` | off | `storm` |
 
 The table lives in `src/frontend/src/art/agentStates.ts`. Momentary signals, such as

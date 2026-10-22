@@ -20,7 +20,7 @@ export interface Appearance {
   costume?: Costume
 }
 
-export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'relax' | 'stuck'
+export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'cheer' | 'stuck'
 
 /**
  * What the agent does with the arms: raised arms are drawn behind the desk, hands
@@ -31,7 +31,7 @@ export const GESTURE_PARTS: Record<Gesture, { arms?: SpriteDef; hands?: SpriteDe
   typing: { hands: HANDS.typing },
   think: { arms: GESTURES.think, hands: HANDS.left },
   wave: { arms: GESTURES.wave, hands: HANDS.left },
-  relax: { arms: GESTURES.relax },
+  cheer: { arms: GESTURES.cheer },
   stuck: { arms: GESTURES.stuck },
 }
 

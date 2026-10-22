@@ -1,6 +1,6 @@
-import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
+import { BONE, CHARACTER_COLORS, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
 import type { Light } from './lighting'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, OUTFITS, SKELETON, type Accessory, type Emotion, type HairStyle, type Outfit } from './sheets/character'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
 import { pixelsOf, type Pixel, type Resolve, type SpriteDef } from './sprite'
 import type { Theme } from './themes'
@@ -16,7 +16,7 @@ export interface Appearance {
   /** A hoodie or a long coat instead of the plain shirt. */
   outfit?: Outfit
   /** Replaces head, hair and clothes: for the special agents. */
-  costume?: 'skeleton'
+  costume?: Costume
 }
 
 export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'relax' | 'stuck'
@@ -53,7 +53,8 @@ export const STATION = { width: 32, height: 46, deskY: 25 } as const
 
 /** Colours of a character: shared names, plus the tones of this appearance. */
 export function characterColors(look: Appearance): Resolve {
-  const [skinLight, skinMid, skinShadow] = look.costume === 'skeleton' ? BONE : SKIN_TONES[look.skin]
+  // Costumes have bones or gloves where skin would show.
+  const [skinLight, skinMid, skinShadow] = look.costume === 'skeleton' ? BONE : look.costume === 'hooded' ? GLOVES : SKIN_TONES[look.skin]
   const [hairBase, hairShade] = HAIR_COLORS[look.hair]
   // The skeleton always wears its blue hoodie.
   const [clothLight, clothMid, clothDark] = CLOTH_COLORS[look.costume === 'skeleton' ? 'blue' : look.cloth]
@@ -100,10 +101,10 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const cy = STATION.deskY - 14
   const { arms, hands } = GESTURE_PARTS[pose.gesture]
   const closed = pose.emotion === 'blink' || pose.emotion === 'asleep'
-  const self =
-    look.costume === 'skeleton'
-      ? [SKELETON.body, closed ? SKELETON.closed : SKELETON.open]
-      : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
+  const costume = look.costume && COSTUMES[look.costume]
+  const self = costume
+    ? [costume.body, closed ? costume.closed : costume.open]
+    : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
   const layers = [...self, look.accessory && ACCESSORIES[look.accessory], arms]
   const behind = layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))
   const desk = pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY)

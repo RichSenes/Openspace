@@ -24,6 +24,8 @@ src/
   building/   Floor plan layout and camera maths (pure, tested) and their PixiJS rendering
   board/      Task board, new task dialog, task drawer, board rules (tested)
   rooms/      Rooms, room context and desks of an office
+  art/        Pixel art: palettes, sprites as character matrices, station composition (tested)
+  lab/        Sprite lab: open the app with ?lab to review every sprite and combination
   ui/         Toasts, dialog, status pill
 ```
 

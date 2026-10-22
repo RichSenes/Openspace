@@ -1,0 +1,67 @@
+.lab {
+  display: grid;
+  gap: 28px;
+  padding: 20px 24px 48px;
+  min-height: 100%;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.lab-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.lab-head h1 {
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.lab-head label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mute);
+}
+
+.lab h2 {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--mute);
+}
+
+.pixels {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.lab-grid {
+  display: grid;
+  justify-content: start;
+  gap: 8px 16px;
+}
+
+.lab-row {
+  display: contents;
+}
+
+.lab figure {
+  width: fit-content;
+  margin: 0;
+}
+
+.lab figcaption {
+  font-size: 12px;
+  color: var(--mute);
+  text-align: center;
+}
+
+.lab-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px;
+}

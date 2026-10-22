@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from './ui/Toasts'
 import './index.css'
 import App from './App.tsx'
+import { SpriteLab } from './lab/SpriteLab'
 
 console.info('Hello, friend.')
 
@@ -16,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <App />
+        {new URLSearchParams(location.search).has('lab') ? <SpriteLab /> : <App />}
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

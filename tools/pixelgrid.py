@@ -235,7 +235,7 @@ def palette_of(frames, count):
     return merged
 
 
-def shrink(frames, colors, height):
+def shrink(frames, colors, height, thin=False):
     """
     Brings sprites down to a height in pixels, keeping them crisp: each new pixel takes
     the most common colour of the area it covers (outline counts a bit more, so lines
@@ -260,6 +260,9 @@ def shrink(frames, colors, height):
                         key = frame[y][x]
                         if key is not None and key == outline:
                             weight *= 1.3
+                        # Thin art (a blade, a ring) would vanish into the background otherwise.
+                        if key is None and thin:
+                            weight *= 0.35
                         votes[key] = votes.get(key, 0) + weight
                 line.append(max(votes, key=votes.get))
             rows.append(line)
@@ -286,6 +289,7 @@ def main():
     parser.add_argument('--hole', action='append', default=[], help='x,y of a hole to empty (inside a ring, say), in the full-size grid')
     parser.add_argument('--largest', action='store_true', help='keep only the biggest figure (drops signatures and captions)')
     parser.add_argument('--height', type=int, help='shrink to this height in pixels, to match the other sprites')
+    parser.add_argument('--thin', action='store_true', help='with --height: keep thin lines (blades, rings) from breaking')
     parser.add_argument('--hint', help='its line on hover; the original prop line is kept otherwise')
     args = parser.parse_args()
 
@@ -310,7 +314,7 @@ def main():
     nearest = lambda c: min(range(len(colors)), key=lambda i: distance(c, colors[i]))
     indexed = [[[nearest(c) if c else None for c in line] for line in f] for f in frames]
     if args.height and args.height < len(indexed[0]):
-        indexed = shrink(indexed, colors, args.height)
+        indexed = shrink(indexed, colors, args.height, args.thin)
     rows = [[''.join(LETTERS[i] if i is not None else '.' for i in line) for line in f] for f in indexed]
 
     key = lambda i: f'fan.{args.prop}.{LETTERS[i]}'

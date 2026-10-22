@@ -11,7 +11,7 @@ export const AGENT_LOOKS: Record<AgentState, { emotion: Emotion; gesture: Gestur
   reading: { emotion: 'focused', gesture: 'think', screen: 'on' },
   waiting: { emotion: 'neutral', gesture: 'wave', screen: 'alert', signal: 'question' },
   queued: { emotion: 'asleep', gesture: 'rest', screen: 'off', signal: 'zz' },
-  done: { emotion: 'happy', gesture: 'relax', screen: 'on', signal: 'check' },
+  done: { emotion: 'happy', gesture: 'cheer', screen: 'on', signal: 'check' },
   failed: { emotion: 'worried', gesture: 'stuck', screen: 'off', signal: 'storm' },
 }
 

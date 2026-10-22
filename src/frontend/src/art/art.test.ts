@@ -3,7 +3,7 @@ import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SKIN_TONES, 
 import { AGENT_LOOKS, poseOf, type AgentState } from './agentStates'
 import { inTheDark } from './lighting'
 import { baseline, sceneLights, scenePixels } from './scene'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, OUTFITS, SKELETON } from './sheets/character'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS } from './sheets/character'
 import { PROPS } from './sheets/props'
 import { SIGNALS } from './sheets/signals'
 import { problemsOf, pixelsOf, type SpriteDef } from './sprite'
@@ -19,7 +19,7 @@ const characterSprites: SpriteDef[] = [
   ...Object.values(GESTURES),
   ...Object.values(ACCESSORIES),
   ...Object.values(OUTFITS),
-  ...Object.values(SKELETON),
+  ...Object.values(COSTUMES).flatMap((c) => Object.values(c)),
 ]
 const roomSprites: SpriteDef[] = [
   ...Object.values(THEMES).flatMap((t) => [t.floor, t.wall, t.desk]),
@@ -110,6 +110,15 @@ describe('costumes and outfits', () => {
     expect(colors('neutral').has(SKIN_TONES.deep[0])).toBe(false)
     expect(colors('neutral').has(CHARACTER_COLORS.pupil)).toBe(true)
     expect(colors('blink').has(CHARACTER_COLORS.pupil)).toBe(false)
+  })
+
+  it('hides the face under a hood, with eyes that glow in the dark and close to blink', () => {
+    const pixels = (emotion: 'neutral' | 'blink') =>
+      stationPixels({ ...look, costume: 'hooded' }, { emotion, gesture: 'rest', frame: 0, screen: 'on' }, THEMES.cozy)
+    const open = pixels('neutral')
+    expect(open.some((p) => p.color === SKIN_TONES.deep[0])).toBe(false)
+    expect(open.find((p) => p.color === CHARACTER_COLORS['eye.glow'])?.glow).toBe(true)
+    expect(pixels('blink').some((p) => p.color === CHARACTER_COLORS['eye.glow'])).toBe(false)
   })
 
   it('keeps the skeleton eyes readable on bone', () => {

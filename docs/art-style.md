@@ -39,9 +39,10 @@ characters, one per pixel) and where sprites live are described at the end.
 - Appearance is per desk: skin tone, hair style and colour, clothes colour (from
   the role by default), an optional outfit (`hoodie`, long `coat`) and an optional
   accessory (`glasses`, `headset`, `pointyHat`).
-- Special agents can wear a **costume**, which replaces head, hair and clothes:
-  `skeleton` (round skull with a fixed grin, blue fur-lined hoodie; its eyes close
-  to blink and sleep).
+- Special agents can wear a **costume**, which replaces head, hair and clothes;
+  its eyes close to blink and sleep: `skeleton` (round skull with a fixed grin,
+  blue fur-lined hoodie) and `hooded` (long black coat whose hood hides the face
+  completely, two yellow eyes glowing in the dark, black gloves).
 - Emotions: `neutral`, `focused`, `happy`, `worried`, `asleep`.
 
 ## Outline and shading
@@ -101,11 +102,12 @@ so masks and swords have room to hang.
 ### Homages
 
 Some furniture and outfits are affectionate homages to games, films and series
-the team loves: a rare dragon lamp, a rare fan, a key-shaped sword, a star-shaped
-fruit, a grinning mask, a long red motorbike, a purple giant robot statue, a heart
-on a pedestal, a sleeping white dog, a twinkling save star, a long black coat, a
-skeleton in a blue hoodie, a soft green pointy hat. They are drawn by us,
-recognisable on purpose, and **never named after their source**: in code, docs
+the team loves: a rare dragon lamp, a stack of gold bars, a throne, a leather
+club sofa, a key-shaped sword with its charm, a long red motorbike, a purple giant
+robot statue, a heart on a pedestal, a white dog, a twinkling save star, a proud
+little star, a black cat waiting for something to happen, a corporate poster, a
+hooded black coat with glowing eyes, a skeleton in a blue hoodie, a soft green
+pointy hat. They are drawn by us, recognisable on purpose, and **never named after their source**: in code, docs
 and hints they have descriptive names and their lines quote or wink without
 naming anything.
 

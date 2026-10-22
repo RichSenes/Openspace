@@ -34,7 +34,7 @@ export const THEMES = {
     floor: FLOOR,
     wall: WALL,
     desk: DESK,
-    furniture: ['rug', 'bookshelf', 'floorLamp', 'plant', 'sideTable', 'dragonLamp', 'whiteDog', 'keySword'],
+    furniture: ['rug', 'bookshelf', 'floorLamp', 'plant', 'sideTable', 'dragonLamp', 'whiteDog', 'keySword', 'blackCat', 'clubSofa'],
   },
   neonDistrict: {
     label: 'Neon district',
@@ -42,7 +42,7 @@ export const THEMES = {
     floor: NEON_DISTRICT_FLOOR,
     wall: NEON_DISTRICT_WALL,
     desk: NEON_DISTRICT_DESK,
-    furniture: ['redBike', 'mechStatue', 'vendingMachine', 'serverRack', 'plant', 'fruitTable'],
+    furniture: ['redBike', 'mechStatue', 'vendingMachine', 'serverRack', 'plant', 'starWalker'],
   },
   securityFirm: {
     label: 'Security firm',
@@ -50,7 +50,7 @@ export const THEMES = {
     floor: SECURITY_FIRM_FLOOR,
     wall: SECURITY_FIRM_WALL,
     desk: SECURITY_FIRM_DESK,
-    furniture: ['whiteboard', 'waterCooler', 'plant', 'rareFan', 'serverRack', 'saveStar'],
+    furniture: ['whiteboard', 'corpPoster', 'waterCooler', 'plant', 'goldBars', 'serverRack', 'saveStar', 'throne'],
   },
   backRoomArcade: {
     label: 'Back-room arcade',
@@ -58,7 +58,7 @@ export const THEMES = {
     floor: BACK_ROOM_ARCADE_FLOOR,
     wall: BACK_ROOM_ARCADE_WALL,
     desk: BACK_ROOM_ARCADE_DESK,
-    furniture: ['arcadeCabinet', 'smileMask', 'itemPedestal', 'vendingMachine', 'serverRack', 'sideTable'],
+    furniture: ['arcadeCabinet', 'itemPedestal', 'vendingMachine', 'serverRack', 'sideTable', 'whiteDog'],
   },
 } satisfies Record<string, Theme>
 

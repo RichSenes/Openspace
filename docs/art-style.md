@@ -136,6 +136,25 @@ A theme is more than colours: it brings its own floor, wall and desk model
 Floor and wall frames are tile variants, picked by position, so a room is not a
 grid of identical tiles.
 
+### Fan pack (local only)
+
+Faithful one-to-one copies of artwork we do not own (a sprite from a game, say) never
+go into this repository. They live in `src/frontend/src/art/fanpack/`, which git
+ignores, and replace the drawing of an existing prop on that machine only; in the
+repository the prop keeps its own homage drawing.
+
+`tools/pixelgrid.py` makes them from a picture of the pixel art, even blown up or
+saved as JPEG: it finds the size of one pixel, samples the grid back, makes the
+background transparent (keeping background-coloured eyes inside the figure) and
+writes `fanpack/<prop>.ts`. Animated GIFs become animation frames.
+
+```bash
+python3 tools/pixelgrid.py dragonLamp ~/Downloads/dragon.jpg --light 52,14,30,flame.mid
+python3 tools/pixelgrid.py blackCat ~/Downloads/cat.gif
+```
+
+Copies keep their original size, so they can be much bigger than the agents.
+
 ### Lights off
 
 Any theme can be shown with the lights off. Everything sinks towards the theme's

@@ -28,6 +28,7 @@ src/backend/
   Openspace.Api/               ASP.NET Core host
 src/frontend/                  React + PixiJS building
 tests/                         Architecture and domain tests
+tools/                         Helper scripts (pixelgrid.py: pictures to fan pack sprites)
 ```
 
 Each project has its own README with detailed specifications.

@@ -1,4 +1,5 @@
 import { BONE, CHARACTER_COLORS, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
+import { FAN_COLORS } from './fanPack'
 import type { Light } from './lighting'
 import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
@@ -83,7 +84,7 @@ export function themeColors(theme: ThemeColors, screen: ScreenState = 'off'): Re
     if (name === 'screen') return theme[`screen.${screen}`]
     if (name === 'glow') return screen === 'off' ? null : theme[`glow.${screen}`]
     if (name === 'spill') return screen === 'off' ? theme['wood.light'] : theme[`spill.${screen}`]
-    return (theme as Record<string, string>)[name] ?? OBJECT_COLORS[name] ?? (SIGNAL_COLORS as Record<string, string>)[name] ?? null
+    return (theme as Record<string, string>)[name] ?? OBJECT_COLORS[name] ?? (SIGNAL_COLORS as Record<string, string>)[name] ?? FAN_COLORS[name] ?? null
   }
 }
 

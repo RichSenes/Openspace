@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from './palette'
 import { AGENT_LOOKS, poseOf, type AgentState } from './agentStates'
+import { FURNITURE, withFanPack, type FanModule } from './fanPack'
 import { inTheDark } from './lighting'
 import { baseline, sceneLights, scenePixels } from './scene'
 import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS } from './sheets/character'
@@ -86,6 +87,30 @@ describe('themes', () => {
 
   it.each(Object.entries(THEMES))('%s only uses furniture that exists', (_, theme) => {
     for (const name of theme.furniture) expect(PROPS[name]).toBeDefined()
+  })
+})
+
+describe('fan pack', () => {
+  const sprite: SpriteDef = { name: 'copy', width: 1, height: 1, legend: { a: 'fan.copy.a' }, frames: [['a']] }
+
+  it('redraws a prop and keeps its line, dropping lights placed for the old drawing', () => {
+    const fan: FanModule = { colors: { 'fan.copy.a': '#123456' }, props: { dragonLamp: { sprite } } }
+    const merged = withFanPack(PROPS, [fan])
+    expect(merged.dragonLamp.sprite).toBe(sprite)
+    expect(merged.dragonLamp.hint).toBe(PROPS.dragonLamp.hint)
+    expect(merged.dragonLamp.lights).toBeUndefined()
+    expect(merged.plant).toBe(PROPS.plant)
+  })
+
+  it('ignores props that do not exist', () => {
+    const fan = { colors: {}, props: { nothing: { sprite } } } as unknown as FanModule
+    expect(Object.keys(withFanPack(PROPS, [fan]))).toEqual(Object.keys(PROPS))
+  })
+
+  it.each(Object.entries(FURNITURE))('%s, as drawn on this machine, is well formed and resolves', (_, prop) => {
+    expect(problemsOf(prop.sprite)).toEqual([])
+    const resolve = themeColors(THEMES.cozy.colors)
+    for (const name of Object.values(prop.sprite.legend)) expect(resolve(name), name).not.toBeNull()
   })
 })
 

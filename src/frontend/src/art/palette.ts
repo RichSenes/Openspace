@@ -310,6 +310,7 @@ export const OBJECT_COLORS: Record<string, string> = {
   'plinth.dark': '#5e3a20',
   'gold.light': '#f2c94c',
   'gold.dark': '#c49a2a',
+  'gold.deep': '#966e1e',
   'gold.shine': '#fff2b0',
   'cat.fur': '#2b2930',
   'cat.eye': '#f4f4f4',

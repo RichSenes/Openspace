@@ -26,3 +26,6 @@ worktrees/
 .idea/
 .vscode/
 .DS_Store
+
+# Local fan pack: faithful copies of artwork we do not own, never published
+src/frontend/src/art/fanpack/

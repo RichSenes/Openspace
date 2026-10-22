@@ -5,7 +5,8 @@ import { inTheDark } from '../art/lighting'
 import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from '../art/palette'
 import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
 import { ACCESSORIES, FACES, HAIR_STYLES, type Accessory, type Emotion, type HairStyle } from '../art/sheets/character'
-import { PROPS, type PropName } from '../art/sheets/props'
+import { FURNITURE } from '../art/fanPack'
+import type { PropName } from '../art/sheets/props'
 import { SIGNALS, type Signal } from '../art/sheets/signals'
 import { pixelsOf, type Pixel, type SpriteDef } from '../art/sprite'
 import { STATION, stationLights, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
@@ -126,9 +127,11 @@ function roomPixels(tick: number, name: ThemeName, dark: boolean): { width: numb
   }
   const items: SceneItem[] = [
     ...LAYOUTS[name].map(({ prop, x, y }): SceneItem => {
-      const { sprite, lights, layer } = PROPS[prop]
+      const { sprite, lights, layer } = FURNITURE[prop]
       const resolved = (lights ?? []).map((l) => ({ ...l, color: colors(l.color) ?? '#ffffff' }))
-      return { x, y, height: sprite.height, pixels: pixelsOf(sprite, Math.floor(tick / 2), colors), lights: resolved, layer }
+      // A redrawn prop may be bigger than the one the layout was made for: keep it inside.
+      const at = { x: Math.min(x, cols * 16 - sprite.width), y: Math.min(y, 32 + rows * 16 - sprite.height) }
+      return { ...at, height: sprite.height, pixels: pixelsOf(sprite, Math.floor(tick / 2), colors), lights: resolved, layer }
     }),
     desk(0, 'working', 52, 20),
     desk(1, 'reading', 98, 20),
@@ -317,8 +320,8 @@ export function SpriteLab() {
       <section>
         <h2>Furniture (hover for its line)</h2>
         <div className="lab-pieces">
-          {(Object.keys(PROPS) as PropName[]).map((name) => {
-            const { sprite, hint } = PROPS[name]
+          {(Object.keys(FURNITURE) as PropName[]).map((name) => {
+            const { sprite, hint } = FURNITURE[name]
             return (
               <figure key={name} title={hint}>
                 <Pixels

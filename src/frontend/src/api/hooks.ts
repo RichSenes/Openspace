@@ -128,6 +128,10 @@ export function useSetRepository(officeId: string) {
   )
 }
 
+export function useSetOfficeTheme(officeId: string) {
+  return useWrite((theme: string) => request<void>('PUT', `/api/offices/${officeId}/theme`, { theme }), keys.offices)
+}
+
 /** Problems with a repository folder that Openspace can fix by initializing git there. */
 export const INITIALIZABLE = new Set(['not-a-repository', 'no-commits'])
 

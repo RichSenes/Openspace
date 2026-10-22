@@ -32,6 +32,27 @@ public class OfficeTests
         Assert.IsType<OfficeRenamed>(office.DomainEvents[^1]);
     }
 
+    [Fact]
+    public void An_office_starts_cozy_and_can_change_its_theme()
+    {
+        var office = ECorp();
+        Assert.Equal(Office.DefaultTheme, office.Theme);
+
+        office.ChangeTheme(" backRoomArcade ", Now);
+
+        Assert.Equal("backRoomArcade", office.Theme);
+        Assert.IsType<OfficeThemeChanged>(office.DomainEvents[^1]);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("two words")]
+    [InlineData("../etc")]
+    public void A_theme_is_a_single_word(string theme)
+    {
+        Assert.Throws<DomainException>(() => ECorp().ChangeTheme(theme, Now));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("  ")]

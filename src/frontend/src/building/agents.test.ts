@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest'
+import type { DeskActivity, WorkTaskView } from '../api/types'
+import { agentStateOf, appearanceOf } from './agents'
+
+const task = (status: WorkTaskView['status'], createdAt = '2026-01-01T10:00:00Z', deskId = 'desk-1'): WorkTaskView => ({
+  id: `${status}-${createdAt}`,
+  officeId: 'e-corp',
+  deskId,
+  title: 'Patch the login page',
+  description: '',
+  requestedBy: 'elliot',
+  status,
+  createdAt,
+  branch: null,
+  mergedInto: null,
+  epicId: null,
+  procedure: [],
+  notes: [],
+})
+
+const activity = (kind: DeskActivity['kind'], doing: string | null = null): DeskActivity => ({
+  officeId: 'e-corp',
+  deskId: 'desk-1',
+  taskId: 't',
+  kind,
+  step: null,
+  doing,
+  permissionId: null,
+  at: '2026-01-01T10:00:00Z',
+  headline: 'Patching the login page',
+})
+
+describe('agentStateOf', () => {
+  it('is idle with nothing to do', () => {
+    expect(agentStateOf('desk-1', [], undefined)).toBe('idle')
+  })
+
+  it('waits for a person before anything else', () => {
+    expect(agentStateOf('desk-1', [task('Running')], activity('Waiting'))).toBe('waiting')
+  })
+
+  it('works, or reads while it only looks at things', () => {
+    expect(agentStateOf('desk-1', [task('Running')], activity('Working', 'Editing src/app.ts'))).toBe('working')
+    expect(agentStateOf('desk-1', [task('Running')], activity('Working', 'Reading src/app.ts'))).toBe('reading')
+    expect(agentStateOf('desk-1', [task('Running')], undefined)).toBe('working')
+  })
+
+  it('shows the latest failure, then work to review, then queued work', () => {
+    expect(agentStateOf('desk-1', [task('Done', '2026-01-01T09:00:00Z'), task('Failed', '2026-01-01T10:00:00Z')], undefined)).toBe('failed')
+    expect(agentStateOf('desk-1', [task('Review'), task('Queued', '2026-01-01T11:00:00Z')], undefined)).toBe('done')
+    expect(agentStateOf('desk-1', [task('Queued')], undefined)).toBe('queued')
+  })
+
+  it('only looks at its own desk', () => {
+    expect(agentStateOf('desk-1', [task('Running', undefined, 'desk-2')], undefined)).toBe('idle')
+  })
+})
+
+describe('appearanceOf', () => {
+  it('always gives a desk the same person', () => {
+    expect(appearanceOf('desk-1')).toEqual(appearanceOf('desk-1'))
+  })
+
+  it('gives different desks different people', () => {
+    const looks = new Set(Array.from({ length: 12 }, (_, i) => JSON.stringify(appearanceOf(`desk-${i}`))))
+    expect(looks.size).toBeGreaterThan(6)
+  })
+})

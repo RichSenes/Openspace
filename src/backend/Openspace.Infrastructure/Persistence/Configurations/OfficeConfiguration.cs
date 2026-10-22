@@ -13,6 +13,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
         builder.Ignore(o => o.DomainEvents);
         builder.Property(o => o.Name).IsRequired();
         builder.Property(o => o.RepositoryPath);
+        builder.Property(o => o.Theme).IsRequired().HasDefaultValue(Office.DefaultTheme);
 
         builder.OwnsMany(o => o.Rooms, room =>
         {

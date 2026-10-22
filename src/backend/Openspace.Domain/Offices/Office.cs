@@ -8,6 +8,9 @@ public sealed class Office : AggregateRoot<OfficeId>
 {
     internal const int MaxNameLength = 80;
 
+    /// <summary>The mood offices start with.</summary>
+    public const string DefaultTheme = "cozy";
+
     private readonly List<Room> _rooms = [];
 
     private Office(OfficeId id, string name)
@@ -19,6 +22,12 @@ public sealed class Office : AggregateRoot<OfficeId>
     public string Name { get; private set; }
 
     public IReadOnlyList<Room> Rooms => _rooms;
+
+    /// <summary>
+    /// The mood the office is drawn with: floors, walls, desks and furniture. A short name
+    /// the frontend knows; one it does not know is drawn with the default.
+    /// </summary>
+    public string Theme { get; private set; } = DefaultTheme;
 
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
@@ -34,6 +43,18 @@ public sealed class Office : AggregateRoot<OfficeId>
     {
         Name = Guard.NotBlank(name, "Office name", MaxNameLength);
         Raise(new OfficeRenamed(Id, Name, now));
+    }
+
+    public void ChangeTheme(string theme, DateTimeOffset now)
+    {
+        var name = Guard.NotBlank(theme, "Theme", 40);
+        if (!name.All(char.IsAsciiLetterOrDigit))
+        {
+            throw new DomainException($"Theme '{name}' must be a single word of letters and digits.");
+        }
+
+        Theme = name;
+        Raise(new OfficeThemeChanged(Id, name, now));
     }
 
     public void SetRepository(string path, DateTimeOffset now)

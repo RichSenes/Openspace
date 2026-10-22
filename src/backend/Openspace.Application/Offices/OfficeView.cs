@@ -2,12 +2,12 @@ using Openspace.Domain.Offices;
 
 namespace Openspace.Application.Offices;
 
-public sealed record OfficeView(Guid Id, string Name, string? RepositoryPath, IReadOnlyList<RoomView> Rooms)
+public sealed record OfficeView(Guid Id, string Name, string? RepositoryPath, string Theme, IReadOnlyList<RoomView> Rooms)
 {
     public static OfficeView From(Office office)
     {
         ArgumentNullException.ThrowIfNull(office);
-        return new(office.Id.Value, office.Name, office.RepositoryPath, [.. office.Rooms.Select(RoomView.From)]);
+        return new(office.Id.Value, office.Name, office.RepositoryPath, office.Theme, [.. office.Rooms.Select(RoomView.From)]);
     }
 }
 

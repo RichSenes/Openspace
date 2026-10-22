@@ -1,8 +1,30 @@
 // Every string is one row of pixels; '.' is transparent. See docs/art-style.md.
 import type { SpriteDef } from '../sprite'
 
+/** A light a prop gives off, in the prop's own pixels, coloured by a palette name. */
+export interface PropLight {
+  x: number
+  y: number
+  radius: number
+  color: string
+}
+
+/**
+ * Furniture that can stand anywhere in a room. Its bottom row is where it touches the
+ * floor; rugs lie on the floor and masks hang on the wall, under everything else.
+ */
+export interface PropDef {
+  sprite: SpriteDef
+  /** Shown on hover: a line of flavour, often a quote. */
+  hint: string
+  lights?: PropLight[]
+  layer?: 'floor' | 'wall'
+}
+
+const prop = (sprite: SpriteDef, hint: string, extra: Omit<PropDef, 'sprite' | 'hint'> = {}): PropDef => ({ sprite, hint, ...extra })
+
 /** A potted plant. */
-export const PLANT: SpriteDef = {
+const PLANT: SpriteDef = {
   name: 'plant',
   width: 16,
   height: 24,
@@ -38,7 +60,7 @@ export const PLANT: SpriteDef = {
 }
 
 /** A small table with a steaming mug. */
-export const SIDE_TABLE: SpriteDef = {
+const SIDE_TABLE: SpriteDef = {
   name: 'side-table',
   width: 20,
   height: 16,
@@ -84,7 +106,7 @@ export const SIDE_TABLE: SpriteDef = {
 }
 
 /** A whiteboard on legs, with a sketch and sticky notes. */
-export const WHITEBOARD: SpriteDef = {
+const WHITEBOARD: SpriteDef = {
   name: 'whiteboard',
   width: 32,
   height: 28,
@@ -124,7 +146,7 @@ export const WHITEBOARD: SpriteDef = {
 }
 
 /** A server rack with blinking lights. */
-export const SERVER_RACK: SpriteDef = {
+const SERVER_RACK: SpriteDef = {
   name: 'server-rack',
   width: 16,
   height: 32,
@@ -202,7 +224,7 @@ export const SERVER_RACK: SpriteDef = {
 }
 
 /** A floor lamp with a warm shade. */
-export const FLOOR_LAMP: SpriteDef = {
+const FLOOR_LAMP: SpriteDef = {
   name: 'floor-lamp',
   width: 12,
   height: 32,
@@ -245,7 +267,726 @@ export const FLOOR_LAMP: SpriteDef = {
   ],
 }
 
-/** Furniture that can stand anywhere in a room; its bottom row is where it touches the floor. */
-export const PROPS = { plant: PLANT, sideTable: SIDE_TABLE, whiteboard: WHITEBOARD, serverRack: SERVER_RACK, floorLamp: FLOOR_LAMP } as const
+/** A rare dragon lamp breathing fire, on a stone plinth. */
+const DRAGON_LAMP: SpriteDef = {
+  name: 'dragon-lamp',
+  width: 16,
+  height: 28,
+  legend: { o: 'outline', D: 'dragon.light', d: 'dragon.dark', y: 'dragon.eye', F: 'flame.light', f: 'flame.mid', r: 'flame.dark', j: 'stone.light', k: 'stone.mid', K: 'stone.dark' },
+  frames: [
+    [
+      '.........r......',
+      '........rFr.....',
+      '........fFFr....',
+      '.......fFFf.....',
+      '........ff......',
+      '....oooooo......',
+      '...oDDDDDDo.....',
+      '..oDDyoDDDDo....',
+      '..oDDDDDDDdo....',
+      '...oDDDooooo....',
+      '....oDDo........',
+      '....oDDdo.......',
+      '...oDDDdo..oo...',
+      '...oDDDdo.oDDo..',
+      '..oDDDDDdoDDDo..',
+      '..oDDDDDDDDDdo..',
+      '.oDDdDDDDDDddo..',
+      '.oDDDdDDDDddo...',
+      '.oDDDDdDDdddo.oo',
+      '..oDDDDDDddooDdo',
+      '...oddddddddddo.',
+      '....oooooooooo..',
+      '..oooooooooooo..',
+      '..ojjjjjjjjjjo..',
+      '..okkkkkkkkkko..',
+      '...okkkkkkkko...',
+      '..okkkkkkkkkKo..',
+      '..oooooooooooo..',
+    ],
+    [
+      '........r.r.....',
+      '.........Fr.....',
+      '........FFFf....',
+      '........fFf.....',
+      '........ff......',
+      '....oooooo......',
+      '...oDDDDDDo.....',
+      '..oDDyoDDDDo....',
+      '..oDDDDDDDdo....',
+      '...oDDDooooo....',
+      '....oDDo........',
+      '....oDDdo.......',
+      '...oDDDdo..oo...',
+      '...oDDDdo.oDDo..',
+      '..oDDDDDdoDDDo..',
+      '..oDDDDDDDDDdo..',
+      '.oDDdDDDDDDddo..',
+      '.oDDDdDDDDddo...',
+      '.oDDDDdDDdddo.oo',
+      '..oDDDDDDddooDdo',
+      '...oddddddddddo.',
+      '....oooooooooo..',
+      '..oooooooooooo..',
+      '..ojjjjjjjjjjo..',
+      '..okkkkkkkkkko..',
+      '...okkkkkkkko...',
+      '..okkkkkkkkkKo..',
+      '..oooooooooooo..',
+    ],
+  ],
+}
+
+/** A rare standing fan with purple blades. */
+const RARE_FAN: SpriteDef = {
+  name: 'rare-fan',
+  width: 14,
+  height: 24,
+  legend: { o: 'outline', P: 'fan.light', p: 'fan.dark', w: 'fan.cage', j: 'metal.light', k: 'metal.mid' },
+  frames: [
+    [
+      '.....oooo.....',
+      '...ooPPPPoo...',
+      '..oPPwpwwPPo..',
+      '.oPPwwpwwwPPo.',
+      '.oPwwwpwwwwPo.',
+      'oPwwwwpwwwwwPo',
+      'oPppppoopppwPo',
+      'oPwwwwoowwwwPo',
+      'oPwwwwpwwwwwPo',
+      '.oPwwwpwwwwPo.',
+      '.oPPwwpwwwPPo.',
+      '..oPPwwwwPPo..',
+      '...ooPPPPoo...',
+      '.....oooo.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '..oooooooooo..',
+      '..oPPPPPPPpo..',
+      '..oooooooooo..',
+    ],
+    [
+      '.....oooo.....',
+      '...ooPPPPoo...',
+      '..pPPwwwwPpo..',
+      '.oPpwwwwwpPPo.',
+      '.oPwpwwwpwwPo.',
+      'oPwwwpwpwwwwPo',
+      'oPwwwwoowwwwPo',
+      'oPwwwpoowwwwPo',
+      'oPwwpwwwpwwwPo',
+      '.oPpwwwwwpwPo.',
+      '.opPwwwwwwpPo.',
+      '..oPPwwwwPPo..',
+      '...ooPPPPoo...',
+      '.....oooo.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '.....ojko.....',
+      '..oooooooooo..',
+      '..oPPPPPPPpo..',
+      '..oooooooooo..',
+    ],
+  ],
+}
+
+/** A key-shaped sword hanging on the wall, with its charm. */
+const KEY_SWORD: SpriteDef = {
+  name: 'key-sword',
+  width: 14,
+  height: 33,
+  legend: { o: 'outline', S: 'blade.light', b: 'blade.dark', Y: 'guard.light', y: 'guard.dark', H: 'grip', C: 'blade.light' },
+  frames: [
+    [
+      '....oo.o.o.o..',
+      '....oSoSoSoSo.',
+      '....oSbSSSSSo.',
+      '....oSbooooooo',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '....oSbo......',
+      '..oooooooooo..',
+      '..oYYYYYYYYo..',
+      '..oYooHHooYo..',
+      '..oYo.HH.oYo..',
+      '..oYooHHooYo..',
+      '..oYYYYYYYyo..',
+      '..oooooooooo..',
+      '.....oHHo.....',
+      '......oo......',
+      '......o.......',
+      '...oo..oo.....',
+      '..oCCooCCo....',
+      '...oCCCCo.....',
+      '..oCCCCCCo....',
+      '...oCCCCo.....',
+      '....oooo......',
+    ],
+  ],
+}
+
+/** A small table with a star-shaped fruit. */
+const FRUIT_TABLE: SpriteDef = {
+  name: 'fruit-table',
+  width: 20,
+  height: 16,
+  legend: { o: 'outline', T: 'wood.light', t: 'wood.mid', f: 'wood.dark', Y: 'fruit.light', y: 'fruit.dark', g: 'leaf.mid' },
+  frames: [
+    [
+      '.........gg.........',
+      '........oYYo........',
+      '....oooooYYooooo....',
+      '....oYYYYYYYYyyo....',
+      '.....oYYYYYYyyo.....',
+      '......oYYYYyyo......',
+      '.....oYYyooYyyo.....',
+      '..oooooooooooooooo..',
+      '.oTTTTTTTTTTTTTTTTo.',
+      '.oTTTTTTTTTTTTTTTto.',
+      '.otttttttttttttttto.',
+      '.oooooooooooooooooo.',
+      '..ofo..........ofo..',
+      '..ofo..........ofo..',
+      '..ofo..........ofo..',
+      '..ooo..........ooo..',
+    ],
+  ],
+}
+
+/** A grinning mask with a moustache, hanging on a nail. */
+const SMILE_MASK: SpriteDef = {
+  name: 'smile-mask',
+  width: 14,
+  height: 16,
+  legend: { o: 'outline', W: 'mask.light', s: 'mask.shade' },
+  frames: [
+    [
+      '......oo......',
+      '.....o..o.....',
+      '...oo....oo...',
+      '..oWWWWWWWWo..',
+      '.oWWWWWWWWWWo.',
+      '.oWooWWWWooWo.',
+      '.oWWWWWWWWWWo.',
+      '.oWo.oWWo.oWo.',
+      '.oWWWWWWWWWWo.',
+      '.oWWWWsWWWWWo.',
+      'ooWooooooooWoo',
+      'o.oWWWWWWWWo.o',
+      '.oWWWWWWooWWo.',
+      '..oWWWWWWWWo..',
+      '...oWWWWWWo...',
+      '....oooooo....',
+    ],
+  ],
+}
+
+/** A long red motorbike with a capsule sticker. */
+const RED_BIKE: SpriteDef = {
+  name: 'red-bike',
+  width: 40,
+  height: 22,
+  legend: { o: 'outline', R: 'bike.light', r: 'bike.dark', L: 'bike.lamp', W: 'bike.decal', x: 'bike.seat', t: 'tyre', k: 'metal.mid', j: 'metal.light' },
+  frames: [
+    [
+      '........................................',
+      '........................................',
+      '........................................',
+      '........................................',
+      '..........oooooooooo....................',
+      '.......oooxxxxxxxxxxoo..................',
+      '.....ooRRRoxxxxxxxxxxxoooooooooo........',
+      '...ooRRRRRRoooooooooooRRRRRRRRRRooo.....',
+      '..oLRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRoo...',
+      '.oLLRRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRRRo..',
+      'oLLRRRRrWWWWWWWrRRRRRRRRRRRRRRRRRRRRRRo.',
+      'oLRRRRRrWrWWWrWrRRRRRRRRRRRRRRRRRRRRRRo.',
+      'oRRRRRRrWWWWWWWrRRRRRRRRRRRRRRRRRRRRRro.',
+      'orRRRRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRRrro.',
+      '.orRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRrro..',
+      '..orrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrroo..',
+      '..ooooooooooooooooooooooooooooooooooto..',
+      '..ottkkjkktto..............ottkkjkktto..',
+      '..otttkkkttto..............otttkkkttto..',
+      '...ottttttto................ottttttto...',
+      '....ottttto..................ottttto....',
+      '.....ooooo....................ooooo.....',
+    ],
+  ],
+}
+
+/** A statue of a purple and green giant robot with a horn. */
+const MECH_STATUE: SpriteDef = {
+  name: 'mech-statue',
+  width: 16,
+  height: 30,
+  legend: { o: 'outline', P: 'mech.light', G: 'mech.accent', j: 'stone.light', k: 'stone.mid', K: 'stone.dark' },
+  frames: [
+    [
+      '........o.......',
+      '.......oPo......',
+      '.......oPo......',
+      '......oPPo......',
+      '.....oPPPPo.....',
+      '.....oGPPGo.....',
+      '.....oPGGPo.....',
+      '...oo.oPPo.oo...',
+      '..oPPooPPooPPo..',
+      '..oPPPPPPPPPPo..',
+      '..oPPoGPPGoPPo..',
+      '..oPPoPPPPoPPo..',
+      '.oPo.oPGGPo.oPo.',
+      '.oPo.oPPPPo.oPo.',
+      '.oGo..oPPo..oGo.',
+      '.oPo..oGGo..oPo.',
+      '.ooo.oPPPPo.ooo.',
+      '.....oPooPo.....',
+      '....oPPooPPo....',
+      '....oPo..oPo....',
+      '....oGo..oGo....',
+      '....oPo..oPo....',
+      '....oPo..oPo....',
+      '...oPPo..oPPo...',
+      '...oooo..oooo...',
+      '.oooooooooooooo.',
+      '.ojjjjjjjjjjjjo.',
+      '.okkkkkkkkkkkKo.',
+      '.okkkkkkkkkkkKo.',
+      '.oooooooooooooo.',
+    ],
+  ],
+}
+
+/** A stone pedestal with a floating heart. */
+const ITEM_PEDESTAL: SpriteDef = {
+  name: 'item-pedestal',
+  width: 14,
+  height: 22,
+  legend: { o: 'outline', H: 'heart.light', h: 'heart.shine', j: 'stone.light', k: 'stone.mid', K: 'stone.dark' },
+  frames: [
+    [
+      '....oo.oo.....',
+      '...oHHoHHo....',
+      '...oHhHHHo....',
+      '...oHHHHHo....',
+      '....oHHHo.....',
+      '.....oHo......',
+      '......o.......',
+      '..............',
+      '..............',
+      '..............',
+      'oooooooooooooo',
+      'ojjjjjjjjjjjjo',
+      'okkkkkkkkkkkKo',
+      'oooooooooooooo',
+      '..okkkkkkkKo..',
+      '..okkkkkkkKo..',
+      '..okKkkkkkKo..',
+      '..okkkkkkkKo..',
+      '..okkkkkkkKo..',
+      '.oooooooooooo.',
+      '.okkkkkkkkkKo.',
+      '.oooooooooooo.',
+    ],
+    [
+      '..............',
+      '....oo.oo.....',
+      '...oHHoHHo....',
+      '...oHhHHHo....',
+      '...oHHHHHo....',
+      '....oHHHo.....',
+      '.....oHo......',
+      '......o.......',
+      '..............',
+      '..............',
+      'oooooooooooooo',
+      'ojjjjjjjjjjjjo',
+      'okkkkkkkkkkkKo',
+      'oooooooooooooo',
+      '..okkkkkkkKo..',
+      '..okkkkkkkKo..',
+      '..okKkkkkkKo..',
+      '..okkkkkkkKo..',
+      '..okkkkkkkKo..',
+      '.oooooooooooo.',
+      '.okkkkkkkkkKo.',
+      '.oooooooooooo.',
+    ],
+  ],
+}
+
+/** A small white dog, asleep. */
+const WHITE_DOG: SpriteDef = {
+  name: 'white-dog',
+  width: 16,
+  height: 10,
+  legend: { o: 'outline', W: 'dog.light', s: 'dog.shade' },
+  frames: [
+    [
+      '................',
+      '..oo............',
+      '.oWWo...........',
+      'oWWWWoooooooo...',
+      'oWoWWWWWWWWWWo..',
+      'oWWWWWWWWWWWWWo.',
+      '.oWWsWWWWWWWWWWo',
+      '..ooWWWWWWWWWWso',
+      '...oWWsWWWWWWsso',
+      '....oooooooooo..',
+    ],
+    [
+      '................',
+      '.oo.............',
+      'oWWo............',
+      'oWWWWoooooooo...',
+      'oWoWWWWWWWWWWo..',
+      'oWWWWWWWWWWWWWo.',
+      '.oWWsWWWWWWWWWWo',
+      '..ooWWWWWWWWWWso',
+      '...oWWsWWWWWWsso',
+      '....oooooooooo..',
+    ],
+  ],
+}
+
+/** A twinkling yellow star. */
+const SAVE_STAR: SpriteDef = {
+  name: 'save-star',
+  width: 9,
+  height: 9,
+  legend: { o: 'outline', Y: 'star.mid', W: 'star.light' },
+  frames: [
+    [
+      '....o....',
+      '...oYo...',
+      '...oYo...',
+      '.ooYYYoo.',
+      'oYYYWYYYo',
+      '.ooYYYoo.',
+      '...oYo...',
+      '...oYo...',
+      '....o....',
+    ],
+    [
+      '.........',
+      '....o....',
+      '...oYo...',
+      '..oYYYo..',
+      '.oYYWYYo.',
+      '..oYYYo..',
+      '...oYo...',
+      '....o....',
+      '.........',
+    ],
+  ],
+}
+
+/** An arcade cabinet with a game running. */
+const ARCADE_CABINET: SpriteDef = {
+  name: 'arcade-cabinet',
+  width: 16,
+  height: 32,
+  legend: { o: 'outline', C: 'cabinet.light', c: 'cabinet.dark', S: 'cabinet.side', M: 'cabinet.marquee', m: 'cabinet.marqueeInk', X: 'cabinet.screen', p: 'cabinet.pixel', k: 'metal.mid', R: 'button.red', B: 'button.blue', Y: 'cabinet.coin' },
+  frames: [
+    [
+      '.oooooooooooooo.',
+      '.oMMMMMMMMMMMMo.',
+      '.oMMmMMmMMmMMMo.',
+      '.oMMMMMMMMMMMMo.',
+      '.oooooooooooooo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oSooooooooooCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSopXXXXXXXoCo.',
+      '.oSoXppXXXXXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSoXXXXXppXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSoXXXpXXXXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSooooooooooCo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oooooooooooooo.',
+      '.oScoccccccccco.',
+      '.oSokoccRcBcRco.',
+      '.oSccccccccccco.',
+      '.oooooooooooooo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oSCCooooooCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCocYYcoCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCooooooCCCo.',
+      '.oSCCCCCCCCCCCo.',
+      '.cccccccccccccc.',
+      '.oooooooooooooo.',
+    ],
+    [
+      '.oooooooooooooo.',
+      '.oMMMMMMMMMMMMo.',
+      '.oMMmMMmMMmMMMo.',
+      '.oMMMMMMMMMMMMo.',
+      '.oooooooooooooo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oSooooooooooCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSopXXXXXXXoCo.',
+      '.oSoXXppXXXXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSoXXXXXppXoCo.',
+      '.oSoXpXXXXXXoCo.',
+      '.oSoXXXXXXXXoCo.',
+      '.oSooooooooooCo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oooooooooooooo.',
+      '.oScoccccccccco.',
+      '.oSokoccRcBcRco.',
+      '.oSccccccccccco.',
+      '.oooooooooooooo.',
+      '.oSCCCCCCCCCCCo.',
+      '.oSCCooooooCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCocYYcoCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCoccccoCCCo.',
+      '.oSCCooooooCCCo.',
+      '.oSCCCCCCCCCCCo.',
+      '.cccccccccccccc.',
+      '.oooooooooooooo.',
+    ],
+  ],
+}
+
+/** A water cooler. */
+const WATER_COOLER: SpriteDef = {
+  name: 'water-cooler',
+  width: 12,
+  height: 26,
+  legend: { o: 'outline', U: 'water.light', u: 'water.dark', W: 'appliance.light', w: 'appliance.dark', B: 'button.blue', R: 'button.red', k: 'metal.mid' },
+  frames: [
+    [
+      '...oooooo...',
+      '..oUUUUUUo..',
+      '.oUUuUUUUUo.',
+      '.oUuUUUUUUo.',
+      '.oUuUUUUUUo.',
+      '.oUuUUUUUUo.',
+      '.oUuUUUUUUo.',
+      '.oUuUUUUUUo.',
+      '..oUUUUUuo..',
+      '....oooo....',
+      '.oooooooooo.',
+      '.oWWWWWWWwo.',
+      '.oWWWWWWWwo.',
+      '.oWWWWWWWwo.',
+      '.oWoBooRowo.',
+      '.oWooWWoowo.',
+      '.oWWWWWWWwo.',
+      '.oWWWWWWWwo.',
+      '.oooooooooo.',
+      '.ookkkkkkoo.',
+      '.ookkkkkkoo.',
+      '.oooooooooo.',
+      '.oWWWWWWWwo.',
+      '.oWWWWWWWwo.',
+      '.oWWWWWWWwo.',
+      '.oooooooooo.',
+    ],
+  ],
+}
+
+/** A vending machine with a lit window. */
+const VENDING_MACHINE: SpriteDef = {
+  name: 'vending-machine',
+  width: 18,
+  height: 32,
+  legend: { o: 'outline', K: 'metal.dark', k: 'metal.mid', n: 'neon', V: 'vending.glass', v: 'metal.light', R: 'button.red', G: 'fruit.light', B: 'button.blue', Y: 'note.yellow', L: 'led.on', l: 'led.off' },
+  frames: [
+    [
+      'oooooooooooooooooo',
+      'onnnnnnnnnnnnnnnno',
+      'onnnnnnnnnnnnnnnno',
+      'oKKKKKKKKKKKKKKKKo',
+      'oKooooooooooKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoRVGVBVYVoKoooKo',
+      'oKoRVGVBVYVoKokoKo',
+      'oKovvvvvvvvoKoLoKo',
+      'oKoVVVVVVVVoKokoKo',
+      'oKoGVBVYVRVoKoloKo',
+      'oKoGVBVYVRVoKokoKo',
+      'oKovvvvvvvvoKoooKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoBVYVRVGVoKKKKKo',
+      'oKoBVYVRVGVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoYVRVGVBVoKKKKKo',
+      'oKoYVRVGVBVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoRVGVBVYVoKKKKKo',
+      'oKoRVGVBVYVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKKooooooooKKKKKKo',
+      'oKKokkkkkkoKKKKKKo',
+      'oKKokkkkkkoKKKKKKo',
+      'oKKooooooooKKKKKKo',
+      'oooooooooooooooooo',
+      '.ooo..........ooo.',
+      '.ooo..........ooo.',
+    ],
+    [
+      'oooooooooooooooooo',
+      'onnnnnnnnnnnnnnnno',
+      'onnnnnnnnnnnnnnnno',
+      'oKKKKKKKKKKKKKKKKo',
+      'oKooooooooooKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoGVBVYVRVoKoooKo',
+      'oKoGVBVYVRVoKokoKo',
+      'oKovvvvvvvvoKoloKo',
+      'oKoVVVVVVVVoKokoKo',
+      'oKoBVYVRVGVoKoloKo',
+      'oKoBVYVRVGVoKokoKo',
+      'oKovvvvvvvvoKoooKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoYVRVGVBVoKKKKKo',
+      'oKoYVRVGVBVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoRVGVBVYVoKKKKKo',
+      'oKoRVGVBVYVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKoVVVVVVVVoKKKKKo',
+      'oKoGVBVYVRVoKKKKKo',
+      'oKoGVBVYVRVoKKKKKo',
+      'oKovvvvvvvvoKKKKKo',
+      'oKKooooooooKKKKKKo',
+      'oKKokkkkkkoKKKKKKo',
+      'oKKokkkkkkoKKKKKKo',
+      'oKKooooooooKKKKKKo',
+      'oooooooooooooooooo',
+      '.ooo..........ooo.',
+      '.ooo..........ooo.',
+    ],
+  ],
+}
+
+/** A bookshelf full of books. */
+const BOOKSHELF: SpriteDef = {
+  name: 'bookshelf',
+  width: 24,
+  height: 28,
+  legend: { o: 'outline', f: 'wood.dark', T: 'wood.light', t: 'wood.mid', R: 'book.red', B: 'book.blue', G: 'book.green', Y: 'book.yellow', W: 'book.label' },
+  frames: [
+    [
+      'oooooooooooooooooooooooo',
+      'oTTTTTTTTTTTTTTTTTTTTTTo',
+      'offffffffffffffBBffffffo',
+      'offfBBfffffffRRWBfffYYfo',
+      'ofRRWBffffYYfWRBBfRRWYfo',
+      'ofWRBBffffWYfRRBBfWRYYfo',
+      'ofRRBBfffGYYfRRBBfRRYYfo',
+      'ofRRBBffGfYYfRRBBfRRYYfo',
+      'ofRRBBfGffYYfRRBBfRRYYfo',
+      'oTTTTTTTTTTTTTTTTTTTTTTo',
+      'ottttttBBttttttGGtttttto',
+      'offffRRWBfffYYfWGfffRRfo',
+      'ofYYfWRBBfRRWYfGGfffWRfo',
+      'ofWYfRRBBfWRYYfGGfffRRfo',
+      'ofYYfRRBBfRRYYfGGffBRRfo',
+      'ofYYfRRBBfRRYYfGGfBfRRfo',
+      'ofYYfRRBBfRRYYfGGBffRRfo',
+      'oTTTTTTTTTTTTTTTTTTTTTTo',
+      'ottttttGGtttttBBttttttto',
+      'offfYYfWGfffRRWBfffYYffo',
+      'ofRRWYfGGfffWRBBfGGWYffo',
+      'ofWRYYfGGfffRRBBfWGYYffo',
+      'ofRRYYfGGffBRRBBfGGYYffo',
+      'ofRRYYfGGfBfRRBBfGGYYffo',
+      'ofRRYYfGGBffRRBBfGGYYffo',
+      'oTTTTTTTTTTTTTTTTTTTTTTo',
+      'otttttttttttttttttttttto',
+      'oooooooooooooooooooooooo',
+    ],
+  ],
+}
+
+/** A round rug. */
+const RUG: SpriteDef = {
+  name: 'rug',
+  width: 48,
+  height: 20,
+  legend: { R: 'rug.light', r: 'rug.mid', d: 'rug.dark' },
+  frames: [
+    [
+      '................................................',
+      '..............dddddddRRRRRRddddddd..............',
+      '..........ddddRRRRRRRRRRRRRRRRRRRRdddd..........',
+      '.......dddRRRRRrrrrrrrrrrrrrrrrrrRRRRRddd.......',
+      '.....dddRRRRrrrrrrrrrrrrrrrrrrrrrrrrRRRRddd.....',
+      '...dddRRRRrrrrrrrrrrRRRRRRRRrrrrrrrrrrRRRRddd...',
+      '..dddRRRrrrrrrrrRRRRRRRRRRRRRRRRrrrrrrrrRRRddd..',
+      '.dddRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRrrrrrrrRRRddd.',
+      '.ddRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRRRrrrrrrrRRRdd.',
+      '.ddRRRrrrrrrRRRRRRRRRRRRRRRRRRRRRRRRrrrrrrRRRdd.',
+      '.ddRRRrrrrrrRRRRRRRRRRRRRRRRRRRRRRRRrrrrrrRRRdd.',
+      '.ddRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRRRrrrrrrrRRRdd.',
+      '.dddRRRrrrrrrrRRRRRRRRRRRRRRRRRRRRrrrrrrrRRRddd.',
+      '..dddRRRrrrrrrrrRRRRRRRRRRRRRRRRrrrrrrrrRRRddd..',
+      '...dddRRRRrrrrrrrrrrRRRRRRRRrrrrrrrrrrRRRRddd...',
+      '.....dddRRRRrrrrrrrrrrrrrrrrrrrrrrrrRRRRddd.....',
+      '.......dddRRRRRrrrrrrrrrrrrrrrrrrRRRRRddd.......',
+      '..........ddddRRRRRRRRRRRRRRRRRRRRdddd..........',
+      '..............dddddddRRRRRRddddddd..............',
+      '................................................',
+    ],
+  ],
+}
+
+export const PROPS = {
+  plant: prop(PLANT, 'Watered by whoever closes the last task of the day.'),
+  sideTable: prop(SIDE_TABLE, 'Coffee: the real orchestrator.'),
+  whiteboard: prop(WHITEBOARD, 'Nobody remembers who drew that arrow.'),
+  serverRack: prop(SERVER_RACK, 'The cloud is just someone else\'s computer.', { lights: [{ x: 10, y: 15, radius: 14, color: 'led.on' }] }),
+  floorLamp: prop(FLOOR_LAMP, 'Warm light, cold coffee.', { lights: [{ x: 6, y: 8, radius: 40, color: 'lamp.light' }] }),
+  dragonLamp: prop(DRAGON_LAMP, 'A true rare. Not for trade, not even for two thrones.', { lights: [{ x: 9, y: 2, radius: 30, color: 'flame.mid' }] }),
+  rareFan: prop(RARE_FAN, 'Rare fan. Worth more than the whole office, ask any trader.'),
+  keySword: prop(KEY_SWORD, 'May your heart be your guiding key.', { layer: 'wall' }),
+  fruitTable: prop(FRUIT_TABLE, 'Share one with someone and your destinies become intertwined.'),
+  smileMask: prop(SMILE_MASK, 'Hello, friend.', { layer: 'wall' }),
+  redBike: prop(RED_BIKE, 'Parked in the meeting room. Nobody dares ask whose it is.', { lights: [{ x: 1, y: 10, radius: 16, color: 'bike.lamp' }] }),
+  mechStatue: prop(MECH_STATUE, 'Get in the robot.'),
+  itemPedestal: prop(ITEM_PEDESTAL, 'A heart on a pedestal. Picking it up changes the whole run.'),
+  whiteDog: prop(WHITE_DOG, '* The dog is asleep on the network cable. You decide not to move it.'),
+  saveStar: prop(SAVE_STAR, '* The tests are green. It fills you with determination.', { lights: [{ x: 4, y: 4, radius: 16, color: 'star.mid' }] }),
+  arcadeCabinet: prop(ARCADE_CABINET, 'Insert coin to continue.', { lights: [{ x: 8, y: 10, radius: 28, color: 'cabinet.pixel' }] }),
+  waterCooler: prop(WATER_COOLER, 'Where the real decisions are made.'),
+  vendingMachine: prop(VENDING_MACHINE, 'Accepts exact change and good intentions only.', { lights: [{ x: 7, y: 14, radius: 28, color: 'vending.glass' }] }),
+  bookshelf: prop(BOOKSHELF, 'Mostly manuals nobody read.'),
+  rug: prop(RUG, 'It really ties the room together.', { layer: 'floor' }),
+} as const
 
 export type PropName = keyof typeof PROPS

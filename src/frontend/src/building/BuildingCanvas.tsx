@@ -2,9 +2,13 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { DeskActivity, OfficeView, WorkTaskView } from '../api/types'
-import { paintInto } from '../art/canvas'
+import { paintInto, toCanvas } from '../art/canvas'
+import { inTheDark, unlit } from '../art/lighting'
 import { deskItem, propItem, roomPixels, roomShell, WALL_HEIGHT } from '../art/roomScene'
-import { STATION } from '../art/station'
+import { sceneLights, scenePixels } from '../art/scene'
+import { HALL_FLOOR } from '../art/sheets/rooms'
+import { pixelsOf, type Pixel } from '../art/sprite'
+import { STATION, themeColors } from '../art/station'
 import { themeOf } from '../art/themes'
 import { agentStateOf, appearanceOf } from './agents'
 import { arrangementOf, boundsOf, handlesOf, place, targetAt, type Edge, type Target } from './arrange'
@@ -385,7 +389,9 @@ function drawBuilding(
   const world = new Container()
   const labels = new Container()
   const bubbles = new Container()
+  world.addChild(hallFloor(layout, scene))
   const rooms = new Map(layout.rooms.map((room) => [room.id, drawRoom(room, scene, world)]))
+  world.addChild(walls(layout, scene), hallFurniture(layout, scene))
   const names = new Map<string, Text>()
 
   for (const room of layout.rooms) {
@@ -446,7 +452,104 @@ function carryTo(view: View, room: RoomBox, target: Target, x: number, y: number
   return { x: spot.x, y: spot.y }
 }
 
-/** One room: its pixel art in a sprite, with a dark edge so rooms stand apart. */
+/** A still picture of pixels, `width` by `height`, at (x, y) in the world. */
+function still(pixels: Pixel[], x: number, y: number, width: number, height: number): Sprite {
+  const texture = Texture.from(toCanvas(width, height, pixels))
+  texture.source.scaleMode = 'nearest'
+  const sprite = new Sprite(texture)
+  sprite.position.set(x, y)
+  return sprite
+}
+
+/** The corridor furniture, in pixels from the building's corner, with its lights. */
+function hallItems(layout: BuildingLayout, scene: Scene) {
+  const theme = themeOf(scene.office.theme)
+  const size = { width: layout.floor.width * TILE, height: layout.floor.height * TILE }
+  const items = layout.hall.map((p) => propItem(p.name, p.x - layout.floor.x * TILE, p.y - layout.floor.y * TILE, 0, theme, size))
+  return { theme, size, items, lights: sceneLights(items) }
+}
+
+/** The common floor: everything inside the building that is not a room. Rooms cover the rest. */
+function hallFloor(layout: BuildingLayout, scene: Scene): Sprite {
+  const { theme, size, lights } = hallItems(layout, scene)
+  const colors = themeColors(theme.colors)
+  const pixels: Pixel[] = []
+  for (let r = 0; r < layout.floor.height; r++)
+    for (let c = 0; c < layout.floor.width; c++) pixels.push(...pixelsOf(HALL_FLOOR, 0, colors, c * TILE, r * TILE))
+  const lit = scene.dark ? inTheDark(pixels, lights, theme.colors.night) : pixels
+  return still(lit, layout.floor.x * TILE, layout.floor.y * TILE, size.width, size.height)
+}
+
+/** What stands in the corridors: over the walls behind it, as it stands in front of them. */
+function hallFurniture(layout: BuildingLayout, scene: Scene): Sprite {
+  const { theme, size, items, lights } = hallItems(layout, scene)
+  const pixels = scenePixels(items)
+  return still(scene.dark ? inTheDark(pixels, lights, theme.colors.night) : pixels, layout.floor.x * TILE, layout.floor.y * TILE, size.width, size.height)
+}
+
+/** Walls seen from above are a thin cap: this thick, centred on the line between two spaces. */
+const WALL_CAP = 4
+const OUTER_CAP = 6
+/** How much of a front wall shows below its cap, on the corridor side. */
+const WALL_FACE = 7
+
+/**
+ * The building's walls: around it, between rooms side by side and along the front of
+ * each room, open where its door is.
+ */
+function walls(layout: BuildingLayout, scene: Scene): Graphics {
+  const theme = themeOf(scene.office.theme)
+  const tone = (color: string) => (scene.dark ? unlit(color, theme.colors.night) : color)
+  const half = WALL_CAP / 2
+  const strips: { x: number; y: number; width: number; height: number }[] = []
+  // The side of a front wall that faces the corridor, seen from above and in front.
+  const faces: { x: number; y: number; width: number }[] = []
+  const line = (x1: number, y1: number, x2: number, y2: number, cap = WALL_CAP) =>
+    strips.push({ x: Math.min(x1, x2) - cap / 2, y: Math.min(y1, y2) - cap / 2, width: Math.abs(x2 - x1) + cap, height: Math.abs(y2 - y1) + cap })
+  const front = (x1: number, x2: number, y: number) => {
+    line(x1, y, x2, y)
+    faces.push({ x: x1 - half, y: y + half, width: x2 - x1 + WALL_CAP })
+  }
+
+  const { floor } = layout
+  // The outer walls are thicker than the ones between rooms.
+  const [west, north, east, south] = [floor.x * TILE, floor.y * TILE, (floor.x + floor.width) * TILE, (floor.y + floor.height) * TILE]
+  line(west, north, east, north, OUTER_CAP)
+  line(west, north, west, south, OUTER_CAP)
+  line(east, north, east, south, OUTER_CAP)
+  line(west, south, east, south, OUTER_CAP)
+  for (const room of layout.rooms) {
+    const [left, top, right, bottom] = [room.x * TILE, room.y * TILE, (room.x + room.width) * TILE, (room.y + room.height) * TILE]
+    line(left, top, right, top)
+    line(left, top, left, bottom)
+    line(right, top, right, bottom)
+    const door = layout.doors.find((d) => d.roomId === room.id)
+    if (!door) front(left, right, bottom)
+    else {
+      front(left, door.x - half, bottom)
+      front(door.x + door.width + half, right, bottom)
+    }
+  }
+
+  // Every outline first, then every cap, so walls meet without seams.
+  const g = new Graphics()
+  for (const f of faces) {
+    g.rect(f.x, f.y, f.width, WALL_FACE).fill(tone(theme.colors.outline))
+    g.rect(f.x + 1, f.y, f.width - 2, WALL_FACE - 2).fill(tone(theme.colors['wall.light']))
+    g.rect(f.x + 1, f.y + WALL_FACE - 3, f.width - 2, 1).fill(tone(theme.colors['wall.shadow']))
+  }
+  for (const s of strips) g.rect(s.x, s.y, s.width, s.height).fill(tone(theme.colors.outline))
+  for (const s of strips) g.rect(s.x + 1, s.y + 1, s.width - 2, s.height - 2).fill(tone(theme.colors['wall.top']))
+  // Jambs: the door frame stands a little proud of the wall.
+  for (const d of layout.doors)
+    for (const x of [d.x - half - 1, d.x + d.width - half - 1]) {
+      g.rect(x, d.y - 4, WALL_CAP + 2, 8).fill(tone(theme.colors.outline))
+      g.rect(x + 1, d.y - 3, WALL_CAP, 6).fill(tone(theme.colors['trim.light']))
+    }
+  return g
+}
+
+/** One room: its pixel art in a sprite, between the common floor and the walls. */
 function drawRoom(room: RoomBox, scene: Scene, world: Container): RoomPainter {
   const theme = themeOf(scene.office.theme)
   const size = { width: room.width * TILE, height: room.height * TILE }
@@ -458,9 +561,7 @@ function drawRoom(room: RoomBox, scene: Scene, world: Container): RoomPainter {
   const sprite = new Sprite(texture)
   sprite.position.set(room.x * TILE, room.y * TILE)
 
-  const edge = new Graphics()
-  edge.rect(room.x * TILE - 1, room.y * TILE - 1, size.width + 2, size.height + 2).stroke({ width: 1, color: COLORS.roomEdge })
-  world.addChild(edge, sprite)
+  world.addChild(sprite)
 
   const looks = new Map(room.desks.map((d) => [d.id, appearanceOf(d.id)]))
   const states = new Map(room.desks.map((d) => [d.id, agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))

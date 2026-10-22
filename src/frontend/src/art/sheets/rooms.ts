@@ -404,3 +404,34 @@ export const BACK_ROOM_ARCADE_DESK: SpriteDef = {
     ],
   ],
 }
+
+/**
+ * The floor of the common areas: corridors, landings and the lobby. Big square tiles
+ * in the colours of the walls, so they read as different from the rooms they join.
+ */
+export const HALL_FLOOR: SpriteDef = {
+  name: 'hallFloor',
+  width: 16,
+  height: 16,
+  legend: { L: 'wall.light', M: 'wall.mid', s: 'wall.shadow', h: 'wall.top' },
+  frames: [
+    [
+      'hLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'LLLLLLLsMMMMMMMs',
+      'ssssssssssssssss',
+      'MMMMMMMshLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'MMMMMMMsLLLLLLLs',
+      'ssssssssssssssss',
+    ],
+  ],
+}

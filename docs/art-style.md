@@ -99,6 +99,14 @@ therefore stand in several rows, not only side by side.
 Walls are two tiles tall: the upper tile repeats the panel without the skirting,
 so masks and swords have room to hang.
 
+An office is one building. Seen from above, walls between spaces are a thin cap
+(4 px, 6 px for the outer walls) in `wall.top` with an `outline` edge; the front
+wall of a room also shows a few pixels of its face on the corridor side, and
+stops at the door, framed by two jambs in `trim.light`. The common floor uses the
+hall tile (`HALL_FLOOR` in `sheets/rooms.ts`): big square tiles in the wall
+colours, so corridors never read as part of a room. Each theme lists its corridor
+furniture in `hall`.
+
 ### Homages
 
 Some furniture and outfits are affectionate homages to games, films and series

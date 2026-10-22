@@ -23,6 +23,9 @@ function ring(distance: number, radius: number): number {
   return 0
 }
 
+/** A colour no light reaches, with the lights off. */
+export const unlit = (color: string, night: string) => hex(mix(rgb(color), rgb(night), 0.72))
+
 /**
  * The room with the lights off: everything sinks towards the night colour, except what
  * glows by itself, and each light brings back its surroundings in rings, tinted by its

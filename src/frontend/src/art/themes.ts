@@ -25,6 +25,8 @@ export interface Theme {
   wall: SpriteDef
   desk: SpriteDef
   furniture: PropName[]
+  /** What stands in the corridors, in turn. */
+  hall: PropName[]
 }
 
 export const THEMES = {
@@ -35,6 +37,7 @@ export const THEMES = {
     wall: WALL,
     desk: DESK,
     furniture: ['rug', 'bookshelf', 'floorLamp', 'plant', 'sideTable', 'dragonLamp', 'whiteDog', 'keySword', 'blackCat', 'clubSofa'],
+    hall: ['plant', 'waterCooler', 'bookshelf', 'sideTable'],
   },
   neonDistrict: {
     label: 'Neon district',
@@ -43,6 +46,7 @@ export const THEMES = {
     wall: NEON_DISTRICT_WALL,
     desk: NEON_DISTRICT_DESK,
     furniture: ['redBike', 'mechStatue', 'vendingMachine', 'serverRack', 'plant', 'starWalker'],
+    hall: ['vendingMachine', 'plant', 'serverRack'],
   },
   securityFirm: {
     label: 'Security firm',
@@ -51,6 +55,7 @@ export const THEMES = {
     wall: SECURITY_FIRM_WALL,
     desk: SECURITY_FIRM_DESK,
     furniture: ['whiteboard', 'corpPoster', 'waterCooler', 'plant', 'goldBars', 'serverRack', 'saveStar', 'throne'],
+    hall: ['waterCooler', 'plant', 'vendingMachine'],
   },
   backRoomArcade: {
     label: 'Back-room arcade',
@@ -59,6 +64,7 @@ export const THEMES = {
     wall: BACK_ROOM_ARCADE_WALL,
     desk: BACK_ROOM_ARCADE_DESK,
     furniture: ['arcadeCabinet', 'itemPedestal', 'vendingMachine', 'serverRack', 'sideTable', 'whiteDog'],
+    hall: ['arcadeCabinet', 'vendingMachine', 'plant'],
   },
 } satisfies Record<string, Theme>
 

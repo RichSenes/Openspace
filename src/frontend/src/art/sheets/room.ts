@@ -56,7 +56,10 @@ export const WALL: SpriteDef = {
   ],
 }
 
-/** The desk with its monitor; 'g' is the screen, coloured by the desk's state. */
+/**
+ * The desk with its monitor, back to the viewer. 'g' is the lit edge of the screen,
+ * 'G' its halo and 'P' the light it spills on the desk top; all follow the desk's state.
+ */
 export const DESK: SpriteDef = {
   name: 'desk',
   width: 32,
@@ -73,22 +76,24 @@ export const DESK: SpriteDef = {
     a: 'key.light',
     A: 'key.dark',
     g: 'screen',
+    G: 'glow',
+    P: 'spill',
   },
   frames: [
     [
       '..oooooooooo....................',
       '..ojjjjjjjkog...................',
-      '..ojkkkkkkkog...................',
-      '..ojkkkkkkkog...................',
-      '..ojkkkkkkkog...................',
-      '..ojkkkkkkkog...................',
+      '..ojkkkkkkkogG..................',
+      '..ojkkkkkkkogG..................',
+      '..ojkkkkkkkogG..................',
+      '..ojkkkkkkkogG..................',
       '..okkkkkkkKog...................',
       '..oKKKKKKKKo....................',
       '..oooooooooo....................',
       '......okko......................',
       '.oooookkooooooooooooooooooooooo.',
-      '.oTTTTTTTTTTTTTTTTTTTTTTTTTTTTo.',
-      '.oTTTTTTTTTTTTTaaaaaaaaaTTTTTto.',
+      '.oTTTTTTTTTTPPPPTTTTTTTTTTTTTTo.',
+      '.oTTTTTTTTTTPPTaaaaaaaaaTTTTTto.',
       '.oTTTTTTTTTTTTTAAAAAAAAATTTTtto.',
       '.otttttttttttttttttttttttttttto.',
       '.oooooooooooooooooooooooooooooo.',

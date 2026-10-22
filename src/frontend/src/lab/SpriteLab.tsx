@@ -4,10 +4,29 @@ import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, THEMES, type ClothColor, type Ha
 import { FACES, HAIR_STYLES, type Emotion, type HairStyle } from '../art/sheets/character'
 import { DESK, FLOOR, WALL } from '../art/sheets/room'
 import { pixelsOf, type Pixel, type SpriteDef } from '../art/sprite'
-import { STATION, stationPixels, themeColors, type Appearance, type ScreenState, type StationPose } from '../art/station'
+import { SIGNALS, type Signal } from '../art/sheets/signals'
+import { flashing, STATION, stationPixels, themeColors, type Appearance, type ScreenState, type StationPose } from '../art/station'
 import './lab.css'
 
 const FPS = 5
+
+/** The face and screen that go with each signal in the lab. */
+const SIGNAL_FACES: Record<Signal, Emotion> = {
+  bulb: 'happy',
+  exclaim: 'worried',
+  question: 'neutral',
+  zz: 'asleep',
+  check: 'happy',
+  storm: 'worried',
+}
+const SIGNAL_SCREENS: Record<Signal, ScreenState> = {
+  bulb: 'on',
+  exclaim: 'alert',
+  question: 'alert',
+  zz: 'off',
+  check: 'on',
+  storm: 'off',
+}
 const EMOTIONS = Object.keys(FACES).filter((e) => e !== 'blink') as Emotion[]
 
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
@@ -33,11 +52,11 @@ const SAMPLE: { look: Appearance; pose: (tick: number) => StationPose }[] = [
   },
   {
     look: { skin: 'deep', hair: 'black', hairStyle: 'bun', cloth: 'green' },
-    pose: (t) => ({ emotion: t % 20 === 0 ? 'blink' : 'happy', hands: 'rest', frame: 0, screen: 'on' }),
+    pose: (t) => ({ emotion: t % 20 === 0 ? 'blink' : 'happy', hands: 'rest', frame: 0, screen: 'on', signal: 'bulb' }),
   },
   {
     look: { skin: 'tan', hair: 'auburn', hairStyle: 'long', cloth: 'red' },
-    pose: (t) => ({ emotion: t % 25 === 0 ? 'blink' : 'worried', hands: 'rest', frame: 0, screen: 'alert' }),
+    pose: (t) => ({ emotion: t % 25 === 0 ? 'blink' : 'worried', hands: 'rest', frame: 0, screen: flashing('alert', t), signal: 'exclaim' }),
   },
 ]
 
@@ -50,7 +69,7 @@ function roomPixels(tick: number, theme: ThemeName): { width: number; height: nu
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) pixels.push(...pixelsOf(FLOOR, 0, colors, c * 16, 16 + r * 16))
   SAMPLE.forEach((s, i) => {
     const station = stationPixels(s.look, s.pose(tick + i * 7), THEMES[theme])
-    pixels.push(...station.map((p) => ({ ...p, x: p.x + 6 + i * 40, y: p.y + 22 })))
+    pixels.push(...station.map((p) => ({ ...p, x: p.x + 6 + i * 40, y: p.y + 12 })))
   })
   return { width: cols * 16, height: 16 + rows * 16, pixels }
 }
@@ -130,6 +149,28 @@ export function SpriteLab() {
                 </figure>
               ))}
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Signals above the head</h2>
+        <div className="lab-pieces">
+          {(Object.keys(SIGNALS) as Signal[]).map((signal, i) => (
+            <figure key={signal}>
+              <Pixels
+                width={STATION.width}
+                height={STATION.height}
+                pixels={stationPixels(
+                  combos[i % combos.length],
+                  { emotion: SIGNAL_FACES[signal], hands: 'rest', frame: 0, screen: flashing(SIGNAL_SCREENS[signal], tick), signal },
+                  THEMES[theme],
+                )}
+                scale={Math.max(2, scale - 1)}
+                label={signal}
+              />
+              <figcaption>{signal}</figcaption>
+            </figure>
           ))}
         </div>
       </section>

@@ -5,8 +5,7 @@
 
 export const CHARACTER_COLORS = {
   outline: '#2a1f2d',
-  eye: '#2a1f2d',
-  mouth: '#9c4a46',
+  eye: '#1e1620',
   blush: '#e8907c',
   sweat: '#8fc6e8',
 } as const
@@ -16,7 +15,32 @@ export const SKIN_TONES = {
   fair: ['#f6d5bc', '#e8b694', '#c98f72'],
   medium: ['#e2a77e', '#c6885f', '#9e6646'],
   tan: ['#b97c54', '#985f3f', '#714431'],
-  deep: ['#7d5038', '#603c29', '#45291d'],
+  deep: ['#8e5c40', '#6c4430', '#523424'],
+} as const
+
+/**
+ * The mouth colour of each skin tone. Mouths and eyes must stand out from the skin by
+ * lightness, not only hue (at least 3:1), so they read for colour-blind people too:
+ * dark mouths on light skin, a light mouth on the deepest tone. Tests enforce it.
+ */
+export const MOUTHS: Record<keyof typeof SKIN_TONES, string> = {
+  fair: '#9c4a46',
+  medium: '#7a3230',
+  tan: '#3e1c1e',
+  deep: '#f4bfae',
+}
+
+/** Colours of the signals shown above heads; the same in every office. */
+export const SIGNAL_COLORS = {
+  'icon.yellow': '#f6d35a',
+  'icon.yellowShade': '#c9a23a',
+  'icon.white': '#fff8ec',
+  'icon.grey': '#8e8f9c',
+  'icon.amber': '#f2b84b',
+  'icon.blue': '#8fc6e8',
+  'icon.green': '#8fd282',
+  'icon.cloud': '#c3c6d1',
+  'icon.cloudShade': '#8f92a0',
 } as const
 
 /** Base and shade. */
@@ -63,6 +87,10 @@ export const THEME_KEYS = [
   'screen.off',
   'screen.on',
   'screen.alert',
+  'glow.on',
+  'glow.alert',
+  'spill.on',
+  'spill.alert',
   'key.light',
   'key.dark',
 ] as const
@@ -91,6 +119,10 @@ export const COZY_EVENING: Theme = {
   'screen.off': '#2b2e38',
   'screen.on': '#8fe0c4',
   'screen.alert': '#f2b84b',
+  'glow.on': '#d4fff0',
+  'glow.alert': '#ffe2a3',
+  'spill.on': '#b4b88c',
+  'spill.alert': '#e3a75a',
   'key.light': '#d9d4cc',
   'key.dark': '#a8a29a',
 }

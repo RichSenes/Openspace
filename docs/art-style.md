@@ -18,7 +18,9 @@ characters, one per pixel) and where sprites live are described at the end.
   bottom edges take the shadow.
 - Agents sit **behind** their desk, **facing the viewer**, so their expressions are
   visible. The monitor stands on the left of the desk, its back towards the
-  viewer; its glow is the screen state.
+  viewer; its glow is the screen state. A lit screen has a halo around it and
+  spills its light on the desk top; an alert screen flashes (two frames lit, two
+  dark); a screen that is off has neither.
 
 ## Characters
 
@@ -59,6 +61,21 @@ characters, one per pixel) and where sprites live are described at the end.
 | Work sent to review | `done` | `happy` |
 | Failed | `stuck` | `worried` |
 
+## Signals above the head
+
+A 9×10 icon above the head says at a glance what happened. Each one differs from
+the others by **shape**, not only by colour, so it reads for colour-blind people
+too.
+
+| Signal | Shape | Meaning |
+| --- | --- | --- |
+| `bulb` | light bulb | The agent found something or left a note |
+| `exclaim` | exclamation mark | Something unexpected: a command failed, a conflict |
+| `question` | question mark | Waiting for a person (a permission, an answer) |
+| `zz` | Z in a bubble | Queued, waiting for a seat |
+| `check` | tick | Work sent to review |
+| `storm` | cloud with lightning | The task failed |
+
 ## Colour
 
 Two kinds of palette:
@@ -70,6 +87,11 @@ Two kinds of palette:
   `wood.mid`, `screen.on`…), and a theme gives each name its real colour. A new
   mood is a new table of colours, not new drawings. The first theme is
   **cozy evening** (warm wood, muted blue-grey walls, amber lights).
+
+Faces must read on every skin tone: eyes and mouth differ from the light skin
+tone by a **contrast of at least 3:1** (WCAG luminance, not hue), which tests
+enforce. That is why the mouth colour depends on the skin: dark on light skins,
+light on the deepest one.
 
 The exact colours live in `src/frontend/src/art/palette.ts`, which is the source
 of truth.

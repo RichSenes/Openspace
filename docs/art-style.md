@@ -37,7 +37,11 @@ characters, one per pixel) and where sprites live are described at the end.
   7. the desk, drawn by the room;
   8. `hands`: drawn **after** the desk, so they rest on it.
 - Appearance is per desk: skin tone, hair style and colour, clothes colour (from
-  the role by default) and an optional accessory.
+  the role by default), an optional outfit (`hoodie`, long `coat`) and an optional
+  accessory (`glasses`, `headset`, `pointyHat`).
+- Special agents can wear a **costume**, which replaces head, hair and clothes:
+  `skeleton` (round skull with a fixed grin, blue fur-lined hoodie; its eyes close
+  to blink and sleep).
 - Emotions: `neutral`, `focused`, `happy`, `worried`, `asleep`.
 
 ## Outline and shading
@@ -84,12 +88,26 @@ too.
 
 ## Furniture and depth
 
-Props stand anywhere on the floor: `plant`, `side-table` (with a steaming mug),
-`whiteboard`, `server-rack` (blinking lights) and `floor-lamp`. A sprite's bottom
-row is where it touches the floor, its **base line**. A room draws desks and props
-sorted by base line, so whatever stands lower on the screen is closer to the
-viewer and covers what is behind it. Desks can therefore stand in several rows,
-not only side by side.
+Props stand anywhere in a room, each with a line of flavour shown on hover
+(`src/frontend/src/art/sheets/props.ts`). A sprite's bottom row is where it
+touches the floor, its **base line**. A room draws rugs first, then what hangs on
+the walls, then desks and props sorted by base line, so whatever stands lower on
+the screen is closer to the viewer and covers what is behind it. Desks can
+therefore stand in several rows, not only side by side.
+
+Walls are two tiles tall: the upper tile repeats the panel without the skirting,
+so masks and swords have room to hang.
+
+### Homages
+
+Some furniture and outfits are affectionate homages to games, films and series
+the team loves: a rare dragon lamp, a rare fan, a key-shaped sword, a star-shaped
+fruit, a grinning mask, a long red motorbike, a purple giant robot statue, a heart
+on a pedestal, a sleeping white dog, a twinkling save star, a long black coat, a
+skeleton in a blue hoodie, a soft green pointy hat. They are drawn by us,
+recognisable on purpose, and **never named after their source**: in code, docs
+and hints they have descriptive names and their lines quote or wink without
+naming anything.
 
 ## Colour
 
@@ -97,13 +115,32 @@ Two kinds of palette:
 
 - **Character palette**, the same in every office: outline, eyes, mouth, skin
   tones, hair colours and clothes colours.
-- **Theme palette**, one per office mood: every colour of rooms, floors, walls,
-  furniture and props is named by its meaning (`floor.light`, `wall.shadow`,
-  `wood.mid`, `screen.on`…), and a theme gives each name its real colour. A new
-  mood is a new table of colours, not new drawings. Themes so far: **cozy
-  evening** (warm wood, muted blue-grey walls, amber lights, the default), **late
-  night** (cold greys, blue screens) and **neon** (dark violet, cyan screens, pink
-  trims).
+- **Theme palette**, one per office mood: every colour of rooms, floors, walls and
+  desks is named by its meaning (`floor.light`, `wall.shadow`, `wood.mid`,
+  `screen.on`…), and a theme gives each name its real colour.
+- **Object colours**, the same everywhere: furniture keeps its own colours (a
+  green dragon is green in every office).
+
+A theme is more than colours: it brings its own floor, wall and desk model
+(`src/frontend/src/art/themes.ts`) and the furniture that suits it.
+
+| Theme | Floor | Walls | Desk | Furniture |
+| --- | --- | --- | --- | --- |
+| Cozy evening (default) | wooden planks | blue-grey panels | wood, monitor | rug, bookshelf, lamps, plants |
+| Neon district | metal plates with cyan lights | hexagon panels, hazard stripes, neon line | glass and metal, holographic screen | bike, robot statue, vending machine, servers |
+| Security firm | carpet tiles | white, company stripe, windows with blinds | laminate, phone, stripe | whiteboard, water cooler, fan, plants |
+| Back-room arcade | confetti carpet | bare bricks, graffiti, neon line | folding table, CRT, soda can | arcade cabinets, mask, vending machine |
+
+Floor and wall frames are tile variants, picked by position, so a room is not a
+grid of identical tiles.
+
+### Lights off
+
+Any theme can be shown with the lights off. Everything sinks towards the theme's
+`night` colour, except what glows by itself (screens, neon, lamps, LEDs, flames,
+signals: the `EMISSIVE` names), and every light brings back its surroundings in
+hard-edged rings tinted by its colour: lit monitors, lamps, arcade screens,
+vending machines. Signals always stay readable.
 
 Faces must read on every skin tone: eyes and mouth differ from the light skin
 tone by a **contrast of at least 3:1** (WCAG luminance, not hue), which tests

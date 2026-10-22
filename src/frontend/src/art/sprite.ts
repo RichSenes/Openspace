@@ -1,3 +1,5 @@
+import { EMISSIVE } from './palette'
+
 /**
  * A sprite written as rows of characters, one per pixel. '.' is transparent; every
  * other character is looked up in the legend, which names a colour of a palette.
@@ -15,6 +17,8 @@ export interface Pixel {
   x: number
   y: number
   color: string
+  /** Gives off light, so it keeps its colour in the dark. */
+  glow?: true
 }
 
 /** Turns a palette name into a colour; null leaves the pixel transparent. */
@@ -45,7 +49,9 @@ export function pixelsOf(sprite: SpriteDef, frame: number, resolve: Resolve, dx 
       const ch = row[x]
       if (ch === '.') continue
       const color = resolve(sprite.legend[ch])
-      if (color) pixels.push({ x: dx + x, y: dy + y, color })
+      if (!color) continue
+      const name = sprite.legend[ch]
+      pixels.push(EMISSIVE.has(name) ? { x: dx + x, y: dy + y, color, glow: true } : { x: dx + x, y: dy + y, color })
     }
   })
   return pixels

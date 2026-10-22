@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AGENT_LOOKS, poseOf, type AgentState } from '../art/agentStates'
 import { toCanvas } from '../art/canvas'
-import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, THEMES, type ClothColor, type HairColor, type SkinTone, type ThemeName } from '../art/palette'
-import { scenePixels, type SceneItem } from '../art/scene'
+import { inTheDark } from '../art/lighting'
+import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from '../art/palette'
+import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
 import { ACCESSORIES, FACES, HAIR_STYLES, type Accessory, type Emotion, type HairStyle } from '../art/sheets/character'
 import { PROPS, type PropName } from '../art/sheets/props'
-import { DESK, FLOOR, WALL } from '../art/sheets/room'
 import { SIGNALS, type Signal } from '../art/sheets/signals'
 import { pixelsOf, type Pixel, type SpriteDef } from '../art/sprite'
-import { STATION, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
+import { STATION, stationLights, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
+import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import './lab.css'
 
 const FPS = 5
@@ -44,46 +45,97 @@ function useTick() {
 const PEOPLE: Appearance[] = [
   { skin: 'fair', hair: 'brown', hairStyle: 'short', cloth: 'blue', accessory: 'headset' },
   { skin: 'medium', hair: 'black', hairStyle: 'long', cloth: 'purple', accessory: 'glasses' },
-  { skin: 'tan', hair: 'auburn', hairStyle: 'bun', cloth: 'red' },
+  { skin: 'tan', hair: 'auburn', hairStyle: 'bun', cloth: 'red', outfit: 'hoodie' },
   { skin: 'deep', hair: 'black', hairStyle: 'short', cloth: 'green' },
-  { skin: 'medium', hair: 'blonde', hairStyle: 'long', cloth: 'mustard', accessory: 'glasses' },
-  { skin: 'fair', hair: 'grey', hairStyle: 'bun', cloth: 'grey' },
+  { skin: 'medium', hair: 'blonde', hairStyle: 'long', cloth: 'mustard', outfit: 'coat' },
+  { skin: 'fair', hair: 'grey', hairStyle: 'bun', cloth: 'grey', costume: 'skeleton' },
 ]
 
-/** A sample room: two rows of desks among furniture, everything sorted by depth. */
-function roomPixels(tick: number, theme: ThemeName): { width: number; height: number; pixels: Pixel[] } {
+/** Where each theme's furniture stands in the sample room. */
+const LAYOUTS: Record<ThemeName, { prop: PropName; x: number; y: number }[]> = {
+  cozy: [
+    { prop: 'rug', x: 70, y: 108 },
+    { prop: 'bookshelf', x: 6, y: 6 },
+    { prop: 'keySword', x: 206, y: 0 },
+    { prop: 'floorLamp', x: 186, y: 10 },
+    { prop: 'plant', x: 4, y: 112 },
+    { prop: 'dragonLamp', x: 200, y: 92 },
+    { prop: 'sideTable', x: 172, y: 120 },
+    { prop: 'whiteDog', x: 148, y: 126 },
+  ],
+  neonDistrict: [
+    { prop: 'mechStatue', x: 10, y: 4 },
+    { prop: 'serverRack', x: 182, y: 4 },
+    { prop: 'vendingMachine', x: 202, y: 4 },
+    { prop: 'redBike', x: 172, y: 112 },
+    { prop: 'plant', x: 4, y: 112 },
+    { prop: 'fruitTable', x: 120, y: 120 },
+  ],
+  securityFirm: [
+    { prop: 'whiteboard', x: 6, y: 6 },
+    { prop: 'rareFan', x: 178, y: 14 },
+    { prop: 'waterCooler', x: 194, y: 10 },
+    { prop: 'serverRack', x: 208, y: 4 },
+    { prop: 'plant', x: 4, y: 112 },
+    { prop: 'plant', x: 204, y: 112 },
+    { prop: 'saveStar', x: 120, y: 124 },
+  ],
+  backRoomArcade: [
+    { prop: 'arcadeCabinet', x: 4, y: 4 },
+    { prop: 'arcadeCabinet', x: 22, y: 4 },
+    { prop: 'smileMask', x: 86, y: 6 },
+    { prop: 'serverRack', x: 182, y: 4 },
+    { prop: 'vendingMachine', x: 202, y: 4 },
+    { prop: 'itemPedestal', x: 196, y: 110 },
+    { prop: 'sideTable', x: 110, y: 122 },
+  ],
+}
+
+/** Tile variants: the frame of a floor or wall tile depends on where it lies. */
+const variant = (sprite: SpriteDef, c: number, r: number) => (c * 7 + r * 3) % sprite.frames.length
+
+/**
+ * The upper half of a wall: the tile's cap and panel without its skirting, so walls are
+ * two tiles tall and leave room for what hangs on them.
+ */
+function upperWall(sprite: SpriteDef): SpriteDef {
+  return { ...sprite, frames: sprite.frames.map((rows) => [...rows.slice(0, 10), ...rows.slice(2, 8)]) }
+}
+
+/** A sample room: two rows of desks among the theme's furniture, sorted by depth. */
+function roomPixels(tick: number, name: ThemeName, dark: boolean): { width: number; height: number; pixels: Pixel[] } {
+  const theme: Theme = THEMES[name]
   const cols = 14
   const rows = 7
-  const colors = themeColors(THEMES[theme])
+  const colors = themeColors(theme.colors)
+  const upper = upperWall(theme.wall)
   const floor: Pixel[] = []
-  for (let c = 0; c < cols; c++) floor.push(...pixelsOf(WALL, 0, colors, c * 16, 0))
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) floor.push(...pixelsOf(FLOOR, 0, colors, c * 16, 16 + r * 16))
-
-  const prop = (name: PropName, x: number, y: number): SceneItem => {
-    const sprite = PROPS[name]
-    return { x, y, height: sprite.height, pixels: pixelsOf(sprite, Math.floor(tick / 3), colors) }
+  for (let c = 0; c < cols; c++) {
+    floor.push(...pixelsOf(upper, variant(upper, c, 0), colors, c * 16, 0))
+    floor.push(...pixelsOf(theme.wall, variant(theme.wall, c, 1), colors, c * 16, 16))
   }
-  const desk = (who: number, state: AgentState, x: number, y: number): SceneItem => ({
-    x,
-    y,
-    height: STATION.height,
-    pixels: stationPixels(PEOPLE[who], poseOf(state, tick + who * 7), THEMES[theme]),
-  })
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) floor.push(...pixelsOf(theme.floor, variant(theme.floor, c, r), colors, c * 16, 32 + r * 16))
+
+  const desk = (who: number, state: AgentState, x: number, y: number): SceneItem => {
+    const pose = poseOf(state, tick + who * 7)
+    return { x, y, height: STATION.height, pixels: stationPixels(PEOPLE[who], pose, theme), lights: stationLights(pose, theme) }
+  }
   const items: SceneItem[] = [
-    prop('whiteboard', 8, 2),
-    prop('serverRack', 200, 0),
-    prop('floorLamp', 184, 6),
-    desk(0, 'working', 52, 4),
-    desk(1, 'reading', 98, 4),
-    desk(2, 'waiting', 144, 4),
-    desk(3, 'done', 30, 50),
-    desk(4, 'failed', 76, 50),
-    desk(5, 'queued', 122, 50),
-    prop('plant', 4, 100),
-    prop('plant', 204, 64),
-    prop('sideTable', 176, 102),
+    ...LAYOUTS[name].map(({ prop, x, y }): SceneItem => {
+      const { sprite, lights, layer } = PROPS[prop]
+      const resolved = (lights ?? []).map((l) => ({ ...l, color: colors(l.color) ?? '#ffffff' }))
+      return { x, y, height: sprite.height, pixels: pixelsOf(sprite, Math.floor(tick / 2), colors), lights: resolved, layer }
+    }),
+    desk(0, 'working', 52, 20),
+    desk(1, 'reading', 98, 20),
+    desk(2, 'waiting', 144, 20),
+    desk(3, 'done', 30, 64),
+    desk(4, 'failed', 76, 64),
+    desk(5, 'queued', 122, 64),
   ]
-  return { width: cols * 16, height: 16 + rows * 16, pixels: [...floor, ...scenePixels(items)] }
+  const pixels = [...floor, ...scenePixels(items)]
+  return { width: cols * 16, height: 32 + rows * 16, pixels: dark ? inTheDark(pixels, sceneLights(items), theme.colors.night) : pixels }
 }
 
 /**
@@ -93,9 +145,11 @@ function roomPixels(tick: number, theme: ThemeName): { width: number; height: nu
 export function SpriteLab() {
   const tick = useTick()
   const [scale, setScale] = useState(4)
-  const [theme, setTheme] = useState<ThemeName>('cozy')
+  const [themeName, setThemeName] = useState<ThemeName>('cozy')
+  const [dark, setDark] = useState(false)
   const [hairStyle, setHairStyle] = useState<HairStyle>('short')
-  const room = useMemo(() => roomPixels(tick, theme), [tick, theme])
+  const room = useMemo(() => roomPixels(tick, themeName, dark), [tick, themeName, dark])
+  const theme = THEMES[themeName]
   const small = Math.max(2, scale - 1)
 
   const combos: Appearance[] = useMemo(() => {
@@ -105,13 +159,19 @@ export function SpriteLab() {
     return skins.map((skin, i) => ({ skin, hair: hairs[i % hairs.length], hairStyle, cloth: cloths[i % cloths.length] }))
   }, [hairStyle])
 
-  const pieces: { sprite: SpriteDef; screen?: ScreenState }[] = [
-    { sprite: FLOOR },
-    { sprite: WALL },
-    { sprite: DESK, screen: 'off' },
-    { sprite: DESK, screen: 'on' },
-    { sprite: DESK, screen: 'alert' },
-    ...Object.values(PROPS).map((sprite) => ({ sprite })),
+  const pieces: { sprite: SpriteDef; frame?: number; screen?: ScreenState }[] = [
+    ...theme.floor.frames.map((_, frame) => ({ sprite: theme.floor, frame })),
+    ...theme.wall.frames.map((_, frame) => ({ sprite: theme.wall, frame })),
+    { sprite: theme.desk, screen: 'off' },
+    { sprite: theme.desk, screen: 'on' },
+    { sprite: theme.desk, screen: 'alert' },
+  ]
+  const looks: { label: string; look: Appearance }[] = [
+    { label: 'shirt', look: { ...combos[0] } },
+    { label: 'hoodie', look: { ...combos[1], cloth: 'black', outfit: 'hoodie' } },
+    { label: 'coat', look: { ...combos[2], outfit: 'coat' } },
+    { label: 'skeleton', look: { ...combos[3], costume: 'skeleton' } },
+    { label: 'pointy hat', look: { ...combos[0], cloth: 'green', accessory: 'pointyHat' } },
   ]
 
   return (
@@ -130,12 +190,19 @@ export function SpriteLab() {
         </label>
         <label>
           Theme{' '}
-          <select className="input" value={theme} onChange={(e) => setTheme(e.target.value as ThemeName)}>
-            {Object.keys(THEMES).map((t) => (
+          <select className="input" value={themeName} onChange={(e) => setThemeName(e.target.value as ThemeName)}>
+            {(Object.keys(THEMES) as ThemeName[]).map((t) => (
               <option key={t} value={t}>
-                {t}
+                {THEMES[t].label}
               </option>
             ))}
+          </select>
+        </label>
+        <label>
+          Lights{' '}
+          <select className="input" value={dark ? 'off' : 'on'} onChange={(e) => setDark(e.target.value === 'off')}>
+            <option value="on">on</option>
+            <option value="off">off</option>
           </select>
         </label>
         <label>
@@ -163,7 +230,7 @@ export function SpriteLab() {
               <Pixels
                 width={STATION.width}
                 height={STATION.height}
-                pixels={stationPixels(PEOPLE[i % PEOPLE.length], poseOf(state, tick + i * 3), THEMES[theme])}
+                pixels={stationPixels(PEOPLE[i % PEOPLE.length], poseOf(state, tick + i * 3), theme)}
                 scale={small}
                 label={state}
               />
@@ -181,7 +248,7 @@ export function SpriteLab() {
               {[...EMOTIONS, 'blink' as const].map((emotion) => (
                 <figure key={emotion}>
                   <Station
-                    pixels={stationPixels(look, { emotion, gesture: 'rest', frame: 0, screen: 'on' }, THEMES[theme])}
+                    pixels={stationPixels(look, { emotion, gesture: 'rest', frame: 0, screen: 'on' }, theme)}
                     scale={small}
                     label={`${look.skin} ${emotion}`}
                   />
@@ -194,6 +261,18 @@ export function SpriteLab() {
       </section>
 
       <section>
+        <h2>Outfits and costumes</h2>
+        <div className="lab-pieces">
+          {looks.map(({ label, look }, i) => (
+            <figure key={label}>
+              <Station pixels={stationPixels(look, poseOf(i % 2 ? 'working' : 'idle', tick + i * 5), theme)} scale={small} label={label} />
+              <figcaption>{label}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
         <h2>Accessories</h2>
         <div className="lab-grid" style={{ gridTemplateColumns: `repeat(${combos.length}, auto)` }}>
           {(Object.keys(ACCESSORIES) as Accessory[]).map((accessory) => (
@@ -201,7 +280,7 @@ export function SpriteLab() {
               {combos.map((look) => (
                 <figure key={look.skin}>
                   <Station
-                    pixels={stationPixels({ ...look, accessory }, { emotion: 'neutral', gesture: 'rest', frame: 0, screen: 'on' }, THEMES[theme])}
+                    pixels={stationPixels({ ...look, accessory }, { emotion: 'neutral', gesture: 'rest', frame: 0, screen: 'on' }, theme)}
                     scale={small}
                     label={`${look.skin} ${accessory}`}
                   />
@@ -221,7 +300,7 @@ export function SpriteLab() {
               <Pixels
                 width={STATION.width}
                 height={STATION.height}
-                pixels={stationPixels(combos[i % combos.length], poseOf('idle', tick, signal), THEMES[theme])}
+                pixels={stationPixels(combos[i % combos.length], poseOf('idle', tick, signal), theme)}
                 scale={small}
                 label={signal}
               />
@@ -232,14 +311,35 @@ export function SpriteLab() {
       </section>
 
       <section>
-        <h2>Pieces</h2>
+        <h2>Furniture (hover for its line)</h2>
         <div className="lab-pieces">
-          {pieces.map(({ sprite, screen }, i) => (
+          {(Object.keys(PROPS) as PropName[]).map((name) => {
+            const { sprite, hint } = PROPS[name]
+            return (
+              <figure key={name} title={hint}>
+                <Pixels
+                  width={sprite.width}
+                  height={sprite.height}
+                  pixels={pixelsOf(sprite, Math.floor(tick / 2), themeColors(theme.colors))}
+                  scale={scale}
+                  label={hint}
+                />
+                <figcaption>{sprite.name}</figcaption>
+              </figure>
+            )
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2>Pieces of the theme</h2>
+        <div className="lab-pieces">
+          {pieces.map(({ sprite, frame, screen }, i) => (
             <figure key={i}>
               <Pixels
                 width={sprite.width}
                 height={sprite.height}
-                pixels={pixelsOf(sprite, Math.floor(tick / 3), themeColors(THEMES[theme], screen))}
+                pixels={pixelsOf(sprite, frame ?? 0, themeColors(theme.colors, screen))}
                 scale={scale + 2}
                 label={sprite.name}
               />

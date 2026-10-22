@@ -1,8 +1,9 @@
-import { CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type Theme } from './palette'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, type Accessory, type Emotion, type HairStyle } from './sheets/character'
-import { DESK } from './sheets/room'
+import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
+import type { Light } from './lighting'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, OUTFITS, SKELETON, type Accessory, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
 import { pixelsOf, type Pixel, type Resolve, type SpriteDef } from './sprite'
+import type { Theme } from './themes'
 
 /** How the agent at a desk looks. */
 export interface Appearance {
@@ -12,6 +13,10 @@ export interface Appearance {
   cloth: ClothColor
   /** Glasses, a headset…: usually given by the role. */
   accessory?: Accessory
+  /** A hoodie or a long coat instead of the plain shirt. */
+  outfit?: Outfit
+  /** Replaces head, hair and clothes: for the special agents. */
+  costume?: 'skeleton'
 }
 
 export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'relax' | 'stuck'
@@ -48,9 +53,10 @@ export const STATION = { width: 32, height: 46, deskY: 25 } as const
 
 /** Colours of a character: shared names, plus the tones of this appearance. */
 export function characterColors(look: Appearance): Resolve {
-  const [skinLight, skinMid, skinShadow] = SKIN_TONES[look.skin]
+  const [skinLight, skinMid, skinShadow] = look.costume === 'skeleton' ? BONE : SKIN_TONES[look.skin]
   const [hairBase, hairShade] = HAIR_COLORS[look.hair]
-  const [clothLight, clothMid, clothDark] = CLOTH_COLORS[look.cloth]
+  // The skeleton always wears its blue hoodie.
+  const [clothLight, clothMid, clothDark] = CLOTH_COLORS[look.costume === 'skeleton' ? 'blue' : look.cloth]
   const colors: Record<string, string> = {
     ...CHARACTER_COLORS,
     mouth: MOUTHS[look.skin],
@@ -71,12 +77,12 @@ export function characterColors(look: Appearance): Resolve {
  * the desk follow the desk's state; with the screen off there is no halo and the desk
  * top keeps its wood.
  */
-export function themeColors(theme: Theme, screen: ScreenState = 'off'): Resolve {
+export function themeColors(theme: ThemeColors, screen: ScreenState = 'off'): Resolve {
   return (name) => {
     if (name === 'screen') return theme[`screen.${screen}`]
     if (name === 'glow') return screen === 'off' ? null : theme[`glow.${screen}`]
     if (name === 'spill') return screen === 'off' ? theme['wood.light'] : theme[`spill.${screen}`]
-    return (theme as Record<string, string>)[name] ?? (SIGNAL_COLORS as Record<string, string>)[name] ?? null
+    return (theme as Record<string, string>)[name] ?? OBJECT_COLORS[name] ?? (SIGNAL_COLORS as Record<string, string>)[name] ?? null
   }
 }
 
@@ -93,10 +99,21 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const cx = 8
   const cy = STATION.deskY - 14
   const { arms, hands } = GESTURE_PARTS[pose.gesture]
-  const layers = [BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle], look.accessory && ACCESSORIES[look.accessory], arms]
+  const closed = pose.emotion === 'blink' || pose.emotion === 'asleep'
+  const self =
+    look.costume === 'skeleton'
+      ? [SKELETON.body, closed ? SKELETON.closed : SKELETON.open]
+      : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
+  const layers = [...self, look.accessory && ACCESSORIES[look.accessory], arms]
   const behind = layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))
-  const desk = pixelsOf(DESK, 0, themeColors(theme, pose.screen), 0, STATION.deskY)
+  const desk = pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY)
   const front = hands ? pixelsOf(hands, pose.frame, person, cx, cy) : []
-  const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme), cx + 8, cy - 11) : []
+  const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme.colors), cx + 8, cy - 11) : []
   return [...behind, ...desk, ...front, ...signal]
+}
+
+/** The light a desk's screen casts while it is on, in the station's own pixels. */
+export function stationLights(pose: StationPose, theme: Theme): Light[] {
+  if (pose.screen === 'off') return []
+  return [{ x: 12, y: STATION.deskY + 3, radius: 26, color: theme.colors[`screen.${pose.screen}`] }]
 }

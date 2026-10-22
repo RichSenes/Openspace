@@ -10,7 +10,7 @@ import type {
   ReportView,
   RoleInput,
   RoleView,
-  RoomLayoutRequest,
+  FloorPlanRequest,
   WorkTaskView,
 } from './types'
 
@@ -133,13 +133,11 @@ export function useSetOfficeTheme(officeId: string) {
   return useWrite((theme: string) => request<void>('PUT', `/api/offices/${officeId}/theme`, { theme }), keys.offices)
 }
 
-/** Saves how a room is arranged; 'auto' gives it back to the automatic layout. */
-export function useArrangeRoom(officeId: string) {
+/** Saves the building drawn by hand; 'auto' gives the whole office back to the automatic layout. */
+export function useSaveFloorPlan(officeId: string) {
   return useWrite(
-    ({ roomId, layout }: { roomId: string; layout: RoomLayoutRequest | 'auto' }) =>
-      layout === 'auto'
-        ? request<void>('DELETE', `/api/offices/${officeId}/rooms/${roomId}/layout`)
-        : request<void>('PUT', `/api/offices/${officeId}/rooms/${roomId}/layout`, layout),
+    (plan: FloorPlanRequest | 'auto') =>
+      plan === 'auto' ? request<void>('DELETE', `/api/offices/${officeId}/plan`) : request<void>('PUT', `/api/offices/${officeId}/plan`, plan),
     keys.offices,
   )
 }

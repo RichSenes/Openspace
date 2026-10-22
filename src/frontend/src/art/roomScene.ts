@@ -20,7 +20,7 @@ const variant = (sprite: SpriteDef, c: number, r: number) => (c * 7 + r * 3) % s
  * The upper half of a wall: the tile's cap and panel without its skirting, so walls are
  * two tiles tall and leave room for what hangs on them.
  */
-function upperWall(sprite: SpriteDef): SpriteDef {
+export function upperWall(sprite: SpriteDef): SpriteDef {
   return { ...sprite, frames: sprite.frames.map((rows) => [...rows.slice(0, 10), ...rows.slice(2, 8)]) }
 }
 

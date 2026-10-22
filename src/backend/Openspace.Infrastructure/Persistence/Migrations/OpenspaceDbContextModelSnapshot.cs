@@ -22,6 +22,12 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("FloorDepth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("FloorWidth")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -235,6 +241,35 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Openspace.Domain.Offices.Office", b =>
                 {
+                    b.OwnsMany("Openspace.Domain.Offices.FurniturePiece", "Furniture", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.Property<Guid>("OfficeId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("X")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("Y")
+                                .HasColumnType("INTEGER");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("OfficeId");
+
+                            b1.ToTable("CommonFurniture", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("OfficeId");
+                        });
+
                     b.OwnsMany("Openspace.Domain.Offices.Room", "Rooms", b1 =>
                         {
                             b1.Property<Guid>("Id")
@@ -245,6 +280,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .HasColumnType("TEXT");
 
                             b1.Property<int?>("Depth")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int?>("Left")
                                 .HasColumnType("INTEGER");
 
                             b1.Property<string>("Name")
@@ -258,8 +296,15 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .IsRequired()
                                 .HasColumnType("TEXT");
 
+                            b1.Property<int?>("Top")
+                                .HasColumnType("INTEGER");
+
                             b1.Property<int?>("Width")
                                 .HasColumnType("INTEGER");
+
+                            b1.PrimitiveCollection<string>("Windows")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
 
                             b1.HasKey("Id");
 
@@ -343,6 +388,28 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                     b2.Navigation("Spot");
                                 });
 
+                            b1.OwnsOne("Openspace.Domain.Offices.DoorPlacement", "Door", b2 =>
+                                {
+                                    b2.Property<Guid>("RoomId")
+                                        .HasColumnType("TEXT");
+
+                                    b2.Property<int>("Offset")
+                                        .HasColumnType("INTEGER")
+                                        .HasColumnName("DoorOffset");
+
+                                    b2.Property<string>("Wall")
+                                        .IsRequired()
+                                        .HasColumnType("TEXT")
+                                        .HasColumnName("DoorWall");
+
+                                    b2.HasKey("RoomId");
+
+                                    b2.ToTable("Rooms");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("RoomId");
+                                });
+
                             b1.OwnsMany("Openspace.Domain.Offices.FurniturePiece", "Furniture", b2 =>
                                 {
                                     b2.Property<int>("Id")
@@ -374,8 +441,12 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
                             b1.Navigation("Desks");
 
+                            b1.Navigation("Door");
+
                             b1.Navigation("Furniture");
                         });
+
+                    b.Navigation("Furniture");
 
                     b.Navigation("Rooms");
                 });

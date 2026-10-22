@@ -77,6 +77,22 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Saves the building drawn by hand: its size, its rooms and the common floor.</summary>
+    public async Task PlanFloorAsync(OfficeId officeId, FloorPlan plan, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.PlanFloor(plan, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Goes back to the automatic building.</summary>
+    public async Task ClearFloorPlanAsync(OfficeId officeId, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.ClearFloorPlan(clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task RenameDeskAsync(OfficeId officeId, DeskId deskId, string name, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

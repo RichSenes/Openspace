@@ -27,6 +27,14 @@ export interface FurniturePiece {
   y: number
 }
 
+export type WallSide = 'Front' | 'Back' | 'Left' | 'Right'
+
+/** A room's door: its wall and how many tiles from the start of it, left or back, it opens. */
+export interface DoorPlacement {
+  wall: WallSide
+  offset: number
+}
+
 export interface RoomView {
   id: string
   name: string
@@ -37,6 +45,13 @@ export interface RoomView {
   width?: number | null
   depth?: number | null
   furniture?: FurniturePiece[]
+  /** Null for the middle of the front wall. */
+  door?: DoorPlacement | null
+  /** Windows of the back wall, by the pixel where each starts. */
+  windows?: number[]
+  /** The back left corner in tiles from the building's; null until the floor is drawn by hand. */
+  left?: number | null
+  top?: number | null
 }
 
 export interface ProcedureStepView {
@@ -53,6 +68,11 @@ export interface OfficeView {
   /** The mood it is drawn with; unknown names fall back to the default. */
   theme: string
   rooms: RoomView[]
+  /** The building's size in tiles; null while it is laid out automatically. */
+  floorWidth?: number | null
+  floorDepth?: number | null
+  /** The common floor's furniture, in pixels from the building's corner. */
+  furniture?: FurniturePiece[]
 }
 
 export interface TaskNoteView {
@@ -157,4 +177,14 @@ export interface RoomLayoutRequest {
   depth: number
   desks: { deskId: string; x: number; y: number }[]
   furniture: FurniturePiece[]
+  door: DoorPlacement
+  windows: number[]
+}
+
+/** The building drawn by hand, as the API takes it. */
+export interface FloorPlanRequest {
+  width: number
+  depth: number
+  furniture: FurniturePiece[]
+  rooms: { roomId: string; left: number; top: number; layout: RoomLayoutRequest }[]
 }

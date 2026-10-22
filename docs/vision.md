@@ -97,7 +97,13 @@ Later, in rough order of appearance:
 - ~~**One building.**~~ Done: an office is drawn as one building. Rooms of a row
   share their walls and open through a door onto the corridor in front of them;
   whatever is not a room is common floor, furnished from the theme's corridor list
-  (water cooler, vending machine, plants…). Corridor furniture is not editable yet.
+  (water cooler, vending machine, plants…).
+- ~~**Floor plans.**~~ Done: in Arrange the building keeps the size you give it and
+  never follows the screen; rooms are dragged by their back wall anywhere they fit,
+  doors slide along any wall (shared walls and outer walls open too), the common
+  floor is furnished by hand, and windows in back walls show the sky for the hour
+  of the day on an outer wall, or whatever stands behind an inner one.
+- **Shapes other than rectangles** (L, T, courtyards) for the building.
 - **Agents dressed by hand.** Outfits, costumes and accessories chosen per desk or
   per role instead of derived from the desk id.
 - **The city.** A map of the town where each office is a building (a house, a

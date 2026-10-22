@@ -119,6 +119,50 @@ public sealed class ApiTests : IDisposable
         Assert.Empty(cleared.Furniture);
     }
 
+    private sealed record Door(string Wall, int Offset);
+
+    private sealed record PlannedRoom(int? Left, int? Top, Door? Door, List<int> Windows);
+
+    private sealed record PlannedOffice(int? FloorWidth, int? FloorDepth, List<Piece> Furniture, List<PlannedRoom> Rooms);
+
+    [Fact]
+    public async Task An_office_floor_can_be_drawn_by_hand_and_given_back()
+    {
+        var (officeId, roomId, deskId) = await FurnishAsync();
+        var url = $"/api/offices/{officeId}/plan";
+        object Plan(int left) => new
+        {
+            width = 20,
+            depth = 12,
+            furniture = new[] { new { name = "waterCooler", x = 200, y = 150 } },
+            rooms = new[]
+            {
+                new
+                {
+                    roomId,
+                    left,
+                    top = 1,
+                    layout = new { width = 8, depth = 4, desks = new[] { new { deskId, x = 20, y = 20 } }, door = new { wall = "Back", offset = 3 }, windows = new[] { 16 } },
+                },
+            },
+        };
+
+        var put = await _http.PutAsJsonAsync(url, Plan(2));
+        var planned = await GetAsync<PlannedOffice>($"/api/offices/{officeId}");
+        var outside = await _http.PutAsJsonAsync(url, Plan(15));
+        (await _http.DeleteAsync(url)).EnsureSuccessStatusCode();
+        var cleared = await GetAsync<PlannedOffice>($"/api/offices/{officeId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        Assert.Equal((20, 12), (planned.FloorWidth, planned.FloorDepth));
+        Assert.Equal(new Piece("waterCooler", 200, 150), Assert.Single(planned.Furniture));
+        var room = Assert.Single(planned.Rooms);
+        Assert.Equal((2, 1, new Door("Back", 3)), (room.Left, room.Top, room.Door));
+        Assert.Equal([16], room.Windows);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, outside.StatusCode);
+        Assert.Equal(((int?)null, (int?)null), (cleared.FloorWidth, Assert.Single(cleared.Rooms).Left));
+    }
+
     [Fact]
     public async Task A_task_goes_from_queue_to_discarded_with_notes_by_the_operator()
     {

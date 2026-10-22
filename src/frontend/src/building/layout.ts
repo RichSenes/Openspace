@@ -1,9 +1,9 @@
-import type { OfficeView, RoomView } from '../api/types'
+import type { DoorPlacement, OfficeView, RoomView, WallSide } from '../api/types'
 import { FURNITURE } from '../art/fanPack'
-import { themeOf } from '../art/themes'
 import { TILE } from '../art/roomScene'
-import { STATION } from '../art/station'
 import type { PropName } from '../art/sheets/props'
+import { STATION } from '../art/station'
+import { themeOf } from '../art/themes'
 
 export { TILE }
 
@@ -12,8 +12,8 @@ const SLOT = 3 // tiles of floor per desk, side by side and front to back
 const MIN_INNER = 8 // an empty room is still a room
 export const WALL = 2 // tiles of back wall
 const HALL = 3 // tiles of corridor in front of each row of rooms
-const OUT = 1 // tiles of ground around the building
-const DOOR = 2 // tiles of doorway in a room's front wall
+export const OUT = 1 // tiles of ground around the building
+export const DOOR = 2 // tiles of doorway
 const HALL_SPACING = 6 // tiles between things standing in a corridor
 
 /** A desk, in world pixels: where its station's top left corner goes. */
@@ -24,11 +24,20 @@ export interface DeskSpot {
   y: number
 }
 
-/** A piece of furniture, in pixels from the room's top left corner. */
+/** A piece of furniture, in pixels from the top left corner of its room or of the building. */
 export interface PropSpot {
   name: PropName
   x: number
   y: number
+}
+
+/** A doorway, in world pixels: where it starts on its wall and how long it is. */
+export interface Door {
+  roomId: string
+  wall: WallSide
+  x: number
+  y: number
+  length: number
 }
 
 /** A room, in tiles. */
@@ -41,24 +50,21 @@ export interface RoomBox {
   height: number
   desks: DeskSpot[]
   props: PropSpot[]
+  door: DoorPlacement
+  /** Windows of the back wall, by the pixel where each starts from the room's left. */
+  windows: number[]
 }
 
-/** A gap in a room's front wall onto the corridor, in world pixels. */
-export interface Door {
-  roomId: string
-  x: number
-  y: number
-  width: number
-}
-
-/** The building: rooms joined wall to wall, with corridors in front of each row. */
+/** The building: rooms joined wall to wall, and common floor everywhere else. */
 export interface BuildingLayout {
   rooms: RoomBox[]
   /** The building's walls, in tiles: everything inside that is not a room is common floor. */
   floor: { x: number; y: number; width: number; height: number }
   doors: Door[]
-  /** What stands in the corridors, in world pixels. */
+  /** What stands on the common floor, in world pixels. */
   hall: PropSpot[]
+  /** Whether the building was drawn by hand: then it never moves by itself. */
+  planned: boolean
   /** The whole picture, ground around the building included, in tiles. */
   width: number
   height: number
@@ -82,17 +88,19 @@ function deskSpots(room: RoomView, firstColumn: number): Map<string, { x: number
     if (desk.spot) continue
     let spot
     do {
-      spot = {
-        // Centred in its slot; the first row leans on the wall, heads in front of it.
-        x: (firstColumn + (slot % PER_ROW) * SLOT) * TILE + (SLOT * TILE - STATION.width) / 2,
-        y: WALL * TILE - 12 + Math.floor(slot / PER_ROW) * SLOT * TILE,
-      }
+      spot = autoSlot(slot, firstColumn)
       slot++
     } while (placed.some((p) => overlaps(p, spot!)))
     spots.set(desk.id, spot)
   }
   return spots
 }
+
+/** The n-th desk slot of a room: rows of four, the first leaning on the wall, heads in front of it. */
+export const autoSlot = (slot: number, firstColumn = 1) => ({
+  x: (firstColumn + (slot % PER_ROW) * SLOT) * TILE + (SLOT * TILE - STATION.width) / 2,
+  y: WALL * TILE - 12 + Math.floor(slot / PER_ROW) * SLOT * TILE,
+})
 
 /** A room's size in tiles: as arranged, or grown with its desks. */
 function sizeOf(room: RoomView): { width: number; height: number; firstColumn: number } {
@@ -103,64 +111,110 @@ function sizeOf(room: RoomView): { width: number; height: number; firstColumn: n
   return { width: inner + 2, height: WALL + deskRows * SLOT + 1, firstColumn: 1 + Math.floor((inner - columns * SLOT) / 2) }
 }
 
+/** The middle of the front wall, where a door goes unless it is moved. */
+export const defaultDoor = (width: number): DoorPlacement => ({ wall: 'Front', offset: Math.floor((width - DOOR) / 2) })
+
+/** A room's contents at a place, in tiles. */
+function boxOf(room: RoomView, x: number, y: number): RoomBox {
+  const { width, height, firstColumn } = sizeOf(room)
+  const spots = deskSpots(room, firstColumn)
+  const arranged = Boolean(room.width && room.depth)
+  return {
+    id: room.id,
+    name: room.name,
+    x,
+    y,
+    width,
+    height,
+    desks: room.desks.map((d) => ({ id: d.id, name: d.name, x: x * TILE + spots.get(d.id)!.x, y: y * TILE + spots.get(d.id)!.y })),
+    props: arranged
+      ? (room.furniture ?? []).filter((p) => isProp(p.name)).map((p) => ({ ...p, name: p.name as PropName }))
+      : [{ name: 'plant', x: width * TILE - 18, y: height * TILE - 26 }],
+    door: room.door ?? defaultDoor(width),
+    windows: room.windows ?? [],
+  }
+}
+
+/** Where a room's door opens, in world pixels. */
+export function doorOf(room: RoomBox): Door {
+  const { wall, offset } = room.door
+  const along = (wall === 'Left' || wall === 'Right' ? WALL + offset : offset) * TILE
+  const [left, top] = [room.x * TILE, room.y * TILE]
+  const [right, bottom] = [left + room.width * TILE, top + room.height * TILE]
+  const at = { Front: [left + along, bottom], Back: [left + along, top], Left: [left, top + along], Right: [right, top + along] }[wall]
+  return { roomId: room.id, wall, x: at[0], y: at[1], length: DOOR * TILE }
+}
+
 /**
- * Lays the office out as one building, in tiles: rooms side by side sharing their walls,
- * wrapping into a new row when a row would exceed maxWidth, and a corridor in front of
- * each row that every room opens onto. Rooms arranged by hand keep their size, desks and
- * furniture; the others grow with their desks and get a plant in their front corner.
+ * Lays the office out as one building, in tiles. Drawn by hand, it keeps its size and
+ * every room stays where it was put; rooms without a place yet take the first free one.
+ * Otherwise rooms stand side by side sharing their walls, in rows of about the square
+ * root of their number, with a corridor in front of each row. Never the screen's size:
+ * the building is the same on every screen.
  */
-export function layoutOffice(office: OfficeView, maxWidth: number): BuildingLayout {
+export function layoutOffice(office: OfficeView, perRow = Math.ceil(Math.sqrt(office.rooms.length))): BuildingLayout {
+  return office.floorWidth && office.floorDepth ? plannedLayout(office) : automaticLayout(office, perRow)
+}
+
+function plannedLayout(office: OfficeView): BuildingLayout {
+  const floor = { x: OUT, y: OUT, width: office.floorWidth!, height: office.floorDepth! }
+  const rooms: RoomBox[] = []
+  const waiting: RoomView[] = []
+  for (const room of office.rooms) {
+    if (room.left != null && room.top != null) rooms.push(boxOf(room, OUT + room.left, OUT + room.top))
+    else waiting.push(room)
+  }
+  for (const room of waiting) {
+    const { width, height } = sizeOf(room)
+    const spot = freeSpot(rooms, floor, width, height) ?? { x: floor.x, y: floor.y + floor.height }
+    floor.height = Math.max(floor.height, spot.y + height - floor.y)
+    rooms.push(boxOf(room, spot.x, spot.y))
+  }
+  const hall = (office.furniture ?? [])
+    .filter((p) => isProp(p.name))
+    .map((p) => ({ name: p.name as PropName, x: p.x + floor.x * TILE, y: p.y + floor.y * TILE }))
+  return { rooms, floor, doors: rooms.map(doorOf), hall, planned: true, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
+}
+
+/** The first place on the floor, back to front and left to right, where a room fits. */
+export function freeSpot(
+  rooms: readonly { x: number; y: number; width: number; height: number }[],
+  floor: BuildingLayout['floor'],
+  width: number,
+  height: number,
+): { x: number; y: number } | undefined {
+  for (let y = floor.y; y + height <= floor.y + floor.height; y++)
+    for (let x = floor.x; x + width <= floor.x + floor.width; x++)
+      if (!rooms.some((r) => x < r.x + r.width && r.x < x + width && y < r.y + r.height && r.y < y + height)) return { x, y }
+  return undefined
+}
+
+function automaticLayout(office: OfficeView, perRow: number): BuildingLayout {
   const rooms: RoomBox[] = []
   const rows: { y: number; height: number; rooms: RoomBox[] }[] = []
-  let x = OUT
   let y = OUT
-  let row: (typeof rows)[number] | undefined
-
-  for (const room of office.rooms) {
-    const { width: roomWidth, height: roomHeight, firstColumn } = sizeOf(room)
-    if (row && x > OUT && x + roomWidth + OUT > maxWidth) {
-      x = OUT
-      y += row.height + HALL
-      row = undefined
+  office.rooms.forEach((room, i) => {
+    if (i % Math.max(1, perRow) === 0) {
+      const previous = rows[rows.length - 1]
+      if (previous) y += previous.height + HALL
+      rows.push({ y, height: 0, rooms: [] })
     }
-    if (!row) {
-      row = { y, height: 0, rooms: [] }
-      rows.push(row)
-    }
-
-    const spots = deskSpots(room, firstColumn)
-    const arranged = Boolean(room.width && room.depth)
-    const box: RoomBox = {
-      id: room.id,
-      name: room.name,
-      x,
-      y,
-      width: roomWidth,
-      height: roomHeight,
-      desks: room.desks.map((d) => ({ id: d.id, name: d.name, x: x * TILE + spots.get(d.id)!.x, y: y * TILE + spots.get(d.id)!.y })),
-      props: arranged
-        ? (room.furniture ?? []).filter((p) => isProp(p.name)).map((p) => ({ ...p, name: p.name as PropName }))
-        : [{ name: 'plant', x: roomWidth * TILE - 18, y: roomHeight * TILE - 26 }],
-    }
+    const row = rows[rows.length - 1]
+    const last = row.rooms[row.rooms.length - 1]
+    const box = boxOf(room, last ? last.x + last.width : OUT, y)
     rooms.push(box)
     row.rooms.push(box)
-    row.height = Math.max(row.height, roomHeight)
-    x += roomWidth
-  }
+    row.height = Math.max(row.height, box.height)
+  })
 
-  if (rooms.length === 0) return { rooms, floor: { x: 0, y: 0, width: 0, height: 0 }, doors: [], hall: [], width: 0, height: 0 }
+  if (rooms.length === 0) return { rooms, floor: { x: 0, y: 0, width: 0, height: 0 }, doors: [], hall: [], planned: false, width: 0, height: 0 }
 
   const inside = Math.max(...rooms.map((r) => r.x + r.width)) - OUT
   const last = rows[rows.length - 1]
   const floor = { x: OUT, y: OUT, width: inside, height: last.y + last.height + HALL - OUT }
-  const doors = rooms.map((r) => ({
-    roomId: r.id,
-    x: (r.x + Math.floor((r.width - DOOR) / 2)) * TILE,
-    y: (r.y + r.height) * TILE,
-    width: DOOR * TILE,
-  }))
+  const doors = rooms.map(doorOf)
   const hall = rows.flatMap((r) => hallFurniture(office.theme, r.y + r.height, floor, doors.filter((d) => r.rooms.some((b) => b.id === d.roomId))))
-  return { rooms, floor, doors, hall, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
+  return { rooms, floor, doors, hall, planned: false, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
 }
 
 /**
@@ -176,7 +230,7 @@ function hallFurniture(theme: string, rowBottom: number, floor: BuildingLayout['
   while (names.length > 0 && x < end) {
     const name = names[spots.length % names.length]
     const { sprite } = FURNITURE[name]
-    const blocked = doors.some((d) => x < d.x + d.width + 4 && x + sprite.width > d.x - 4)
+    const blocked = doors.some((d) => x < d.x + d.length + 4 && x + sprite.width > d.x - 4)
     if (x + sprite.width > end) break
     if (blocked) {
       x += TILE / 2
@@ -188,34 +242,3 @@ function hallFurniture(theme: string, rowBottom: number, floor: BuildingLayout['
   }
   return spots
 }
-
-/** Largest whole-number zoom that fits, so pixel art stays crisp; below 1 only when it must. */
-export function fitScale(content: { width: number; height: number }, viewport: { width: number; height: number }): number {
-  if (content.width === 0 || content.height === 0) return 1
-  const exact = Math.min(viewport.width / content.width, viewport.height / content.height)
-  return exact >= 1 ? Math.min(4, Math.floor(exact)) : exact
-}
-
-/**
- * Tries every row width from "all rooms in one row" down to "one room per row"
- * and keeps the arrangement that can be drawn biggest in the viewport.
- */
-export function bestLayout(
-  office: OfficeView,
-  viewport: { width: number; height: number },
-): { layout: BuildingLayout; scale: number } {
-  const single = layoutOffice(office, Number.MAX_SAFE_INTEGER)
-  let best = { layout: single, scale: fitScale(pixels(single), viewport) }
-
-  for (let maxWidth = single.width - 1; maxWidth > 0; maxWidth--) {
-    const layout = layoutOffice(office, maxWidth)
-    if (layout.width >= best.layout.width && layout.height === best.layout.height) continue
-    const scale = fitScale(pixels(layout), viewport)
-    if (scale > best.scale) best = { layout, scale }
-    if (layout.rooms.every((r) => r.x === layout.rooms[0].x)) break
-  }
-
-  return best
-}
-
-const pixels = (layout: BuildingLayout) => ({ width: layout.width * TILE, height: layout.height * TILE })

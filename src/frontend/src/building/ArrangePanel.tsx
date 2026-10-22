@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Minus, Plus, Trash2 } from 'lucide-react'
-import { useArrangeRoom } from '../api/hooks'
+import { AppWindow, Minus, Plus, Rows3, Trash2 } from 'lucide-react'
+import { useSaveFloorPlan } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { toCanvas } from '../art/canvas'
 import { FURNITURE } from '../art/fanPack'
@@ -10,19 +10,32 @@ import { themeColors } from '../art/station'
 import { themeOf, type Theme } from '../art/themes'
 import { useToast } from '../ui/toastContext'
 import {
+  addCommon,
   addPiece,
+  addWindow,
+  BUILDING,
   currentArrangement,
+  currentFloor,
+  editFloor,
   editRoom,
   FURNITURE_NAMES,
   furnitureLabel,
-  layoutRequest,
   LIMITS,
+  NO_DRAFTS,
   place,
+  placeCommon,
+  planRequest,
+  removeCommon,
   removePiece,
+  removeWindow,
   resize,
+  resizeFloor,
+  tidyDesks,
   type Drafts,
+  type Target,
 } from './arrange'
 import type { Selection } from './BuildingCanvas'
+import { DOOR } from './layout'
 
 interface Props {
   /** The office as it will look once saved. */
@@ -30,9 +43,10 @@ interface Props {
   /** The office as it is saved now. */
   saved: OfficeView
   drafts: Drafts
-  onDrafts: (drafts: Drafts) => void
-  selection: Selection | null
+  /** Changes the drafts, from the office as they show it. */
+  onEdit: (change: (shown: OfficeView, drafts: Drafts) => Drafts) => void
   onSelect: (selection: Selection | null) => void
+  selection: Selection | null
   onClose: () => void
 }
 
@@ -49,54 +63,98 @@ function useThumbnails(theme: Theme): Record<PropName, string> {
   }, [theme])
 }
 
-/** Beside the building while rooms are arranged: size, furniture, save or cancel. */
-export function ArrangePanel({ office, saved, drafts, onDrafts, selection, onSelect, onClose }: Props) {
+/** What the picked thing is and what can be done with it, in a line. */
+function describe(target: Target | undefined, office: OfficeView, roomId: string, pieceName: string | undefined): string {
+  if (!target) return roomId === BUILDING ? 'Pick a piece of furniture to move it, or drag the yellow handles to resize the building.' : 'Pick a desk, a piece of furniture, the door or a window. Drag the back wall to move the room.'
+  switch (target.kind) {
+    case 'desk':
+      return `${office.rooms.find((r) => r.id === roomId)?.desks.find((d) => d.id === target.id)?.name ?? 'Desk'}: drag it or use the arrows.`
+    case 'piece':
+      return `${furnitureLabel(pieceName ?? '')}: drag it, use the arrows or remove it.`
+    case 'door':
+      return 'Door: drag it along any wall of the room, or use the arrows.'
+    case 'window':
+      return 'Window: drag it along the back wall. It shows the sky on an outer wall, what is behind on an inner one.'
+  }
+}
+
+/** Beside the building while it is arranged: sizes, furniture, doors and windows, save or cancel. */
+export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelect, onClose }: Props) {
   const theme = themeOf(office.theme)
   const thumbnails = useThumbnails(theme)
-  const arrangeRoom = useArrangeRoom(office.id)
+  const savePlan = useSaveFloorPlan(office.id)
   const toast = useToast()
   const [error, setError] = useState<string>()
 
-  const room = office.rooms.find((r) => r.id === selection?.roomId)
+  const building = selection?.roomId === BUILDING
+  const room = building ? undefined : office.rooms.find((r) => r.id === selection?.roomId)
   const arrangement = room && currentArrangement(office, drafts, room.id)
+  const floor = building ? currentFloor(office, drafts) : undefined
   const target = selection?.target
-  const piece = target?.kind === 'piece' ? arrangement?.furniture[target.index] : undefined
-  const desk = target?.kind === 'desk' ? room?.desks.find((d) => d.id === target.id) : undefined
-  const changed = Object.keys(drafts).length
+  const pieceName =
+    target?.kind === 'piece' ? (building ? floor?.furniture[target.index]?.name : arrangement?.furniture[target.index]?.name) : undefined
+  const changed = drafts !== NO_DRAFTS
   const suggested = theme.furniture
   const others = FURNITURE_NAMES.filter((n) => !suggested.includes(n))
 
-  const edit = (change: Parameters<typeof editRoom>[3]) => room && onDrafts(editRoom(office, drafts, room.id, change))
+  const editThisRoom = (change: Parameters<typeof editRoom>[3]) => room && onEdit((o, d) => editRoom(o, d, room.id, change))
+  const editTheFloor = (change: Parameters<typeof editFloor>[2]) => onEdit((o, d) => editFloor(o, d, change))
 
-  // Arrows nudge what is picked, Delete takes furniture away, Escape lets go.
+  const remove = () => {
+    if (!selection || !target) return
+    if (building && target.kind === 'piece') editTheFloor((f) => removeCommon(f, target.index))
+    else if (target.kind === 'piece') editThisRoom((a) => removePiece(a, target.index))
+    else if (target.kind === 'window') editThisRoom((a) => removeWindow(a, target.index))
+    else return
+    onSelect({ roomId: selection.roomId })
+  }
+
+  // Arrows nudge what is picked, Delete takes furniture and windows away, Escape lets go.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!room || !target || !arrangement) return
+      if (!selection || !target) return
       if (e.target instanceof HTMLElement && e.target.closest('input, select, textarea')) return
       const step = e.shiftKey ? 8 : 1
       const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
-      if (moves[e.key]) {
+      const move = moves[e.key]
+      if (move) {
         e.preventDefault()
-        const spot = target.kind === 'desk' ? arrangement.desks[target.id] : arrangement.furniture[target.index]
-        if (spot) onDrafts(editRoom(office, drafts, room.id, (a) => place(a, target, spot.x + moves[e.key][0], spot.y + moves[e.key][1])))
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && target.kind === 'piece') {
+        const [dx, dy] = move
+        if (building && target.kind === 'piece') {
+          const piece = floor?.furniture[target.index]
+          if (piece) editTheFloor((f) => placeCommon(f, target.index, piece.x + dx, piece.y + dy))
+        } else if (arrangement && target.kind === 'door') {
+          // Along its wall, a tile at a time.
+          const along = arrangement.door.wall === 'Left' || arrangement.door.wall === 'Right' ? Math.sign(dy) : Math.sign(dx)
+          const length = arrangement.door.wall === 'Left' || arrangement.door.wall === 'Right' ? arrangement.depth : arrangement.width
+          editThisRoom((a) => ({ ...a, door: { ...a.door, offset: Math.max(0, Math.min(length - DOOR, a.door.offset + along)) } }))
+        } else if (arrangement) {
+          const spot =
+            target.kind === 'desk'
+              ? arrangement.desks[target.id]
+              : target.kind === 'piece'
+                ? arrangement.furniture[target.index]
+                : target.kind === 'window'
+                  ? { x: arrangement.windows[target.index], y: 0 }
+                  : undefined
+          if (spot) editThisRoom((a) => place(a, target, spot.x + dx, spot.y + dy))
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        onDrafts(editRoom(office, drafts, room.id, (a) => removePiece(a, target.index)))
-        onSelect({ roomId: room.id })
+        remove()
       } else if (e.key === 'Escape') {
-        onSelect({ roomId: room.id })
+        onSelect({ roomId: selection.roomId })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [room, target, arrangement, office, drafts, onDrafts, onSelect])
+  })
 
   const save = async () => {
     setError(undefined)
     try {
-      for (const [roomId, draft] of Object.entries(drafts))
-        await arrangeRoom.mutateAsync({ roomId, layout: draft === 'auto' ? 'auto' : layoutRequest(draft) })
-      toast(changed === 1 ? 'Room arranged' : `${changed} rooms arranged`)
+      await savePlan.mutateAsync(drafts.auto ? 'auto' : planRequest(office))
+      toast(drafts.auto ? `${office.name} is laid out automatically again` : `${office.name} arranged`)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The layout could not be saved.')
@@ -104,75 +162,87 @@ export function ArrangePanel({ office, saved, drafts, onDrafts, selection, onSel
   }
 
   const add = (name: PropName) => {
-    if (!room || !arrangement) return
-    edit((a) => addPiece(a, name))
-    onSelect({ roomId: room.id, target: { kind: 'piece', index: arrangement.furniture.length } })
+    if (building && floor) {
+      editTheFloor((f, sizes) => addCommon(f, sizes, name))
+      onSelect({ roomId: BUILDING, target: { kind: 'piece', index: floor.furniture.length } })
+    } else if (room && arrangement) {
+      editThisRoom((a) => addPiece(a, name))
+      onSelect({ roomId: room.id, target: { kind: 'piece', index: arrangement.furniture.length } })
+    }
   }
 
-  const isAuto = (roomId: string) => !saved.rooms.find((r) => r.id === roomId)?.width
+  const planned = Boolean(saved.floorWidth && saved.floorDepth)
 
   return (
-    <aside className="arrange-panel" aria-label="Arrange rooms">
-      {!room || !arrangement ? (
-        <p className="hint">Click a room to arrange it.</p>
+    <aside className="arrange-panel" aria-label="Arrange the building">
+      {!selection || (!building && !arrangement) ? (
+        <p className="hint">Click a room to arrange it, or an empty spot of the corridors for the building itself.</p>
       ) : (
         <>
           <header>
-            <h2>{room.name}</h2>
-            <p className="hint">
-              {desk
-                ? `${desk.name}: drag it or use the arrows.`
-                : piece
-                  ? `${furnitureLabel(piece.name)}: drag it, use the arrows or remove it.`
-                  : 'Pick a desk or a piece of furniture to move it.'}
-            </p>
-            {piece && target?.kind === 'piece' && (
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  edit((a) => removePiece(a, target.index))
-                  onSelect({ roomId: room.id })
-                }}
-              >
-                <Trash2 size={16} /> Remove {furnitureLabel(piece.name).toLowerCase()}
+            <h2>{building ? 'Building' : room?.name}</h2>
+            <p className="hint">{describe(target, office, selection.roomId, pieceName)}</p>
+            {(target?.kind === 'piece' || target?.kind === 'window') && (
+              <button type="button" className="btn" onClick={remove}>
+                <Trash2 size={16} /> Remove {target.kind === 'window' ? 'window' : furnitureLabel(pieceName ?? '').toLowerCase()}
               </button>
             )}
           </header>
 
           <section aria-label="Size">
-            <Stepper
-              label="Width"
-              value={arrangement.width}
-              limits={LIMITS.width}
-              onChange={(width) => edit((a) => resize(a, width, a.depth))}
-            />
-            <Stepper
-              label="Depth"
-              value={arrangement.depth}
-              limits={LIMITS.depth}
-              onChange={(depth) => edit((a) => resize(a, a.width, depth))}
-            />
+            {building && floor ? (
+              <>
+                <Stepper label="Width" value={floor.width} limits={LIMITS.floorWidth} onChange={(w) => editTheFloor((f, s) => resizeFloor(f, s, w, f.depth))} />
+                <Stepper label="Depth" value={floor.depth} limits={LIMITS.floorDepth} onChange={(d) => editTheFloor((f, s) => resizeFloor(f, s, f.width, d))} />
+              </>
+            ) : (
+              arrangement && (
+                <>
+                  <Stepper label="Width" value={arrangement.width} limits={LIMITS.width} onChange={(w) => editThisRoom((a) => resize(a, w, a.depth))} />
+                  <Stepper label="Depth" value={arrangement.depth} limits={LIMITS.depth} onChange={(d) => editThisRoom((a) => resize(a, a.width, d))} />
+                </>
+              )
+            )}
           </section>
+
+          {room && arrangement && (
+            <section className="arrange-actions" aria-label="Room">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  editThisRoom(addWindow)
+                  onSelect({ roomId: room.id, target: { kind: 'window', index: arrangement.windows.length } })
+                }}
+              >
+                <AppWindow size={16} /> Add a window
+              </button>
+              <button type="button" className="btn" onClick={() => editThisRoom(tidyDesks)}>
+                <Rows3 size={16} /> Desks in rows
+              </button>
+            </section>
+          )}
 
           <section aria-label="Add furniture">
-            <h3>Suits {theme.label.toLowerCase()}</h3>
-            <Catalogue names={suggested} thumbnails={thumbnails} onAdd={add} />
+            <h3>{building ? 'For the corridors' : `Suits ${theme.label.toLowerCase()}`}</h3>
+            <Catalogue names={building ? [...theme.hall, ...suggested.filter((n) => !theme.hall.includes(n))] : suggested} thumbnails={thumbnails} onAdd={add} />
             <h3>Everything else</h3>
-            <Catalogue names={others} thumbnails={thumbnails} onAdd={add} />
+            <Catalogue names={building ? FURNITURE_NAMES.filter((n) => !theme.hall.includes(n) && !suggested.includes(n)) : others} thumbnails={thumbnails} onAdd={add} />
           </section>
 
-          <button
-            type="button"
-            className="btn"
-            disabled={drafts[room.id] === 'auto' || (isAuto(room.id) && !drafts[room.id])}
-            onClick={() => {
-              onDrafts({ ...drafts, [room.id]: 'auto' })
-              onSelect({ roomId: room.id })
-            }}
-          >
-            Back to automatic layout
-          </button>
+          {building && (
+            <button
+              type="button"
+              className="btn"
+              disabled={drafts.auto || (!planned && !changed)}
+              onClick={() => {
+                onEdit(() => ({ ...NO_DRAFTS, auto: true }))
+                onSelect({ roomId: BUILDING })
+              }}
+            >
+              Back to the automatic building
+            </button>
+          )}
         </>
       )}
 
@@ -182,10 +252,10 @@ export function ArrangePanel({ office, saved, drafts, onDrafts, selection, onSel
         </p>
       )}
       <footer>
-        <button type="button" className="btn" onClick={onClose} disabled={arrangeRoom.isPending}>
+        <button type="button" className="btn" onClick={onClose} disabled={savePlan.isPending}>
           Cancel
         </button>
-        <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={changed === 0 || arrangeRoom.isPending}>
+        <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!changed || savePlan.isPending}>
           Save layout
         </button>
       </footer>

@@ -154,3 +154,9 @@
     top: 50%;
   }
 }
+
+.arrange-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

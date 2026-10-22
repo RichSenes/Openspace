@@ -12,6 +12,7 @@ public sealed class Office : AggregateRoot<OfficeId>
     public const string DefaultTheme = "cozy";
 
     private readonly List<Room> _rooms = [];
+    private List<FurniturePiece> _furniture = [];
 
     private Office(OfficeId id, string name)
         : base(id)
@@ -28,6 +29,15 @@ public sealed class Office : AggregateRoot<OfficeId>
     /// the frontend knows; one it does not know is drawn with the default.
     /// </summary>
     public string Theme { get; private set; } = DefaultTheme;
+
+    /// <summary>Tiles from the west to the east wall of the building; null while it is laid out automatically.</summary>
+    public int? FloorWidth { get; private set; }
+
+    /// <summary>Tiles from the north to the south wall of the building; null while it is laid out automatically.</summary>
+    public int? FloorDepth { get; private set; }
+
+    /// <summary>The furniture of the common floor, placed by hand.</summary>
+    public IReadOnlyList<FurniturePiece> Furniture => _furniture;
 
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
@@ -90,19 +100,78 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new RoomProcedureSet(Id, roomId, now));
     }
 
-    /// <summary>Gives a room a size, places its desks and furnishes it.</summary>
+    /// <summary>Gives a room a size, places its desks and furnishes it. On a floor plan it must still fit.</summary>
     public void ArrangeRoom(RoomId roomId, RoomLayout layout, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        FindRoom(roomId).Arrange(layout);
+        var room = FindRoom(roomId);
+        if (room.Left is { } left && room.Top is { } top)
+        {
+            var box = new PlannedRoom(roomId, left, top, layout).Box;
+            if (box.Right > FloorWidth || box.Bottom > FloorDepth
+                || _rooms.Exists(r => r != room && r.Box is { } other && FloorPlan.Overlap(box, other)))
+            {
+                throw new DomainException($"Room '{room.Name}' no longer fits where it stands.");
+            }
+        }
+
+        room.Arrange(layout);
         Raise(new RoomArranged(Id, roomId, now));
     }
 
-    /// <summary>Lets the room be laid out automatically again, without its furniture.</summary>
+    /// <summary>Lets the room be laid out automatically again, without its furniture; it leaves the floor plan.</summary>
     public void ClearRoomLayout(RoomId roomId, DateTimeOffset now)
     {
-        FindRoom(roomId).ClearLayout();
+        var room = FindRoom(roomId);
+        room.ClearLayout();
+        room.PlaceAt(null, null);
         Raise(new RoomArranged(Id, roomId, now));
+    }
+
+    /// <summary>
+    /// Draws the building by hand: its size, where each room stands and how it is arranged,
+    /// and the furniture of the common floor. Rooms the plan leaves out wait for a place.
+    /// </summary>
+    public void PlanFloor(FloorPlan plan, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        foreach (var planned in plan.Rooms)
+        {
+            FindRoom(planned.Id);
+        }
+
+        FloorWidth = plan.Width;
+        FloorDepth = plan.Depth;
+        _furniture = [.. plan.Furniture];
+        foreach (var room in _rooms)
+        {
+            var planned = plan.Rooms.FirstOrDefault(r => r.Id == room.Id);
+            if (planned is null)
+            {
+                room.PlaceAt(null, null);
+                continue;
+            }
+
+            room.Arrange(planned.Layout);
+            room.PlaceAt(planned.Left, planned.Top);
+        }
+
+        Raise(new FloorPlanned(Id, now));
+    }
+
+    /// <summary>Goes back to the automatic building: every room and the common floor laid out by Openspace.</summary>
+    public void ClearFloorPlan(DateTimeOffset now)
+    {
+        FloorWidth = null;
+        FloorDepth = null;
+        _furniture = [];
+        foreach (var room in _rooms)
+        {
+            room.ClearLayout();
+            room.PlaceAt(null, null);
+        }
+
+        Raise(new FloorPlanned(Id, now));
     }
 
     public void UpdateRoomContext(RoomId roomId, string? context, DateTimeOffset now)

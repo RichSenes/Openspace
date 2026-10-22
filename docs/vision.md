@@ -94,6 +94,10 @@ Later, in rough order of appearance:
   drags desks and furniture anywhere (arrows nudge, Delete removes) and saves the
   room; everything is drawn sorted by its base line. Rooms never arranged keep
   the automatic layout.
+- ~~**One building.**~~ Done: an office is drawn as one building. Rooms of a row
+  share their walls and open through a door onto the corridor in front of them;
+  whatever is not a room is common floor, furnished from the theme's corridor list
+  (water cooler, vending machine, plants…). Corridor furniture is not editable yet.
 - **Agents dressed by hand.** Outfits, costumes and accessories chosen per desk or
   per role instead of derived from the desk id.
 - **The city.** A map of the town where each office is a building (a house, a

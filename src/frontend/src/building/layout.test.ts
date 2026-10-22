@@ -14,7 +14,7 @@ const office = (...rooms: RoomView[]): OfficeView => ({ id: 'e-corp', name: 'E C
 
 describe('layoutOffice', () => {
   it('is empty for an office without rooms', () => {
-    expect(layoutOffice(office(), 100)).toEqual({ rooms: [], width: 0, height: 0 })
+    expect(layoutOffice(office(), 100)).toMatchObject({ rooms: [], doors: [], hall: [], width: 0, height: 0 })
   })
 
   it('places rooms side by side without overlapping', () => {
@@ -104,5 +104,48 @@ describe('layoutOffice with rooms arranged by hand', () => {
     const mixed: RoomView = { ...room('Web', 0), width: 12, depth: 6, desks: [desk('a', first), desk('b')] }
     const box = layoutOffice(office(mixed), 100).rooms[0]
     expect(box.desks[1].x).not.toBe(box.desks[0].x)
+  })
+})
+
+describe('layoutOffice as one building', () => {
+  const allsafe = () => office(room('Web', 3), room('Identity', 1), room('Compliance', 2))
+
+  it('joins the rooms of a row wall to wall', () => {
+    const { rooms } = layoutOffice(allsafe(), 100)
+    expect(rooms[1].x).toBe(rooms[0].x + rooms[0].width)
+    expect(rooms[2].x).toBe(rooms[1].x + rooms[1].width)
+  })
+
+  it('leaves a corridor in front of each row, inside the building', () => {
+    const { rooms, floor } = layoutOffice(allsafe(), 24)
+    const second = rooms.find((r) => r.y > rooms[0].y)!
+    const firstRow = rooms.filter((r) => r.y === rooms[0].y)
+    expect(second.y).toBe(Math.max(...firstRow.map((r) => r.y + r.height)) + 3)
+    for (const r of rooms) {
+      expect(r.x).toBeGreaterThanOrEqual(floor.x)
+      expect(r.x + r.width).toBeLessThanOrEqual(floor.x + floor.width)
+      expect(r.y + r.height + 3).toBeLessThanOrEqual(floor.y + floor.height)
+    }
+  })
+
+  it('opens a door in the front wall of every room', () => {
+    const { rooms, doors } = layoutOffice(allsafe(), 100)
+    for (const r of rooms) {
+      const door = doors.find((d) => d.roomId === r.id)!
+      expect(door.y).toBe((r.y + r.height) * 16)
+      expect(door.x).toBeGreaterThan(r.x * 16)
+      expect(door.x + door.width).toBeLessThan((r.x + r.width) * 16)
+    }
+  })
+
+  it('puts corridor furniture of the theme in the corridor, never in front of a door', () => {
+    const { rooms, doors, hall } = layoutOffice({ ...allsafe(), theme: 'neonDistrict' }, 100)
+    const rowBottom = Math.max(...rooms.map((r) => r.y + r.height)) * 16
+    expect(hall.length).toBeGreaterThan(0)
+    expect(hall.map((p) => p.name)).toContain('vendingMachine')
+    for (const p of hall) {
+      expect(p.y + 32).toBeGreaterThan(rowBottom)
+      for (const d of doors) expect(p.x >= d.x + d.width || p.x + 18 <= d.x).toBe(true)
+    }
   })
 })

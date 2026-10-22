@@ -7,6 +7,7 @@
 .building-canvas {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   touch-action: none;
 }
 
@@ -31,6 +32,10 @@
 }
 
 .building-canvas canvas {
+  /* Out of the flow: the canvas follows the box and can never make it grow. */
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
   image-rendering: pixelated;
 }

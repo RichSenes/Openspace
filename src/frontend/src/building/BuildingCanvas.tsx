@@ -115,7 +115,15 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
       appRef.current = app
       app.renderer.on('resize', () => draw.current())
       // Pixi follows the window; the panel beside the building changes its size too.
-      const observer = new ResizeObserver(() => app.resize())
+      let size = `${element.clientWidth}x${element.clientHeight}`
+      const observer = new ResizeObserver(() => {
+        // Only a real change of the box, never the canvas settling inside it.
+        const now = `${element.clientWidth}x${element.clientHeight}`
+        if (now !== size) {
+          size = now
+          app.resize()
+        }
+      })
       observer.observe(element)
       listeners.push(() => observer.disconnect())
       fitAll.current = () => {

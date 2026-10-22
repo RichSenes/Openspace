@@ -14,7 +14,9 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
-| PUT | `/api/offices/{id}/rooms/{roomId}/layout` | Arrange a room by hand: `{ width, depth, desks: [{ deskId, x, y }], furniture: [{ name, x, y }] }`; sizes in tiles, places in pixels from the room's corner; desks left out are placed automatically |
+| PUT | `/api/offices/{id}/rooms/{roomId}/layout` | Arrange a room by hand: `{ width, depth, desks: [{ deskId, x, y }], furniture: [{ name, x, y }], door?: { wall, offset }, windows?: [x] }`; sizes in tiles, places in pixels from the room's corner; `wall` is `Front`, `Back`, `Left` or `Right`, `offset` in tiles; desks left out are placed automatically. On a floor plan the room must still fit |
+| PUT | `/api/offices/{id}/plan` | Draw the building by hand: `{ width, depth, furniture: [{ name, x, y }], rooms: [{ roomId, left, top, layout }] }`; rooms in tiles from the building's corner, never overlapping; `layout` as above |
+| DELETE | `/api/offices/{id}/plan` | Give the whole office back to the automatic layout |
 | DELETE | `/api/offices/{id}/rooms/{roomId}/layout` | Give the room back to the automatic layout |
 | POST | `/api/offices/{id}/rooms/{roomId}/desks` | Add a desk: `{ name, agentName, model?, roleId? }` |
 | GET | `/api/tasks?officeId=&status=` | Tasks, oldest first, optionally filtered |

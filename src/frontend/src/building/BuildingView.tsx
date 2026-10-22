@@ -5,7 +5,7 @@ import { useActivity, useOfficeTasks, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
-import { editRoom, placeIn, resize, withDrafts, type Drafts } from './arrange'
+import { editFloor, editRoom, moveRoom, NO_DRAFTS, placeIn, resize, resizeFloor, withDrafts, type Drafts } from './arrange'
 import { ArrangePanel } from './ArrangePanel'
 import { BuildingCanvas, type Selection } from './BuildingCanvas'
 import './building.css'
@@ -49,12 +49,14 @@ export function BuildingView({ office, onOpenRooms }: Props) {
   const toast = useToast()
   const noTasks = useMemo(() => [], [])
   const [arranging, setArranging] = useState(false)
-  const [drafts, setDrafts] = useState<Drafts>({})
+  const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
   const shown = useMemo(() => withDrafts(office, drafts), [office, drafts])
+  /** Changes the drafts from the office as they show it, whatever changed in between. */
+  const edit = (change: (shown: OfficeView, drafts: Drafts) => Drafts) => setDrafts((d) => change(withDrafts(office, d), d))
   const stopArranging = () => {
     setArranging(false)
-    setDrafts({})
+    setDrafts(NO_DRAFTS)
     setSelection(null)
   }
 
@@ -82,8 +84,10 @@ export function BuildingView({ office, onOpenRooms }: Props) {
             ? {
                 selection,
                 onSelect: setSelection,
-                onPlace: (roomId, target, x, y) => setDrafts((d) => placeIn(shown, d, roomId, target, x, y)),
-                onResize: (roomId, width, depth) => setDrafts((d) => editRoom(shown, d, roomId, (a) => resize(a, width, depth))),
+                onPlace: (roomId, target, x, y) => edit((o, d) => placeIn(o, d, roomId, target, x, y)),
+                onResize: (roomId, width, depth) => edit((o, d) => editRoom(o, d, roomId, (a) => resize(a, width, depth))),
+                onMoveRoom: (roomId, left, top) => edit((o, d) => editFloor(o, d, (f, sizes) => moveRoom(f, sizes, roomId, left, top))),
+                onResizeFloor: (width, depth) => edit((o, d) => editFloor(o, d, (f, sizes) => resizeFloor(f, sizes, width, depth))),
               }
             : undefined
         }
@@ -131,7 +135,7 @@ export function BuildingView({ office, onOpenRooms }: Props) {
           office={shown}
           saved={office}
           drafts={drafts}
-          onDrafts={setDrafts}
+          onEdit={edit}
           selection={selection}
           onSelect={setSelection}
           onClose={stopArranging}

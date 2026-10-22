@@ -2,18 +2,34 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { DeskActivity, OfficeView, WorkTaskView } from '../api/types'
-import { paintInto, toCanvas } from '../art/canvas'
-import { inTheDark, unlit } from '../art/lighting'
-import { deskItem, propItem, roomPixels, roomShell, WALL_HEIGHT } from '../art/roomScene'
-import { sceneLights, scenePixels } from '../art/scene'
+import { paintInto } from '../art/canvas'
+import { inTheDark, unlit, type Light } from '../art/lighting'
+import { deskItem, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
+import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
 import { HALL_FLOOR } from '../art/sheets/rooms'
 import { pixelsOf, type Pixel } from '../art/sprite'
 import { STATION, themeColors } from '../art/station'
-import { themeOf } from '../art/themes'
+import { themeOf, type Theme } from '../art/themes'
+import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import { agentStateOf, appearanceOf } from './agents'
-import { arrangementOf, boundsOf, handlesOf, place, targetAt, type Edge, type Target } from './arrange'
+import {
+  arrangementOf,
+  boundsOf,
+  BUILDING,
+  commonAt,
+  commonBounds,
+  floorArrangementOf,
+  handlesOf,
+  place,
+  placeCommon,
+  targetAt,
+  WINDOW,
+  type Edge,
+  type Target,
+} from './arrange'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
-import { bestLayout, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
+import { doorOf, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
+import { wallPlan } from './walls'
 
 /** Frames per second of the pixel art, as in docs/art-style.md. */
 const FPS = 5
@@ -45,7 +61,7 @@ interface Props {
   arrange?: ArrangeControls
 }
 
-/** A room being arranged and, possibly, the desk or piece of furniture picked in it. */
+/** A room being arranged, or the building itself (BUILDING), and possibly the thing picked in it. */
 export interface Selection {
   roomId: string
   target?: Target
@@ -54,15 +70,19 @@ export interface Selection {
 export interface ArrangeControls {
   selection: Selection | null
   onSelect: (selection: Selection | null) => void
-  /** A target was dropped at (x, y), in pixels from its room's corner. */
+  /** A target was dropped at (x, y), in pixels from its room's corner, or the building's. */
   onPlace: (roomId: string, target: Target, x: number, y: number) => void
   /** A room's edge was dragged: its new size in tiles, wall to wall and floor depth. */
   onResize: (roomId: string, width: number, depth: number) => void
+  /** A room was dragged by its back wall to a new place, in tiles from the building's corner. */
+  onMoveRoom: (roomId: string, left: number, top: number) => void
+  /** The building's edge was dragged: its new size in tiles. */
+  onResizeFloor: (width: number, depth: number) => void
 }
 
 const EDGE_CURSORS: Record<Edge, string> = { right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
-/** Draws the selected office as a pixel-art floor plan you can zoom, pan and fly through. */
+/** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
 export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
@@ -77,21 +97,17 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
       const app = appRef.current
       if (!app) return
       const view = viewOf(app)
-      const auto = view.auto
-      const layout = auto
-        ? bestLayout(office, { width: Math.max(1, app.screen.width - 32), height: Math.max(1, app.screen.height - 32) }).layout
-        : layoutOffice(office, view.layout?.width ?? Number.MAX_SAFE_INTEGER)
+      // The same building on every screen: only the camera follows the window.
+      const layout = layoutOffice(office)
       view.layout = layout
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
-      const { world, rooms, names, selection } = drawBuilding(layout, { office, tasks, activities, dark }, arrange?.selection)
-      app.stage.addChild(world)
-      view.world = world
-      view.rooms = rooms
-      view.names = names
-      view.selection = selection
-      rooms.forEach((room) => room.paint(view.tick))
-      if (auto) view.camera = fit(worldRect(layout), app.screen)
+      const drawn = drawBuilding(layout, { office, tasks, activities, dark }, arrange?.selection)
+      app.stage.addChild(drawn.world)
+      Object.assign(view, drawn)
+      view.hall?.paint()
+      drawn.rooms.forEach((room) => room.paint(view.tick))
+      if (view.auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
     }
   })
@@ -113,7 +129,13 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
       }
       element.appendChild(app.canvas)
       appRef.current = app
-      app.renderer.on('resize', () => draw.current())
+      app.renderer.on('resize', () => {
+        const view = viewOf(app)
+        if (view.auto && view.layout) {
+          view.camera = fit(worldRect(view.layout), app.screen)
+          apply(view)
+        }
+      })
       // Pixi follows the window; the panel beside the building changes its size too.
       let size = `${element.clientWidth}x${element.clientHeight}`
       const observer = new ResizeObserver(() => {
@@ -161,7 +183,9 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
     <div className="building-canvas" ref={host}>
       <div className="building-controls">
         <span className="hint">
-          {arrange ? 'Drag desks and furniture · arrows nudge · Delete removes' : 'Scroll to zoom · drag to move · double-click a room'}
+          {arrange
+            ? 'Drag desks, furniture, doors and windows · drag a back wall to move its room · arrows nudge · Delete removes'
+            : 'Scroll to zoom · drag to move · double-click a room'}
         </span>
         <button type="button" className="btn" onClick={() => fitAll.current()}>
           <Maximize size={16} /> Fit
@@ -175,11 +199,16 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
 /** Camera, layout and animation of one canvas, kept beside the Pixi application. */
 interface View {
   camera: Camera
-  /** True until the person zooms or pans: the view then follows the window and the data. */
+  /** True until the person zooms or pans: the camera then follows the window. */
   auto: boolean
   layout?: BuildingLayout
   world?: Container
   rooms?: Map<string, RoomPainter>
+  /** The furniture of the common floor, repainted while a piece of it is dragged. */
+  hall?: { paint: () => void }
+  /** The walls, redrawn while a door is dragged along them. */
+  walls?: Graphics
+  scene?: Scene
   /** Desk name labels, by desk id: they follow a desk being dragged. */
   names?: Map<string, Text>
   /** The outline of what is selected while arranging. */
@@ -228,7 +257,18 @@ function flyTo(view: View, target: Camera, duration = 320) {
   view.animation = requestAnimationFrame(step)
 }
 
-/** Wheel to zoom at the cursor, left-drag to pan, double-click to fly into a room. Returns the cleanups. */
+const floorBox = (layout: BuildingLayout) => ({ x: layout.floor.x, y: layout.floor.y, width: layout.floor.width, height: layout.floor.height })
+
+/** What a press picks up while arranging. */
+type Grip =
+  | { kind: 'stretch'; roomId: string; edge: Edge }
+  | { kind: 'carry'; roomId: string; target: Target; from: { x: number; y: number }; grab: { x: number; y: number } }
+  | { kind: 'shift'; room: RoomBox; grab: { x: number; y: number } }
+
+/**
+ * Wheel to zoom at the cursor, left-drag to pan, double-click to fly into a room. While
+ * arranging, a press picks up what is under it instead. Returns the cleanups.
+ */
 function attachNavigation(app: Application, arrange: () => ArrangeControls | undefined): (() => void)[] {
   const canvas = app.canvas
   const view = viewOf(app)
@@ -237,35 +277,66 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     return { x: e.clientX - box.left, y: e.clientY - box.top }
   }
   let drag: { x: number; y: number; id: number; moved: number } | undefined
-  let carry: { roomId: string; target: Target; from: { x: number; y: number }; grab: { x: number; y: number }; to?: { x: number; y: number } } | undefined
-  let stretch: { roomId: string; edge: Edge; size: { width: number; depth: number } } | undefined
+  let grip: Grip | undefined
+  // What the grip did last: the place to save on release, or the size already sent.
+  let to: { x: number; y: number } | undefined
+  let sent = ''
+
   // Rooms are redrawn as soon as something is picked: always look them up by id.
   const roomById = (id: string) => view.layout?.rooms.find((r) => r.id === id)
-
   const roomAt = (world: { x: number; y: number }) =>
     view.layout?.rooms.find(
       (r) => world.x >= r.x * TILE && world.x < (r.x + r.width) * TILE && world.y >= r.y * TILE && world.y < (r.y + r.height) * TILE,
     )
-  /** The room and the thing under the pointer, in pixels from that room's corner. */
-  const pick = (e: MouseEvent) => {
-    const world = toWorld(view.camera, point(e))
-    const room = roomAt(world)
-    if (!room) return undefined
-    const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
-    return { room, local, target: targetAt(arrangementOf(room), local) }
+  const inFloor = (world: { x: number; y: number }) => {
+    const f = view.layout?.floor
+    return !!f && world.x >= f.x * TILE && world.x < (f.x + f.width) * TILE && world.y >= f.y * TILE && world.y < (f.y + f.height) * TILE
   }
-  /** The edge handle of the selected room under the pointer, a few screen pixels around it. */
-  const handleAt = (e: MouseEvent) => {
-    const id = arrange()?.selection?.roomId
-    const room = id ? roomById(id) : undefined
-    if (!room) return undefined
+
+  /** The edge handle of the selected room, or of the building, a few screen pixels around the pointer. */
+  const handleAt = (e: MouseEvent): Grip | undefined => {
+    const selected = arrange()?.selection?.roomId
+    const box = selected === BUILDING ? view.layout && floorBox(view.layout) : selected ? roomById(selected) : undefined
+    if (!box || !selected) return undefined
     const at = point(e)
-    const handle = handlesOf(room).find((h) => {
+    const handle = handlesOf(box).find((h) => {
       const x = h.x * view.camera.scale + view.camera.x
       const y = h.y * view.camera.scale + view.camera.y
       return Math.abs(at.x - x) <= 10 && Math.abs(at.y - y) <= 10
     })
-    return handle && { room, edge: handle.edge }
+    return handle && { kind: 'stretch', roomId: selected, edge: handle.edge }
+  }
+
+  /** What a press at this point would pick up while arranging. */
+  const gripAt = (e: MouseEvent): Grip | undefined => {
+    const handle = handleAt(e)
+    if (handle || !view.layout) return handle
+    const world = toWorld(view.camera, point(e))
+    const { floor } = view.layout
+    const onFloor = { x: world.x - floor.x * TILE, y: world.y - floor.y * TILE }
+    const common = commonAt(floorArrangementOf(view.layout), onFloor)
+    if (common !== undefined) {
+      const box = commonBounds(floorArrangementOf(view.layout), common)!
+      return { kind: 'carry', roomId: BUILDING, target: { kind: 'piece', index: common }, from: { x: box.x, y: box.y }, grab: onFloor }
+    }
+    // Doors sit across a wall: they can be taken from either side of it.
+    for (const r of view.layout.rooms) {
+      const local = { x: world.x - r.x * TILE, y: world.y - r.y * TILE }
+      const door = boundsOf(arrangementOf(r), { kind: 'door' })!
+      if (local.x >= door.x - 3 && local.x < door.x + door.width + 3 && local.y >= door.y - 3 && local.y < door.y + door.height + 3)
+        return { kind: 'carry', roomId: r.id, target: { kind: 'door' }, from: { x: door.x, y: door.y }, grab: local }
+    }
+    const room = roomAt(world)
+    if (!room) return undefined
+    const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
+    const target = targetAt(arrangementOf(room), local)
+    if (target) {
+      const box = boundsOf(arrangementOf(room), target)!
+      return { kind: 'carry', roomId: room.id, target, from: { x: box.x, y: box.y }, grab: local }
+    }
+    // The back wall is the room's handle: drag it to move the whole room.
+    if (local.y < WALL_HEIGHT) return { kind: 'shift', room, grab: { x: Math.floor(local.x / TILE), y: Math.floor(local.y / TILE) } }
+    return undefined
   }
 
   const onWheel = (e: WheelEvent) => {
@@ -278,17 +349,13 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return
     const controls = arrange()
-    const handle = controls ? handleAt(e) : undefined
-    const picked = controls && !handle ? pick(e) : undefined
-    if (handle) {
-      // The room grows under the pointer: the camera stays put meanwhile.
-      view.auto = false
-      stretch = { roomId: handle.room.id, edge: handle.edge, size: { width: handle.room.width, depth: handle.room.height - WALL } }
-    } else if (controls && picked?.target) {
-      const box = boundsOf(arrangementOf(picked.room), picked.target)!
-      carry = { roomId: picked.room.id, target: picked.target, from: { x: box.x, y: box.y }, grab: picked.local }
-      controls.onSelect({ roomId: picked.room.id, target: picked.target })
-    }
+    grip = controls ? gripAt(e) : undefined
+    to = undefined
+    sent = ''
+    if (grip?.kind === 'carry') controls?.onSelect({ roomId: grip.roomId, target: grip.target })
+    if (grip?.kind === 'shift') controls?.onSelect({ roomId: grip.room.id })
+    // Rooms and the building change shape under the pointer: the camera stays put meanwhile.
+    if (grip) view.auto = false
     drag = { ...point(e), id: e.pointerId, moved: 0 }
     try {
       // Keeps the drag going when the pointer leaves the canvas.
@@ -296,65 +363,76 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     } catch {
       // Some pointers cannot be captured; dragging still works inside the canvas.
     }
-    canvas.style.cursor = stretch ? EDGE_CURSORS[stretch.edge] : carry ? 'move' : 'grabbing'
+    canvas.style.cursor = grip?.kind === 'stretch' ? EDGE_CURSORS[grip.edge] : grip ? 'move' : 'grabbing'
   }
   const onMove = (e: PointerEvent) => {
     if (!drag) {
       if (arrange()) {
-        const handle = handleAt(e)
-        canvas.style.cursor = handle ? EDGE_CURSORS[handle.edge] : pick(e)?.target ? 'move' : 'grab'
+        const hover = gripAt(e)
+        canvas.style.cursor = hover?.kind === 'stretch' ? EDGE_CURSORS[hover.edge] : hover ? 'move' : 'grab'
       }
       return
     }
     if (drag.id !== e.pointerId) return
     const now = point(e)
-    drag.moved += Math.abs(now.x - drag.x) + Math.abs(now.y - drag.y)
-    const room = carry ? roomById(carry.roomId) : stretch ? roomById(stretch.roomId) : undefined
-    if (carry && room) {
-      const world = toWorld(view.camera, now)
-      const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
-      carry.to = carryTo(view, room, carry.target, carry.from.x + local.x - carry.grab.x, carry.from.y + local.y - carry.grab.y)
-      drag = { ...now, id: e.pointerId, moved: drag.moved }
-      return
-    }
-    if (stretch && room) {
-      const world = toWorld(view.camera, now)
-      const size = {
-        width: stretch.edge === 'bottom' ? stretch.size.width : Math.round((world.x - room.x * TILE) / TILE),
-        depth: stretch.edge === 'right' ? stretch.size.depth : Math.round((world.y - room.y * TILE) / TILE) - WALL,
+    const before = drag
+    drag = { ...now, id: e.pointerId, moved: before.moved + Math.abs(now.x - before.x) + Math.abs(now.y - before.y) }
+    const world = toWorld(view.camera, now)
+    const controls = arrange()
+    const layout = view.layout
+    if (grip && controls && layout) {
+      if (grip.kind === 'carry') {
+        const origin = grip.roomId === BUILDING ? layout.floor : roomById(grip.roomId)
+        if (!origin) return
+        const local = { x: world.x - origin.x * TILE, y: world.y - origin.y * TILE }
+        // A door follows the pointer to the nearest wall; everything else keeps where it was held.
+        const goal = grip.target.kind === 'door' ? local : { x: grip.from.x + local.x - grip.grab.x, y: grip.from.y + local.y - grip.grab.y }
+        to = carryTo(view, grip.roomId, grip.target, goal.x, goal.y)
+      } else if (grip.kind === 'stretch') {
+        const box = grip.roomId === BUILDING ? floorBox(layout) : roomById(grip.roomId)
+        if (!box) return
+        const width = grip.edge === 'bottom' ? box.width : Math.round(world.x / TILE - box.x)
+        const height = grip.edge === 'right' ? box.height : Math.round(world.y / TILE - box.y)
+        // Whole tiles only: the building is redrawn when something gains or loses one.
+        const key = `${width}x${height}`
+        if (key !== sent && (width !== box.width || height !== box.height)) {
+          sent = key
+          if (grip.roomId === BUILDING) controls.onResizeFloor(width, height)
+          else controls.onResize(grip.roomId, width, height - WALL)
+        }
+      } else {
+        const left = Math.floor(world.x / TILE) - grip.grab.x - layout.floor.x
+        const top = Math.floor(world.y / TILE) - grip.grab.y - layout.floor.y
+        const key = `${left}x${top}`
+        if (key !== sent) {
+          sent = key
+          controls.onMoveRoom(grip.room.id, left, top)
+        }
       }
-      // Whole tiles only: the room is redrawn when it gains or loses one.
-      if (size.width !== stretch.size.width || size.depth !== stretch.size.depth) {
-        stretch.size = size
-        arrange()?.onResize(stretch.roomId, size.width, size.depth)
-      }
-      drag = { ...now, id: e.pointerId, moved: drag.moved }
       return
     }
     if (view.animation) cancelAnimationFrame(view.animation)
     view.auto = false
-    view.camera = pan(view.camera, now.x - drag.x, now.y - drag.y)
-    drag = { ...now, id: e.pointerId, moved: drag.moved }
+    view.camera = pan(view.camera, now.x - before.x, now.y - before.y)
     apply(view)
   }
   const onUp = (e: PointerEvent) => {
     if (drag?.id !== e.pointerId) return
     const controls = arrange()
-    if (carry?.to) controls?.onPlace(carry.roomId, carry.target, carry.to.x, carry.to.y)
-    // A click on a room, not a drag of the view, picks the room to arrange.
-    else if (controls && !carry && !stretch && drag.moved < 4) {
-      const room = pick(e)?.room
-      controls.onSelect(room ? { roomId: room.id } : null)
+    if (grip?.kind === 'carry' && to) controls?.onPlace(grip.roomId, grip.target, to.x, to.y)
+    // A click, not a drag of the view, picks the room under it, or the building.
+    else if (controls && !grip && drag.moved < 4) {
+      const world = toWorld(view.camera, point(e))
+      const room = roomAt(world)
+      controls.onSelect(room ? { roomId: room.id } : inFloor(world) ? { roomId: BUILDING } : null)
     }
     drag = undefined
-    carry = undefined
-    stretch = undefined
+    grip = undefined
     canvas.style.cursor = 'grab'
   }
   const onDoubleClick = (e: MouseEvent) => {
     if (!view.layout) return
-    const world = toWorld(view.camera, point(e))
-    const room = roomAt(world)
+    const room = roomAt(toWorld(view.camera, point(e)))
     view.auto = !room
     flyTo(view, room ? fit({ x: room.x * TILE, y: room.y * TILE, width: room.width * TILE, height: room.height * TILE }, app.screen, 64) : fit(worldRect(view.layout), app.screen))
   }
@@ -389,17 +467,54 @@ interface Scene {
   dark: boolean
 }
 
+/** A canvas already painted, somewhere in the world: windows look through to it. */
+interface Source {
+  canvas: HTMLCanvasElement
+  x: number
+  y: number
+}
+
+const hex = (r: number, g: number, b: number) => '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)
+
+/** What is painted in a rectangle of the world, in pixels from its corner: the view through a window. */
+function sample(sources: Source[], x: number, y: number, width: number, height: number): Pixel[] {
+  const pixels: Pixel[] = []
+  for (const source of sources) {
+    const left = Math.max(x, source.x)
+    const top = Math.max(y, source.y)
+    const right = Math.min(x + width, source.x + source.canvas.width)
+    const bottom = Math.min(y + height, source.y + source.canvas.height)
+    if (right <= left || bottom <= top) continue
+    const data = source.canvas.getContext('2d')!.getImageData(left - source.x, top - source.y, right - left, bottom - top).data
+    for (let j = 0; j < bottom - top; j++)
+      for (let i = 0; i < right - left; i++) {
+        const k = (j * (right - left) + i) * 4
+        if (data[k + 3] > 0) pixels.push({ x: left - x + i, y: top - y + j, color: hex(data[k], data[k + 1], data[k + 2]) })
+      }
+  }
+  return pixels
+}
+
 function drawBuilding(
   layout: BuildingLayout,
   scene: Scene,
   selected: Selection | null | undefined,
-): { world: Container; rooms: Map<string, RoomPainter>; names: Map<string, Text>; selection: Graphics } {
+): { world: Container; rooms: Map<string, RoomPainter>; hall: { paint: () => void }; walls: Graphics; names: Map<string, Text>; selection: Graphics; scene: Scene } {
   const world = new Container()
   const labels = new Container()
   const bubbles = new Container()
-  world.addChild(hallFloor(layout, scene))
-  const rooms = new Map(layout.rooms.map((room) => [room.id, drawRoom(room, scene, world)]))
-  world.addChild(walls(layout, scene), hallFurniture(layout, scene))
+  const theme = themeOf(scene.office.theme)
+
+  const floor = hallFloor(layout, scene, theme)
+  world.addChild(floor.sprite)
+  const sources: Source[] = [floor.source]
+  const rooms = new Map(layout.rooms.map((room) => [room.id, drawRoom(room, layout, scene, theme, world, sources)]))
+  const walls = new Graphics()
+  drawWalls(walls, layout, scene, theme)
+  const hall = hallFurniture(layout, scene, theme)
+  // Windows see what stands in the corridor too, over its floor.
+  sources.push(hall.source)
+  world.addChild(walls, hall.sprite)
   const names = new Map<string, Text>()
 
   for (const room of layout.rooms) {
@@ -418,18 +533,27 @@ function drawBuilding(
   outline(selection, layout, selected)
   // Names, then bubbles, go on top of every room, so they can spill over walls.
   world.addChild(labels, bubbles, selection)
-  return { world, rooms, names, selection }
+  return { world, rooms, hall: hall.painter, walls, names, selection, scene }
 }
 
-/** Frames the room being arranged and, inside it, the thing picked. */
+/** Frames the room being arranged, or the building, and inside it the thing picked. */
 function outline(g: Graphics, layout: BuildingLayout, selected: Selection | null | undefined) {
   g.clear()
-  const room = selected && layout.rooms.find((r) => r.id === selected.roomId)
+  if (!selected) return
+  const building = selected.roomId === BUILDING
+  const room = building ? floorBox(layout) : layout.rooms.find((r) => r.id === selected.roomId)
   if (!room) return
   g.rect(room.x * TILE - 3, room.y * TILE - 3, room.width * TILE + 6, room.height * TILE + 6).stroke({ width: 2, color: COLORS.selected })
   // Square handles to drag the walls out or in.
   for (const h of handlesOf(room)) g.rect(h.x - 3, h.y - 3, 6, 6).fill(COLORS.selected).stroke({ width: 1, color: COLORS.roomEdge })
-  const box = selected.target && boundsOf(arrangementOf(room), selected.target)
+  const target = selected.target
+  const box = !target
+    ? undefined
+    : building
+      ? target.kind === 'piece'
+        ? commonBounds(floorArrangementOf(layout), target.index)
+        : undefined
+      : boundsOf(arrangementOf(layout.rooms.find((r) => r.id === selected.roomId)!), target)
   if (box) {
     const x = room.x * TILE + box.x
     const y = room.y * TILE + box.y
@@ -441,148 +565,165 @@ function outline(g: Graphics, layout: BuildingLayout, selected: Selection | null
 }
 
 /**
- * Moves a thing being dragged to where it may stand, right away: its room is repainted
- * and its name follows. The new place is returned, to be saved when it is dropped.
+ * Moves a thing being dragged to where it may stand, right away: its room, or the common
+ * floor, is repainted, its name follows and a door opens its wall where it goes. The new
+ * place is returned, to be saved when it is dropped.
  */
-function carryTo(view: View, room: RoomBox, target: Target, x: number, y: number): { x: number; y: number } {
+function carryTo(view: View, roomId: string, target: Target, x: number, y: number): { x: number; y: number } | undefined {
+  const layout = view.layout
+  if (!layout) return undefined
+  if (roomId === BUILDING) {
+    if (target.kind !== 'piece') return undefined
+    const moved = placeCommon(floorArrangementOf(layout), target.index, x, y).furniture[target.index]
+    layout.hall[target.index] = { ...layout.hall[target.index], x: moved.x + layout.floor.x * TILE, y: moved.y + layout.floor.y * TILE }
+    view.hall?.paint()
+    if (view.selection) outline(view.selection, layout, { roomId, target })
+    return { x: moved.x, y: moved.y }
+  }
+
+  const room = layout.rooms.find((r) => r.id === roomId)
+  if (!room) return undefined
   const moved = place(arrangementOf(room), target, x, y)
-  const spot = target.kind === 'desk' ? moved.desks[target.id] : moved.furniture[target.index]
+  let spot = { x, y }
   if (target.kind === 'desk') {
+    spot = moved.desks[target.id]
     const desk = room.desks.find((d) => d.id === target.id)!
     desk.x = room.x * TILE + spot.x
     desk.y = room.y * TILE + spot.y
     view.names?.get(desk.id)?.position.set(desk.x + STATION.width / 2, desk.y + STATION.height + 1)
-  } else {
+  } else if (target.kind === 'piece') {
+    spot = moved.furniture[target.index]
     room.props[target.index] = { ...room.props[target.index], x: spot.x, y: spot.y }
+  } else if (target.kind === 'window') {
+    spot = { x: moved.windows[target.index], y: WINDOW.y }
+    room.windows[target.index] = spot.x
+  } else {
+    room.door = moved.door
+    layout.doors = layout.doors.map((d) => (d.roomId === room.id ? doorOf(room) : d))
+    if (view.walls && view.scene) drawWalls(view.walls, layout, view.scene, themeOf(view.scene.office.theme))
   }
   view.rooms?.get(room.id)?.paint(view.tick)
-  if (view.selection && view.layout) outline(view.selection, view.layout, { roomId: room.id, target })
-  return { x: spot.x, y: spot.y }
+  if (view.selection) outline(view.selection, layout, { roomId, target })
+  return spot
 }
 
-/** A still picture of pixels, `width` by `height`, at (x, y) in the world. */
-function still(pixels: Pixel[], x: number, y: number, width: number, height: number): Sprite {
-  const texture = Texture.from(toCanvas(width, height, pixels))
+/** The common floor: everything inside the building that is not a room, with a back wall along the north side. */
+function hallFloor(layout: BuildingLayout, scene: Scene, theme: Theme): { sprite: Sprite; source: Source } {
+  const colors = themeColors(theme.colors)
+  const { floor } = layout
+  const size = { width: floor.width * TILE, height: floor.height * TILE }
+  const upper = upperWall(theme.wall)
+  const pixels: Pixel[] = []
+  for (let c = 0; c < floor.width; c++) {
+    pixels.push(...pixelsOf(upper, 0, colors, c * TILE, 0))
+    pixels.push(...pixelsOf(theme.wall, 0, colors, c * TILE, TILE))
+  }
+  for (let r = WALL; r < floor.height; r++) for (let c = 0; c < floor.width; c++) pixels.push(...pixelsOf(HALL_FLOOR, 0, colors, c * TILE, r * TILE))
+  const lit = scene.dark ? inTheDark(pixels, hallItems(layout, theme).lights, theme.colors.night) : pixels
+  const canvas = document.createElement('canvas')
+  paintInto(canvas, size.width, size.height, lit)
+  return { sprite: spriteOf(canvas, floor.x * TILE, floor.y * TILE), source: { canvas, x: floor.x * TILE, y: floor.y * TILE } }
+}
+
+function spriteOf(canvas: HTMLCanvasElement, x: number, y: number): Sprite {
+  const texture = Texture.from(canvas)
   texture.source.scaleMode = 'nearest'
   const sprite = new Sprite(texture)
   sprite.position.set(x, y)
   return sprite
 }
 
-/** The corridor furniture, in pixels from the building's corner, with its lights. */
-function hallItems(layout: BuildingLayout, scene: Scene) {
-  const theme = themeOf(scene.office.theme)
+/** The common floor's furniture, in pixels from the building's corner, with its lights. */
+function hallItems(layout: BuildingLayout, theme: Theme) {
   const size = { width: layout.floor.width * TILE, height: layout.floor.height * TILE }
   const items = layout.hall.map((p) => propItem(p.name, p.x - layout.floor.x * TILE, p.y - layout.floor.y * TILE, 0, theme, size))
-  return { theme, size, items, lights: sceneLights(items) }
+  return { size, items, lights: sceneLights(items) }
 }
 
-/** The common floor: everything inside the building that is not a room. Rooms cover the rest. */
-function hallFloor(layout: BuildingLayout, scene: Scene): Sprite {
-  const { theme, size, lights } = hallItems(layout, scene)
-  const colors = themeColors(theme.colors)
-  const pixels: Pixel[] = []
-  for (let r = 0; r < layout.floor.height; r++)
-    for (let c = 0; c < layout.floor.width; c++) pixels.push(...pixelsOf(HALL_FLOOR, 0, colors, c * TILE, r * TILE))
-  const lit = scene.dark ? inTheDark(pixels, lights, theme.colors.night) : pixels
-  return still(lit, layout.floor.x * TILE, layout.floor.y * TILE, size.width, size.height)
+/** What stands on the common floor: over the walls behind it, as it stands in front of them. */
+function hallFurniture(layout: BuildingLayout, scene: Scene, theme: Theme): { sprite: Sprite; source: Source; painter: { paint: () => void } } {
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, layout.floor.width * TILE)
+  canvas.height = Math.max(1, layout.floor.height * TILE)
+  const sprite = spriteOf(canvas, layout.floor.x * TILE, layout.floor.y * TILE)
+  return {
+    sprite,
+    source: { canvas, x: layout.floor.x * TILE, y: layout.floor.y * TILE },
+    painter: {
+      paint: () => {
+        const { size, items, lights } = hallItems(layout, theme)
+        const pixels = scenePixels(items)
+        paintInto(canvas, size.width, size.height, scene.dark ? inTheDark(pixels, lights, theme.colors.night) : pixels)
+        sprite.texture.source.update()
+      },
+    },
+  }
 }
 
-/** What stands in the corridors: over the walls behind it, as it stands in front of them. */
-function hallFurniture(layout: BuildingLayout, scene: Scene): Sprite {
-  const { theme, size, items, lights } = hallItems(layout, scene)
-  const pixels = scenePixels(items)
-  return still(scene.dark ? inTheDark(pixels, lights, theme.colors.night) : pixels, layout.floor.x * TILE, layout.floor.y * TILE, size.width, size.height)
+/** The building's walls, from the plan: faces, then outlines, then caps, then door jambs. */
+function drawWalls(g: Graphics, layout: BuildingLayout, scene: Scene, theme: Theme) {
+  const tone = (color: string) => (scene.dark ? unlit(color, theme.colors.night) : color)
+  const plan = wallPlan(layout)
+  g.clear()
+  for (const f of plan.faces) {
+    g.rect(f.x, f.y, f.width, f.height).fill(tone(theme.colors.outline))
+    g.rect(f.x + 1, f.y, f.width - 2, f.height - 2).fill(tone(theme.colors['wall.light']))
+    g.rect(f.x + 1, f.y + f.height - 3, f.width - 2, 1).fill(tone(theme.colors['wall.shadow']))
+  }
+  // Every outline first, then every cap, so walls meet without seams.
+  for (const s of plan.caps) g.rect(s.x, s.y, s.width, s.height).fill(tone(theme.colors.outline))
+  for (const s of plan.caps) g.rect(s.x + 1, s.y + 1, s.width - 2, s.height - 2).fill(tone(theme.colors['wall.top']))
+  // Jambs: the door frame stands a little proud of the wall.
+  for (const j of plan.jambs) {
+    g.rect(j.x, j.y, j.width, j.height).fill(tone(theme.colors.outline))
+    g.rect(j.x + 1, j.y + 1, j.width - 2, j.height - 2).fill(tone(theme.colors['trim.light']))
+  }
 }
-
-/** Walls seen from above are a thin cap: this thick, centred on the line between two spaces. */
-const WALL_CAP = 4
-const OUTER_CAP = 6
-/** How much of a front wall shows below its cap, on the corridor side. */
-const WALL_FACE = 7
 
 /**
- * The building's walls: around it, between rooms side by side and along the front of
- * each room, open where its door is.
+ * What a window or a doorway in a back wall shows: the sky when the wall is the building's
+ * own, otherwise whatever is painted just behind it.
  */
-function walls(layout: BuildingLayout, scene: Scene): Graphics {
-  const theme = themeOf(scene.office.theme)
-  const tone = (color: string) => (scene.dark ? unlit(color, theme.colors.night) : color)
-  const half = WALL_CAP / 2
-  const strips: { x: number; y: number; width: number; height: number }[] = []
-  // The side of a front wall that faces the corridor, seen from above and in front.
-  const faces: { x: number; y: number; width: number }[] = []
-  const line = (x1: number, y1: number, x2: number, y2: number, cap = WALL_CAP) =>
-    strips.push({ x: Math.min(x1, x2) - cap / 2, y: Math.min(y1, y2) - cap / 2, width: Math.abs(x2 - x1) + cap, height: Math.abs(y2 - y1) + cap })
-  const front = (x1: number, x2: number, y: number) => {
-    line(x1, y, x2, y)
-    faces.push({ x: x1 - half, y: y + half, width: x2 - x1 + WALL_CAP })
-  }
-
-  const { floor } = layout
-  // The outer walls are thicker than the ones between rooms.
-  const [west, north, east, south] = [floor.x * TILE, floor.y * TILE, (floor.x + floor.width) * TILE, (floor.y + floor.height) * TILE]
-  line(west, north, east, north, OUTER_CAP)
-  line(west, north, west, south, OUTER_CAP)
-  line(east, north, east, south, OUTER_CAP)
-  line(west, south, east, south, OUTER_CAP)
-  for (const room of layout.rooms) {
-    const [left, top, right, bottom] = [room.x * TILE, room.y * TILE, (room.x + room.width) * TILE, (room.y + room.height) * TILE]
-    line(left, top, right, top)
-    line(left, top, left, bottom)
-    line(right, top, right, bottom)
-    const door = layout.doors.find((d) => d.roomId === room.id)
-    if (!door) front(left, right, bottom)
-    else {
-      front(left, door.x - half, bottom)
-      front(door.x + door.width + half, right, bottom)
-    }
-  }
-
-  // Every outline first, then every cap, so walls meet without seams.
-  const g = new Graphics()
-  for (const f of faces) {
-    g.rect(f.x, f.y, f.width, WALL_FACE).fill(tone(theme.colors.outline))
-    g.rect(f.x + 1, f.y, f.width - 2, WALL_FACE - 2).fill(tone(theme.colors['wall.light']))
-    g.rect(f.x + 1, f.y + WALL_FACE - 3, f.width - 2, 1).fill(tone(theme.colors['wall.shadow']))
-  }
-  for (const s of strips) g.rect(s.x, s.y, s.width, s.height).fill(tone(theme.colors.outline))
-  for (const s of strips) g.rect(s.x + 1, s.y + 1, s.width - 2, s.height - 2).fill(tone(theme.colors['wall.top']))
-  // Jambs: the door frame stands a little proud of the wall.
-  for (const d of layout.doors)
-    for (const x of [d.x - half - 1, d.x + d.width - half - 1]) {
-      g.rect(x, d.y - 4, WALL_CAP + 2, 8).fill(tone(theme.colors.outline))
-      g.rect(x + 1, d.y - 3, WALL_CAP, 6).fill(tone(theme.colors['trim.light']))
-    }
-  return g
+function behind(room: RoomBox, layout: BuildingLayout, sources: Source[], x: number, width: number, height: number, tick: number, phase: DayPhase): { pixels: Pixel[]; outside: boolean } {
+  const worldX = room.x * TILE + x
+  if (room.y <= layout.floor.y) return { pixels: skyPixels(worldX, width, height, tick, phase), outside: true }
+  return { pixels: sample(sources, worldX, room.y * TILE - height, width, height), outside: false }
 }
 
-/** One room: its pixel art in a sprite, between the common floor and the walls. */
-function drawRoom(room: RoomBox, scene: Scene, world: Container): RoomPainter {
-  const theme = themeOf(scene.office.theme)
+/** One room: its pixel art in a sprite, between the common floor and the walls. Windows look through it. */
+function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Theme, world: Container, sources: Source[]): RoomPainter {
   const size = { width: room.width * TILE, height: room.height * TILE }
   const shell = roomShell(theme, room.width, room.height - WALL_HEIGHT / TILE)
   const canvas = document.createElement('canvas')
   paintInto(canvas, size.width, size.height, shell)
-  const texture = Texture.from(canvas)
-  texture.source.scaleMode = 'nearest'
-  const sprite = new Sprite(texture)
-  sprite.position.set(room.x * TILE, room.y * TILE)
-
+  const sprite = spriteOf(canvas, room.x * TILE, room.y * TILE)
   world.addChild(sprite)
+  sources.push({ canvas, x: room.x * TILE, y: room.y * TILE })
+  const colors = themeColors(theme.colors)
 
   const looks = new Map(room.desks.map((d) => [d.id, appearanceOf(d.id)]))
   const states = new Map(room.desks.map((d) => [d.id, agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
   return {
     paint: (tick) => {
+      const phase = phaseOf(new Date().getHours())
+      const openings: SceneItem[] = room.windows.map((x) => {
+        const view = behind(room, layout, sources, x + GLASS.x, GLASS.width, GLASS.height, tick, phase)
+        const lights: Light[] = view.outside && scene.dark ? windowLight(phase) : []
+        return { x, y: WINDOW.y, height: WINDOW_SIZE.height, pixels: windowPixels(view.pixels, colors), layer: 'wall', lights }
+      })
+      if (room.door.wall === 'Back') {
+        const view = behind(room, layout, sources, room.door.offset * TILE + 3, 26, 27, tick, phase)
+        openings.push({ x: room.door.offset * TILE, y: 0, height: WALL_HEIGHT, pixels: doorwayPixels(view.pixels, colors), layer: 'wall' })
+      }
       const items = [
+        ...openings,
         ...room.props.map((p) => propItem(p.name, p.x, p.y, tick, theme, size)),
         ...room.desks.map((d, i) =>
           deskItem(looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme),
         ),
       ]
       paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, scene.dark))
-      texture.source.update()
+      sprite.texture.source.update()
     },
   }
 }

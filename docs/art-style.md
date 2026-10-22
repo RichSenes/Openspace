@@ -107,6 +107,15 @@ hall tile (`HALL_FLOOR` in `sheets/rooms.ts`): big square tiles in the wall
 colours, so corridors never read as part of a room. Each theme lists its corridor
 furniture in `hall`.
 
+Windows (`src/frontend/src/art/windows.ts`) are 24 by 22: a frame in `trim.light`,
+a cross that splits four panes, a sill, and a two-pixel glint in each pane. On an
+outer back wall they show the sky for the hour on the viewer's clock (day, dusk,
+night) with bands dithered like pixel art, a far skyline, drifting clouds by day
+and twinkling stars and lit windows by night; by day they light a dark room. On an
+inner wall they show what is painted just behind the wall. Either way the view is
+glazed, a little paler and bluer, so a window never reads as a hole. A door in a
+back wall is a doorway with posts and a lintel that shows the same view.
+
 ### Homages
 
 Some furniture and outfits are affectionate homages to games, films and series

@@ -26,3 +26,5 @@ public sealed record DeskRenamed(OfficeId OfficeId, DeskId DeskId, string Name, 
 public sealed record RoomProcedureSet(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record RoomArranged(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record FloorPlanned(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;

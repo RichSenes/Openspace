@@ -14,6 +14,17 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
         builder.Property(o => o.Name).IsRequired();
         builder.Property(o => o.RepositoryPath);
         builder.Property(o => o.Theme).IsRequired().HasDefaultValue(Office.DefaultTheme);
+        builder.Property(o => o.FloorWidth);
+        builder.Property(o => o.FloorDepth);
+        builder.OwnsMany(o => o.Furniture, piece =>
+        {
+            piece.ToTable("CommonFurniture");
+            piece.WithOwner().HasForeignKey("OfficeId");
+            piece.Property<int>("Id");
+            piece.HasKey("Id");
+            piece.Property(p => p.Name).IsRequired();
+        });
+        builder.Navigation(o => o.Furniture).HasField("_furniture").UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.OwnsMany(o => o.Rooms, room =>
         {
@@ -35,6 +46,14 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                 piece.Property(p => p.Name).IsRequired();
             });
             room.Navigation(r => r.Furniture).HasField("_furniture").UsePropertyAccessMode(PropertyAccessMode.Field);
+            room.Property(r => r.Left);
+            room.Property(r => r.Top);
+            room.PrimitiveCollection(r => r.Windows).HasField("_windows").UsePropertyAccessMode(PropertyAccessMode.Field);
+            room.OwnsOne(r => r.Door, door =>
+            {
+                door.Property(d => d.Wall).HasColumnName("DoorWall").HasConversion<string>();
+                door.Property(d => d.Offset).HasColumnName("DoorOffset");
+            });
 
             room.OwnsMany(r => r.Desks, desk =>
             {

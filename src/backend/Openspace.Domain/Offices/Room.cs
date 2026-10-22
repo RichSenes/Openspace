@@ -8,6 +8,7 @@ public sealed class Room
     private readonly List<Desk> _desks = [];
     private List<string> _procedure = [];
     private List<FurniturePiece> _furniture = [];
+    private List<int> _windows = [];
 
     internal Room(RoomId id, string name)
     {
@@ -32,6 +33,24 @@ public sealed class Room
 
     /// <summary>Furniture placed by hand; empty while the room is laid out automatically.</summary>
     public IReadOnlyList<FurniturePiece> Furniture => _furniture;
+
+    /// <summary>Where the door is; null for the middle of the front wall.</summary>
+    public DoorPlacement? Door { get; private set; }
+
+    /// <summary>Windows in the back wall, by the pixel where each one starts.</summary>
+    public IReadOnlyList<int> Windows => _windows;
+
+    /// <summary>The room's back left corner in tiles from the building's; null while the office is laid out automatically.</summary>
+    public int? Left { get; private set; }
+
+    /// <inheritdoc cref="Left"/>
+    public int? Top { get; private set; }
+
+    /// <summary>The tiles the room takes on a floor plan, when it has a place and a size.</summary>
+    internal (int Left, int Top, int Right, int Bottom)? Box =>
+        Left is { } left && Top is { } top && Width is { } width && Depth is { } depth
+            ? (left, top, left + width, top + depth + RoomLayout.WallTiles)
+            : null;
 
     /// <summary>Steps every task of this room must follow; checked before its work goes to review.</summary>
     public IReadOnlyList<string> Procedure => _procedure;
@@ -64,6 +83,8 @@ public sealed class Room
         Width = layout.Width;
         Depth = layout.Depth;
         _furniture = [.. layout.Furniture];
+        Door = layout.Door;
+        _windows = [.. layout.Windows];
         _desks.ForEach(d => d.MoveTo(layout.Desks.GetValueOrDefault(d.Id)));
     }
 
@@ -72,7 +93,15 @@ public sealed class Room
         Width = null;
         Depth = null;
         _furniture = [];
+        Door = null;
+        _windows = [];
         _desks.ForEach(d => d.MoveTo(null));
+    }
+
+    internal void PlaceAt(int? left, int? top)
+    {
+        Left = left;
+        Top = top;
     }
 
     internal Desk AddDesk(string name, AgentProfile agent)

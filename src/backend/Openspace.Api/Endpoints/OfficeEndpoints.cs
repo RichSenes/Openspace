@@ -16,7 +16,35 @@ internal static class OfficeEndpoints
 
     public sealed record ThemeRequest(string Theme);
 
-    public sealed record LayoutRequest(int Width, int Depth, IReadOnlyList<DeskSpotRequest>? Desks, IReadOnlyList<FurniturePiece>? Furniture);
+    public sealed record LayoutRequest(
+        int Width,
+        int Depth,
+        IReadOnlyList<DeskSpotRequest>? Desks,
+        IReadOnlyList<FurniturePiece>? Furniture,
+        DoorPlacement? Door = null,
+        IReadOnlyList<int>? Windows = null)
+    {
+        public RoomLayout ToLayout()
+        {
+            var desks = Desks ?? [];
+            if (desks.DistinctBy(d => d.DeskId).Count() != desks.Count)
+            {
+                throw new DomainException("Each desk can stand in one place only.");
+            }
+
+            return RoomLayout.Create(
+                Width,
+                Depth,
+                desks.ToDictionary(d => new DeskId(d.DeskId), d => new Spot(d.X, d.Y)),
+                Furniture ?? [],
+                Door,
+                Windows);
+        }
+    }
+
+    public sealed record PlannedRoomRequest(Guid RoomId, int Left, int Top, LayoutRequest Layout);
+
+    public sealed record FloorPlanRequest(int Width, int Depth, IReadOnlyList<FurniturePiece>? Furniture, IReadOnlyList<PlannedRoomRequest>? Rooms);
 
     public sealed record DeskSpotRequest(Guid DeskId, int X, int Y);
 
@@ -68,18 +96,25 @@ internal static class OfficeEndpoints
         offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/layout", async (
             Guid officeId, Guid roomId, LayoutRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
-            var desks = request.Desks ?? [];
-            if (desks.DistinctBy(d => d.DeskId).Count() != desks.Count)
-            {
-                throw new DomainException("Each desk can stand in one place only.");
-            }
+            await commands.ArrangeRoomAsync(new OfficeId(officeId), new RoomId(roomId), request.ToLayout(), ct);
+            return Results.NoContent();
+        });
 
-            var layout = RoomLayout.Create(
+        offices.MapPut("/{officeId:guid}/plan", async (
+            Guid officeId, FloorPlanRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            var plan = FloorPlan.Create(
                 request.Width,
                 request.Depth,
-                desks.ToDictionary(d => new DeskId(d.DeskId), d => new Spot(d.X, d.Y)),
-                request.Furniture ?? []);
-            await commands.ArrangeRoomAsync(new OfficeId(officeId), new RoomId(roomId), layout, ct);
+                request.Furniture ?? [],
+                (request.Rooms ?? []).Select(r => new PlannedRoom(new RoomId(r.RoomId), r.Left, r.Top, r.Layout.ToLayout())));
+            await commands.PlanFloorAsync(new OfficeId(officeId), plan, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapDelete("/{officeId:guid}/plan", async (Guid officeId, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.ClearFloorPlanAsync(new OfficeId(officeId), ct);
             return Results.NoContent();
         });
 

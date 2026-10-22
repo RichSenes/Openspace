@@ -10,12 +10,12 @@ git ignores (see docs/art-style.md).
 
     python3 tools/pixelgrid.py dragonLamp picture.jpg
     python3 tools/pixelgrid.py blackCat frame1.png frame2.png --colors 6
-    python3 tools/pixelgrid.py blackCat animation.gif
+    python3 tools/pixelgrid.py blackCat animation.gif --height 12
     python3 tools/pixelgrid.py dragonLamp picture.jpg --light 52,14,30,flame.mid
 
 Requires Pillow. Several pictures, or the frames of an animated GIF, become animation
-frames and must share the grid. Transparent pixels, or the colour of the top left
-corner in pictures without transparency, are the background.
+frames and must share the grid. Transparent pixels and whatever surrounds the figure,
+even a gradient, are the background.
 """
 import argparse
 import math
@@ -62,7 +62,16 @@ def grid_of(found, low=3.0, high=40.0):
         scores.append(score(size))
         size += 0.01 if size < 16 else 0.05
     top = max(entry[0] for entry in scores)
-    rough = max((entry for entry in scores if entry[0] >= 0.9 * top), key=lambda entry: entry[1])[1]
+    # Sizes that fit well come in runs around each true multiple: take the run of the
+    # largest size, and its best fit.
+    good = [entry for entry in scores if entry[0] >= 0.9 * top]
+    runs = [[good[0]]]
+    for entry in good[1:]:
+        if entry[1] - runs[-1][-1][1] <= 0.06:
+            runs[-1].append(entry)
+        else:
+            runs.append([entry])
+    rough = max(runs[-1], key=lambda entry: entry[0])[1]
     # Then a finer look around it: a small error adds up across a wide picture.
     _, size, offset = max(score(rough + step / 1000) for step in range(-60, 61))
     return size, offset
@@ -71,7 +80,6 @@ def grid_of(found, low=3.0, high=40.0):
 def sample(image, size_x, size_y, offset_x, offset_y):
     px = image.load()
     w, h = image.size
-    background = px[0, 0]
     rows = []
     for r in range(int((h - offset_y) // size_y)):
         line = []
@@ -80,29 +88,129 @@ def sample(image, size_x, size_y, offset_x, offset_y):
             spots = [px[min(w - 1, int(cx + dx)), min(h - 1, int(cy + dy))] for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
             if sum(s[3] < 128 for s in spots) > len(spots) // 2:
                 line.append(None)
-                continue
-            color = tuple(sum(s[i] for s in spots) // len(spots) for i in range(3))
-            line.append(BACKGROUND if background[3] >= 128 and distance(color, background[:3]) < 30 else color)
+            else:
+                line.append(tuple(sum(s[i] for s in spots) // len(spots) for i in range(3)))
         rows.append(line)
-    return outside_cleared(rows, background[:3])
+    return background_cleared(rows)
 
 
-BACKGROUND = 'background'
-
-
-def outside_cleared(rows, background):
+def background_cleared(rows):
     """
-    Background around the figure becomes transparent; background enclosed by it (the
-    black eyes of a white dog on a black picture) keeps its colour.
+    Clears the background around the figure: a flood from the borders that spreads
+    while neighbours look alike, so it follows gradients and stops at outlines.
+    Background-coloured pixels enclosed by the figure (the black eyes of a white dog on
+    a black picture) keep their colour.
     """
     height, width = len(rows), len(rows[0])
-    stack = [(x, y) for x in range(width) for y in (0, height - 1)] + [(x, y) for y in range(height) for x in (0, width - 1)]
+    edge = [rows[y][x] for x in range(width) for y in (0, height - 1)] + [rows[y][x] for y in range(height) for x in (0, width - 1)]
+    if any(c is None for c in edge):
+        # A transparent picture: transparency is the background, and the figure may touch the borders.
+        return rows
+    # The background is the colour most of the border has (a figure may touch the border too),
+    # with the shades of it a gradient brings.
+    rounded = {}
+    for c in edge:
+        key = tuple(v // 16 for v in c)
+        rounded[key] = rounded.get(key, 0) + 1
+    common = max(rounded, key=rounded.get)
+    mode = next(c for c in edge if tuple(v // 16 for v in c) == common)
+    border = [c for c in edge[:: max(1, len(edge) // 80)] if distance(c, mode) < 120]
+    seen = [[False] * width for _ in range(height)]
+    stack = [(x, y, None) for x in range(width) for y in (0, height - 1)] + [(x, y, None) for y in range(height) for x in (0, width - 1)]
     while stack:
-        x, y = stack.pop()
-        if 0 <= x < width and 0 <= y < height and rows[y][x] == BACKGROUND:
-            rows[y][x] = None
-            stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-    return [[background if c == BACKGROUND else c for c in line] for line in rows]
+        x, y, came_from = stack.pop()
+        if not (0 <= x < width and 0 <= y < height) or seen[y][x]:
+            continue
+        here = rows[y][x]
+        # Spread to alike neighbours only, and never far from what the borders look like:
+        # a gentle gradient is background, a figure shading away from it is not.
+        if here is not None and (min(distance(here, b) for b in border) > 90 or (came_from is not None and distance(here, came_from) > 24)):
+            continue
+        seen[y][x] = True
+        rows[y][x] = None
+        step = here if here is not None else came_from
+        stack += [(x + 1, y, step), (x - 1, y, step), (x, y + 1, step), (x, y - 1, step)]
+    return holes_cleared(rows, border)
+
+
+def holes_cleared(rows, border):
+    """
+    Clears holes in the figure that show the background (inside a ring, say), but keeps
+    small ones: two black eyes on a black picture are part of the face.
+    """
+    height, width = len(rows), len(rows[0])
+    looks_like = lambda c: c is not None and min(distance(c, b) for b in border) < 40
+    seen = [[False] * width for _ in range(height)]
+    for y in range(height):
+        for x in range(width):
+            if seen[y][x] or not looks_like(rows[y][x]):
+                continue
+            region, stack = [], [(x, y)]
+            while stack:
+                cx, cy = stack.pop()
+                if 0 <= cx < width and 0 <= cy < height and not seen[cy][cx] and looks_like(rows[cy][cx]):
+                    seen[cy][cx] = True
+                    region.append((cx, cy))
+                    stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+            if len(region) > 6:
+                for cx, cy in region:
+                    rows[cy][cx] = None
+    return rows
+
+
+def emptied(rows, x, y):
+    """Empties the area around (x, y) that looks alike: a hole the background shows through."""
+    height, width = len(rows), len(rows[0])
+    stack, start = [(x, y)], rows[y][x]
+    while stack and start is not None:
+        cx, cy = stack.pop()
+        if 0 <= cx < width and 0 <= cy < height and rows[cy][cx] is not None and distance(rows[cy][cx], start) < 48:
+            rows[cy][cx] = None
+            stack += [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]
+    return rows
+
+
+def largest_only(frames):
+    """Keeps the biggest connected figure of each frame: drops signatures and captions."""
+    result = []
+    for rows in frames:
+        height, width = len(rows), len(rows[0])
+        label = [[0] * width for _ in range(height)]
+        sizes = {}
+        for y in range(height):
+            for x in range(width):
+                if rows[y][x] is None or label[y][x]:
+                    continue
+                n = len(sizes) + 1
+                stack, count = [(x, y)], 0
+                while stack:
+                    cx, cy = stack.pop()
+                    if 0 <= cx < width and 0 <= cy < height and rows[cy][cx] is not None and not label[cy][cx]:
+                        label[cy][cx] = n
+                        count += 1
+                        stack += [(cx + dx, cy + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+                sizes[n] = count
+        keep = max(sizes, key=sizes.get)
+        result.append([[c if label[y][x] == keep else None for x, c in enumerate(line)] for y, line in enumerate(rows)])
+    return result
+
+
+def outlined(frames):
+    """Adds a black line around the figure, for art drawn on a black background."""
+    result = []
+    for rows in frames:
+        height, width = len(rows) + 2, len(rows[0]) + 2
+        padded = [[None] * width] + [[None] + line + [None] for line in rows] + [[None] * width]
+        out = [line[:] for line in padded]
+        for y in range(height):
+            for x in range(width):
+                if padded[y][x] is None and any(
+                    0 <= x + dx < width and 0 <= y + dy < height and padded[y + dy][x + dx] is not None
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                ):
+                    out[y][x] = (0, 0, 0)
+        result.append(out)
+    return result
 
 
 def crop(frames):
@@ -127,13 +235,57 @@ def palette_of(frames, count):
     return merged
 
 
+def shrink(frames, colors, height):
+    """
+    Brings sprites down to a height in pixels, keeping them crisp: each new pixel takes
+    the most common colour of the area it covers (outline counts a bit more, so lines
+    survive), and the silhouette gets its outline back afterwards.
+    """
+    source_h, source_w = len(frames[0]), len(frames[0][0])
+    factor = height / source_h
+    width = max(1, round(source_w * factor))
+    outline = min(range(len(colors)), key=lambda i: sum(colors[i]))
+    result = []
+    for frame in frames:
+        rows = []
+        for r in range(height):
+            line = []
+            y0, y1 = r / factor, (r + 1) / factor
+            for c in range(width):
+                x0, x1 = c / factor, (c + 1) / factor
+                votes = {}
+                for y in range(int(y0), min(source_h, math.ceil(y1))):
+                    for x in range(int(x0), min(source_w, math.ceil(x1))):
+                        weight = (min(x1, x + 1) - max(x0, x)) * (min(y1, y + 1) - max(y0, y))
+                        key = frame[y][x]
+                        if key is not None and key == outline:
+                            weight *= 1.3
+                        votes[key] = votes.get(key, 0) + weight
+                line.append(max(votes, key=votes.get))
+            rows.append(line)
+        for r in range(height):
+            for c in range(width):
+                if rows[r][c] is not None and any(
+                    not (0 <= c + dx < width and 0 <= r + dy < height) or rows[r + dy][c + dx] is None
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                ):
+                    rows[r][c] = outline
+        result.append(rows)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('prop', help='name of the prop to redraw, as in PROPS (e.g. dragonLamp)')
     parser.add_argument('pictures', nargs='+')
     parser.add_argument('--colors', type=int, default=24, help='most colours to keep (default 24)')
-    parser.add_argument('--cell', type=float, help='size of one pixel in the picture, if guessing fails')
+    parser.add_argument('--cell', help='size of one pixel in the picture if guessing fails: 12.5, or 30.8x27.9 when stretched')
+    parser.add_argument('--offset', default='0,0', help='with --cell: where the first column and row start, as x,y')
+    parser.add_argument('--outline', action='store_true', help='draw a black outline around the figure')
     parser.add_argument('--light', action='append', default=[], help='x,y,radius,palette name of a light it gives off')
+    parser.add_argument('--hole', action='append', default=[], help='x,y of a hole to empty (inside a ring, say), in the full-size grid')
+    parser.add_argument('--largest', action='store_true', help='keep only the biggest figure (drops signatures and captions)')
+    parser.add_argument('--height', type=int, help='shrink to this height in pixels, to match the other sprites')
     parser.add_argument('--hint', help='its line on hover; the original prop line is kept otherwise')
     args = parser.parse_args()
 
@@ -143,12 +295,23 @@ def main():
     size_x, offset_x = grid_of(edges(first, w, h, 0))
     size_y, offset_y = grid_of(edges(first, w, h, 1))
     if args.cell:
-        size_x = size_y = args.cell
-        offset_x = offset_y = 0
-    frames = crop([sample(image, size_x, size_y, offset_x, offset_y) for image in images])
+        size_x, size_y = (float(v) for v in (args.cell.split('x') * 2)[:2])
+        offset_x, offset_y = (float(v) for v in args.offset.split(','))
+    frames = [sample(image, size_x, size_y, offset_x, offset_y) for image in images]
+    for hole in args.hole:
+        hx, hy = (int(v) for v in hole.split(','))
+        frames = [emptied(rows, hx, hy) for rows in frames]
+    if args.largest:
+        frames = largest_only(frames)
+    if args.outline:
+        frames = outlined(frames)
+    frames = crop(frames)
     colors = palette_of(frames, args.colors)
     nearest = lambda c: min(range(len(colors)), key=lambda i: distance(c, colors[i]))
-    rows = [[''.join(LETTERS[nearest(c)] if c else '.' for c in line) for line in f] for f in frames]
+    indexed = [[[nearest(c) if c else None for c in line] for line in f] for f in frames]
+    if args.height and args.height < len(indexed[0]):
+        indexed = shrink(indexed, colors, args.height)
+    rows = [[''.join(LETTERS[i] if i is not None else '.' for i in line) for line in f] for f in indexed]
 
     key = lambda i: f'fan.{args.prop}.{LETTERS[i]}'
     lights = []

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from './palette'
 import { AGENT_LOOKS, poseOf, type AgentState } from './agentStates'
-import { FURNITURE, withFanPack, type FanModule } from './fanPack'
+import { FAN_MODULES, withFanPack, type FanModule } from './fanPack'
 import { inTheDark } from './lighting'
 import { baseline, sceneLights, scenePixels } from './scene'
 import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS } from './sheets/character'
@@ -107,10 +107,16 @@ describe('fan pack', () => {
     expect(Object.keys(withFanPack(PROPS, [fan]))).toEqual(Object.keys(PROPS))
   })
 
-  it.each(Object.entries(FURNITURE))('%s, as drawn on this machine, is well formed and resolves', (_, prop) => {
-    expect(problemsOf(prop.sprite)).toEqual([])
+  it('has well formed drawings that resolve, if this machine has one', () => {
     const resolve = themeColors(THEMES.cozy.colors)
-    for (const name of Object.values(prop.sprite.legend)) expect(resolve(name), name).not.toBeNull()
+    const sprites = FAN_MODULES.flatMap((m) => [
+      ...Object.values(m.props).map((p) => p!.sprite),
+      ...Object.values(m.costumes ?? {}).flatMap((c) => Object.values(c!)),
+    ])
+    for (const sprite of sprites) {
+      expect(problemsOf(sprite)).toEqual([])
+      for (const name of Object.values(sprite.legend)) expect(resolve(name), name).not.toBeNull()
+    }
   })
 })
 

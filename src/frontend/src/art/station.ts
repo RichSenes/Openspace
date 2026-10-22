@@ -1,5 +1,5 @@
 import { BONE, CHARACTER_COLORS, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
-import { FAN_COLORS } from './fanPack'
+import { FAN_COLORS, FAN_COSTUMES } from './fanPack'
 import type { Light } from './lighting'
 import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
@@ -71,7 +71,7 @@ export function characterColors(look: Appearance): Resolve {
     'cloth.mid': clothMid,
     'cloth.dark': clothDark,
   }
-  return (name) => colors[name] ?? null
+  return (name) => colors[name] ?? FAN_COLORS[name] ?? null
 }
 
 /**
@@ -102,7 +102,7 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const cy = STATION.deskY - 14
   const { arms, hands } = GESTURE_PARTS[pose.gesture]
   const closed = pose.emotion === 'blink' || pose.emotion === 'asleep'
-  const costume = look.costume && COSTUMES[look.costume]
+  const costume = look.costume && (FAN_COSTUMES?.[look.costume] ?? COSTUMES[look.costume])
   const self = costume
     ? [costume.body, closed ? costume.closed : costume.open]
     : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]

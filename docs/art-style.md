@@ -149,11 +149,18 @@ background transparent (keeping background-coloured eyes inside the figure) and
 writes `fanpack/<prop>.ts`. Animated GIFs become animation frames.
 
 ```bash
-python3 tools/pixelgrid.py dragonLamp ~/Downloads/dragon.jpg --light 52,14,30,flame.mid
-python3 tools/pixelgrid.py blackCat ~/Downloads/cat.gif
+python3 tools/pixelgrid.py dragonLamp ~/Downloads/dragon.jpg --height 44 --light 30,8,30,flame.mid
+python3 tools/pixelgrid.py blackCat ~/Downloads/cat.gif --height 12
+python3 tools/pixelgrid.py keySword ~/Downloads/key.png --largest --hole 28,59 --height 44
 ```
 
-Copies keep their original size, so they can be much bigger than the agents.
+Copies are often bigger than our scale: `--height` brings them down to match the
+agents, keeping outlines crisp. `--largest` drops signatures and captions, `--hole`
+empties a ring's inside, `--cell`/`--offset` set the grid by hand when a picture is
+stretched, `--outline` adds a black line for art drawn on black. A fan module can
+also redraw a costume (`costumes.skeleton`, with `open`, `closed` and `body`).
+
+The tool has its own tests: `python3 -m unittest discover tools`.
 
 ### Lights off
 

@@ -90,6 +90,21 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new RoomProcedureSet(Id, roomId, now));
     }
 
+    /// <summary>Gives a room a size, places its desks and furnishes it.</summary>
+    public void ArrangeRoom(RoomId roomId, RoomLayout layout, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        FindRoom(roomId).Arrange(layout);
+        Raise(new RoomArranged(Id, roomId, now));
+    }
+
+    /// <summary>Lets the room be laid out automatically again, without its furniture.</summary>
+    public void ClearRoomLayout(RoomId roomId, DateTimeOffset now)
+    {
+        FindRoom(roomId).ClearLayout();
+        Raise(new RoomArranged(Id, roomId, now));
+    }
+
     public void UpdateRoomContext(RoomId roomId, string? context, DateTimeOffset now)
     {
         FindRoom(roomId).UpdateContext(context);

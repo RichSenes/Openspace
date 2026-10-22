@@ -7,6 +7,7 @@ public sealed class Room
 {
     private readonly List<Desk> _desks = [];
     private List<string> _procedure = [];
+    private List<FurniturePiece> _furniture = [];
 
     internal Room(RoomId id, string name)
     {
@@ -22,6 +23,15 @@ public sealed class Room
     public string Context { get; private set; } = string.Empty;
 
     public IReadOnlyList<Desk> Desks => _desks;
+
+    /// <summary>Tiles from wall to wall; null while the room is laid out automatically.</summary>
+    public int? Width { get; private set; }
+
+    /// <summary>Tiles of floor in front of the back wall; null while the room is laid out automatically.</summary>
+    public int? Depth { get; private set; }
+
+    /// <summary>Furniture placed by hand; empty while the room is laid out automatically.</summary>
+    public IReadOnlyList<FurniturePiece> Furniture => _furniture;
 
     /// <summary>Steps every task of this room must follow; checked before its work goes to review.</summary>
     public IReadOnlyList<string> Procedure => _procedure;
@@ -42,6 +52,27 @@ public sealed class Room
         }
 
         _procedure = clean;
+    }
+
+    internal void Arrange(RoomLayout layout)
+    {
+        foreach (var id in layout.Desks.Keys.Where(id => !_desks.Exists(d => d.Id == id)))
+        {
+            throw new DomainException($"Room '{Name}' has no desk {id.Value}.");
+        }
+
+        Width = layout.Width;
+        Depth = layout.Depth;
+        _furniture = [.. layout.Furniture];
+        _desks.ForEach(d => d.MoveTo(layout.Desks.GetValueOrDefault(d.Id)));
+    }
+
+    internal void ClearLayout()
+    {
+        Width = null;
+        Depth = null;
+        _furniture = [];
+        _desks.ForEach(d => d.MoveTo(null));
     }
 
     internal Desk AddDesk(string name, AgentProfile agent)

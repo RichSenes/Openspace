@@ -27,6 +27,11 @@ public sealed class Desk
     /// <summary>The role that tells the agent how to work; null for a plain OpenCode agent.</summary>
     public RoleId? RoleId { get; private set; }
 
+    /// <summary>Where the desk stands in its room; null when the room places it automatically.</summary>
+    public Spot? Spot { get; private set; }
+
+    internal void MoveTo(Spot? spot) => Spot = spot;
+
     internal void Reassign(AgentProfile agent) => Agent = agent;
 
     internal void GiveRole(RoleId? roleId) => RoleId = roleId;

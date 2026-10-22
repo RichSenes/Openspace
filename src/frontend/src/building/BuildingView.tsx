@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Lightbulb, LightbulbOff } from 'lucide-react'
+import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
 import { useActivity, useOfficeTasks, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
-import { BuildingCanvas } from './BuildingCanvas'
+import { placeIn, withDrafts, type Drafts } from './arrange'
+import { ArrangePanel } from './ArrangePanel'
+import { BuildingCanvas, type Selection } from './BuildingCanvas'
 import './building.css'
 
 const lightsKey = (officeId: string) => `openspace.lights-off.${officeId}`
@@ -46,6 +48,15 @@ export function BuildingView({ office, onOpenRooms }: Props) {
   const setTheme = useSetOfficeTheme(office.id)
   const toast = useToast()
   const noTasks = useMemo(() => [], [])
+  const [arranging, setArranging] = useState(false)
+  const [drafts, setDrafts] = useState<Drafts>({})
+  const [selection, setSelection] = useState<Selection | null>(null)
+  const shown = useMemo(() => withDrafts(office, drafts), [office, drafts])
+  const stopArranging = () => {
+    setArranging(false)
+    setDrafts({})
+    setSelection(null)
+  }
 
   if (office.rooms.length === 0) {
     return (
@@ -60,14 +71,34 @@ export function BuildingView({ office, onOpenRooms }: Props) {
   }
 
   return (
-    <div className="building">
+    <div className={arranging ? 'building arranging' : 'building'}>
       <BuildingCanvas
-        office={office}
+        office={shown}
         tasks={tasks.data ?? noTasks}
         activities={bubbles}
         dark={lightsOff}
+        arrange={
+          arranging
+            ? {
+                selection,
+                onSelect: setSelection,
+                onPlace: (roomId, target, x, y) => setDrafts((d) => placeIn(shown, d, roomId, target, x, y)),
+              }
+            : undefined
+        }
         controls={
+          arranging ? undefined : (
           <>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setArranging(true)
+                setSelection({ roomId: office.rooms[0].id })
+              }}
+            >
+              <Move size={16} /> Arrange
+            </button>
             <button type="button" className="btn" aria-pressed={lightsOff} onClick={() => setLightsOff(!lightsOff)}>
               {lightsOff ? <LightbulbOff size={16} /> : <Lightbulb size={16} />} {lightsOff ? 'Lights on' : 'Lights off'}
             </button>
@@ -91,8 +122,20 @@ export function BuildingView({ office, onOpenRooms }: Props) {
               ))}
             </select>
           </>
+          )
         }
       />
+      {arranging && (
+        <ArrangePanel
+          office={shown}
+          saved={office}
+          drafts={drafts}
+          onDrafts={setDrafts}
+          selection={selection}
+          onSelect={setSelection}
+          onClose={stopArranging}
+        />
+      )}
     </div>
   )
 }

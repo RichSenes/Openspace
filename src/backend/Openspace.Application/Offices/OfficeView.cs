@@ -11,13 +11,24 @@ public sealed record OfficeView(Guid Id, string Name, string? RepositoryPath, st
     }
 }
 
-public sealed record RoomView(Guid Id, string Name, string Context, IReadOnlyList<string> Procedure, IReadOnlyList<DeskView> Desks)
+/// <param name="Width">Tiles from wall to wall; null while the room is laid out automatically, like <paramref name="Depth"/>.</param>
+public sealed record RoomView(
+    Guid Id,
+    string Name,
+    string Context,
+    IReadOnlyList<string> Procedure,
+    IReadOnlyList<DeskView> Desks,
+    int? Width,
+    int? Depth,
+    IReadOnlyList<FurniturePiece> Furniture)
 {
     public static RoomView From(Room room) =>
-        new(room.Id.Value, room.Name, room.Context, [.. room.Procedure], [.. room.Desks.Select(DeskView.From)]);
+        new(room.Id.Value, room.Name, room.Context, [.. room.Procedure], [.. room.Desks.Select(DeskView.From)], room.Width, room.Depth, [.. room.Furniture]);
 }
 
-public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId)
+/// <param name="Spot">Where the desk stands in its room; null when it is placed automatically.</param>
+public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot)
 {
-    public static DeskView From(Desk desk) => new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value);
+    public static DeskView From(Desk desk) =>
+        new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot);
 }

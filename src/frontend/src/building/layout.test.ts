@@ -86,3 +86,23 @@ describe('bestLayout', () => {
     expect(scale).toBeGreaterThanOrEqual(fitScale({ width: single.width * 16, height: single.height * 16 }, viewport))
   })
 })
+
+describe('layoutOffice with rooms arranged by hand', () => {
+  const desk = (id: string, spot?: { x: number; y: number }) => ({ id, name: id, agentName: 'agent', model: null, roleId: null, spot })
+
+  it('keeps the size, the desks and the furniture of an arranged room', () => {
+    const arranged: RoomView = { ...room('Web', 0), width: 12, depth: 6, desks: [desk('a', { x: 70, y: 50 })], furniture: [{ name: 'rug', x: 10, y: 40 }, { name: 'not-a-prop', x: 0, y: 40 }] }
+    const box = layoutOffice(office(arranged), 100).rooms[0]
+    expect([box.width, box.height]).toEqual([12, 8])
+    expect(box.desks[0]).toMatchObject({ x: box.x * 16 + 70, y: box.y * 16 + 50 })
+    expect(box.props).toEqual([{ name: 'rug', x: 10, y: 40 }])
+  })
+
+  it('gives desks without a spot a free slot', () => {
+    const auto = layoutOffice(office(room('Web', 2)), 100).rooms[0]
+    const first = { x: auto.desks[0].x - auto.x * 16, y: auto.desks[0].y - auto.y * 16 }
+    const mixed: RoomView = { ...room('Web', 0), width: 12, depth: 6, desks: [desk('a', first), desk('b')] }
+    const box = layoutOffice(office(mixed), 100).rooms[0]
+    expect(box.desks[1].x).not.toBe(box.desks[0].x)
+  })
+})

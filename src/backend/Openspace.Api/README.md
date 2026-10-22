@@ -10,9 +10,12 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/offices` | All offices with rooms and desks |
 | GET | `/api/offices/{id}` | One office |
 | POST | `/api/offices` | Open an office: `{ name }` |
+| PUT | `/api/offices/{id}/theme` | Draw the office with another mood: `{ theme }`, one word such as `cozy` or `neonDistrict` |
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
+| PUT | `/api/offices/{id}/rooms/{roomId}/layout` | Arrange a room by hand: `{ width, depth, desks: [{ deskId, x, y }], furniture: [{ name, x, y }] }`; sizes in tiles, places in pixels from the room's corner; desks left out are placed automatically |
+| DELETE | `/api/offices/{id}/rooms/{roomId}/layout` | Give the room back to the automatic layout |
 | POST | `/api/offices/{id}/rooms/{roomId}/desks` | Add a desk: `{ name, agentName, model?, roleId? }` |
 | GET | `/api/tasks?officeId=&status=` | Tasks, oldest first, optionally filtered |
 | GET | `/api/tasks/{id}` | One task with its notes |

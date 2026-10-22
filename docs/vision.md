@@ -90,11 +90,16 @@ Later, in rough order of appearance:
   review, when a task fails, and other moments worth hearing. Customisable per
   kind of event, per room or per single desk, with sensible defaults and a quick
   way to mute.
-- **Office layout editor.** Offices and rooms are arranged by hand: desks and
-  props (plants, small tables, whiteboards, server racks…) are dragged and placed
-  freely, not only in a row, some in front and some behind. Everything is drawn
-  sorted by its base line, so what stands in front covers what is behind. Comes
-  after the sprite set.
+- ~~**Office layout editor.**~~ Done: Arrange in the building view resizes a room,
+  drags desks and furniture anywhere (arrows nudge, Delete removes) and saves the
+  room; everything is drawn sorted by its base line. Rooms never arranged keep
+  the automatic layout.
+- **Agents dressed by hand.** Outfits, costumes and accessories chosen per desk or
+  per role instead of derived from the desk id.
+- **The city.** A map of the town where each office is a building (a house, a
+  tower, a warehouse) among roads with moving cars, random decorations and light
+  that follows the time of day. Clicking a building zooms into it and fades to
+  its rooms; leaving zooms back out to the street.
 - ~~**Mouse navigation**~~ Done: wheel to zoom at the cursor, left-drag to pan,
   double-click a room to fly into it, Fit to see everything again.
 - ~~**Audit log.**~~ Done: every tool call, step, permission, note and status

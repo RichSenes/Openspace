@@ -61,6 +61,22 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Saves how a room is arranged: its size, where its desks stand, its furniture.</summary>
+    public async Task ArrangeRoomAsync(OfficeId officeId, RoomId roomId, RoomLayout layout, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.ArrangeRoom(roomId, layout, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Goes back to the automatic layout of a room.</summary>
+    public async Task ClearRoomLayoutAsync(OfficeId officeId, RoomId roomId, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.ClearRoomLayout(roomId, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task RenameDeskAsync(OfficeId officeId, DeskId deskId, string name, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

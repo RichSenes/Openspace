@@ -6,6 +6,7 @@ import {
   arrangementOf,
   boundsOf,
   furnitureLabel,
+  handlesOf,
   layoutRequest,
   place,
   removePiece,
@@ -133,5 +134,16 @@ describe('withDrafts', () => {
       desks: [{ deskId: 'd', x: 1, y: 2 }],
       furniture: [{ name: 'rug', x: 3, y: 40 }],
     })
+  })
+})
+
+describe('handlesOf', () => {
+  it('puts a handle on the right wall, the front edge and the corner between them', () => {
+    const box = { id: 'r', name: 'R', x: 2, y: 2, width: 10, height: 6, desks: [], props: [] }
+    expect(handlesOf(box)).toEqual([
+      { edge: 'right', x: 194, y: 80 },
+      { edge: 'bottom', x: 112, y: 130 },
+      { edge: 'corner', x: 194, y: 130 },
+    ])
   })
 })

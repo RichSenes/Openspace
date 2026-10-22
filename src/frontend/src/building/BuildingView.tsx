@@ -5,7 +5,7 @@ import { useActivity, useOfficeTasks, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
-import { placeIn, withDrafts, type Drafts } from './arrange'
+import { editRoom, placeIn, resize, withDrafts, type Drafts } from './arrange'
 import { ArrangePanel } from './ArrangePanel'
 import { BuildingCanvas, type Selection } from './BuildingCanvas'
 import './building.css'
@@ -83,6 +83,7 @@ export function BuildingView({ office, onOpenRooms }: Props) {
                 selection,
                 onSelect: setSelection,
                 onPlace: (roomId, target, x, y) => setDrafts((d) => placeIn(shown, d, roomId, target, x, y)),
+                onResize: (roomId, width, depth) => setDrafts((d) => editRoom(shown, d, roomId, (a) => resize(a, width, depth))),
               }
             : undefined
         }

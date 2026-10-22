@@ -7,9 +7,9 @@ import { deskItem, propItem, roomPixels, roomShell, WALL_HEIGHT } from '../art/r
 import { STATION } from '../art/station'
 import { themeOf } from '../art/themes'
 import { agentStateOf, appearanceOf } from './agents'
-import { arrangementOf, boundsOf, place, targetAt, type Target } from './arrange'
+import { arrangementOf, boundsOf, handlesOf, place, targetAt, type Edge, type Target } from './arrange'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
-import { bestLayout, layoutOffice, TILE, type BuildingLayout, type RoomBox } from './layout'
+import { bestLayout, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
 
 /** Frames per second of the pixel art, as in docs/art-style.md. */
 const FPS = 5
@@ -52,7 +52,11 @@ export interface ArrangeControls {
   onSelect: (selection: Selection | null) => void
   /** A target was dropped at (x, y), in pixels from its room's corner. */
   onPlace: (roomId: string, target: Target, x: number, y: number) => void
+  /** A room's edge was dragged: its new size in tiles, wall to wall and floor depth. */
+  onResize: (roomId: string, width: number, depth: number) => void
 }
+
+const EDGE_CURSORS: Record<Edge, string> = { right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art floor plan you can zoom, pan and fly through. */
 export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange }: Props) {
@@ -221,7 +225,10 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     return { x: e.clientX - box.left, y: e.clientY - box.top }
   }
   let drag: { x: number; y: number; id: number; moved: number } | undefined
-  let carry: { room: RoomBox; target: Target; from: { x: number; y: number }; grab: { x: number; y: number }; to?: { x: number; y: number } } | undefined
+  let carry: { roomId: string; target: Target; from: { x: number; y: number }; grab: { x: number; y: number }; to?: { x: number; y: number } } | undefined
+  let stretch: { roomId: string; edge: Edge; size: { width: number; depth: number } } | undefined
+  // Rooms are redrawn as soon as something is picked: always look them up by id.
+  const roomById = (id: string) => view.layout?.rooms.find((r) => r.id === id)
 
   const roomAt = (world: { x: number; y: number }) =>
     view.layout?.rooms.find(
@@ -235,6 +242,19 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
     return { room, local, target: targetAt(arrangementOf(room), local) }
   }
+  /** The edge handle of the selected room under the pointer, a few screen pixels around it. */
+  const handleAt = (e: MouseEvent) => {
+    const id = arrange()?.selection?.roomId
+    const room = id ? roomById(id) : undefined
+    if (!room) return undefined
+    const at = point(e)
+    const handle = handlesOf(room).find((h) => {
+      const x = h.x * view.camera.scale + view.camera.x
+      const y = h.y * view.camera.scale + view.camera.y
+      return Math.abs(at.x - x) <= 10 && Math.abs(at.y - y) <= 10
+    })
+    return handle && { room, edge: handle.edge }
+  }
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
@@ -246,10 +266,15 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return
     const controls = arrange()
-    const picked = controls ? pick(e) : undefined
-    if (controls && picked?.target) {
+    const handle = controls ? handleAt(e) : undefined
+    const picked = controls && !handle ? pick(e) : undefined
+    if (handle) {
+      // The room grows under the pointer: the camera stays put meanwhile.
+      view.auto = false
+      stretch = { roomId: handle.room.id, edge: handle.edge, size: { width: handle.room.width, depth: handle.room.height - WALL } }
+    } else if (controls && picked?.target) {
       const box = boundsOf(arrangementOf(picked.room), picked.target)!
-      carry = { room: picked.room, target: picked.target, from: { x: box.x, y: box.y }, grab: picked.local }
+      carry = { roomId: picked.room.id, target: picked.target, from: { x: box.x, y: box.y }, grab: picked.local }
       controls.onSelect({ roomId: picked.room.id, target: picked.target })
     }
     drag = { ...point(e), id: e.pointerId, moved: 0 }
@@ -259,20 +284,38 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     } catch {
       // Some pointers cannot be captured; dragging still works inside the canvas.
     }
-    canvas.style.cursor = carry ? 'move' : 'grabbing'
+    canvas.style.cursor = stretch ? EDGE_CURSORS[stretch.edge] : carry ? 'move' : 'grabbing'
   }
   const onMove = (e: PointerEvent) => {
     if (!drag) {
-      if (arrange()) canvas.style.cursor = pick(e)?.target ? 'move' : 'grab'
+      if (arrange()) {
+        const handle = handleAt(e)
+        canvas.style.cursor = handle ? EDGE_CURSORS[handle.edge] : pick(e)?.target ? 'move' : 'grab'
+      }
       return
     }
     if (drag.id !== e.pointerId) return
     const now = point(e)
     drag.moved += Math.abs(now.x - drag.x) + Math.abs(now.y - drag.y)
-    if (carry) {
+    const room = carry ? roomById(carry.roomId) : stretch ? roomById(stretch.roomId) : undefined
+    if (carry && room) {
       const world = toWorld(view.camera, now)
-      const local = { x: world.x - carry.room.x * TILE, y: world.y - carry.room.y * TILE }
-      carry.to = carryTo(view, carry.room, carry.target, carry.from.x + local.x - carry.grab.x, carry.from.y + local.y - carry.grab.y)
+      const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
+      carry.to = carryTo(view, room, carry.target, carry.from.x + local.x - carry.grab.x, carry.from.y + local.y - carry.grab.y)
+      drag = { ...now, id: e.pointerId, moved: drag.moved }
+      return
+    }
+    if (stretch && room) {
+      const world = toWorld(view.camera, now)
+      const size = {
+        width: stretch.edge === 'bottom' ? stretch.size.width : Math.round((world.x - room.x * TILE) / TILE),
+        depth: stretch.edge === 'right' ? stretch.size.depth : Math.round((world.y - room.y * TILE) / TILE) - WALL,
+      }
+      // Whole tiles only: the room is redrawn when it gains or loses one.
+      if (size.width !== stretch.size.width || size.depth !== stretch.size.depth) {
+        stretch.size = size
+        arrange()?.onResize(stretch.roomId, size.width, size.depth)
+      }
       drag = { ...now, id: e.pointerId, moved: drag.moved }
       return
     }
@@ -285,14 +328,15 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
   const onUp = (e: PointerEvent) => {
     if (drag?.id !== e.pointerId) return
     const controls = arrange()
-    if (carry?.to) controls?.onPlace(carry.room.id, carry.target, carry.to.x, carry.to.y)
+    if (carry?.to) controls?.onPlace(carry.roomId, carry.target, carry.to.x, carry.to.y)
     // A click on a room, not a drag of the view, picks the room to arrange.
-    else if (controls && !carry && drag.moved < 4) {
+    else if (controls && !carry && !stretch && drag.moved < 4) {
       const room = pick(e)?.room
       controls.onSelect(room ? { roomId: room.id } : null)
     }
     drag = undefined
     carry = undefined
+    stretch = undefined
     canvas.style.cursor = 'grab'
   }
   const onDoubleClick = (e: MouseEvent) => {
@@ -369,6 +413,8 @@ function outline(g: Graphics, layout: BuildingLayout, selected: Selection | null
   const room = selected && layout.rooms.find((r) => r.id === selected.roomId)
   if (!room) return
   g.rect(room.x * TILE - 3, room.y * TILE - 3, room.width * TILE + 6, room.height * TILE + 6).stroke({ width: 2, color: COLORS.selected })
+  // Square handles to drag the walls out or in.
+  for (const h of handlesOf(room)) g.rect(h.x - 3, h.y - 3, 6, 6).fill(COLORS.selected).stroke({ width: 1, color: COLORS.roomEdge })
   const box = selected.target && boundsOf(arrangementOf(room), selected.target)
   if (box) {
     const x = room.x * TILE + box.x

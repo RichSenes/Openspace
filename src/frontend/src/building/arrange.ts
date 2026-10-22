@@ -217,3 +217,16 @@ export function editRoom(shown: OfficeView, drafts: Drafts, roomId: string, chan
 
 export const placeIn = (shown: OfficeView, drafts: Drafts, roomId: string, target: Target, x: number, y: number) =>
   editRoom(shown, drafts, roomId, (a) => place(a, target, x, y))
+
+export type Edge = 'right' | 'bottom' | 'corner'
+
+/** The handles on the edges of a room being arranged, in world pixels, just outside its walls. */
+export function handlesOf(room: RoomBox): { edge: Edge; x: number; y: number }[] {
+  const right = (room.x + room.width) * TILE + 2
+  const bottom = (room.y + room.height) * TILE + 2
+  return [
+    { edge: 'right', x: right, y: (room.y + room.height / 2) * TILE },
+    { edge: 'bottom', x: (room.x + room.width / 2) * TILE, y: bottom },
+    { edge: 'corner', x: right, y: bottom },
+  ]
+}

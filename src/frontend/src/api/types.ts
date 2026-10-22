@@ -37,6 +37,8 @@ export interface OfficeView {
   id: string
   name: string
   repositoryPath: string | null
+  /** The mood it is drawn with; unknown names fall back to the default. */
+  theme: string
   rooms: RoomView[]
 }
 

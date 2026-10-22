@@ -117,6 +117,17 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_office_theme_survives_a_round_trip()
+    {
+        var (office, _, _) = await FurnishECorpAsync();
+        Assert.Equal("cozy", (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Theme);
+
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().ChangeThemeAsync(office, "neonDistrict", default));
+
+        Assert.Equal("neonDistrict", (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Theme);
+    }
+
+    [Fact]
     public async Task Repository_path_and_agent_run_survive_a_round_trip()
     {
         var (office, frontend, _) = await FurnishECorpAsync();

@@ -29,6 +29,12 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<string>("RepositoryPath")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("cozy");
+
                     b.HasKey("Id");
 
                     b.ToTable("Offices", (string)null);

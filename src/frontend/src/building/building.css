@@ -21,8 +21,13 @@
   pointer-events: none;
 }
 
-.building-controls .btn {
+.building-controls .btn,
+.building-controls select {
   pointer-events: auto;
+}
+
+.building-controls select {
+  width: auto;
 }
 
 .building-canvas canvas {

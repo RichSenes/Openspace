@@ -82,6 +82,7 @@ In scope:
 - when done: show the diff, accept or discard, with the agent's notes attached to the task;
 - a minimal MCP server so agents can update their task and announce bubbles;
 - one pixel-art office view with basic animations (idle, working, sleeping).
+  Done: agents drawn in their real state, office themes, lights off.
 
 Later, in rough order of appearance:
 

@@ -63,3 +63,6 @@ export const THEMES = {
 } satisfies Record<string, Theme>
 
 export type ThemeName = keyof typeof THEMES
+
+/** The theme an office asks for, or the default when this version does not know it. */
+export const themeOf = (name: string): Theme => (name in THEMES ? THEMES[name as ThemeName] : THEMES.cozy)

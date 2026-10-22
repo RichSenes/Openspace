@@ -1,20 +1,21 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
-import { Application, Container, Graphics, Text } from 'pixi.js'
-import type { DeskActivity, OfficeView } from '../api/types'
+import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
+import type { DeskActivity, OfficeView, WorkTaskView } from '../api/types'
+import { paintInto } from '../art/canvas'
+import { deskItem, propItem, roomPixels, roomShell, WALL_HEIGHT } from '../art/roomScene'
+import { STATION } from '../art/station'
+import { themeOf } from '../art/themes'
+import { agentStateOf, appearanceOf } from './agents'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
-import { bestLayout, layoutOffice, TILE, type BuildingLayout } from './layout'
+import { bestLayout, layoutOffice, TILE, type BuildingLayout, type RoomBox } from './layout'
+
+/** Frames per second of the pixel art, as in docs/art-style.md. */
+const FPS = 5
 
 const COLORS = {
   ground: 0x14161c,
-  floorLight: 0x2a2d38,
-  floorDark: 0x252833,
-  wall: 0x4a5163,
-  wallTop: 0x5d6579,
-  desk: 0x8a6a4a,
-  deskEdge: 0x6b5139,
-  screenOff: 0x1b1e26,
-  screenOn: 0x8fd282,
+  roomEdge: 0x0b0c10,
   label: 0xece8df,
   mute: 0xa3a8b6,
   bubble: 0xece8df,
@@ -26,14 +27,18 @@ const BUBBLE_WIDTH = 132
 
 interface Props {
   office: OfficeView
-  /** Desks with a running task: their screens are lit. */
-  busyDeskIds: ReadonlySet<string>
+  /** The office's tasks: they tell what each agent is up to. */
+  tasks: readonly WorkTaskView[]
   /** What each desk is doing, by desk id: shown as speech bubbles. */
   activities: ReadonlyMap<string, DeskActivity>
+  /** Lights off: only screens, lamps and other glowing things light the rooms. */
+  dark: boolean
+  /** More controls beside Fit. */
+  controls?: ReactNode
 }
 
 /** Draws the selected office as a pixel-art floor plan you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
+export function BuildingCanvas({ office, tasks, activities, dark, controls }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
@@ -51,10 +56,12 @@ export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
         : layoutOffice(office, view.layout?.width ?? Number.MAX_SAFE_INTEGER)
       view.layout = layout
 
-      app.stage.removeChildren().forEach((child) => child.destroy({ children: true }))
-      const world = drawBuilding(layout, busyDeskIds, activities)
+      app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
+      const { world, rooms } = drawBuilding(layout, { office, tasks, activities, dark })
       app.stage.addChild(world)
       view.world = world
+      view.rooms = rooms
+      rooms.forEach((room) => room.paint(view.tick))
       if (auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
     }
@@ -85,6 +92,15 @@ export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
       }
       listeners.push(...attachNavigation(app))
       draw.current()
+      // The art moves at its own pace; people who prefer less motion get still rooms.
+      if (!reducedMotion()) {
+        const timer = setInterval(() => {
+          const view = viewOf(app)
+          view.tick++
+          view.rooms?.forEach((room) => room.paint(view.tick))
+        }, 1000 / FPS)
+        listeners.push(() => clearInterval(timer))
+      }
     })
 
     return () => {
@@ -97,7 +113,7 @@ export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
     }
   }, [])
 
-  useEffect(() => draw.current(), [office, busyDeskIds, activities])
+  useEffect(() => draw.current(), [office, tasks, activities, dark])
 
   return (
     <div className="building-canvas" ref={host}>
@@ -106,6 +122,7 @@ export function BuildingCanvas({ office, busyDeskIds, activities }: Props) {
         <button type="button" className="btn" onClick={() => fitAll.current()}>
           <Maximize size={16} /> Fit
         </button>
+        {controls}
       </div>
     </div>
   )
@@ -118,6 +135,9 @@ interface View {
   auto: boolean
   layout?: BuildingLayout
   world?: Container
+  rooms?: RoomPainter[]
+  /** Frames of pixel art shown so far. */
+  tick: number
   animation?: number
 }
 
@@ -126,7 +146,7 @@ const views = new WeakMap<Application, View>()
 function viewOf(app: Application): View {
   let view = views.get(app)
   if (!view) {
-    view = { camera: { x: 0, y: 0, scale: 1 }, auto: true }
+    view = { camera: { x: 0, y: 0, scale: 1 }, auto: true, tick: 0 }
     views.set(app, view)
   }
   return view
@@ -229,51 +249,68 @@ function attachNavigation(app: Application): (() => void)[] {
   ]
 }
 
-function drawBuilding(
-  layout: BuildingLayout,
-  busy: ReadonlySet<string>,
-  activities: ReadonlyMap<string, DeskActivity>,
-): Container {
+/** A room drawn as pixel art, repainted at every frame of the animation. */
+interface RoomPainter {
+  paint: (tick: number) => void
+}
+
+interface Scene {
+  office: OfficeView
+  tasks: readonly WorkTaskView[]
+  activities: ReadonlyMap<string, DeskActivity>
+  dark: boolean
+}
+
+function drawBuilding(layout: BuildingLayout, scene: Scene): { world: Container; rooms: RoomPainter[] } {
   const world = new Container()
+  const labels = new Container()
   const bubbles = new Container()
+  const rooms = layout.rooms.map((room) => drawRoom(room, scene, world))
 
   for (const room of layout.rooms) {
-    const g = new Graphics()
-    const px = room.x * TILE
-    const py = room.y * TILE
-
-    // Walls, then a checkered floor inside them.
-    g.rect(px, py, room.width * TILE, room.height * TILE).fill(COLORS.wall)
-    g.rect(px, py, room.width * TILE, 4).fill(COLORS.wallTop)
-    for (let ty = 2; ty < room.height - 1; ty++) {
-      for (let tx = 1; tx < room.width - 1; tx++) {
-        g.rect(px + tx * TILE, py + ty * TILE, TILE, TILE).fill((tx + ty) % 2 === 0 ? COLORS.floorLight : COLORS.floorDark)
-      }
-    }
-
+    labels.addChild(label(room.name, room.x * TILE + 6, room.y * TILE + 4, COLORS.label, 8))
     for (const desk of room.desks) {
-      const dx = desk.x * TILE
-      const dy = desk.y * TILE
-      g.rect(dx - 4, dy + 10, 2 * TILE + 8, TILE - 6).fill(COLORS.deskEdge)
-      g.rect(dx - 4, dy + 8, 2 * TILE + 8, TILE - 8).fill(COLORS.desk)
-      g.rect(dx + 6, dy - 6, 20, 14).fill(COLORS.deskEdge)
-      g.rect(dx + 8, dy - 4, 16, 10).fill(busy.has(desk.id) ? COLORS.screenOn : COLORS.screenOff)
-    }
-    world.addChild(g)
-
-    world.addChild(label(room.name, px + TILE, py + TILE + 2, COLORS.label, 8))
-    for (const desk of room.desks) {
-      world.addChild(label(desk.name, desk.x * TILE + TILE, desk.y * TILE + TILE + 8, COLORS.mute, 8, true))
-      const activity = activities.get(desk.id)
-      if (activity?.headline) {
-        bubbles.addChild(bubble(activity, desk.x * TILE + TILE, desk.y * TILE - 10))
-      }
+      labels.addChild(label(desk.name, desk.x + STATION.width / 2, desk.y + STATION.height + 1, COLORS.mute, 6, true, NAME_WIDTH))
+      const activity = scene.activities.get(desk.id)
+      if (activity?.headline) bubbles.addChild(bubble(activity, desk.x + STATION.width / 2, desk.y - 1))
     }
   }
 
-  // Bubbles go on top of every room, so they can spill over walls.
-  world.addChild(bubbles)
-  return world
+  // Names, then bubbles, go on top of every room, so they can spill over walls.
+  world.addChild(labels, bubbles)
+  return { world, rooms }
+}
+
+/** One room: its pixel art in a sprite, with a dark edge so rooms stand apart. */
+function drawRoom(room: RoomBox, scene: Scene, world: Container): RoomPainter {
+  const theme = themeOf(scene.office.theme)
+  const size = { width: room.width * TILE, height: room.height * TILE }
+  const shell = roomShell(theme, room.width, room.height - WALL_HEIGHT / TILE)
+  const canvas = document.createElement('canvas')
+  paintInto(canvas, size.width, size.height, shell)
+  const texture = Texture.from(canvas)
+  texture.source.scaleMode = 'nearest'
+  const sprite = new Sprite(texture)
+  sprite.position.set(room.x * TILE, room.y * TILE)
+
+  const edge = new Graphics()
+  edge.rect(room.x * TILE - 1, room.y * TILE - 1, size.width + 2, size.height + 2).stroke({ width: 1, color: COLORS.roomEdge })
+  world.addChild(edge, sprite)
+
+  const looks = new Map(room.desks.map((d) => [d.id, appearanceOf(d.id)]))
+  const states = new Map(room.desks.map((d) => [d.id, agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
+  return {
+    paint: (tick) => {
+      const items = [
+        ...room.props.map((p) => propItem(p.name, p.x, p.y, tick, theme, size)),
+        ...room.desks.map((d, i) =>
+          deskItem(looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme),
+        ),
+      ]
+      paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, scene.dark))
+      texture.source.update()
+    },
+  }
 }
 
 /** A speech bubble whose tail points at (x, y). */
@@ -308,8 +345,13 @@ function bubble(activity: DeskActivity, x: number, y: number): Container {
   return group
 }
 
-function label(text: string, x: number, y: number, fill: number, size: number, centered = false): Text {
-  const t = new Text({ text, style: { fontFamily: 'Silkscreen', fontSize: size, fill } })
+/** Desk names fit their slot; longer ones end with an ellipsis. */
+const NAME_WIDTH = 42
+
+function label(text: string, x: number, y: number, fill: number, size: number, centered = false, maxWidth = Infinity): Text {
+  // A dark outline keeps names readable on light walls and floors too.
+  const t = new Text({ text, style: { fontFamily: 'Silkscreen', fontSize: size, fill, stroke: { color: COLORS.roomEdge, width: 2, join: 'round' } } })
+  for (let n = text.length - 1; t.width > maxWidth && n > 1; n--) t.text = `${text.slice(0, n).trimEnd()}…`
   t.resolution = 4
   if (centered) t.anchor.set(0.5, 0)
   t.position.set(x, y)

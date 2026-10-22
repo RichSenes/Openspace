@@ -13,6 +13,8 @@ internal static class OfficeEndpoints
     /// <param name="Initialize">Turn the folder into a git repository if it is not one yet.</param>
     public sealed record ProcedureRequest(IReadOnlyList<string> Steps);
 
+    public sealed record ThemeRequest(string Theme);
+
     public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
     public sealed record DeskRequest(string Name, string AgentName, string? Model, Guid? RoleId = null);
@@ -41,6 +43,13 @@ internal static class OfficeEndpoints
             Guid officeId, RepositoryRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.SetRepositoryAsync(new OfficeId(officeId), request.Path, request.Initialize, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/theme", async (
+            Guid officeId, ThemeRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.ChangeThemeAsync(new OfficeId(officeId), request.Theme, ct);
             return Results.NoContent();
         });
 

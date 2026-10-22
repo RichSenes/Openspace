@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AGENT_LOOKS, poseOf, type AgentState } from '../art/agentStates'
 import { toCanvas } from '../art/canvas'
-import { inTheDark } from '../art/lighting'
 import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from '../art/palette'
-import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
+import { deskItem, propItem, roomPixels, roomShell, TILE, WALL_HEIGHT } from '../art/roomScene'
+import type { SceneItem } from '../art/scene'
 import { ACCESSORIES, FACES, HAIR_STYLES, type Accessory, type Emotion, type HairStyle } from '../art/sheets/character'
 import { FURNITURE } from '../art/fanPack'
 import type { PropName } from '../art/sheets/props'
 import { SIGNALS, type Signal } from '../art/sheets/signals'
 import { pixelsOf, type Pixel, type SpriteDef } from '../art/sprite'
-import { STATION, stationLights, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
+import { STATION, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
 import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import './lab.css'
 
@@ -95,44 +95,15 @@ const LAYOUTS: Record<ThemeName, { prop: PropName; x: number; y: number }[]> = {
   ],
 }
 
-/** Tile variants: the frame of a floor or wall tile depends on where it lies. */
-const variant = (sprite: SpriteDef, c: number, r: number) => (c * 7 + r * 3) % sprite.frames.length
-
-/**
- * The upper half of a wall: the tile's cap and panel without its skirting, so walls are
- * two tiles tall and leave room for what hangs on them.
- */
-function upperWall(sprite: SpriteDef): SpriteDef {
-  return { ...sprite, frames: sprite.frames.map((rows) => [...rows.slice(0, 10), ...rows.slice(2, 8)]) }
-}
-
 /** A sample room: two rows of desks among the theme's furniture, sorted by depth. */
-function roomPixels(tick: number, name: ThemeName, dark: boolean): { width: number; height: number; pixels: Pixel[] } {
+function roomPixelsAt(tick: number, name: ThemeName, dark: boolean): { width: number; height: number; pixels: Pixel[] } {
   const theme: Theme = THEMES[name]
   const cols = 14
   const rows = 7
-  const colors = themeColors(theme.colors)
-  const upper = upperWall(theme.wall)
-  const floor: Pixel[] = []
-  for (let c = 0; c < cols; c++) {
-    floor.push(...pixelsOf(upper, variant(upper, c, 0), colors, c * 16, 0))
-    floor.push(...pixelsOf(theme.wall, variant(theme.wall, c, 1), colors, c * 16, 16))
-  }
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++) floor.push(...pixelsOf(theme.floor, variant(theme.floor, c, r), colors, c * 16, 32 + r * 16))
-
-  const desk = (who: number, state: AgentState, x: number, y: number): SceneItem => {
-    const pose = poseOf(state, tick + who * 7)
-    return { x, y, height: STATION.height, pixels: stationPixels(PEOPLE[who], pose, theme), lights: stationLights(pose, theme) }
-  }
+  const size = { width: cols * TILE, height: WALL_HEIGHT + rows * TILE }
+  const desk = (who: number, state: AgentState, x: number, y: number) => deskItem(PEOPLE[who], state, x, y, tick + who * 7, theme)
   const items: SceneItem[] = [
-    ...LAYOUTS[name].map(({ prop, x, y }): SceneItem => {
-      const { sprite, lights, layer } = FURNITURE[prop]
-      const resolved = (lights ?? []).map((l) => ({ ...l, color: colors(l.color) ?? '#ffffff' }))
-      // A redrawn prop may be bigger than the one the layout was made for: keep it inside.
-      const at = { x: Math.min(x, cols * 16 - sprite.width), y: Math.min(y, 32 + rows * 16 - sprite.height) }
-      return { ...at, height: sprite.height, pixels: pixelsOf(sprite, Math.floor(tick / 2), colors), lights: resolved, layer }
-    }),
+    ...LAYOUTS[name].map(({ prop, x, y }) => propItem(prop, x, y, tick, theme, size)),
     desk(0, 'working', 52, 20),
     desk(1, 'reading', 98, 20),
     desk(2, 'waiting', 144, 20),
@@ -140,8 +111,7 @@ function roomPixels(tick: number, name: ThemeName, dark: boolean): { width: numb
     desk(4, 'failed', 76, 64),
     desk(5, 'queued', 122, 64),
   ]
-  const pixels = [...floor, ...scenePixels(items)]
-  return { width: cols * 16, height: 32 + rows * 16, pixels: dark ? inTheDark(pixels, sceneLights(items), theme.colors.night) : pixels }
+  return { ...size, pixels: roomPixels(theme, roomShell(theme, cols, rows), items, dark) }
 }
 
 /**
@@ -154,7 +124,7 @@ export function SpriteLab() {
   const [themeName, setThemeName] = useState<ThemeName>('cozy')
   const [dark, setDark] = useState(false)
   const [hairStyle, setHairStyle] = useState<HairStyle>('short')
-  const room = useMemo(() => roomPixels(tick, themeName, dark), [tick, themeName, dark])
+  const room = useMemo(() => roomPixelsAt(tick, themeName, dark), [tick, themeName, dark])
   const theme = THEMES[themeName]
   const small = Math.max(2, scale - 1)
 

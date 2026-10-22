@@ -16,6 +16,15 @@ export interface DeskView {
   agentName: string
   model: string | null
   roleId: string | null
+  /** Where the desk stands in its room, in pixels from the room's corner; null when placed automatically. */
+  spot?: { x: number; y: number } | null
+}
+
+/** A piece of furniture placed by hand, in pixels from the room's corner. */
+export interface FurniturePiece {
+  name: string
+  x: number
+  y: number
 }
 
 export interface RoomView {
@@ -24,6 +33,10 @@ export interface RoomView {
   context: string
   procedure: string[]
   desks: DeskView[]
+  /** Tiles from wall to wall and tiles of floor; null while the room is laid out automatically. */
+  width?: number | null
+  depth?: number | null
+  furniture?: FurniturePiece[]
 }
 
 export interface ProcedureStepView {
@@ -136,4 +149,12 @@ export interface ReportView {
   periodEnd: string | null
   epicId: string | null
   writtenByAi: boolean
+}
+
+/** How a room is arranged by hand, as the API takes it. */
+export interface RoomLayoutRequest {
+  width: number
+  depth: number
+  desks: { deskId: string; x: number; y: number }[]
+  furniture: FurniturePiece[]
 }

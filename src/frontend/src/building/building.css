@@ -34,3 +34,118 @@
   display: block;
   image-rendering: pixelated;
 }
+
+.arrange-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  width: min(300px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.arrange-panel header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.arrange-panel h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 1rem;
+}
+
+.arrange-panel h3 {
+  margin: 12px 0 8px;
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.arrange-panel section h3:first-child {
+  margin-top: 0;
+}
+
+.arrange-panel footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper + .stepper {
+  margin-top: 8px;
+}
+
+.stepper span {
+  flex: 1;
+}
+
+.catalogue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.catalogue button {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 4px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.catalogue button:hover,
+.catalogue button:focus-visible {
+  border-color: var(--accent);
+}
+
+.catalogue img {
+  max-width: 48px;
+  max-height: 48px;
+  image-rendering: pixelated;
+}
+
+/* The panel takes the right side; the building fits in what is left. */
+.building.arranging .building-canvas {
+  right: 332px;
+}
+
+@media (max-width: 720px) {
+  .building.arranging .building-canvas {
+    right: 0;
+    bottom: 50%;
+  }
+
+  .arrange-panel {
+    top: 50%;
+  }
+}

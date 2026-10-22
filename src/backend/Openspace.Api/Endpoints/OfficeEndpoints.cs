@@ -1,4 +1,5 @@
 using Openspace.Application.Offices;
+using Openspace.Domain.Common;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Roles;
 
@@ -14,6 +15,10 @@ internal static class OfficeEndpoints
     public sealed record ProcedureRequest(IReadOnlyList<string> Steps);
 
     public sealed record ThemeRequest(string Theme);
+
+    public sealed record LayoutRequest(int Width, int Depth, IReadOnlyList<DeskSpotRequest>? Desks, IReadOnlyList<FurniturePiece>? Furniture);
+
+    public sealed record DeskSpotRequest(Guid DeskId, int X, int Y);
 
     public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
@@ -58,6 +63,31 @@ internal static class OfficeEndpoints
         {
             var id = await commands.OpenRoomAsync(new OfficeId(officeId), request.Name, ct);
             return Results.Ok(new { id = id.Value });
+        });
+
+        offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/layout", async (
+            Guid officeId, Guid roomId, LayoutRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            var desks = request.Desks ?? [];
+            if (desks.DistinctBy(d => d.DeskId).Count() != desks.Count)
+            {
+                throw new DomainException("Each desk can stand in one place only.");
+            }
+
+            var layout = RoomLayout.Create(
+                request.Width,
+                request.Depth,
+                desks.ToDictionary(d => new DeskId(d.DeskId), d => new Spot(d.X, d.Y)),
+                request.Furniture ?? []);
+            await commands.ArrangeRoomAsync(new OfficeId(officeId), new RoomId(roomId), layout, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapDelete("/{officeId:guid}/rooms/{roomId:guid}/layout", async (
+            Guid officeId, Guid roomId, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.ClearRoomLayoutAsync(new OfficeId(officeId), new RoomId(roomId), ct);
+            return Results.NoContent();
         });
 
         offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/context", async (

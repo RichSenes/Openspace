@@ -80,6 +80,45 @@ public sealed class ApiTests : IDisposable
         Assert.Single(all);
     }
 
+    private sealed record Spot(int X, int Y);
+
+    private sealed record PlacedDesk(Guid Id, Spot? Spot);
+
+    private sealed record Piece(string Name, int X, int Y);
+
+    private sealed record ArrangedRoom(int? Width, int? Depth, List<PlacedDesk> Desks, List<Piece> Furniture);
+
+    private sealed record ArrangedOffice(List<ArrangedRoom> Rooms);
+
+    [Fact]
+    public async Task A_room_can_be_arranged_by_hand_and_given_back_to_the_automatic_layout()
+    {
+        var (officeId, roomId, deskId) = await FurnishAsync();
+        var url = $"/api/offices/{officeId}/rooms/{roomId}/layout";
+
+        var put = await _http.PutAsJsonAsync(url, new
+        {
+            width = 10,
+            depth = 4,
+            desks = new[] { new { deskId, x = 40, y = 20 } },
+            furniture = new[] { new { name = "plant", x = 130, y = 66 } },
+        });
+        var arranged = Assert.Single((await GetAsync<ArrangedOffice>($"/api/offices/{officeId}")).Rooms);
+        var outside = await _http.PutAsJsonAsync(url, new { width = 10, depth = 4, furniture = new[] { new { name = "plant", x = 500, y = 0 } } });
+        var twice = await _http.PutAsJsonAsync(url, new { width = 10, depth = 4, desks = new[] { new { deskId, x = 0, y = 0 }, new { deskId, x = 40, y = 0 } } });
+        (await _http.DeleteAsync(url)).EnsureSuccessStatusCode();
+        var cleared = Assert.Single((await GetAsync<ArrangedOffice>($"/api/offices/{officeId}")).Rooms);
+
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        Assert.Equal((10, 4), (arranged.Width, arranged.Depth));
+        Assert.Equal(new Spot(40, 20), Assert.Single(arranged.Desks).Spot);
+        Assert.Equal(new Piece("plant", 130, 66), Assert.Single(arranged.Furniture));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, outside.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, twice.StatusCode);
+        Assert.Equal(((int?)null, (Spot?)null), (cleared.Width, Assert.Single(cleared.Desks).Spot));
+        Assert.Empty(cleared.Furniture);
+    }
+
     [Fact]
     public async Task A_task_goes_from_queue_to_discarded_with_notes_by_the_operator()
     {

@@ -128,6 +128,28 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_room_layout_survives_a_round_trip_and_can_be_rearranged()
+    {
+        var (office, frontend, backend) = await FurnishECorpAsync();
+        var room = new RoomId((await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0].Id);
+        var first = RoomLayout.Create(12, 5, new Dictionary<DeskId, Spot> { [frontend] = new(20, 24) }, [new("plant", 170, 80), new("rug", 30, 60)]);
+        var second = RoomLayout.Create(9, 3, new Dictionary<DeskId, Spot> { [backend] = new(60, 24) }, [new("whiteboard", 40, 2)]);
+
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().ArrangeRoomAsync(office, room, first, default));
+        var arranged = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0];
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().ArrangeRoomAsync(office, room, second, default));
+        var rearranged = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0];
+
+        Assert.Equal((12, 5), (arranged.Width, arranged.Depth));
+        Assert.Equal(["plant", "rug"], arranged.Furniture.Select(f => f.Name).Order());
+        Assert.Equal(new Spot(20, 24), arranged.Desks.Single(d => d.Id == frontend.Value).Spot);
+        Assert.Equal((9, 3), (rearranged.Width, rearranged.Depth));
+        Assert.Equal(new FurniturePiece("whiteboard", 40, 2), Assert.Single(rearranged.Furniture));
+        Assert.Null(rearranged.Desks.Single(d => d.Id == frontend.Value).Spot);
+        Assert.Equal(new Spot(60, 24), rearranged.Desks.Single(d => d.Id == backend.Value).Spot);
+    }
+
+    [Fact]
     public async Task Repository_path_and_agent_run_survive_a_round_trip()
     {
         var (office, frontend, _) = await FurnishECorpAsync();

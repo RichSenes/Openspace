@@ -244,6 +244,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .IsRequired()
                                 .HasColumnType("TEXT");
 
+                            b1.Property<int?>("Depth")
+                                .HasColumnType("INTEGER");
+
                             b1.Property<string>("Name")
                                 .IsRequired()
                                 .HasColumnType("TEXT");
@@ -254,6 +257,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                             b1.PrimitiveCollection<string>("Procedure")
                                 .IsRequired()
                                 .HasColumnType("TEXT");
+
+                            b1.Property<int?>("Width")
+                                .HasColumnType("INTEGER");
 
                             b1.HasKey("Id");
 
@@ -310,11 +316,65 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                                 .HasForeignKey("DeskId");
                                         });
 
+                                    b2.OwnsOne("Openspace.Domain.Offices.Spot", "Spot", b3 =>
+                                        {
+                                            b3.Property<Guid>("DeskId")
+                                                .HasColumnType("TEXT");
+
+                                            b3.Property<int>("X")
+                                                .HasColumnType("INTEGER")
+                                                .HasColumnName("SpotX");
+
+                                            b3.Property<int>("Y")
+                                                .HasColumnType("INTEGER")
+                                                .HasColumnName("SpotY");
+
+                                            b3.HasKey("DeskId");
+
+                                            b3.ToTable("Desks");
+
+                                            b3.WithOwner()
+                                                .HasForeignKey("DeskId");
+                                        });
+
                                     b2.Navigation("Agent")
                                         .IsRequired();
+
+                                    b2.Navigation("Spot");
+                                });
+
+                            b1.OwnsMany("Openspace.Domain.Offices.FurniturePiece", "Furniture", b2 =>
+                                {
+                                    b2.Property<int>("Id")
+                                        .ValueGeneratedOnAdd()
+                                        .HasColumnType("INTEGER");
+
+                                    b2.Property<string>("Name")
+                                        .IsRequired()
+                                        .HasColumnType("TEXT");
+
+                                    b2.Property<Guid>("RoomId")
+                                        .HasColumnType("TEXT");
+
+                                    b2.Property<int>("X")
+                                        .HasColumnType("INTEGER");
+
+                                    b2.Property<int>("Y")
+                                        .HasColumnType("INTEGER");
+
+                                    b2.HasKey("Id");
+
+                                    b2.HasIndex("RoomId");
+
+                                    b2.ToTable("Furniture", (string)null);
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("RoomId");
                                 });
 
                             b1.Navigation("Desks");
+
+                            b1.Navigation("Furniture");
                         });
 
                     b.Navigation("Rooms");

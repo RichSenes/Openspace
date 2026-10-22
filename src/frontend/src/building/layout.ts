@@ -1,4 +1,5 @@
-import type { OfficeView } from '../api/types'
+import type { OfficeView, RoomView } from '../api/types'
+import { FURNITURE } from '../art/fanPack'
 import { TILE } from '../art/roomScene'
 import { STATION } from '../art/station'
 import type { PropName } from '../art/sheets/props'
@@ -8,7 +9,7 @@ export { TILE }
 const PER_ROW = 4 // desks side by side before a new row starts
 const SLOT = 3 // tiles of floor per desk, side by side and front to back
 const MIN_INNER = 8 // an empty room is still a room
-const WALL = 2 // tiles of back wall
+export const WALL = 2 // tiles of back wall
 const GAP = 2 // tiles of corridor between rooms
 
 /** A desk, in world pixels: where its station's top left corner goes. */
@@ -44,10 +45,49 @@ export interface BuildingLayout {
   height: number
 }
 
+export const isProp = (name: string): name is PropName => Object.hasOwn(FURNITURE, name)
+
+const overlaps = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.abs(a.x - b.x) < STATION.width && Math.abs(a.y - b.y) < STATION.height - 12
+
+/**
+ * Where each desk of a room stands, in pixels from the room's corner. Desks placed by
+ * hand keep their spot; the others take the free slots of rows of four, back to front.
+ */
+function deskSpots(room: RoomView, firstColumn: number): Map<string, { x: number; y: number }> {
+  const spots = new Map<string, { x: number; y: number }>()
+  for (const desk of room.desks) if (desk.spot) spots.set(desk.id, desk.spot)
+  const placed = [...spots.values()]
+  let slot = 0
+  for (const desk of room.desks) {
+    if (desk.spot) continue
+    let spot
+    do {
+      spot = {
+        // Centred in its slot; the first row leans on the wall, heads in front of it.
+        x: (firstColumn + (slot % PER_ROW) * SLOT) * TILE + (SLOT * TILE - STATION.width) / 2,
+        y: WALL * TILE - 12 + Math.floor(slot / PER_ROW) * SLOT * TILE,
+      }
+      slot++
+    } while (placed.some((p) => overlaps(p, spot!)))
+    spots.set(desk.id, spot)
+  }
+  return spots
+}
+
+/** A room's size in tiles: as arranged, or grown with its desks. */
+function sizeOf(room: RoomView): { width: number; height: number; firstColumn: number } {
+  if (room.width && room.depth) return { width: room.width, height: WALL + room.depth, firstColumn: 1 }
+  const columns = Math.min(PER_ROW, room.desks.length)
+  const deskRows = Math.max(1, Math.ceil(room.desks.length / PER_ROW))
+  const inner = Math.max(MIN_INNER, columns * SLOT)
+  return { width: inner + 2, height: WALL + deskRows * SLOT + 1, firstColumn: 1 + Math.floor((inner - columns * SLOT) / 2) }
+}
+
 /**
  * Lays the rooms of an office out like a floor plan, in tiles: left to right, wrapping
- * when a row would exceed maxWidth. Desks stand in rows of four, back to front, and
- * rooms grow with them. Each room gets a plant in its front corner.
+ * when a row would exceed maxWidth. Rooms arranged by hand keep their size, desks and
+ * furniture; the others grow with their desks and get a plant in their front corner.
  */
 export function layoutOffice(office: OfficeView, maxWidth: number): BuildingLayout {
   const rooms: RoomBox[] = []
@@ -57,18 +97,15 @@ export function layoutOffice(office: OfficeView, maxWidth: number): BuildingLayo
   let width = 0
 
   for (const room of office.rooms) {
-    const columns = Math.min(PER_ROW, room.desks.length)
-    const deskRows = Math.max(1, Math.ceil(room.desks.length / PER_ROW))
-    const inner = Math.max(MIN_INNER, columns * SLOT)
-    const roomWidth = inner + 2
-    const roomHeight = WALL + deskRows * SLOT + 1
+    const { width: roomWidth, height: roomHeight, firstColumn } = sizeOf(room)
     if (x > GAP && x + roomWidth + GAP > maxWidth) {
       x = GAP
       y += rowHeight + GAP
       rowHeight = 0
     }
 
-    const firstColumn = 1 + Math.floor((inner - columns * SLOT) / 2)
+    const spots = deskSpots(room, firstColumn)
+    const arranged = Boolean(room.width && room.depth)
     rooms.push({
       id: room.id,
       name: room.name,
@@ -76,14 +113,10 @@ export function layoutOffice(office: OfficeView, maxWidth: number): BuildingLayo
       y,
       width: roomWidth,
       height: roomHeight,
-      desks: room.desks.map((d, i) => ({
-        id: d.id,
-        name: d.name,
-        // Centred in its slot; the first row leans on the wall, heads in front of it.
-        x: (x + firstColumn + (i % PER_ROW) * SLOT) * TILE + (SLOT * TILE - STATION.width) / 2,
-        y: y * TILE + WALL * TILE - 12 + Math.floor(i / PER_ROW) * SLOT * TILE,
-      })),
-      props: [{ name: 'plant', x: roomWidth * TILE - 18, y: roomHeight * TILE - 26 }],
+      desks: room.desks.map((d) => ({ id: d.id, name: d.name, x: x * TILE + spots.get(d.id)!.x, y: y * TILE + spots.get(d.id)!.y })),
+      props: arranged
+        ? (room.furniture ?? []).filter((p) => isProp(p.name)).map((p) => ({ ...p, name: p.name as PropName }))
+        : [{ name: 'plant', x: roomWidth * TILE - 18, y: roomHeight * TILE - 26 }],
     })
 
     x += roomWidth + GAP

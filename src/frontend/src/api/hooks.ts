@@ -10,6 +10,7 @@ import type {
   ReportView,
   RoleInput,
   RoleView,
+  RoomLayoutRequest,
   WorkTaskView,
 } from './types'
 
@@ -130,6 +131,17 @@ export function useSetRepository(officeId: string) {
 
 export function useSetOfficeTheme(officeId: string) {
   return useWrite((theme: string) => request<void>('PUT', `/api/offices/${officeId}/theme`, { theme }), keys.offices)
+}
+
+/** Saves how a room is arranged; 'auto' gives it back to the automatic layout. */
+export function useArrangeRoom(officeId: string) {
+  return useWrite(
+    ({ roomId, layout }: { roomId: string; layout: RoomLayoutRequest | 'auto' }) =>
+      layout === 'auto'
+        ? request<void>('DELETE', `/api/offices/${officeId}/rooms/${roomId}/layout`)
+        : request<void>('PUT', `/api/offices/${officeId}/rooms/${roomId}/layout`, layout),
+    keys.offices,
+  )
 }
 
 /** Problems with a repository folder that Openspace can fix by initializing git there. */

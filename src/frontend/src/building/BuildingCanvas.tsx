@@ -7,6 +7,7 @@ import { deskItem, propItem, roomPixels, roomShell, WALL_HEIGHT } from '../art/r
 import { STATION } from '../art/station'
 import { themeOf } from '../art/themes'
 import { agentStateOf, appearanceOf } from './agents'
+import { arrangementOf, boundsOf, place, targetAt, type Target } from './arrange'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
 import { bestLayout, layoutOffice, TILE, type BuildingLayout, type RoomBox } from './layout'
 
@@ -21,6 +22,7 @@ const COLORS = {
   bubble: 0xece8df,
   bubbleText: 0x14161c,
   waiting: 0xf2b84b,
+  selected: 0xf2b84b,
 }
 
 const BUBBLE_WIDTH = 132
@@ -35,17 +37,34 @@ interface Props {
   dark: boolean
   /** More controls beside Fit. */
   controls?: ReactNode
+  /** Present while the person arranges rooms: things can then be picked up and moved. */
+  arrange?: ArrangeControls
+}
+
+/** A room being arranged and, possibly, the desk or piece of furniture picked in it. */
+export interface Selection {
+  roomId: string
+  target?: Target
+}
+
+export interface ArrangeControls {
+  selection: Selection | null
+  onSelect: (selection: Selection | null) => void
+  /** A target was dropped at (x, y), in pixels from its room's corner. */
+  onPlace: (roomId: string, target: Target, x: number, y: number) => void
 }
 
 /** Draws the selected office as a pixel-art floor plan you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, dark, controls }: Props) {
+export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
   const fitAll = useRef<() => void>(() => {})
+  const arrangeRef = useRef(arrange)
 
   // Refreshed after every render so the canvas callbacks always see the latest props.
   useEffect(() => {
+    arrangeRef.current = arrange
     draw.current = () => {
       const app = appRef.current
       if (!app) return
@@ -57,10 +76,12 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls }: Pr
       view.layout = layout
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
-      const { world, rooms } = drawBuilding(layout, { office, tasks, activities, dark })
+      const { world, rooms, names, selection } = drawBuilding(layout, { office, tasks, activities, dark }, arrange?.selection)
       app.stage.addChild(world)
       view.world = world
       view.rooms = rooms
+      view.names = names
+      view.selection = selection
       rooms.forEach((room) => room.paint(view.tick))
       if (auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
@@ -85,12 +106,16 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls }: Pr
       element.appendChild(app.canvas)
       appRef.current = app
       app.renderer.on('resize', () => draw.current())
+      // Pixi follows the window; the panel beside the building changes its size too.
+      const observer = new ResizeObserver(() => app.resize())
+      observer.observe(element)
+      listeners.push(() => observer.disconnect())
       fitAll.current = () => {
         const view = viewOf(app)
         view.auto = true
         if (view.layout) flyTo(view, fit(worldRect(view.layout), app.screen))
       }
-      listeners.push(...attachNavigation(app))
+      listeners.push(...attachNavigation(app, () => arrangeRef.current))
       draw.current()
       // The art moves at its own pace; people who prefer less motion get still rooms.
       if (!reducedMotion()) {
@@ -113,12 +138,15 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls }: Pr
     }
   }, [])
 
-  useEffect(() => draw.current(), [office, tasks, activities, dark])
+  const arranging = Boolean(arrange)
+  useEffect(() => draw.current(), [office, tasks, activities, dark, arranging, arrange?.selection])
 
   return (
     <div className="building-canvas" ref={host}>
       <div className="building-controls">
-        <span className="hint">Scroll to zoom · drag to move · double-click a room</span>
+        <span className="hint">
+          {arrange ? 'Drag desks and furniture · arrows nudge · Delete removes' : 'Scroll to zoom · drag to move · double-click a room'}
+        </span>
         <button type="button" className="btn" onClick={() => fitAll.current()}>
           <Maximize size={16} /> Fit
         </button>
@@ -135,7 +163,11 @@ interface View {
   auto: boolean
   layout?: BuildingLayout
   world?: Container
-  rooms?: RoomPainter[]
+  rooms?: Map<string, RoomPainter>
+  /** Desk name labels, by desk id: they follow a desk being dragged. */
+  names?: Map<string, Text>
+  /** The outline of what is selected while arranging. */
+  selection?: Graphics
   /** Frames of pixel art shown so far. */
   tick: number
   animation?: number
@@ -181,14 +213,28 @@ function flyTo(view: View, target: Camera, duration = 320) {
 }
 
 /** Wheel to zoom at the cursor, left-drag to pan, double-click to fly into a room. Returns the cleanups. */
-function attachNavigation(app: Application): (() => void)[] {
+function attachNavigation(app: Application, arrange: () => ArrangeControls | undefined): (() => void)[] {
   const canvas = app.canvas
   const view = viewOf(app)
   const point = (e: MouseEvent) => {
     const box = canvas.getBoundingClientRect()
     return { x: e.clientX - box.left, y: e.clientY - box.top }
   }
-  let drag: { x: number; y: number; id: number } | undefined
+  let drag: { x: number; y: number; id: number; moved: number } | undefined
+  let carry: { room: RoomBox; target: Target; from: { x: number; y: number }; grab: { x: number; y: number }; to?: { x: number; y: number } } | undefined
+
+  const roomAt = (world: { x: number; y: number }) =>
+    view.layout?.rooms.find(
+      (r) => world.x >= r.x * TILE && world.x < (r.x + r.width) * TILE && world.y >= r.y * TILE && world.y < (r.y + r.height) * TILE,
+    )
+  /** The room and the thing under the pointer, in pixels from that room's corner. */
+  const pick = (e: MouseEvent) => {
+    const world = toWorld(view.camera, point(e))
+    const room = roomAt(world)
+    if (!room) return undefined
+    const local = { x: world.x - room.x * TILE, y: world.y - room.y * TILE }
+    return { room, local, target: targetAt(arrangementOf(room), local) }
+  }
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()
@@ -199,34 +245,60 @@ function attachNavigation(app: Application): (() => void)[] {
   }
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return
-    drag = { ...point(e), id: e.pointerId }
+    const controls = arrange()
+    const picked = controls ? pick(e) : undefined
+    if (controls && picked?.target) {
+      const box = boundsOf(arrangementOf(picked.room), picked.target)!
+      carry = { room: picked.room, target: picked.target, from: { x: box.x, y: box.y }, grab: picked.local }
+      controls.onSelect({ roomId: picked.room.id, target: picked.target })
+    }
+    drag = { ...point(e), id: e.pointerId, moved: 0 }
     try {
       // Keeps the drag going when the pointer leaves the canvas.
       canvas.setPointerCapture(e.pointerId)
     } catch {
       // Some pointers cannot be captured; dragging still works inside the canvas.
     }
-    canvas.style.cursor = 'grabbing'
+    canvas.style.cursor = carry ? 'move' : 'grabbing'
   }
   const onMove = (e: PointerEvent) => {
-    if (!drag || drag.id !== e.pointerId) return
+    if (!drag) {
+      if (arrange()) canvas.style.cursor = pick(e)?.target ? 'move' : 'grab'
+      return
+    }
+    if (drag.id !== e.pointerId) return
     const now = point(e)
+    drag.moved += Math.abs(now.x - drag.x) + Math.abs(now.y - drag.y)
+    if (carry) {
+      const world = toWorld(view.camera, now)
+      const local = { x: world.x - carry.room.x * TILE, y: world.y - carry.room.y * TILE }
+      carry.to = carryTo(view, carry.room, carry.target, carry.from.x + local.x - carry.grab.x, carry.from.y + local.y - carry.grab.y)
+      drag = { ...now, id: e.pointerId, moved: drag.moved }
+      return
+    }
     if (view.animation) cancelAnimationFrame(view.animation)
     view.auto = false
     view.camera = pan(view.camera, now.x - drag.x, now.y - drag.y)
-    drag = { ...now, id: e.pointerId }
+    drag = { ...now, id: e.pointerId, moved: drag.moved }
     apply(view)
   }
   const onUp = (e: PointerEvent) => {
-    if (drag?.id === e.pointerId) drag = undefined
+    if (drag?.id !== e.pointerId) return
+    const controls = arrange()
+    if (carry?.to) controls?.onPlace(carry.room.id, carry.target, carry.to.x, carry.to.y)
+    // A click on a room, not a drag of the view, picks the room to arrange.
+    else if (controls && !carry && drag.moved < 4) {
+      const room = pick(e)?.room
+      controls.onSelect(room ? { roomId: room.id } : null)
+    }
+    drag = undefined
+    carry = undefined
     canvas.style.cursor = 'grab'
   }
   const onDoubleClick = (e: MouseEvent) => {
     if (!view.layout) return
     const world = toWorld(view.camera, point(e))
-    const room = view.layout.rooms.find(
-      (r) => world.x >= r.x * TILE && world.x < (r.x + r.width) * TILE && world.y >= r.y * TILE && world.y < (r.y + r.height) * TILE,
-    )
+    const room = roomAt(world)
     view.auto = !room
     flyTo(view, room ? fit({ x: room.x * TILE, y: room.y * TILE, width: room.width * TILE, height: room.height * TILE }, app.screen, 64) : fit(worldRect(view.layout), app.screen))
   }
@@ -261,24 +333,71 @@ interface Scene {
   dark: boolean
 }
 
-function drawBuilding(layout: BuildingLayout, scene: Scene): { world: Container; rooms: RoomPainter[] } {
+function drawBuilding(
+  layout: BuildingLayout,
+  scene: Scene,
+  selected: Selection | null | undefined,
+): { world: Container; rooms: Map<string, RoomPainter>; names: Map<string, Text>; selection: Graphics } {
   const world = new Container()
   const labels = new Container()
   const bubbles = new Container()
-  const rooms = layout.rooms.map((room) => drawRoom(room, scene, world))
+  const rooms = new Map(layout.rooms.map((room) => [room.id, drawRoom(room, scene, world)]))
+  const names = new Map<string, Text>()
 
   for (const room of layout.rooms) {
     labels.addChild(label(room.name, room.x * TILE + 6, room.y * TILE + 4, COLORS.label, 8))
     for (const desk of room.desks) {
-      labels.addChild(label(desk.name, desk.x + STATION.width / 2, desk.y + STATION.height + 1, COLORS.mute, 6, true, NAME_WIDTH))
+      const name = label(desk.name, desk.x + STATION.width / 2, desk.y + STATION.height + 1, COLORS.mute, 6, true, NAME_WIDTH)
+      names.set(desk.id, name)
+      labels.addChild(name)
       const activity = scene.activities.get(desk.id)
-      if (activity?.headline) bubbles.addChild(bubble(activity, desk.x + STATION.width / 2, desk.y - 1))
+      // Bubbles would hide what is being arranged.
+      if (activity?.headline && selected === undefined) bubbles.addChild(bubble(activity, desk.x + STATION.width / 2, desk.y - 1))
     }
   }
 
+  const selection = new Graphics()
+  outline(selection, layout, selected)
   // Names, then bubbles, go on top of every room, so they can spill over walls.
-  world.addChild(labels, bubbles)
-  return { world, rooms }
+  world.addChild(labels, bubbles, selection)
+  return { world, rooms, names, selection }
+}
+
+/** Frames the room being arranged and, inside it, the thing picked. */
+function outline(g: Graphics, layout: BuildingLayout, selected: Selection | null | undefined) {
+  g.clear()
+  const room = selected && layout.rooms.find((r) => r.id === selected.roomId)
+  if (!room) return
+  g.rect(room.x * TILE - 3, room.y * TILE - 3, room.width * TILE + 6, room.height * TILE + 6).stroke({ width: 2, color: COLORS.selected })
+  const box = selected.target && boundsOf(arrangementOf(room), selected.target)
+  if (box) {
+    const x = room.x * TILE + box.x
+    const y = room.y * TILE + box.y
+    g.rect(x - 1, y - 1, box.width + 2, box.height + 2).stroke({ width: 1, color: COLORS.selected })
+    // Corner ticks tell the picked thing from the room around it without relying on colour.
+    for (const [cx, cy, dx, dy] of [[x - 1, y - 1, 1, 1], [x + box.width + 1, y - 1, -1, 1], [x - 1, y + box.height + 1, 1, -1], [x + box.width + 1, y + box.height + 1, -1, -1]])
+      g.poly([cx, cy + 4 * dy, cx, cy, cx + 4 * dx, cy], false).stroke({ width: 2, color: COLORS.selected })
+  }
+}
+
+/**
+ * Moves a thing being dragged to where it may stand, right away: its room is repainted
+ * and its name follows. The new place is returned, to be saved when it is dropped.
+ */
+function carryTo(view: View, room: RoomBox, target: Target, x: number, y: number): { x: number; y: number } {
+  const moved = place(arrangementOf(room), target, x, y)
+  const spot = target.kind === 'desk' ? moved.desks[target.id] : moved.furniture[target.index]
+  if (target.kind === 'desk') {
+    const desk = room.desks.find((d) => d.id === target.id)!
+    desk.x = room.x * TILE + spot.x
+    desk.y = room.y * TILE + spot.y
+    view.names?.get(desk.id)?.position.set(desk.x + STATION.width / 2, desk.y + STATION.height + 1)
+  } else {
+    room.props[target.index] = { ...room.props[target.index], x: spot.x, y: spot.y }
+  }
+  view.rooms?.get(room.id)?.paint(view.tick)
+  if (view.selection && view.layout) outline(view.selection, view.layout, { roomId: room.id, target })
+  return { x: spot.x, y: spot.y }
 }
 
 /** One room: its pixel art in a sprite, with a dark edge so rooms stand apart. */

@@ -1,8 +1,8 @@
 import { CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type Theme } from './palette'
-import { BODY, FACES, HAIR_STYLES, HANDS, HEAD, type Emotion, type HairStyle } from './sheets/character'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, type Accessory, type Emotion, type HairStyle } from './sheets/character'
 import { DESK } from './sheets/room'
 import { SIGNALS, type Signal } from './sheets/signals'
-import { pixelsOf, type Pixel, type Resolve } from './sprite'
+import { pixelsOf, type Pixel, type Resolve, type SpriteDef } from './sprite'
 
 /** How the agent at a desk looks. */
 export interface Appearance {
@@ -10,13 +10,30 @@ export interface Appearance {
   hair: HairColor
   hairStyle: HairStyle
   cloth: ClothColor
+  /** Glasses, a headset…: usually given by the role. */
+  accessory?: Accessory
+}
+
+export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'relax' | 'stuck'
+
+/**
+ * What the agent does with the arms: raised arms are drawn behind the desk, hands
+ * resting on it in front.
+ */
+export const GESTURE_PARTS: Record<Gesture, { arms?: SpriteDef; hands?: SpriteDef }> = {
+  rest: { hands: HANDS.rest },
+  typing: { hands: HANDS.typing },
+  think: { arms: GESTURES.think, hands: HANDS.left },
+  wave: { arms: GESTURES.wave, hands: HANDS.left },
+  relax: { arms: GESTURES.relax },
+  stuck: { arms: GESTURES.stuck },
 }
 
 export type ScreenState = 'off' | 'on' | 'alert'
 
 export interface StationPose {
   emotion: Emotion | 'blink'
-  hands: 'rest' | 'typing'
+  gesture: Gesture
   frame: number
   screen: ScreenState
   /** Shown above the head: an idea, a surprise, a question, sleep, done, trouble. */
@@ -68,18 +85,18 @@ export const flashing = (screen: ScreenState, frame: number): ScreenState =>
   screen === 'alert' && frame % 4 >= 2 ? 'off' : screen
 
 /**
- * A desk with its agent, as pixels in drawing order: body, head, face, hair behind
- * the desk, then the desk, then the hands resting on it.
+ * A desk with its agent, as pixels in drawing order: body, head, face, hair, accessory
+ * and raised arms behind the desk, then the desk, then the hands resting on it.
  */
 export function stationPixels(look: Appearance, pose: StationPose, theme: Theme): Pixel[] {
   const person = characterColors(look)
   const cx = 8
   const cy = STATION.deskY - 14
-  const behind = [BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]].flatMap((sprite) =>
-    pixelsOf(sprite, 0, person, cx, cy),
-  )
+  const { arms, hands } = GESTURE_PARTS[pose.gesture]
+  const layers = [BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle], look.accessory && ACCESSORIES[look.accessory], arms]
+  const behind = layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))
   const desk = pixelsOf(DESK, 0, themeColors(theme, pose.screen), 0, STATION.deskY)
-  const hands = pixelsOf(HANDS[pose.hands], pose.frame, person, cx, cy)
+  const front = hands ? pixelsOf(hands, pose.frame, person, cx, cy) : []
   const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme), cx + 8, cy - 11) : []
-  return [...behind, ...desk, ...hands, ...signal]
+  return [...behind, ...desk, ...front, ...signal]
 }

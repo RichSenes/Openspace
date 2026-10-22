@@ -31,9 +31,11 @@ characters, one per pixel) and where sprites live are described at the end.
   2. `head`: the face shape;
   3. `face`: eyes and mouth, one per emotion;
   4. `hair`: one of several styles, which may cover the forehead;
-  5. `accessory`: glasses, headset… (optional);
-  6. the desk, drawn by the room;
-  7. `hands`: drawn **after** the desk, so they rest on it.
+  5. `accessory`: `glasses` or `headset` (optional);
+  6. `arms` of a gesture that leaves the desk (raised hand, hands on the cheeks…),
+     drawn **before** the desk so the monitor stays in front of them;
+  7. the desk, drawn by the room;
+  8. `hands`: drawn **after** the desk, so they rest on it.
 - Appearance is per desk: skin tone, hair style and colour, clothes colour (from
   the role by default) and an optional accessory.
 - Emotions: `neutral`, `focused`, `happy`, `worried`, `asleep`.
@@ -51,15 +53,19 @@ characters, one per pixel) and where sprites live are described at the end.
 - Movement is small: one pixel of breathing, hands moving on the keyboard.
 - Idle characters blink every few seconds (a separate one-frame face).
 
-| Agent state | Animation | Face |
-| --- | --- | --- |
-| No task | `idle` | `neutral` |
-| Working | `typing` | `focused` |
-| Reading, searching | `reading` | `focused` |
-| Waiting for a person | `waiting` (hand raised) | `neutral` |
-| Queued, no seat | `idle` | `asleep` |
-| Work sent to review | `done` | `happy` |
-| Failed | `stuck` | `worried` |
+| Agent state | Gesture | Face | Screen | Signal |
+| --- | --- | --- | --- | --- |
+| `idle`: no task | `rest` | `neutral` | off | |
+| `working` | `typing` | `focused` | on | |
+| `reading`: reading, searching | `think` (hand on the chin) | `focused` | on | |
+| `waiting` for a person | `wave` (hand raised) | `neutral` | alert | `question` |
+| `queued`, no seat | `rest` | `asleep` | off | `zz` |
+| `done`: sent to review | `relax` (hands behind the head) | `happy` | on | `check` |
+| `failed` | `stuck` (hands on the cheeks) | `worried` | off | `storm` |
+
+The table lives in `src/frontend/src/art/agentStates.ts`. Momentary signals, such as
+`bulb` for a finding or `exclaim` for a failed command, replace the state's own
+signal for a few seconds.
 
 ## Signals above the head
 
@@ -76,6 +82,15 @@ too.
 | `check` | tick | Work sent to review |
 | `storm` | cloud with lightning | The task failed |
 
+## Furniture and depth
+
+Props stand anywhere on the floor: `plant`, `side-table` (with a steaming mug),
+`whiteboard`, `server-rack` (blinking lights) and `floor-lamp`. A sprite's bottom
+row is where it touches the floor, its **base line**. A room draws desks and props
+sorted by base line, so whatever stands lower on the screen is closer to the
+viewer and covers what is behind it. Desks can therefore stand in several rows,
+not only side by side.
+
 ## Colour
 
 Two kinds of palette:
@@ -85,8 +100,10 @@ Two kinds of palette:
 - **Theme palette**, one per office mood: every colour of rooms, floors, walls,
   furniture and props is named by its meaning (`floor.light`, `wall.shadow`,
   `wood.mid`, `screen.on`…), and a theme gives each name its real colour. A new
-  mood is a new table of colours, not new drawings. The first theme is
-  **cozy evening** (warm wood, muted blue-grey walls, amber lights).
+  mood is a new table of colours, not new drawings. Themes so far: **cozy
+  evening** (warm wood, muted blue-grey walls, amber lights, the default), **late
+  night** (cold greys, blue screens) and **neon** (dark violet, cyan screens, pink
+  trims).
 
 Faces must read on every skin tone: eyes and mouth differ from the light skin
 tone by a **contrast of at least 3:1** (WCAG luminance, not hue), which tests

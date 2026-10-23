@@ -39,7 +39,7 @@ internal static class TaskEndpoints
             Results.File(
                 System.Text.Encoding.UTF8.GetBytes(await queries.ReportAsync(new WorkTaskId(taskId), ct)),
                 "text/markdown; charset=utf-8",
-                $"task-{taskId.ToString("N")[..8]}.md"));
+                $"task-{taskId.ToString("N")[^10..]}.md"));
 
         tasks.MapPost("/{taskId:guid}/permission", (
             Guid taskId, PermissionAnswer request, WorkTaskCommands commands, CancellationToken ct) =>

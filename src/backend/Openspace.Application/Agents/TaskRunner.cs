@@ -68,7 +68,7 @@ public sealed partial class TaskRunner(
             if (task.Run is null)
             {
                 var workspace = await workspaces
-                    .PrepareAsync(office.RepositoryPath!, task.Id.Value.ToString("N")[..8], task.Title, cancellationToken)
+                    .PrepareAsync(office.RepositoryPath!, task.Key, task.Title, cancellationToken)
                     .ConfigureAwait(false);
                 var sessionId = await runtime
                     .CreateSessionAsync(workspace.Path, task.Title, setup, cancellationToken)

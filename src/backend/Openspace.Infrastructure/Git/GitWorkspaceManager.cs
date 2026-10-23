@@ -69,7 +69,15 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, taskKey);
         var branch = $"{TaskBranchPrefix}{Slug(title)}-{taskKey}";
-        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", "-b", branch, path, "HEAD").ConfigureAwait(false);
+        if (Directory.Exists(path))
+        {
+            throw new InvalidOperationException($"The working copy '{path}' is already in use by another task.");
+        }
+
+        // A start that failed halfway may have left the task's branch behind: work goes on there.
+        var leftOver = await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{branch}").ConfigureAwait(false);
+        await GitCli.RunAsync(repositoryPath, cancellationToken, leftOver ? ["worktree", "add", path, branch] : ["worktree", "add", "-b", branch, path, "HEAD"])
+            .ConfigureAwait(false);
         return new Workspace(path, branch);
     }
 

@@ -78,7 +78,7 @@ public class TaskRunnerTests
         var task = _h.Enqueue();
         await _h.Runner().RunQueueAsync(default);
         await _h.Signals().FinishedAsync("ses_1", default);
-        await _h.Commands().SendBackAsync(task.Id, "elliot", "Make it red.", default);
+        await _h.Commands().SendBackAsync(task.Id, "elliot", "Make it red.", withReview: false, default);
 
         await _h.Runner().RunQueueAsync(default);
 
@@ -176,12 +176,12 @@ public class TaskRunnerTests
         var task = _h.Enqueue();
         await _h.Runner().RunQueueAsync(default);
         await _h.Runner().RecoverAsync(default);
-        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_9", "ses_1", "bash php -l index.php"));
-        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_other", "ses_someone_else", "bash rm -rf /"));
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_9", "ses_1", Fakes.Run("php -l index.php")));
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_other", "ses_someone_else", Fakes.Run("rm -rf /")));
 
         await _h.Runner().RunQueueAsync(default);
 
         var activity = _h.Activity.ForTask(task.Id.Value);
-        Assert.Equal((Agents.ActivityKind.Waiting, "per_9", "Wants to bash php -l index.php"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
+        Assert.Equal((Agents.ActivityKind.Waiting, "per_9", "Can I check the code style?"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
     }
 }

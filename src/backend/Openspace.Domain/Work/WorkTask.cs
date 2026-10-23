@@ -12,6 +12,9 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     private const int MaxTitleLength = 200;
     private const int MaxNoteLength = 4000;
 
+    /// <summary>Most things a person can be asked to try by hand on one task.</summary>
+    public const int MaxManualChecks = 20;
+
     private static readonly Dictionary<WorkTaskStatus, WorkTaskStatus[]> AllowedTransitions = new()
     {
         [WorkTaskStatus.Proposed] = [WorkTaskStatus.Queued, WorkTaskStatus.Discarded],
@@ -25,6 +28,8 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     private readonly List<TaskNote> _notes = [];
     private readonly List<ProcedureStep> _procedure = [];
+    private readonly List<ManualCheck> _manualChecks = [];
+    private readonly List<RoundUsage> _usage = [];
 
     private WorkTask(
         WorkTaskId id,
@@ -42,6 +47,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         RequestedBy = requestedBy;
         Status = status;
         CreatedAt = createdAt;
+        StatusChangedAt = createdAt;
     }
 
     public OfficeId OfficeId { get; }
@@ -64,6 +70,20 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     public WorkTaskStatus Status { get; private set; }
 
     public DateTimeOffset CreatedAt { get; }
+
+    /// <summary>When the task last changed status, e.g. when its work last reached review.</summary>
+    public DateTimeOffset StatusChangedAt { get; private set; }
+
+    /// <summary>The round of work: 1, then one more each time the work is sent back.</summary>
+    public int Round { get; private set; } = 1;
+
+    /// <summary>What a person must try by hand before merging, as the agent and the reviewer listed it.</summary>
+    public IReadOnlyList<ManualCheck> ManualChecks => _manualChecks;
+
+    /// <summary>Tokens the agent spent, round by round.</summary>
+    public IReadOnlyList<RoundUsage> Usage => _usage;
+
+    public TokenCount TotalTokens => _usage.Aggregate(TokenCount.Zero, (sum, round) => sum + round.Tokens);
 
     public IReadOnlyList<TaskNote> Notes => _notes;
 
@@ -277,7 +297,70 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         AddNote(reviewer, feedback, now);
+        Round++;
+
+        // The work will change: what was tried by hand must be tried again.
+        _manualChecks.ForEach(c => c.Tick(false, now));
         MoveTo(WorkTaskStatus.Queued, now);
+    }
+
+    /// <summary>
+    /// Lists something a person must try by hand before merging. The same check listed twice
+    /// is kept once. Returns its number.
+    /// </summary>
+    public int AddManualCheck(string what, string? how)
+    {
+        if (Status is not (WorkTaskStatus.Running or WorkTaskStatus.Review))
+        {
+            throw new DomainException($"Checks to try by hand are listed while the work is done or reviewed, not when the task is {Status}.");
+        }
+
+        var text = Guard.NotBlank(what, "Check", 300);
+        if (_manualChecks.Find(c => string.Equals(c.What, text, StringComparison.OrdinalIgnoreCase)) is { } known)
+        {
+            return known.Number;
+        }
+
+        if (_manualChecks.Count >= MaxManualChecks)
+        {
+            throw new DomainException($"A task lists at most {MaxManualChecks} checks to try by hand: keep the ones that matter most.");
+        }
+
+        var check = new ManualCheck(_manualChecks.Count + 1, text, how?.Trim() is { Length: > 0 } h ? h[..Math.Min(h.Length, 1000)] : string.Empty);
+        _manualChecks.Add(check);
+        return check.Number;
+    }
+
+    /// <summary>A person tried a check by hand, or wants it back on the list.</summary>
+    public void TickManualCheck(int number, bool done, DateTimeOffset now)
+    {
+        if (Status is not (WorkTaskStatus.Review or WorkTaskStatus.Done))
+        {
+            throw new DomainException($"Checks are tried once the work is in review, not while the task is {Status}.");
+        }
+
+        var check = _manualChecks.Find(c => c.Number == number)
+            ?? throw new DomainException($"There is no check {number} on this task.");
+        check.Tick(done, now);
+    }
+
+    /// <summary>Counts what the agent spent on the current round.</summary>
+    public void RecordUsage(TokenCount tokens)
+    {
+        ArgumentNullException.ThrowIfNull(tokens);
+        if (tokens.Input < 0 || tokens.Output < 0 || tokens.CacheRead < 0 || tokens.CacheWrite < 0)
+        {
+            throw new DomainException("Token counts cannot be negative.");
+        }
+
+        var round = _usage.Find(u => u.Round == Round);
+        if (round is null)
+        {
+            round = new RoundUsage(Round);
+            _usage.Add(round);
+        }
+
+        round.Add(tokens);
     }
 
     public void Discard(DateTimeOffset now) => MoveTo(WorkTaskStatus.Discarded, now);
@@ -317,6 +400,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
         var from = Status;
         Status = target;
+        StatusChangedAt = now;
         Raise(new WorkTaskStatusChanged(Id, from, target, now));
     }
 

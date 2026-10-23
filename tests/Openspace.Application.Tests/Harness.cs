@@ -43,6 +43,9 @@ internal sealed class Harness
 
     public ActivityBoard Activity { get; }
 
+    /// <summary>A person answers every request unless a test says otherwise.</summary>
+    public Autonomy Autonomy { get; set; } = Autonomy.Ask;
+
     public Office Office { get; }
 
     public Room Room { get; }
@@ -73,10 +76,12 @@ internal sealed class Harness
     }
 
     public TaskRunner Runner(int seats = 1) => new(
-        new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
-        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
+        new QueueDispatcher(Tasks, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Clock, NullLogger<TaskRunner>.Instance);
 
-    public AgentSignals Signals() => new(Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions, Clock);
+    public AgentSignals Signals() => new(
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions,
+        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Clock);
 
     public Review.TaskReviewer Reviewer() => new(Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);
 

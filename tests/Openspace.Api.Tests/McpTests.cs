@@ -72,7 +72,7 @@ public sealed class McpTests : IAsyncDisposable
 
         var tools = await client.ListToolsAsync();
 
-        Assert.Equal(["add_task_note", "announce", "complete_step", "get_task", "permission"], tools.Select(t => t.Name).Order());
+        Assert.Equal(["add_manual_check", "add_task_note", "announce", "complete_step", "get_task", "permission"], tools.Select(t => t.Name).Order());
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public sealed class McpTests : IAsyncDisposable
         var asking = client.CallToolAsync("permission", new Dictionary<string, object?>
         {
             ["tool_name"] = "Bash",
-            ["input"] = new Dictionary<string, object?> { ["command"] = "npm test" },
+            ["input"] = new Dictionary<string, object?> { ["command"] = "git push origin main" },
             ["tool_use_id"] = "toolu_1",
         }).AsTask();
         JsonElement waiting = default;
@@ -111,13 +111,47 @@ public sealed class McpTests : IAsyncDisposable
             waiting = activity.EnumerateArray().FirstOrDefault(a => a.GetProperty("kind").GetString() == "Waiting");
         }
 
-        Assert.Equal("Wants to run npm test", waiting.GetProperty("doing").GetString());
+        Assert.Equal(("Can I push to the remote?", "git push origin main"), (waiting.GetProperty("doing").GetString(), waiting.GetProperty("detail").GetString()));
         Assert.False(asking.IsCompleted);
         (await http.PostAsJsonAsync($"/api/tasks/{taskId}/permission", new { allow = true })).EnsureSuccessStatusCode();
 
         using var answer = JsonDocument.Parse(Text(await asking));
         Assert.Equal("allow", answer.RootElement.GetProperty("behavior").GetString());
-        Assert.Equal("npm test", answer.RootElement.GetProperty("updatedInput").GetProperty("command").GetString());
+        Assert.Equal("git push origin main", answer.RootElement.GetProperty("updatedInput").GetProperty("command").GetString());
+    }
+
+    [Fact]
+    public async Task In_auto_mode_Claude_Code_runs_the_tests_without_asking_anyone()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+        using var http = _app.CreateClient();
+
+        var result = await client.CallToolAsync("permission", new Dictionary<string, object?>
+        {
+            ["tool_name"] = "Bash",
+            ["input"] = new Dictionary<string, object?> { ["command"] = "cd web && npm test" },
+        });
+
+        using var answer = JsonDocument.Parse(Text(result));
+        Assert.Equal("allow", answer.RootElement.GetProperty("behavior").GetString());
+        var log = await http.GetFromJsonAsync<JsonElement>($"/api/tasks/{taskId}/log");
+        Assert.Contains(log.EnumerateArray(), e => e.GetProperty("summary").GetString() == "Allowed on its own: run the tests · cd web && npm test");
+    }
+
+    [Fact]
+    public async Task An_agent_lists_what_a_person_must_try_by_hand()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+        using var http = _app.CreateClient();
+
+        await client.CallToolAsync("add_manual_check", new Dictionary<string, object?> { ["what"] = "The logout button signs you out", ["how"] = "Open the site, sign in, tap Logout." });
+        await client.CallToolAsync("add_manual_check", new Dictionary<string, object?> { ["what"] = "the logout button signs you out", ["how"] = "Again." });
+
+        var task = await http.GetFromJsonAsync<JsonElement>($"/api/tasks/{taskId}");
+        var check = Assert.Single(task.GetProperty("manualChecks").EnumerateArray());
+        Assert.Equal((1, "Open the site, sign in, tap Logout."), (check.GetProperty("number").GetInt32(), check.GetProperty("how").GetString()));
     }
 
     [Fact]

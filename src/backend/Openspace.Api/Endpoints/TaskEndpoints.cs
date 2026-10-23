@@ -15,6 +15,11 @@ internal static class TaskEndpoints
 
     public sealed record TextRequest(string Text);
 
+    /// <param name="WithReview">Sends the reviewer's latest note along with the text, or alone.</param>
+    public sealed record SendBackRequest(string? Text, bool WithReview = false);
+
+    public sealed record CheckRequest(bool Done);
+
     public sealed record PermissionAnswer(bool Allow);
 
     public sealed record MergeRequest(string Target);
@@ -81,8 +86,12 @@ internal static class TaskEndpoints
             NoContent(commands.DiscardAsync(new WorkTaskId(taskId), ct)));
 
         tasks.MapPost("/{taskId:guid}/send-back", (
-            Guid taskId, TextRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>
-            NoContent(commands.SendBackAsync(new WorkTaskId(taskId), me.Value.Name, request.Text, ct)));
+            Guid taskId, SendBackRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>
+            NoContent(commands.SendBackAsync(new WorkTaskId(taskId), me.Value.Name, request.Text, request.WithReview, ct)));
+
+        tasks.MapPut("/{taskId:guid}/checks/{number:int}", (
+            Guid taskId, int number, CheckRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            NoContent(commands.TickManualCheckAsync(new WorkTaskId(taskId), number, request.Done, ct)));
 
         tasks.MapPost("/{taskId:guid}/notes", (
             Guid taskId, TextRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>

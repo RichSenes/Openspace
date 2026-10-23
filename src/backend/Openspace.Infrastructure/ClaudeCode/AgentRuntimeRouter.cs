@@ -15,7 +15,7 @@ internal sealed partial class AgentRuntimeRouter(
     OpenCodeRuntime openCode,
     ClaudeCodeRuntime claude,
     PermissionRequests permissions,
-    IOptions<ClaudeCodeOptions> options,
+    IOptionsMonitor<ClaudeCodeOptions> options,
     ILogger<AgentRuntimeRouter> logger) : IAgentRuntime
 {
     private static readonly string[] ReadingTools = ["Read", "Grep", "Glob"];
@@ -52,7 +52,7 @@ internal sealed partial class AgentRuntimeRouter(
         {
             try
             {
-                return await claude.AskAsync(Path.GetTempPath(), instructions, text, null, [], [], options.Value.SupervisorModel, cancellationToken)
+                return await claude.AskAsync(Path.GetTempPath(), instructions, text, null, [], [], ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.SupervisorModel), cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (InvalidOperationException ex)
@@ -70,7 +70,7 @@ internal sealed partial class AgentRuntimeRouter(
         {
             try
             {
-                return await claude.AskAsync(folder, instructions, text, jsonSchema, ReadingTools, ReadingTools, options.Value.SupervisorModel, cancellationToken)
+                return await claude.AskAsync(folder, instructions, text, jsonSchema, ReadingTools, ReadingTools, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.SupervisorModel), cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (InvalidOperationException ex)
@@ -85,12 +85,12 @@ internal sealed partial class AgentRuntimeRouter(
 
     public async Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
     {
-        if (!options.Value.Review || !await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
+        if (!options.CurrentValue.Review || !await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
 
-        return await claude.AskAsync(folder, instructions, text, jsonSchema, ReviewTools, ReviewAllowed, options.Value.ReviewModel, cancellationToken)
+        return await claude.AskAsync(folder, instructions, text, jsonSchema, ReviewTools, ReviewAllowed, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.ReviewModel), cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -137,7 +137,7 @@ internal sealed partial class AgentRuntimeRouter(
     }
 
     private async Task<bool> SupervisesAsync(CancellationToken cancellationToken) =>
-        options.Value.Supervise && await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false);
+        options.CurrentValue.Supervise && await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Claude Code could not {What} ({Reason}); OpenCode does it instead")]
     private static partial void LogFellBack(ILogger logger, string what, string reason);

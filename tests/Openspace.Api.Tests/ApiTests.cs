@@ -401,4 +401,64 @@ public sealed class ApiTests : IDisposable
         put.EnsureSuccessStatusCode();
         Assert.Equal(["Back up first", "Log the change"], office.GetProperty("rooms")[0].GetProperty("procedure").EnumerateArray().Select(s => s.GetString()));
     }
+
+    private sealed record Settings(string Autonomy, int Seats, bool ClaudeSupervises, string? SupervisorModel, bool ClaudeReviews, string? ReviewModel, string? DraftModel);
+
+    [Fact]
+    public async Task Settings_changed_in_Openspace_apply_at_once_and_are_kept_in_a_file()
+    {
+        var before = await GetAsync<Settings>("/api/settings");
+
+        var put = await _http.PutAsJsonAsync("/api/settings", before with { Autonomy = "Ask", Seats = 3, SupervisorModel = " opus ", DraftModel = "" });
+        put.EnsureSuccessStatusCode();
+        var after = await GetAsync<Settings>("/api/settings");
+
+        Assert.Equal("Auto", before.Autonomy);
+        Assert.Equal(("Ask", 3, "opus", (string?)null), (after.Autonomy, after.Seats, after.SupervisorModel, after.DraftModel));
+        Assert.Contains("\"Seats\": 3", await File.ReadAllTextAsync(_app.SettingsPath), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(13, null)]
+    [InlineData(2, "not a model!")]
+    public async Task Settings_out_of_bounds_are_refused(int seats, string? model)
+    {
+        var before = await GetAsync<Settings>("/api/settings");
+
+        var put = await _http.PutAsJsonAsync("/api/settings", before with { Seats = seats, ReviewModel = model });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, put.StatusCode);
+        Assert.False(File.Exists(_app.SettingsPath));
+    }
+
+    [Fact]
+    public async Task Checks_to_try_by_hand_are_ticked_through_the_api()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var created = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Fix the footer" });
+        using (var scope = _app.Services.CreateScope())
+        {
+            var tasks = scope.ServiceProvider.GetRequiredService<Application.Abstractions.IWorkTaskRepository>();
+            var task = (await tasks.FindAsync(new Domain.Work.WorkTaskId(created.Id), default))!;
+            task.Start(DateTimeOffset.UtcNow);
+            task.AddManualCheck("The footer fits a phone", "Open the site at 360px.");
+            task.SubmitForReview(DateTimeOffset.UtcNow);
+            await scope.ServiceProvider.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        }
+
+        (await _http.PutAsJsonAsync($"/api/tasks/{created.Id}/checks/1", new { done = true })).EnsureSuccessStatusCode();
+        var missing = await _http.PutAsJsonAsync($"/api/tasks/{created.Id}/checks/7", new { done = true });
+        var withoutReview = await _http.PostAsJsonAsync($"/api/tasks/{created.Id}/send-back", new { withReview = true });
+
+        var view = await GetAsync<JsonElement>($"/api/tasks/{created.Id}");
+        Assert.Equal(JsonValueKind.String, view.GetProperty("manualChecks")[0].GetProperty("checkedAt").ValueKind);
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, HttpStatusCode.UnprocessableEntity), (missing.StatusCode, withoutReview.StatusCode));
+    }
+
+    [Fact]
+    public async Task Desk_usage_starts_empty()
+    {
+        Assert.Empty(await GetAsync<List<JsonElement>>("/api/usage/desks"));
+    }
 }

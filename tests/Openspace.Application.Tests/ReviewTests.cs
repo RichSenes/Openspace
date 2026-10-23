@@ -123,6 +123,53 @@ public class ReviewTests
         Assert.Contains("Task: Add a logout button", brief, StringComparison.Ordinal);
         Assert.Contains("1. Run the tests: done, evidence: dotnet test: 12 passed", brief, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task The_reviewer_adds_the_checks_to_try_by_hand_that_were_missing()
+    {
+        var task = _h.Enqueue();
+        await _h.Runner().RunQueueAsync(default);
+        await _h.Signals().AddManualCheckAsync(task.Id, "The button signs you out", "Tap Logout.", default);
+        await _h.Signals().FinishedAsync("ses_1", default);
+        _h.Runtime.Review = """{"verdict":"ok","summary":"Fine.","findings":[],"manualChecks":[{"what":"The button signs you out","how":"Again."},{"what":"The menu still opens on a phone","how":"Open the site at 360px and tap the menu."}]}""";
+
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+
+        Assert.Equal(["The button signs you out", "The menu still opens on a phone"], task.ManualChecks.Select(c => c.What));
+        Assert.Contains("The button signs you out", _h.Runtime.ReviewRequests[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Work_sent_back_with_the_review_carries_it_to_the_agent()
+    {
+        var task = await FinishedTaskAsync();
+        _h.Runtime.Review = """{"verdict":"changes","summary":"Untested.","findings":[{"file":"header.php","problem":"No test."}]}""";
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+
+        await _h.Commands().SendBackAsync(task.Id, "elliot", "Also keep it small.", withReview: true, default);
+
+        var feedback = task.Notes[^1];
+        Assert.Equal(NoteAuthorKind.Human, feedback.Author.Kind);
+        Assert.StartsWith("Also keep it small.", feedback.Text, StringComparison.Ordinal);
+        Assert.Contains("- header.php: No test.", feedback.Text, StringComparison.Ordinal);
+        Assert.Contains("- header.php: No test.", Briefing.ForResume(task), StringComparison.Ordinal);
+        Assert.Equal(2, task.Round);
+    }
+
+    [Fact]
+    public async Task An_old_review_is_not_sent_back_with_new_work()
+    {
+        var task = await FinishedTaskAsync();
+        _h.Runtime.Review = """{"verdict":"changes","summary":"Untested.","findings":[]}""";
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+        await _h.Commands().SendBackAsync(task.Id, "elliot", null, withReview: true, default);
+        await _h.Runner().RunQueueAsync(default);
+        _h.Clock.Advance(TimeSpan.FromMinutes(5));
+        await _h.Signals().FinishedAsync("ses_1", default);
+
+        await Assert.ThrowsAsync<Domain.Common.DomainException>(() =>
+            _h.Commands().SendBackAsync(task.Id, "elliot", null, withReview: true, default));
+    }
 }
 
 public class ClaudeCodeDeskTests
@@ -162,9 +209,9 @@ public class ClaudeCodeDeskTests
         var task = _h.Enqueue();
         await _h.Runner().RunQueueAsync(default);
 
-        var asking = _h.Signals().RequestPermissionAsync(task.Id, "run npm test", default);
+        var asking = _h.Signals().RequestPermissionAsync(task.Id, Fakes.Run("npm test"), default);
         var waiting = Assert.Single(_h.Activity.Snapshot());
-        Assert.Equal((ActivityKind.Waiting, "Wants to run npm test"), (waiting.Kind, waiting.Doing));
+        Assert.Equal((ActivityKind.Waiting, "Can I run the tests?"), (waiting.Kind, waiting.Doing));
         Assert.False(asking.IsCompleted);
 
         Assert.True(_h.Permissions.Answer(waiting.PermissionId!, allow: true));
@@ -176,7 +223,7 @@ public class ClaudeCodeDeskTests
     {
         var task = _h.Enqueue();
         await _h.Runner().RunQueueAsync(default);
-        var asking = _h.Signals().RequestPermissionAsync(task.Id, "run rm -rf build", default);
+        var asking = _h.Signals().RequestPermissionAsync(task.Id, Fakes.Run("rm -rf build"), default);
 
         _h.Permissions.RefuseAll(task.Run!.SessionId);
 

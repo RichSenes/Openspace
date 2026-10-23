@@ -22,6 +22,9 @@ public sealed class ClaudeCodeOptions
     /// <summary>Model for reviews; null means Claude Code's default.</summary>
     public string? ReviewModel { get; set; }
 
+    /// <summary>A model name as set, or null for Claude Code's default when it is left blank.</summary>
+    public static string? ModelOrDefault(string? model) => string.IsNullOrWhiteSpace(model) ? null : model.Trim();
+
     /// <summary>Longest a plan, a draft or a review may take.</summary>
     public TimeSpan AskTimeout { get; set; } = TimeSpan.FromMinutes(10);
 }

@@ -14,6 +14,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     private readonly string _connectionString = $"Data Source=api-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private SqliteConnection? _keepAlive;
 
+    /// <summary>Settings changed through the API land here, never next to the real database.</summary>
+    public string SettingsPath { get; } = Path.Combine(Path.GetTempPath(), $"openspace-settings-{Guid.NewGuid():N}.json");
+
     private SqliteConnection KeepAlive()
     {
         _keepAlive ??= new SqliteConnection(_connectionString);
@@ -34,6 +37,7 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     {
         KeepAlive();
         builder.UseSetting("ConnectionStrings:Openspace", _connectionString);
+        builder.UseSetting("Settings:Path", SettingsPath);
 
         // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
         builder.UseSetting("OpenCode:BaseUrl", "http://127.0.0.1:9");
@@ -55,6 +59,7 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         if (disposing)
         {
             _keepAlive?.Dispose();
+            File.Delete(SettingsPath);
         }
     }
 }

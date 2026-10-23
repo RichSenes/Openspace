@@ -57,6 +57,14 @@ internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor 
             return $"Step {step} recorded.";
         });
 
+    [McpServerTool(Name = "add_manual_check")]
+    [Description("List one thing a person must try by hand before your work is merged, because no automated check covers it. Call it once per check, before your final summary.")]
+    public Task<string> AddManualCheckAsync(
+        [Description("What to verify, in one sentence, e.g. \"The logout button signs you out on a phone\".")] string what,
+        [Description("How to try it: where to go, what to run or tap, what should happen.")] string how,
+        CancellationToken cancellationToken) =>
+        RunAsync(async task => $"Check {await signals.AddManualCheckAsync(task, what, how, cancellationToken)} listed.");
+
     /// <summary>
     /// Claude Code calls this before a tool the agent's role does not allow outright, and
     /// waits: the person answers in Openspace. Not meant for agents to call themselves.
@@ -72,7 +80,7 @@ internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor 
         try
         {
             var allowed = await RunAsync(async task =>
-                (await signals.RequestPermissionAsync(task, ClaudeCodePermissions.Describe(tool_name, input), cancellationToken)).ToString());
+                (await signals.RequestPermissionAsync(task, ClaudeCodePermissions.Action(tool_name, input), cancellationToken)).ToString());
             return ClaudeCodePermissions.Reply(allowed == bool.TrueString, input);
         }
         catch (McpException)

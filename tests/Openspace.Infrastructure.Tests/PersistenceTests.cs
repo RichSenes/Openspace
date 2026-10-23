@@ -350,6 +350,41 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Rounds_checks_and_tokens_survive_a_round_trip()
+    {
+        var (office, frontend, _) = await FurnishECorpAsync();
+        var taskId = await InScope(sp => sp.GetRequiredService<WorkTaskCommands>()
+            .AssignAsync(office, frontend, "Patch the header", null, "elliot", default));
+        await InScope(async sp =>
+        {
+            var task = (await sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().FindAsync(taskId, default))!;
+            task.Start(_db.Clock.GetUtcNow());
+            task.RecordUsage(new TokenCount(1000, 200, 3000, 400));
+            task.AddManualCheck("The header fits a phone", "Open it at 360px.");
+            task.SubmitForReview(_db.Clock.GetUtcNow());
+            task.SendBack(NoteAuthor.Human("elliot"), "Smaller.", _db.Clock.GetUtcNow());
+            task.RecordUsage(new TokenCount(10, 2, 0, 0));
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        });
+        _db.Clock.Advance(TimeSpan.FromMinutes(1));
+        await InScope(async sp =>
+        {
+            var task = (await sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().FindAsync(taskId, default))!;
+            task.RecordUsage(new TokenCount(5, 1, 0, 0));
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        });
+
+        var view = await InScope(sp => sp.GetRequiredService<WorkTaskQueries>().GetAsync(taskId, default));
+        var desks = await InScope(sp => sp.GetRequiredService<UsageQueries>().ByDeskAsync(default));
+
+        Assert.Equal(2, view.Round);
+        Assert.Equal([(1, 1000L, 200L, 3000L, 400L), (2, 15L, 3L, 0L, 0L)], view.Usage.Select(u => (u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite)));
+        Assert.Equal(("The header fits a phone", "Open it at 360px.", (DateTimeOffset?)null), (view.ManualChecks[0].What, view.ManualChecks[0].How, view.ManualChecks[0].CheckedAt));
+        var desk = Assert.Single(desks);
+        Assert.Equal(("Frontend", 1, 1015L), (desk.DeskName, desk.Tasks, desk.Input));
+    }
+
+    [Fact]
     public async Task Reports_are_written_from_the_log_and_kept()
     {
         var (office, frontend, _) = await FurnishECorpAsync();

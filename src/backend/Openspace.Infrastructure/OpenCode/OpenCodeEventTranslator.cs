@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Openspace.Application.Agents;
 using Openspace.Domain.Work;
 
 namespace Openspace.Infrastructure.OpenCode;
@@ -23,6 +24,7 @@ internal static class OpenCodeEventTranslator
         {
             "todo.updated" => FromTodos(props),
             "message.part.updated" => FromPart(props),
+            "message.updated" => FromMessage(props),
             "permission.asked" => FromPermission(props),
             "permission.replied" => Text(props, "sessionID") is { } replied && Text(props, "requestID") is { } request
                 ? new AgentSignal.PermissionReplied(replied, request, Text(props, "reply") is not "reject")
@@ -42,7 +44,7 @@ internal static class OpenCodeEventTranslator
             "read" => File("filePath") is { } f ? $"Reading {f}" : "Reading a file",
             "edit" or "multiedit" or "patch" => File("filePath") is { } f ? $"Editing {f}" : "Editing code",
             "write" => File("filePath") is { } f ? $"Writing {f}" : "Writing a file",
-            "bash" => $"Running {title ?? Text(input, "command") ?? "a command"}",
+            "bash" => ActionPhrases.Doing(new AgentAction(ActionKind.Run, Text(input, "command") ?? title ?? string.Empty)),
             "glob" or "grep" or "list" or "codesearch" => "Searching the code",
             "webfetch" or "websearch" => "Looking something up online",
             "task" => Text(input, "description") is { } d ? $"Delegating: {d}" : "Delegating to a helper",
@@ -50,6 +52,25 @@ internal static class OpenCodeEventTranslator
             _ => $"Using {tool}",
         };
         return phrase is null ? null : Shorten(phrase);
+    }
+
+    /// <summary>An answer of the agent is complete: what it spent, reasoning counted as output.</summary>
+    private static AgentSignal.Used? FromMessage(JsonElement props)
+    {
+        if (!props.TryGetProperty("info", out var info) || Text(info, "role") != "assistant"
+            || !info.TryGetProperty("time", out var time) || !time.TryGetProperty("completed", out var completed) || completed.ValueKind != JsonValueKind.Number
+            || !info.TryGetProperty("tokens", out var tokens) || Text(info, "sessionID") is not { } sessionId)
+        {
+            return null;
+        }
+
+        static long Count(JsonElement element, string name) =>
+            element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var n) && n.ValueKind == JsonValueKind.Number ? n.GetInt64() : 0;
+        var cache = tokens.TryGetProperty("cache", out var c) ? c : default;
+        return new AgentSignal.Used(
+            sessionId,
+            new TokenCount(Count(tokens, "input"), Count(tokens, "output") + Count(tokens, "reasoning"), Count(cache, "read"), Count(cache, "write")),
+            Text(info, "id"));
     }
 
     private static AgentSignal.Progress? FromTodos(JsonElement props)
@@ -105,7 +126,7 @@ internal static class OpenCodeEventTranslator
             "read" => (AuditKind.Read, $"Read {Name(File("filePath"))}", File("filePath")),
             "edit" or "multiedit" or "patch" => (AuditKind.Change, $"Changed {Name(File("filePath"))}", Text(metadata, "diff") ?? File("filePath")),
             "write" => (AuditKind.Change, $"Wrote {Name(File("filePath"))}", Text(metadata, "diff") ?? File("filePath")),
-            "bash" => (AuditKind.Command, $"Ran {Text(state, "title") ?? Text(input, "command") ?? "a command"}", $"$ {Text(input, "command")}\n{output}"),
+            "bash" => (AuditKind.Command, ActionPhrases.Done(new AgentAction(ActionKind.Run, Text(input, "command") ?? Text(state, "title") ?? "a command")), $"$ {Text(input, "command")}\n{output}"),
             "glob" or "grep" or "list" or "codesearch" =>
                 (AuditKind.Search, Text(input, "pattern") is { } pattern ? $"Searched the code for {pattern}" : "Searched the code", output),
             "webfetch" or "websearch" => (AuditKind.Other, $"Looked up {Text(input, "url") ?? Text(input, "query") ?? "something online"}", null),
@@ -127,27 +148,24 @@ internal static class OpenCodeEventTranslator
     }
 
     private static AgentSignal.PermissionAsked FromPermission(JsonElement props) =>
-        new(Text(props, "sessionID")!, Text(props, "id")!, DescribePermission(props));
+        new(Text(props, "sessionID")!, Text(props, "id")!, ActionOf(props));
 
-    /// <summary>
-    /// What a permission request asks for, to follow "Wants to": "run ls -la, git status",
-    /// "edit header.php", "go outside its folder: /srv/other".
-    /// </summary>
-    public static string DescribePermission(JsonElement request)
+    /// <summary>What a permission request asks for: to run "ls -la &amp;&amp; git status", to edit header.php.</summary>
+    public static AgentAction ActionOf(JsonElement request)
     {
         var what = Text(request, "permission") ?? "an action";
         var patterns = request.TryGetProperty("patterns", out var p) && p.ValueKind == JsonValueKind.Array
-            ? string.Join(", ", p.EnumerateArray().Select(x => x.GetString()))
-            : string.Empty;
-        var verb = what switch
+            ? [.. p.EnumerateArray().Select(x => x.GetString()).OfType<string>()]
+            : new List<string>();
+        var metadata = request.TryGetProperty("metadata", out var m) ? m : default;
+        return what switch
         {
-            "bash" => "run",
-            "edit" => "edit",
-            "external_directory" => "go outside its folder:",
-            "webfetch" => "fetch",
-            _ => $"use {what}",
+            "bash" => new AgentAction(ActionKind.Run, patterns.Count > 0 ? string.Join(" && ", patterns) : Text(metadata, "command") ?? "a command"),
+            "edit" => new AgentAction(ActionKind.Edit, Text(metadata, "filepath") ?? patterns.FirstOrDefault() ?? "a file"),
+            "external_directory" => new AgentAction(ActionKind.OutsideFolder, patterns.Count > 0 ? string.Join(", ", patterns) : "another folder"),
+            "webfetch" or "websearch" => new AgentAction(ActionKind.Fetch, patterns.FirstOrDefault() ?? Text(metadata, "url") ?? "a page"),
+            _ => new AgentAction(ActionKind.Other, what),
         };
-        return Shorten(patterns.Length > 0 ? $"{verb} {patterns}" : verb.TrimEnd(':'));
     }
 
     private static AgentSignal.Failed? FromError(JsonElement props)

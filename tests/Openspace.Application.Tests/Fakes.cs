@@ -321,3 +321,18 @@ internal sealed class InMemoryReports : IReportRepository
 
     public void Add(Domain.Reports.Report report) => Items.Add(report);
 }
+
+/// <summary>Options that read their value when asked, as a monitor of live settings does.</summary>
+internal sealed class LiveOptions<T>(Func<T> read) : Microsoft.Extensions.Options.IOptionsMonitor<T>
+{
+    public T CurrentValue => read();
+
+    public T Get(string? name) => read();
+
+    public IDisposable? OnChange(Action<T, string?> listener) => null;
+}
+
+internal static class Fakes
+{
+    public static Agents.AgentAction Run(string command) => new(Agents.ActionKind.Run, command);
+}

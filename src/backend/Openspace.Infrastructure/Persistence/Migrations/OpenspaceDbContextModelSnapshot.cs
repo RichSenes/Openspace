@@ -220,9 +220,15 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Round")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("StatusChangedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -647,6 +653,33 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .HasForeignKey("WorkTaskId");
                         });
 
+                    b.OwnsMany("Openspace.Domain.Work.ManualCheck", "ManualChecks", b1 =>
+                        {
+                            b1.Property<Guid>("WorkTaskId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("Number")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long?>("CheckedAt")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("How")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("What")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.HasKey("WorkTaskId", "Number");
+
+                            b1.ToTable("TaskManualChecks", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("WorkTaskId");
+                        });
+
                     b.OwnsMany("Openspace.Domain.Work.ProcedureStep", "Procedure", b1 =>
                         {
                             b1.Property<Guid>("WorkTaskId")
@@ -668,6 +701,34 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                             b1.HasKey("WorkTaskId", "Number");
 
                             b1.ToTable("TaskProcedureSteps", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("WorkTaskId");
+                        });
+
+                    b.OwnsMany("Openspace.Domain.Work.RoundUsage", "Usage", b1 =>
+                        {
+                            b1.Property<Guid>("WorkTaskId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("Round")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long>("CacheRead")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long>("CacheWrite")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long>("Input")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<long>("Output")
+                                .HasColumnType("INTEGER");
+
+                            b1.HasKey("WorkTaskId", "Round");
+
+                            b1.ToTable("TaskRoundUsage", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("WorkTaskId");
@@ -728,11 +789,15 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .IsRequired();
                         });
 
+                    b.Navigation("ManualChecks");
+
                     b.Navigation("Notes");
 
                     b.Navigation("Procedure");
 
                     b.Navigation("Run");
+
+                    b.Navigation("Usage");
                 });
 #pragma warning restore 612, 618
         }

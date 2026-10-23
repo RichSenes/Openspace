@@ -63,11 +63,11 @@ public class AuditTests
     public async Task Permissions_asked_and_answered_are_logged()
     {
         var task = await RunningTaskAsync();
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash rm -rf build", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("rm -rf build"), default);
 
         await _h.Commands().ReplyToPermissionAsync(task.Id, allow: false, default);
 
-        Assert.Equal(["Asked permission: bash rm -rf build", "Permission refused"], _h.Audit.Items.Select(e => e.Summary));
+        Assert.Equal(["Asked to delete files · rm -rf build", "Permission refused"], _h.Audit.Items.Select(e => e.Summary));
         Assert.All(_h.Audit.Items, e => Assert.Equal(AuditKind.Permission, e.Kind));
     }
 

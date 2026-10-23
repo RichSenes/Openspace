@@ -57,7 +57,7 @@ public class AgentSignalsTests
     {
         var task = await RunningTaskAsync();
 
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash rm -rf build", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("rm -rf build"), default);
 
         var activity = _h.Activity.ForTask(task.Id.Value);
         Assert.Equal((ActivityKind.Waiting, "per_1"), (activity?.Kind, activity?.PermissionId));
@@ -67,7 +67,7 @@ public class AgentSignalsTests
     public async Task Answering_a_permission_forwards_it_and_resumes_the_bubble()
     {
         var task = await RunningTaskAsync();
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash rm -rf build", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("rm -rf build"), default);
 
         await _h.Commands().ReplyToPermissionAsync(task.Id, allow: true, default);
 
@@ -94,20 +94,20 @@ public class AgentSignalsTests
     public async Task A_wait_for_permission_survives_the_blocked_tool_reporting_itself_as_running()
     {
         var task = await RunningTaskAsync();
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("ls -la"), default);
 
         // OpenCode reports the very tool that waits as running, right after asking.
         await _h.Signals().ProgressAsync("ses_1", null, "Running ls -la", default);
 
         var activity = _h.Activity.ForTask(task.Id.Value);
-        Assert.Equal((ActivityKind.Waiting, "per_1", "Wants to bash ls -la"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
+        Assert.Equal((ActivityKind.Waiting, "per_1", "Can I look through the files?"), (activity?.Kind, activity?.PermissionId, activity?.Doing));
     }
 
     [Fact]
     public async Task A_permission_answered_in_OpenCode_itself_ends_the_wait()
     {
         var task = await RunningTaskAsync();
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("ls -la"), default);
 
         await _h.Signals().PermissionRepliedAsync("ses_1", "per_1", allowed: false, default);
 
@@ -119,7 +119,7 @@ public class AgentSignalsTests
     public async Task Finishing_or_failing_still_ends_a_wait()
     {
         var task = await RunningTaskAsync();
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la", default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("ls -la"), default);
 
         await _h.Signals().FinishedAsync("ses_1", default);
 
@@ -130,10 +130,10 @@ public class AgentSignalsTests
     public async Task Two_requests_at_once_are_answered_one_after_the_other()
     {
         var task = await RunningTaskAsync();
-        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", "bash ls -la ../original"));
-        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_2", "ses_1", "bash pwd, git status"));
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls -la ../original", default);
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_2", "bash pwd, git status", default);
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", Fakes.Run("ls -la ../original")));
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_2", "ses_1", Fakes.Run("pwd && git status")));
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("ls -la ../original"), default);
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_2", Fakes.Run("pwd && git status"), default);
 
         var first = _h.Activity.ForTask(task.Id.Value);
         _h.Runtime.Pending.RemoveAt(0);
@@ -144,7 +144,7 @@ public class AgentSignalsTests
         var done = _h.Activity.ForTask(task.Id.Value);
 
         Assert.Equal((ActivityKind.Waiting, "per_1"), (first?.Kind, first?.PermissionId));
-        Assert.Equal((ActivityKind.Waiting, "per_2", "Wants to bash pwd, git status"), (second?.Kind, second?.PermissionId, second?.Doing));
+        Assert.Equal((ActivityKind.Waiting, "per_2", "Can I look at the changes in git?"), (second?.Kind, second?.PermissionId, second?.Doing));
         Assert.Equal((ActivityKind.Working, null), (done?.Kind, done?.PermissionId));
         Assert.Equal([("per_1", true), ("per_2", true)], _h.Runtime.PermissionReplies);
     }
@@ -153,11 +153,85 @@ public class AgentSignalsTests
     public async Task An_answer_given_in_OpenCode_for_another_request_does_not_end_the_current_wait()
     {
         var task = await RunningTaskAsync();
-        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", "bash ls"));
-        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", "bash ls", default);
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_1", "ses_1", Fakes.Run("ls")));
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("ls"), default);
 
         await _h.Signals().PermissionRepliedAsync("ses_1", "per_old", allowed: true, default);
 
         Assert.Equal((ActivityKind.Waiting, "per_1"), (_h.Activity.ForTask(task.Id.Value)?.Kind, _h.Activity.ForTask(task.Id.Value)?.PermissionId));
+    }
+
+    [Fact]
+    public async Task In_auto_mode_Openspace_answers_a_safe_request_itself()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("cd web && npm ci"), default);
+
+        Assert.Equal(("per_1", true), Assert.Single(_h.Runtime.PermissionReplies));
+        Assert.NotEqual(ActivityKind.Waiting, _h.Activity.ForTask(task.Id.Value)?.Kind);
+        Assert.Equal("Allowed on its own: install the dependencies · cd web && npm ci", Assert.Single(_h.Audit.Items).Summary);
+    }
+
+    [Fact]
+    public async Task In_auto_mode_a_risky_request_still_waits_and_says_why()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("git push origin main"), default);
+
+        var activity = _h.Activity.ForTask(task.Id.Value);
+        Assert.Equal((ActivityKind.Waiting, "Can I push to the remote?", "git push origin main"), (activity?.Kind, activity?.Doing, activity?.Detail));
+        Assert.Empty(_h.Runtime.PermissionReplies);
+        Assert.Contains("A person decides because it changes the repository", Assert.Single(_h.Audit.Items).Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task After_an_answer_only_requests_that_need_a_person_are_shown()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("npx wrangler deploy"), default);
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_2", "ses_1", Fakes.Run("npm test")));
+
+        await _h.Commands().ReplyToPermissionAsync(task.Id, allow: false, default);
+
+        Assert.Equal(ActivityKind.Working, _h.Activity.ForTask(task.Id.Value)?.Kind);
+    }
+
+    [Fact]
+    public async Task Claude_Code_asking_through_Openspace_gets_a_safe_answer_at_once_in_auto_mode()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+
+        Assert.True(await _h.Signals().RequestPermissionAsync(task.Id, new AgentAction(ActionKind.Edit, $"{task.Run!.WorkspacePath}/header.php"), default));
+        Assert.Empty(_h.Permissions.Pending(task.Run.WorkspacePath));
+    }
+
+    [Fact]
+    public async Task Tokens_count_on_the_round_even_once_the_work_is_in_review()
+    {
+        var task = await RunningTaskAsync();
+        await _h.Signals().UsedAsync("ses_1", new TokenCount(1200, 300, 5000, 800), default);
+        await _h.Signals().FinishedAsync("ses_1", default);
+
+        await _h.Signals().UsedAsync("ses_1", new TokenCount(100, 20, 0, 0), default);
+        await _h.Signals().UsedAsync("ses_someone_else", new TokenCount(9, 9, 9, 9), default);
+
+        Assert.Equal(new TokenCount(1300, 320, 5000, 800), Assert.Single(task.Usage).Tokens);
+    }
+
+    [Fact]
+    public async Task An_agent_lists_checks_to_try_by_hand_once_each()
+    {
+        var task = await RunningTaskAsync();
+
+        Assert.Equal(1, await _h.Signals().AddManualCheckAsync(task.Id, "The banner shows on a phone", "Open the home page at 360px wide.", default));
+        Assert.Equal(1, await _h.Signals().AddManualCheckAsync(task.Id, "the banner shows on a phone", "Again.", default));
+
+        Assert.Equal("Open the home page at 360px wide.", Assert.Single(task.ManualChecks).How);
     }
 }

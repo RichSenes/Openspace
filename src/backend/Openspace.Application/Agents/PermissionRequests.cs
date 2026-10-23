@@ -13,13 +13,13 @@ public sealed class PermissionRequests
 
     private readonly ConcurrentDictionary<string, Request> _waiting = new();
 
-    private sealed record Request(string SessionId, string WorkspacePath, string Description, TaskCompletionSource<bool> Answer);
+    private sealed record Request(string SessionId, string WorkspacePath, AgentAction Action, TaskCompletionSource<bool> Answer);
 
     /// <summary>Holds a request; its id names it in the activity and in the answer.</summary>
-    public string Open(string sessionId, string workspacePath, string description)
+    public string Open(string sessionId, string workspacePath, AgentAction action)
     {
         var id = Prefix + Guid.NewGuid().ToString("N");
-        _waiting[id] = new Request(sessionId, workspacePath, description, new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
+        _waiting[id] = new Request(sessionId, workspacePath, action, new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
         return id;
     }
 
@@ -54,5 +54,5 @@ public sealed class PermissionRequests
 
     public IReadOnlyList<Abstractions.PermissionRequest> Pending(string workspacePath) =>
         [.. _waiting.Where(w => w.Value.WorkspacePath == workspacePath && !w.Value.Answer.Task.IsCompleted)
-            .Select(w => new Abstractions.PermissionRequest(w.Key, w.Value.SessionId, w.Value.Description))];
+            .Select(w => new Abstractions.PermissionRequest(w.Key, w.Value.SessionId, w.Value.Action))];
 }

@@ -63,5 +63,31 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
             step.Ignore(s => s.IsDone);
         });
         builder.Navigation(t => t.Procedure).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Property(t => t.StatusChangedAt);
+        builder.Property(t => t.Round);
+        builder.Ignore(t => t.TotalTokens);
+        builder.OwnsMany(t => t.ManualChecks, check =>
+        {
+            check.ToTable("TaskManualChecks");
+            check.WithOwner().HasForeignKey("WorkTaskId");
+            check.HasKey("WorkTaskId", nameof(ManualCheck.Number));
+            check.Property(c => c.Number).ValueGeneratedNever();
+            check.Property(c => c.What).IsRequired();
+            check.Property(c => c.How).IsRequired();
+            check.Property(c => c.CheckedAt);
+            check.Ignore(c => c.IsChecked);
+        });
+        builder.Navigation(t => t.ManualChecks).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.OwnsMany(t => t.Usage, usage =>
+        {
+            usage.ToTable("TaskRoundUsage");
+            usage.WithOwner().HasForeignKey("WorkTaskId");
+            usage.HasKey("WorkTaskId", nameof(RoundUsage.Round));
+            usage.Property(u => u.Round).ValueGeneratedNever();
+            usage.Ignore(u => u.Tokens);
+        });
+        builder.Navigation(t => t.Usage).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

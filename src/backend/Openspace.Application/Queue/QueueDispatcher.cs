@@ -13,14 +13,14 @@ namespace Openspace.Application.Queue;
 public sealed class QueueDispatcher(
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
-    IOptions<QueueOptions> options,
+    IOptionsMonitor<QueueOptions> options,
     TimeProvider clock)
 {
     /// <returns>The tasks that just started and now need an agent.</returns>
     public async Task<IReadOnlyList<WorkTaskId>> DispatchAsync(CancellationToken cancellationToken)
     {
         var running = await tasks.ListAsync(null, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false);
-        var freeSeats = options.Value.Seats - running.Count;
+        var freeSeats = options.CurrentValue.Seats - running.Count;
         if (freeSeats <= 0)
         {
             return [];

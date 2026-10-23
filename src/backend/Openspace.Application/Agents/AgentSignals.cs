@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Domain.Work;
 
@@ -18,6 +19,7 @@ public sealed partial class AgentSignals(
     IActivityPublisher publisher,
     Review.PendingReviews reviews,
     PermissionRequests permissions,
+    IOptionsMonitor<AgentOptions> agentOptions,
     TimeProvider clock)
 {
     /// <param name="step">The agent's current todo item, if this update is about its plan.</param>
@@ -46,6 +48,31 @@ public sealed partial class AgentSignals(
     {
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
         task.AddNote(NoteAuthor.FromDesk(task.DeskId!.Value), Guard(text, "Note", 4000), clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The agent listed something a person must try by hand, through the Openspace tools.</summary>
+    public async Task<int> AddManualCheckAsync(WorkTaskId taskId, string what, string? how, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var number = task.AddManualCheck(what, how);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return number;
+    }
+
+    /// <summary>
+    /// An engine reported the tokens a session spent. They count on the task's current round,
+    /// whatever its status: the report may arrive just after the work went to review.
+    /// </summary>
+    public async Task UsedAsync(string sessionId, TokenCount tokens, CancellationToken cancellationToken)
+    {
+        var task = await tasks.FindBySessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is null || tokens.Total == 0)
+        {
+            return;
+        }
+
+        task.RecordUsage(tokens);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -82,8 +109,12 @@ public sealed partial class AgentSignals(
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// OpenCode holds a request for the agent. Openspace answers it on its own when it may;
+    /// otherwise the desk waits for a person.
+    /// </summary>
     public async Task PermissionAskedAsync(
-        string sessionId, string permissionId, string description, CancellationToken cancellationToken)
+        string sessionId, string permissionId, AgentAction action, CancellationToken cancellationToken)
     {
         var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
         if (task is null)
@@ -91,34 +122,50 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        await LogAsync(
-            AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked permission: {description}", externalId: permissionId),
-            cancellationToken).ConfigureAwait(false);
-        await ShowAsync(task, ActivityKind.Waiting, null, $"Wants to {description}", permissionId, cancellationToken)
-            .ConfigureAwait(false);
+        if (MayAllowOnItsOwn(task, action))
+        {
+            await runtime.ReplyToPermissionAsync(permissionId, task.Run!.WorkspacePath, true, cancellationToken).ConfigureAwait(false);
+            await LogAsync(AllowedOnItsOwn(task, action, permissionId), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await LogAsync(Asked(task, action, permissionId), cancellationToken).ConfigureAwait(false);
+        await ShowWaitingAsync(task, permissionId, action, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// The agent asked, through the Openspace tools, to do something its role does not allow
-    /// outright. It waits until a person answers in Openspace: true to allow it once.
+    /// outright. Openspace answers on its own when it may; otherwise it waits until a person
+    /// answers in Openspace. True allows it once.
     /// </summary>
-    public async Task<bool> RequestPermissionAsync(WorkTaskId taskId, string description, CancellationToken cancellationToken)
+    public async Task<bool> RequestPermissionAsync(WorkTaskId taskId, AgentAction action, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(action);
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
-        var id = permissions.Open(task.Run!.SessionId, task.Run.WorkspacePath, Guard(description, "Permission", 200));
+        if (MayAllowOnItsOwn(task, action))
+        {
+            await LogAsync(AllowedOnItsOwn(task, action, null), cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+
+        var id = permissions.Open(task.Run!.SessionId, task.Run.WorkspacePath, action with { Target = Guard(action.Target, "Permission", 2000) });
+        await LogAsync(Asked(task, action, id), cancellationToken).ConfigureAwait(false);
+
         // Another request of the same agent may be on show: this one waits its turn.
         if (activity.ForTask(task.Id.Value) is not { Kind: ActivityKind.Waiting })
         {
-            await PermissionAskedAsync(task.Run.SessionId, id, description, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await LogAsync(
-                AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked permission: {description}", externalId: id),
-                cancellationToken).ConfigureAwait(false);
+            await ShowWaitingAsync(task, id, action, cancellationToken).ConfigureAwait(false);
         }
 
         return await permissions.WaitAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Whether Openspace answers this request without a person: in auto mode, unless it is risky.</summary>
+    public bool MayAllowOnItsOwn(WorkTask task, AgentAction action)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return agentOptions.CurrentValue.Autonomy == Autonomy.Auto
+            && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath) is null;
     }
 
     /// <summary>A permission was answered in OpenCode itself.</summary>
@@ -132,8 +179,9 @@ public sealed partial class AgentSignals(
     }
 
     /// <summary>
-    /// After an answer the agent works again, unless OpenCode holds more requests for the
-    /// same session: then the next one is shown. OpenCode is the source of truth here.
+    /// After an answer the agent works again, unless its engine holds more requests for the
+    /// same session that need a person: then the next one is shown. The engine is the source
+    /// of truth here; requests Openspace may answer on its own are answered as they arrive.
     /// </summary>
     public async Task PermissionAnsweredAsync(WorkTask task, string permissionId, bool allowed, CancellationToken cancellationToken)
     {
@@ -143,11 +191,29 @@ public sealed partial class AgentSignals(
             .ConfigureAwait(false);
 
         var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
-        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId) is { } next)
+        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action)) is { } next)
         {
-            await ShowAsync(task, ActivityKind.Waiting, null, $"Wants to {next.Description}", next.Id, cancellationToken).ConfigureAwait(false);
+            await ShowWaitingAsync(task, next.Id, next.Action, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    private AuditEntry Asked(WorkTask task, AgentAction action, string permissionId) =>
+        AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked to {ActionPhrases.Request(action)}", Reason(task, action), externalId: permissionId);
+
+    private AuditEntry AllowedOnItsOwn(WorkTask task, AgentAction action, string? permissionId) =>
+        AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Allowed on its own: {ActionPhrases.Request(action)}", action.Target, externalId: permissionId);
+
+    /// <summary>Why a person is asked: in auto mode, what makes the request risky.</summary>
+    private string? Reason(WorkTask task, AgentAction action) =>
+        agentOptions.CurrentValue.Autonomy == Autonomy.Auto && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath) is { } why
+            ? $"{action.Target}\nA person decides because {why}."
+            : action.Target;
+
+    private Task ShowWaitingAsync(WorkTask task, string permissionId, AgentAction action, CancellationToken cancellationToken) =>
+        activity.UpdateAsync(
+            new DeskActivity(task.OfficeId.Value, task.DeskId!.Value.Value, task.Id.Value, ActivityKind.Waiting, null,
+                ActionPhrases.Asking(action), permissionId, clock.GetUtcNow(), ActionPhrases.Shorten(action.Target, 300)),
+            cancellationToken);
 
     /// <summary>The agent stopped talking: its work goes to review with its summary as a note.</summary>
     public async Task FinishedAsync(string sessionId, CancellationToken cancellationToken)

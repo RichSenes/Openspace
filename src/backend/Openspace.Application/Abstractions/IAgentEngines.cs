@@ -4,6 +4,9 @@ namespace Openspace.Application.Abstractions;
 public interface IAgentEngines
 {
     Task<EnginesView> DescribeAsync(CancellationToken cancellationToken);
+
+    /// <summary>Asks Claude Code now how much of the account's limits is used; null when it cannot tell.</summary>
+    Task<ClaudeUsageView?> CheckClaudeUsageAsync(CancellationToken cancellationToken);
 }
 
 /// <param name="OpenCodeModels">Models OpenCode can use, as <c>provider/model</c>, with their names.</param>

@@ -19,7 +19,7 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
         if (ForTask(taskId) is { } current)
         {
             await UpdateAsync(
-                current with { Kind = ActivityKind.Stopped, Step = null, Doing = null, PermissionId = null, At = now },
+                current with { Kind = ActivityKind.Stopped, Step = null, Doing = null, PermissionId = null, Detail = null, At = now },
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -33,7 +33,7 @@ public sealed class ActivityBoard(IActivityPublisher publisher)
     {
         if (ForTask(taskId) is { Kind: ActivityKind.Waiting } waiting && waiting.PermissionId == permissionId)
         {
-            var resumed = waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = doing, At = now };
+            var resumed = waiting with { Kind = ActivityKind.Working, PermissionId = null, Doing = doing, Detail = null, At = now };
             _byDesk[waiting.DeskId] = resumed;
             await publisher.PublishAsync(resumed, cancellationToken).ConfigureAwait(false);
         }

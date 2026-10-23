@@ -15,7 +15,11 @@ public sealed record WorkTaskView(
     string? MergedInto,
     Guid? EpicId,
     IReadOnlyList<ProcedureStepView> Procedure,
-    IReadOnlyList<TaskNoteView> Notes)
+    IReadOnlyList<TaskNoteView> Notes,
+    DateTimeOffset StatusChangedAt,
+    int Round,
+    IReadOnlyList<ManualCheckView> ManualChecks,
+    IReadOnlyList<RoundUsageView> Usage)
 {
     public static WorkTaskView From(WorkTask task)
     {
@@ -33,7 +37,11 @@ public sealed record WorkTaskView(
             task.MergedInto,
             task.EpicId?.Value,
             [.. task.Procedure.Select(s => new ProcedureStepView(s.Number, s.Text, s.Evidence, s.CompletedAt))],
-            [.. task.Notes.Select(TaskNoteView.From)]);
+            [.. task.Notes.Select(TaskNoteView.From)],
+            task.StatusChangedAt,
+            task.Round,
+            [.. task.ManualChecks.Select(c => new ManualCheckView(c.Number, c.What, c.How, c.CheckedAt))],
+            [.. task.Usage.OrderBy(u => u.Round).Select(u => new RoundUsageView(u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite))]);
     }
 }
 
@@ -44,3 +52,7 @@ public sealed record TaskNoteView(NoteAuthorKind AuthorKind, string? AuthorName,
 }
 
 public sealed record ProcedureStepView(int Number, string Text, string? Evidence, DateTimeOffset? CompletedAt);
+
+public sealed record ManualCheckView(int Number, string What, string How, DateTimeOffset? CheckedAt);
+
+public sealed record RoundUsageView(int Round, long Input, long Output, long CacheRead, long CacheWrite);

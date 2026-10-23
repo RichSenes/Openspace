@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OfficeView, RoomView } from '../api/types'
-import { doorOf, freeSpot, layoutOffice } from './layout'
+import { doorOf, freeSpot, inBuilding, layoutOffice } from './layout'
 
 const room = (name: string, desks: number, extra: Partial<RoomView> = {}): RoomView => ({
   id: name,
@@ -95,6 +95,15 @@ describe('layoutOffice, drawn by hand', () => {
     const [web, added] = layout.rooms
     expect(added.y).toBe(web.y)
     expect(added.x).toBe(web.x + web.width)
+  })
+
+  it('takes cuts out of the building and finds new rooms a place outside them', () => {
+    const layout = layoutOffice({ ...planned(room('New', 1)), cuts: [{ left: 0, top: 0, width: 12, height: 8 }] })
+    expect(layout.cuts).toEqual([{ x: 1, y: 1, width: 12, height: 8 }])
+    expect(inBuilding(layout, 5, 5)).toBe(false)
+    expect(inBuilding(layout, 13, 5)).toBe(true)
+    expect(inBuilding(layout, 40, 5)).toBe(false)
+    expect(layout.rooms[0].x).toBe(13)
   })
 
   it('makes the building deeper when a new room fits nowhere', () => {

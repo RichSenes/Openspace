@@ -1,4 +1,4 @@
-import type { DoorPlacement, FloorPlanRequest, FurniturePiece, OfficeView, RoomLayoutRequest } from '../api/types'
+import type { DoorPlacement, FloorCut, FloorPlanRequest, FurniturePiece, OfficeView, RoomLayoutRequest } from '../api/types'
 import { FURNITURE } from '../art/fanPack'
 import { WALL_HEIGHT } from '../art/roomScene'
 import { PROPS, type PropName } from '../art/sheets/props'
@@ -15,12 +15,14 @@ export interface Arrangement {
   windows: number[]
 }
 
-/** The building being drawn: its size in tiles, where rooms stand and the common floor's furniture, in pixels. */
+/** The building being drawn: its size and shape in tiles, where rooms stand and the common floor's furniture, in pixels. */
 export interface FloorArrangement {
   width: number
   depth: number
   furniture: FurniturePiece[]
   rooms: Record<string, { left: number; top: number }>
+  /** Pieces cut out of the rectangle, in tiles from its corner. */
+  cuts: FloorCut[]
 }
 
 /** Changes not saved yet; `auto` gives the whole office back to the automatic layout. */
@@ -35,8 +37,13 @@ export const NO_DRAFTS: Drafts = { rooms: {} }
 /** The selection key of the common floor, the building itself. */
 export const BUILDING = 'building'
 
-/** What can be picked up in a room, or on the common floor. */
-export type Target = { kind: 'desk'; id: string } | { kind: 'piece'; index: number } | { kind: 'door' } | { kind: 'window'; index: number }
+/** What can be picked up in a room, or on the common floor; cuts belong to the building. */
+export type Target =
+  | { kind: 'desk'; id: string }
+  | { kind: 'piece'; index: number }
+  | { kind: 'door' }
+  | { kind: 'window'; index: number }
+  | { kind: 'cut'; index: number }
 
 export interface Rect {
   x: number
@@ -86,6 +93,7 @@ export function floorArrangementOf(layout: BuildingLayout): FloorArrangement {
     depth: floor.height,
     furniture: layout.hall.map((p) => ({ name: p.name, x: p.x - floor.x * TILE, y: p.y - floor.y * TILE })),
     rooms: Object.fromEntries(layout.rooms.map((r) => [r.id, { left: r.x - floor.x, top: r.y - floor.y }])),
+    cuts: layout.cuts.map((c) => ({ left: c.x - floor.x, top: c.y - floor.y, width: c.width, height: c.height })),
   }
 }
 
@@ -97,13 +105,14 @@ export function withDrafts(office: OfficeView, drafts: Drafts): OfficeView {
       floorWidth: null,
       floorDepth: null,
       furniture: [],
+      cuts: [],
       rooms: office.rooms.map((r) => ({ ...r, width: null, depth: null, furniture: [], door: null, windows: [], left: null, top: null, desks: r.desks.map((d) => ({ ...d, spot: null })) })),
     }
   }
   const floor = drafts.floor
   return {
     ...office,
-    ...(floor && { floorWidth: floor.width, floorDepth: floor.depth, furniture: floor.furniture }),
+    ...(floor && { floorWidth: floor.width, floorDepth: floor.depth, furniture: floor.furniture, cuts: floor.cuts }),
     rooms: office.rooms.map((room) => {
       const draft = drafts.rooms[room.id]
       const place = floor?.rooms[room.id]
@@ -145,10 +154,13 @@ export const roomSizes = (shown: OfficeView, drafts: Drafts): Sizes =>
     }),
   )
 
-/** Whether a room of a size fits at a place: inside the building and on nobody else's tiles. */
+const cutRect = (c: FloorCut): Rect => ({ x: c.left, y: c.top, width: c.width, height: c.height })
+
+/** Whether a room of a size fits at a place: inside the building, out of its cuts and on nobody else's tiles. */
 export function fits(floor: FloorArrangement, sizes: Sizes, id: string, left: number, top: number, width: number, height: number): boolean {
   if (left < 0 || top < 0 || left + width > floor.width || top + height > floor.depth) return false
   const box = { x: left, y: top, width, height }
+  if (floor.cuts.some((c) => intersects(box, cutRect(c)))) return false
   return Object.entries(floor.rooms).every(([other, at]) => other === id || !sizes[other] || !intersects(box, { x: at.left, y: at.top, ...sizes[other] }))
 }
 
@@ -195,6 +207,7 @@ export function planRequest(shown: OfficeView): FloorPlanRequest {
     depth: floor.depth,
     furniture: floor.furniture,
     rooms: layout.rooms.map((box) => ({ roomId: box.id, ...floor.rooms[box.id], layout: layoutRequest(arrangementOf(box)) })),
+    cuts: floor.cuts,
   }
 }
 
@@ -218,6 +231,8 @@ export function boundsOf(arrangement: Arrangement, target: Target): Rect | undef
       const x = arrangement.windows[target.index]
       return x === undefined ? undefined : { x, y: WINDOW.y, width: WINDOW.width, height: WINDOW.height }
     }
+    case 'cut':
+      return undefined
     case 'door': {
       const { wall, offset } = arrangement.door
       const length = DOOR * TILE
@@ -252,6 +267,7 @@ function allowed(arrangement: Arrangement, target: Target, x: number, y: number)
 /** Moves a target to the nearest whole pixel it may stand on; a door goes to the wall nearest the point. */
 export function place(arrangement: Arrangement, target: Target, x: number, y: number): Arrangement {
   if (target.kind === 'door') return { ...arrangement, door: doorAt(arrangement, { x, y }) }
+  if (target.kind === 'cut') return arrangement
   const spot = allowed(arrangement, target, Math.round(x), Math.round(y))
   if (target.kind === 'desk') return { ...arrangement, desks: { ...arrangement.desks, [target.id]: spot } }
   if (target.kind === 'window') return { ...arrangement, windows: arrangement.windows.map((w, i) => (i === target.index ? spot.x : w)) }
@@ -395,12 +411,33 @@ export function commonBounds(floor: FloorArrangement, index: number): Rect | und
   return { x: piece.x, y: piece.y, width: sprite.width, height: sprite.height }
 }
 
-/** Moves a piece of the common floor, inside the building. */
+/** Whether a box of pixels on the common floor reaches into a cut. */
+const inCut = (floor: FloorArrangement, box: Rect) => floor.cuts.some((c) => intersects(box, { x: c.left * TILE, y: c.top * TILE, width: c.width * TILE, height: c.height * TILE }))
+
+/** Moves a piece of the common floor inside the building; it stays where it was rather than stand in a cut. */
 export function placeCommon(floor: FloorArrangement, index: number, x: number, y: number): FloorArrangement {
   const box = commonBounds(floor, index)
   if (!box) return floor
   const spot = { x: clamp(Math.round(x), 0, floor.width * TILE - box.width), y: clamp(Math.round(y), 0, floor.depth * TILE - box.height) }
+  if (inCut(floor, { ...box, ...spot }) && !inCut(floor, box)) return floor
   return { ...floor, furniture: floor.furniture.map((p, i) => (i === index ? { ...p, ...spot } : p)) }
+}
+
+/** Every piece of the common floor that stands in a cut, moved to the nearest spot out of it. */
+function clearCuts(floor: FloorArrangement): FloorArrangement {
+  const furniture = floor.furniture.map((piece, index) => {
+    const box = commonBounds(floor, index)
+    if (!box || !inCut(floor, box)) return piece
+    let best: { x: number; y: number; distance: number } | undefined
+    for (let y = 0; y + box.height <= floor.depth * TILE; y += 4)
+      for (let x = 0; x + box.width <= floor.width * TILE; x += 4) {
+        if (inCut(floor, { ...box, x, y })) continue
+        const distance = Math.hypot(x - box.x, y - box.y)
+        if (!best || distance < best.distance) best = { x, y, distance }
+      }
+    return best ? { ...piece, x: best.x, y: best.y } : piece
+  })
+  return { ...floor, furniture }
 }
 
 /** The piece of the common floor drawn at a point, front-most first. */
@@ -433,7 +470,7 @@ export function addCommon(floor: FloorArrangement, sizes: Sizes, name: PropName)
   for (let y = 0; y + sprite.height <= floor.depth * TILE; y += 4)
     for (let x = 0; x + sprite.width <= floor.width * TILE; x += 4) {
       const box = { x, y, width: sprite.width, height: sprite.height }
-      if (rooms.some((r) => intersects(box, r)) || pieces.some((p) => intersects(box, p))) continue
+      if (rooms.some((r) => intersects(box, r)) || pieces.some((p) => intersects(box, p)) || inCut(floor, box)) continue
       const distance = Math.hypot(x - centre.x, y - centre.y)
       if (!best || distance < best.distance) best = { x, y, distance }
     }
@@ -453,28 +490,101 @@ export function moveRoom(floor: FloorArrangement, sizes: Sizes, id: string, left
   return fits(floor, sizes, id, at.left, at.top, size.width, size.height) ? { ...floor, rooms: { ...floor.rooms, [id]: at } } : floor
 }
 
-/** A new size for the building, never smaller than what its rooms need; common furniture moves back in. */
+/**
+ * A new size for the building, never smaller than what its rooms and cuts need; cuts at
+ * the right or front edge stay at it, so an L stays an L, and common furniture moves back in.
+ */
 export function resizeFloor(floor: FloorArrangement, sizes: Sizes, width: number, depth: number): FloorArrangement {
   const placed = Object.entries(floor.rooms).filter(([id]) => sizes[id])
+  const atRight = (c: FloorCut) => c.left + c.width === floor.width
+  const atFront = (c: FloorCut) => c.top + c.height === floor.depth
   const needs = {
-    width: Math.max(LIMITS.floorWidth[0], ...placed.map(([id, at]) => at.left + sizes[id].width)),
-    depth: Math.max(LIMITS.floorDepth[0], ...placed.map(([id, at]) => at.top + sizes[id].height)),
+    width: Math.max(LIMITS.floorWidth[0], ...placed.map(([id, at]) => at.left + sizes[id].width), ...floor.cuts.map((c) => c.left + (atRight(c) ? 1 : c.width))),
+    depth: Math.max(LIMITS.floorDepth[0], ...placed.map(([id, at]) => at.top + sizes[id].height), ...floor.cuts.map((c) => c.top + (atFront(c) ? 1 : c.height))),
   }
-  let resized: FloorArrangement = {
-    ...floor,
-    width: clamp(width, needs.width, LIMITS.floorWidth[1]),
-    depth: clamp(depth, needs.depth, LIMITS.floorDepth[1]),
-  }
+  const size = { width: clamp(width, needs.width, LIMITS.floorWidth[1]), depth: clamp(depth, needs.depth, LIMITS.floorDepth[1]) }
+  const cuts = floor.cuts.map((c) => ({
+    ...c,
+    width: atRight(c) ? size.width - c.left : c.width,
+    height: atFront(c) ? size.depth - c.top : c.height,
+  }))
+  // Growing an edge cut could swallow the whole building: then they keep their size.
+  const area = cuts.reduce((sum, c) => sum + c.width * c.height, 0)
+  let resized: FloorArrangement = { ...floor, ...size, cuts: area < size.width * size.depth ? cuts : floor.cuts }
   resized.furniture.forEach((p, i) => (resized = placeCommon(resized, i, p.x, p.y)))
-  return resized
+  return clearCuts(resized)
+}
+
+/** Whether a cut can go there: at least a tile, inside the building, away from its rooms and other cuts, leaving some building. */
+export function cutFits(floor: FloorArrangement, sizes: Sizes, index: number, cut: FloorCut): boolean {
+  if (cut.width < 1 || cut.height < 1 || cut.left < 0 || cut.top < 0 || cut.left + cut.width > floor.width || cut.top + cut.height > floor.depth) return false
+  const box = cutRect(cut)
+  if (floor.cuts.some((c, i) => i !== index && intersects(box, cutRect(c)))) return false
+  if (Object.entries(floor.rooms).some(([id, at]) => sizes[id] && intersects(box, { x: at.left, y: at.top, ...sizes[id] }))) return false
+  const area = floor.cuts.reduce((sum, c, i) => sum + (i === index ? 0 : c.width * c.height), cut.width * cut.height)
+  return area < floor.width * floor.depth
+}
+
+/** Moves or resizes a cut if it fits there; furniture in the way steps out of it. */
+export function setCut(floor: FloorArrangement, sizes: Sizes, index: number, cut: FloorCut): FloorArrangement {
+  if (!floor.cuts[index] || !cutFits(floor, sizes, index, cut)) return floor
+  return clearCuts({ ...floor, cuts: floor.cuts.map((c, i) => (i === index ? cut : c)) })
+}
+
+/**
+ * Cuts a corner off the building, a third of it each way, at the first corner free of
+ * rooms: back right, back left, front right, front left. Smaller when no corner has room
+ * for that much; the building stays as it is when no corner is free at all.
+ */
+export function addCut(floor: FloorArrangement, sizes: Sizes): FloorArrangement {
+  const index = floor.cuts.length
+  const added = { ...floor, cuts: [...floor.cuts, { left: 0, top: 0, width: 1, height: 1 }] }
+  for (let scale = 3; scale <= 12; scale++) {
+    const width = Math.max(1, Math.floor(floor.width / scale))
+    const height = Math.max(1, Math.floor(floor.depth / scale))
+    const corners = [
+      { left: floor.width - width, top: 0 },
+      { left: 0, top: 0 },
+      { left: floor.width - width, top: floor.depth - height },
+      { left: 0, top: floor.depth - height },
+    ]
+    for (const corner of corners) {
+      const cut = { ...corner, width, height }
+      if (cutFits(added, sizes, index, cut)) return setCut(added, sizes, index, cut)
+    }
+  }
+  return floor
+}
+
+export const removeCut = (floor: FloorArrangement, index: number): FloorArrangement => ({
+  ...floor,
+  cuts: floor.cuts.filter((_, i) => i !== index),
+})
+
+/**
+ * A cut dragged by one of its edges to a tile, in tiles from the building's corner: the
+ * left and back edges move with the opposite ones staying put.
+ */
+export function stretchCut(cut: FloorCut, edge: Edge, x: number, y: number): FloorCut {
+  const right = cut.left + cut.width
+  const bottom = cut.top + cut.height
+  const stretched = { ...cut }
+  if (edge === 'left') Object.assign(stretched, { left: Math.min(x, right - 1), width: right - Math.min(x, right - 1) })
+  if (edge === 'top') Object.assign(stretched, { top: Math.min(y, bottom - 1), height: bottom - Math.min(y, bottom - 1) })
+  if (edge === 'right' || edge === 'corner') stretched.width = Math.max(1, x - cut.left)
+  if (edge === 'bottom' || edge === 'corner') stretched.height = Math.max(1, y - cut.top)
+  return stretched
 }
 
 export const sameTarget = (a: Target | null | undefined, b: Target | null | undefined) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b)
 
-export type Edge = 'right' | 'bottom' | 'corner'
+export type Edge = 'left' | 'top' | 'right' | 'bottom' | 'corner'
 
-/** Handles on the right wall, the front edge and the corner of a box in tiles, in world pixels, just outside it. */
-export function handlesOf(box: { x: number; y: number; width: number; height: number }): { edge: Edge; x: number; y: number }[] {
+/**
+ * Handles on the right wall, the front edge and the corner of a box in tiles, in world
+ * pixels, just outside it; on every side of a cut, which can grow any way.
+ */
+export function handlesOf(box: Rect, everySide = false): { edge: Edge; x: number; y: number }[] {
   const right = (box.x + box.width) * TILE + 2
   const bottom = (box.y + box.height) * TILE + 2
   return [
@@ -482,5 +592,11 @@ export function handlesOf(box: { x: number; y: number; width: number; height: nu
     { edge: 'right', x: right, y: (box.y + (box.height * 3) / 4) * TILE },
     { edge: 'bottom', x: (box.x + (box.width * 3) / 4) * TILE, y: bottom },
     { edge: 'corner', x: right, y: bottom },
+    ...(everySide
+      ? [
+          { edge: 'left' as const, x: box.x * TILE - 2, y: (box.y + box.height / 2) * TILE },
+          { edge: 'top' as const, x: (box.x + box.width / 2) * TILE, y: box.y * TILE - 2 },
+        ]
+      : []),
   ]
 }

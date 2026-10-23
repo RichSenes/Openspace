@@ -21,7 +21,7 @@ src/
   api/        Types, fetch client (problem details to readable errors), query hooks
   realtime/   SignalR connection: refetches what the server says changed
   layout/     Top bar with views, office sidebar
-  building/   Floor plans, walls and doors, room arranging and camera maths (pure, tested), their PixiJS rendering and the Arrange panel
+  building/   Floor plans and building shapes, walls and doors, room arranging and camera maths (pure, tested), their PixiJS rendering and the Arrange panel
   board/      Task board, new task dialog, task drawer, board rules (tested)
   rooms/      Rooms, room context and desks of an office
   art/        Pixel art: palettes, sprites as character matrices, station composition (tested)

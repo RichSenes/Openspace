@@ -18,6 +18,19 @@ export interface DeskView {
   roleId: string | null
   /** Where the desk stands in its room, in pixels from the room's corner; null when placed automatically. */
   spot?: { x: number; y: number } | null
+  /** How its agent looks, chosen by hand; null when picked from the desk's id. */
+  look?: DeskLook | null
+}
+
+/** A look chosen by hand: names the pixel art knows; unknown ones fall back to the picked look. */
+export interface DeskLook {
+  skin: string
+  hair: string
+  hairStyle: string
+  cloth: string
+  accessory?: string | null
+  outfit?: string | null
+  costume?: string | null
 }
 
 /** A piece of furniture placed by hand, in pixels from the room's corner. */

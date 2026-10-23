@@ -13,6 +13,7 @@ import {
   useUpdateRoomContext,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
+import { LookDialog, Portrait } from '../building/LookDialog'
 import { useToast } from '../ui/toastContext'
 import { formatSteps, parseSteps } from './procedure'
 import './rooms.css'
@@ -57,7 +58,7 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
       ) : (
         <div className="room-grid">
           {office.rooms.map((room) => (
-            <RoomCard key={room.id} officeId={office.id} room={room} />
+            <RoomCard key={room.id} officeId={office.id} theme={office.theme} room={room} />
           ))}
         </div>
       )}
@@ -118,7 +119,7 @@ function RepositoryForm({ office }: { office: OfficeView }) {
   )
 }
 
-function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
+function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; room: RoomView }) {
   const [context, setContext] = useState(room.context)
   const [desk, setDesk] = useState({ name: '', agentName: 'build', model: '', roleId: '' })
   const updateContext = useUpdateRoomContext(officeId)
@@ -175,7 +176,7 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
         ) : (
           <ul className="desk-list">
             {room.desks.map((d) => (
-              <DeskItem key={d.id} officeId={officeId} desk={d} roles={roles.data ?? []} />
+              <DeskItem key={d.id} officeId={officeId} theme={theme} desk={d} roles={roles.data ?? []} />
             ))}
           </ul>
         )}
@@ -235,8 +236,9 @@ function RoomCard({ officeId, room }: { officeId: string; room: RoomView }) {
   )
 }
 
-function DeskItem({ officeId, desk, roles }: { officeId: string; desk: DeskView; roles: RoleView[] }) {
+function DeskItem({ officeId, theme, desk, roles }: { officeId: string; theme: string; desk: DeskView; roles: RoleView[] }) {
   const [renaming, setRenaming] = useState(false)
+  const [dressing, setDressing] = useState(false)
   const [name, setName] = useState(desk.name)
   const rename = useRenameDesk(officeId)
   const setRole = useSetDeskRole(officeId)
@@ -270,9 +272,13 @@ function DeskItem({ officeId, desk, roles }: { officeId: string; desk: DeskView;
         </form>
       ) : (
         <div className="desk-line">
+          <Portrait desk={desk} theme={theme} />
           <span>{desk.name}</span>
           <button type="button" className="btn btn-quiet desk-rename-btn" onClick={() => setRenaming(true)}>
             Rename
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => setDressing(true)} aria-label={`Look of ${desk.name}`}>
+            Look
           </button>
         </div>
       )}
@@ -302,6 +308,7 @@ function DeskItem({ officeId, desk, roles }: { officeId: string; desk: DeskView;
         </select>
       </label>
       {(rename.error ?? setRole.error) && <p className="error">{(rename.error ?? setRole.error)!.message}</p>}
+      <LookDialog officeId={officeId} theme={theme} desk={dressing ? desk : undefined} onClose={() => setDressing(false)} />
     </li>
   )
 }

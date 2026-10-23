@@ -11,7 +11,7 @@ import { pixelsOf, type Pixel } from '../art/sprite'
 import { STATION, themeColors } from '../art/station'
 import { themeOf, type Theme } from '../art/themes'
 import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
-import { agentStateOf, appearanceOf } from './agents'
+import { agentStateOf, lookOf } from './agents'
 import {
   arrangementOf,
   boundsOf,
@@ -753,7 +753,8 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   sources.push({ canvas, x: room.x * TILE, y: room.y * TILE })
   const colors = themeColors(theme.colors)
 
-  const looks = new Map(room.desks.map((d) => [d.id, appearanceOf(d.id)]))
+  const views = new Map(scene.office.rooms.flatMap((r) => r.desks).map((d) => [d.id, d]))
+  const looks = new Map(room.desks.map((d) => [d.id, lookOf(views.get(d.id) ?? d)]))
   const states = new Map(room.desks.map((d) => [d.id, agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
   return {
     paint: (tick) => {

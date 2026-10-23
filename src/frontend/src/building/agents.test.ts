@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DeskActivity, WorkTaskView } from '../api/types'
-import { agentStateOf, appearanceOf } from './agents'
+import { agentStateOf, appearanceOf, deskLookOf, LOOK_PARTS, lookOf, shuffledLook } from './agents'
 
 const task = (status: WorkTaskView['status'], createdAt = '2026-01-01T10:00:00Z', deskId = 'desk-1'): WorkTaskView => ({
   id: `${status}-${createdAt}`,
@@ -64,5 +64,37 @@ describe('appearanceOf', () => {
   it('gives different desks different people', () => {
     const looks = new Set(Array.from({ length: 12 }, (_, i) => JSON.stringify(appearanceOf(`desk-${i}`))))
     expect(looks.size).toBeGreaterThan(6)
+  })
+})
+
+describe('lookOf', () => {
+  it('is the look picked from the id until one is chosen', () => {
+    expect(lookOf({ id: 'desk-1' })).toEqual(appearanceOf('desk-1'))
+    expect(lookOf({ id: 'desk-1', look: null })).toEqual(appearanceOf('desk-1'))
+  })
+
+  it('wears what was chosen, keeping the picked look for parts it does not know', () => {
+    const look = lookOf({ id: 'desk-1', look: { skin: 'deep', hair: 'teal', hairStyle: 'bun', cloth: 'purple', outfit: 'coat', accessory: 'monocle', costume: null } })
+    expect(look).toMatchObject({ skin: 'deep', hair: appearanceOf('desk-1').hair, hairStyle: 'bun', cloth: 'purple', outfit: 'coat' })
+    expect(look.accessory).toBeUndefined()
+    expect(look.costume).toBeUndefined()
+  })
+
+  it('goes to the API and back unchanged', () => {
+    const chosen = { skin: 'tan', hair: 'grey', hairStyle: 'long', cloth: 'mustard', accessory: 'headset', outfit: null, costume: 'skeleton' } as const
+    expect(deskLookOf(lookOf({ id: 'x', look: chosen }))).toEqual(chosen)
+  })
+})
+
+describe('shuffledLook', () => {
+  it('only wears known parts, never a costume or the pointy hat', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      let n = seed
+      const look = shuffledLook(() => ((n = (n * 9301 + 49297) % 233280) / 233280))
+      expect(LOOK_PARTS.skin).toContain(look.skin)
+      expect(LOOK_PARTS.cloth).toContain(look.cloth)
+      expect(look.costume).toBeUndefined()
+      expect(look.accessory).not.toBe('pointyHat')
+    }
   })
 })

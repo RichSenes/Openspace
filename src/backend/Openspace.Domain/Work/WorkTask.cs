@@ -50,6 +50,12 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     public string Title { get; }
 
+    /// <summary>
+    /// A short key for names (working copy, branch, report file): the random end of the id,
+    /// as its start is the time of creation, the same for tasks proposed together.
+    /// </summary>
+    public string Key => Id.Value.ToString("N")[^10..];
+
     public string Description { get; }
 
     /// <summary>Who asked for it. Today always the local user; kept for a multi-user future.</summary>

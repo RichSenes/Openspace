@@ -296,4 +296,16 @@ public class WorkTaskTests
         Assert.Throws<DomainException>(() => review.RecordMerge("main", Now));
         Assert.Throws<DomainException>(() => TaskIn(WorkTaskStatus.Done).RecordMerge("main", Now));
     }
+
+    [Fact]
+    public void Tasks_proposed_together_still_get_keys_of_their_own()
+    {
+        var office = ECorp();
+
+        // Proposed in the same instant, as the supervisor does: their ids start alike.
+        var keys = Enumerable.Range(0, 12).Select(i => WorkTask.Propose(office, $"Task {i}", null, Requester, Now).Key).ToList();
+
+        Assert.Equal(12, keys.Distinct().Count());
+        Assert.All(keys, k => Assert.Equal(10, k.Length));
+    }
 }

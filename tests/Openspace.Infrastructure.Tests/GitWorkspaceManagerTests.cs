@@ -47,6 +47,26 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_branch_left_by_a_failed_start_is_picked_up_again()
+    {
+        await Git("branch", "openspace/logout-a1b2c3d4");
+
+        var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);
+
+        Assert.Equal("openspace/logout-a1b2c3d4", (await GitCli.RunAsync(workspace.Path, default, "branch", "--show-current")).Trim());
+    }
+
+    [Fact]
+    public async Task A_working_copy_in_use_is_never_shared()
+    {
+        await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);
+
+        var clash = await Assert.ThrowsAsync<InvalidOperationException>(() => _manager.PrepareAsync(Repo, "a1b2c3d4", "Login", default));
+
+        Assert.Contains("already in use", clash.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_diff_shows_edits_and_new_files()
     {
         var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
-import type { DeskActivity, OfficeView, WorkTaskView } from '../api/types'
+import type { DeskActivity, FloorCut, OfficeView, WorkTaskView } from '../api/types'
 import { paintInto } from '../art/canvas'
 import { inTheDark, unlit, type Light } from '../art/lighting'
 import { deskItem, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
@@ -22,13 +22,14 @@ import {
   handlesOf,
   place,
   placeCommon,
+  stretchCut,
   targetAt,
   WINDOW,
   type Edge,
   type Target,
 } from './arrange'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
-import { doorOf, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
+import { doorOf, inBuilding, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
 import { wallPlan } from './walls'
 
 /** Frames per second of the pixel art, as in docs/art-style.md. */
@@ -78,9 +79,11 @@ export interface ArrangeControls {
   onMoveRoom: (roomId: string, left: number, top: number) => void
   /** The building's edge was dragged: its new size in tiles. */
   onResizeFloor: (width: number, depth: number) => void
+  /** A cut of the building was dragged or stretched: where it goes, in tiles from the building's corner. */
+  onCut: (index: number, cut: FloorCut) => void
 }
 
-const EDGE_CURSORS: Record<Edge, string> = { right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
+const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
 export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange }: Props) {
@@ -261,7 +264,8 @@ const floorBox = (layout: BuildingLayout) => ({ x: layout.floor.x, y: layout.flo
 
 /** What a press picks up while arranging. */
 type Grip =
-  | { kind: 'stretch'; roomId: string; edge: Edge }
+  | { kind: 'stretch'; roomId: string; edge: Edge; cut?: number }
+  | { kind: 'cut'; index: number; grab: { x: number; y: number } }
   | { kind: 'carry'; roomId: string; target: Target; from: { x: number; y: number }; grab: { x: number; y: number } }
   | { kind: 'shift'; room: RoomBox; grab: { x: number; y: number } }
 
@@ -288,23 +292,25 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     view.layout?.rooms.find(
       (r) => world.x >= r.x * TILE && world.x < (r.x + r.width) * TILE && world.y >= r.y * TILE && world.y < (r.y + r.height) * TILE,
     )
-  const inFloor = (world: { x: number; y: number }) => {
-    const f = view.layout?.floor
-    return !!f && world.x >= f.x * TILE && world.x < (f.x + f.width) * TILE && world.y >= f.y * TILE && world.y < (f.y + f.height) * TILE
-  }
+  const inFloor = (world: { x: number; y: number }) => !!view.layout && inBuilding(view.layout, Math.floor(world.x / TILE), Math.floor(world.y / TILE))
+  const cutAt = (world: { x: number; y: number }) =>
+    view.layout?.cuts.findIndex((c) => world.x >= c.x * TILE && world.x < (c.x + c.width) * TILE && world.y >= c.y * TILE && world.y < (c.y + c.height) * TILE) ?? -1
 
-  /** The edge handle of the selected room, or of the building, a few screen pixels around the pointer. */
+  /** The edge handle of the selected room, cut or building, a few screen pixels around the pointer. */
   const handleAt = (e: MouseEvent): Grip | undefined => {
-    const selected = arrange()?.selection?.roomId
-    const box = selected === BUILDING ? view.layout && floorBox(view.layout) : selected ? roomById(selected) : undefined
+    const selection = arrange()?.selection
+    const selected = selection?.roomId
+    const cut = selected === BUILDING && selection?.target?.kind === 'cut' ? selection.target.index : undefined
+    const box =
+      cut !== undefined ? view.layout?.cuts[cut] : selected === BUILDING ? view.layout && floorBox(view.layout) : selected ? roomById(selected) : undefined
     if (!box || !selected) return undefined
     const at = point(e)
-    const handle = handlesOf(box).find((h) => {
+    const handle = handlesOf(box, cut !== undefined).find((h) => {
       const x = h.x * view.camera.scale + view.camera.x
       const y = h.y * view.camera.scale + view.camera.y
       return Math.abs(at.x - x) <= 10 && Math.abs(at.y - y) <= 10
     })
-    return handle && { kind: 'stretch', roomId: selected, edge: handle.edge }
+    return handle && { kind: 'stretch', roomId: selected, edge: handle.edge, cut }
   }
 
   /** What a press at this point would pick up while arranging. */
@@ -325,6 +331,11 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
       const door = boundsOf(arrangementOf(r), { kind: 'door' })!
       if (local.x >= door.x - 3 && local.x < door.x + door.width + 3 && local.y >= door.y - 3 && local.y < door.y + door.height + 3)
         return { kind: 'carry', roomId: r.id, target: { kind: 'door' }, from: { x: door.x, y: door.y }, grab: local }
+    }
+    const cut = cutAt(world)
+    if (cut >= 0) {
+      const c = view.layout.cuts[cut]
+      return { kind: 'cut', index: cut, grab: { x: Math.floor(world.x / TILE) - c.x, y: Math.floor(world.y / TILE) - c.y } }
     }
     const room = roomAt(world)
     if (!room) return undefined
@@ -354,6 +365,7 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
     sent = ''
     if (grip?.kind === 'carry') controls?.onSelect({ roomId: grip.roomId, target: grip.target })
     if (grip?.kind === 'shift') controls?.onSelect({ roomId: grip.room.id })
+    if (grip?.kind === 'cut') controls?.onSelect({ roomId: BUILDING, target: { kind: 'cut', index: grip.index } })
     // Rooms and the building change shape under the pointer: the camera stays put meanwhile.
     if (grip) view.auto = false
     drag = { ...point(e), id: e.pointerId, moved: 0 }
@@ -388,6 +400,26 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
         // A door follows the pointer to the nearest wall; everything else keeps where it was held.
         const goal = grip.target.kind === 'door' ? local : { x: grip.from.x + local.x - grip.grab.x, y: grip.from.y + local.y - grip.grab.y }
         to = carryTo(view, grip.roomId, grip.target, goal.x, goal.y)
+      } else if (grip.kind === 'stretch' && grip.cut !== undefined) {
+        const box = layout.cuts[grip.cut]
+        if (!box) return
+        const cut = { left: box.x - layout.floor.x, top: box.y - layout.floor.y, width: box.width, height: box.height }
+        const stretched = stretchCut(cut, grip.edge, Math.round(world.x / TILE) - layout.floor.x, Math.round(world.y / TILE) - layout.floor.y)
+        const key = JSON.stringify(stretched)
+        if (key !== sent && key !== JSON.stringify(cut)) {
+          sent = key
+          controls.onCut(grip.cut, stretched)
+        }
+      } else if (grip.kind === 'cut') {
+        const box = layout.cuts[grip.index]
+        if (!box) return
+        const left = Math.floor(world.x / TILE) - grip.grab.x - layout.floor.x
+        const top = Math.floor(world.y / TILE) - grip.grab.y - layout.floor.y
+        const key = `${left}x${top}`
+        if (key !== sent) {
+          sent = key
+          controls.onCut(grip.index, { left, top, width: box.width, height: box.height })
+        }
       } else if (grip.kind === 'stretch') {
         const box = grip.roomId === BUILDING ? floorBox(layout) : roomById(grip.roomId)
         if (!box) return
@@ -543,10 +575,22 @@ function outline(g: Graphics, layout: BuildingLayout, selected: Selection | null
   const building = selected.roomId === BUILDING
   const room = building ? floorBox(layout) : layout.rooms.find((r) => r.id === selected.roomId)
   if (!room) return
-  g.rect(room.x * TILE - 3, room.y * TILE - 3, room.width * TILE + 6, room.height * TILE + 6).stroke({ width: 2, color: COLORS.selected })
-  // Square handles to drag the walls out or in.
-  for (const h of handlesOf(room)) g.rect(h.x - 3, h.y - 3, 6, 6).fill(COLORS.selected).stroke({ width: 1, color: COLORS.roomEdge })
   const target = selected.target
+  const cut = building && target?.kind === 'cut' ? layout.cuts[target.index] : undefined
+  g.rect(room.x * TILE - 3, room.y * TILE - 3, room.width * TILE + 6, room.height * TILE + 6).stroke({ width: cut ? 1 : 2, color: COLORS.selected })
+  if (cut) {
+    // A cut is drawn dashed, so it reads as a hole in the building and not a room.
+    for (let x = cut.x * TILE; x < (cut.x + cut.width) * TILE; x += 8) {
+      g.rect(x, cut.y * TILE + 1, 4, 2).fill(COLORS.selected)
+      g.rect(x, (cut.y + cut.height) * TILE - 3, 4, 2).fill(COLORS.selected)
+    }
+    for (let y = cut.y * TILE; y < (cut.y + cut.height) * TILE; y += 8) {
+      g.rect(cut.x * TILE + 1, y, 2, 4).fill(COLORS.selected)
+      g.rect((cut.x + cut.width) * TILE - 3, y, 2, 4).fill(COLORS.selected)
+    }
+  }
+  // Square handles to drag the walls out or in.
+  for (const h of handlesOf(cut ?? room, Boolean(cut))) g.rect(h.x - 3, h.y - 3, 6, 6).fill(COLORS.selected).stroke({ width: 1, color: COLORS.roomEdge })
   const box = !target
     ? undefined
     : building
@@ -614,11 +658,19 @@ function hallFloor(layout: BuildingLayout, scene: Scene, theme: Theme): { sprite
   const size = { width: floor.width * TILE, height: floor.height * TILE }
   const upper = upperWall(theme.wall)
   const pixels: Pixel[] = []
+  // A back wall wherever the building starts going south, so cuts get one as the north side does.
   for (let c = 0; c < floor.width; c++) {
-    pixels.push(...pixelsOf(upper, 0, colors, c * TILE, 0))
-    pixels.push(...pixelsOf(theme.wall, 0, colors, c * TILE, TILE))
+    let fromWall = 0
+    for (let r = 0; r < floor.height; r++) {
+      if (!inBuilding(layout, floor.x + c, floor.y + r)) {
+        fromWall = 0
+        continue
+      }
+      const tile = fromWall === 0 ? upper : fromWall < WALL ? theme.wall : HALL_FLOOR
+      pixels.push(...pixelsOf(tile, 0, colors, c * TILE, r * TILE))
+      fromWall++
+    }
   }
-  for (let r = WALL; r < floor.height; r++) for (let c = 0; c < floor.width; c++) pixels.push(...pixelsOf(HALL_FLOOR, 0, colors, c * TILE, r * TILE))
   const lit = scene.dark ? inTheDark(pixels, hallItems(layout, theme).lights, theme.colors.night) : pixels
   const canvas = document.createElement('canvas')
   paintInto(canvas, size.width, size.height, lit)
@@ -686,7 +738,7 @@ function drawWalls(g: Graphics, layout: BuildingLayout, scene: Scene, theme: The
  */
 function behind(room: RoomBox, layout: BuildingLayout, sources: Source[], x: number, width: number, height: number, tick: number, phase: DayPhase): { pixels: Pixel[]; outside: boolean } {
   const worldX = room.x * TILE + x
-  if (room.y <= layout.floor.y) return { pixels: skyPixels(worldX, width, height, tick, phase), outside: true }
+  if (!inBuilding(layout, Math.floor((worldX + width / 2) / TILE), room.y - 1)) return { pixels: skyPixels(worldX, width, height, tick, phase), outside: true }
   return { pixels: sample(sources, worldX, room.y * TILE - height, width, height), outside: false }
 }
 

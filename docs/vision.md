@@ -103,7 +103,10 @@ Later, in rough order of appearance:
   doors slide along any wall (shared walls and outer walls open too), the common
   floor is furnished by hand, and windows in back walls show the sky for the hour
   of the day on an outer wall, or whatever stands behind an inner one.
-- **Shapes other than rectangles** (L, T, courtyards) for the building.
+- ~~**Shapes other than rectangles.**~~ Done: "Cut a corner" takes a rectangle out
+  of the building; dragged and stretched by any edge it makes an L, T or U at an
+  edge, or a courtyard inside. Walls follow the outline, rooms and furniture stay
+  out of the cuts, and windows facing one show the sky.
 - **Agents dressed by hand.** Outfits, costumes and accessories chosen per desk or
   per role instead of derived from the desk id.
 - **The city.** A map of the town where each office is a building (a house, a

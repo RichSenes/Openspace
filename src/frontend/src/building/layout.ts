@@ -55,11 +55,20 @@ export interface RoomBox {
   windows: number[]
 }
 
+export interface TileRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 /** The building: rooms joined wall to wall, and common floor everywhere else. */
 export interface BuildingLayout {
   rooms: RoomBox[]
-  /** The building's walls, in tiles: everything inside that is not a room is common floor. */
-  floor: { x: number; y: number; width: number; height: number }
+  /** The building's rectangle, in tiles: everything inside that is neither a room nor cut away is common floor. */
+  floor: TileRect
+  /** Pieces of the rectangle left out of the building, in tiles: they give it its shape. */
+  cuts: TileRect[]
   doors: Door[]
   /** What stands on the common floor, in world pixels. */
   hall: PropSpot[]
@@ -69,6 +78,12 @@ export interface BuildingLayout {
   width: number
   height: number
 }
+
+const within = (r: TileRect, x: number, y: number) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
+
+/** Whether a tile is part of the building: inside its rectangle and in none of its cuts. */
+export const inBuilding = (layout: Pick<BuildingLayout, 'floor' | 'cuts'>, x: number, y: number) =>
+  within(layout.floor, x, y) && !layout.cuts.some((c) => within(c, x, y))
 
 export const isProp = (name: string): name is PropName => Object.hasOwn(FURNITURE, name)
 
@@ -158,6 +173,7 @@ export function layoutOffice(office: OfficeView, perRow = Math.ceil(Math.sqrt(of
 
 function plannedLayout(office: OfficeView): BuildingLayout {
   const floor = { x: OUT, y: OUT, width: office.floorWidth!, height: office.floorDepth! }
+  const cuts = (office.cuts ?? []).map((c) => ({ x: OUT + c.left, y: OUT + c.top, width: c.width, height: c.height }))
   const rooms: RoomBox[] = []
   const waiting: RoomView[] = []
   for (const room of office.rooms) {
@@ -166,17 +182,17 @@ function plannedLayout(office: OfficeView): BuildingLayout {
   }
   for (const room of waiting) {
     const { width, height } = sizeOf(room)
-    const spot = freeSpot(rooms, floor, width, height) ?? { x: floor.x, y: floor.y + floor.height }
+    const spot = freeSpot([...rooms, ...cuts], floor, width, height) ?? { x: floor.x, y: floor.y + floor.height }
     floor.height = Math.max(floor.height, spot.y + height - floor.y)
     rooms.push(boxOf(room, spot.x, spot.y))
   }
   const hall = (office.furniture ?? [])
     .filter((p) => isProp(p.name))
     .map((p) => ({ name: p.name as PropName, x: p.x + floor.x * TILE, y: p.y + floor.y * TILE }))
-  return { rooms, floor, doors: rooms.map(doorOf), hall, planned: true, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
+  return { rooms, floor, cuts, doors: rooms.map(doorOf), hall, planned: true, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
 }
 
-/** The first place on the floor, back to front and left to right, where a room fits. */
+/** The first place on the floor, back to front and left to right, where a room fits among what is already there. */
 export function freeSpot(
   rooms: readonly { x: number; y: number; width: number; height: number }[],
   floor: BuildingLayout['floor'],
@@ -207,14 +223,14 @@ function automaticLayout(office: OfficeView, perRow: number): BuildingLayout {
     row.height = Math.max(row.height, box.height)
   })
 
-  if (rooms.length === 0) return { rooms, floor: { x: 0, y: 0, width: 0, height: 0 }, doors: [], hall: [], planned: false, width: 0, height: 0 }
+  if (rooms.length === 0) return { rooms, floor: { x: 0, y: 0, width: 0, height: 0 }, cuts: [], doors: [], hall: [], planned: false, width: 0, height: 0 }
 
   const inside = Math.max(...rooms.map((r) => r.x + r.width)) - OUT
   const last = rows[rows.length - 1]
   const floor = { x: OUT, y: OUT, width: inside, height: last.y + last.height + HALL - OUT }
   const doors = rooms.map(doorOf)
   const hall = rows.flatMap((r) => hallFurniture(office.theme, r.y + r.height, floor, doors.filter((d) => r.rooms.some((b) => b.id === d.roomId))))
-  return { rooms, floor, doors, hall, planned: false, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
+  return { rooms, floor, cuts: [], doors, hall, planned: false, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
 }
 
 /**

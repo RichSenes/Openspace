@@ -1,4 +1,4 @@
-import { TILE, type BuildingLayout } from './layout'
+import { inBuilding, TILE, type BuildingLayout } from './layout'
 
 /** A rectangle of wall, in world pixels. */
 export interface Strip {
@@ -32,28 +32,50 @@ interface Segment {
 }
 
 /**
- * The walls of a building: around it, around every room, and open wherever a door is,
- * even where two rooms share a wall or a room's wall is the building's own. Rooms side by
- * side draw the same line twice, which is harmless.
+ * Runs of tiles along a line where `edge(i)` holds, as [from, to) pairs: the walls of a
+ * shaped building follow its tiles, and a front wall shows its face only where it does.
+ */
+function runs(from: number, to: number, edge: (i: number) => boolean): [number, number][] {
+  const found: [number, number][] = []
+  for (let i = from; i < to; i++) {
+    if (!edge(i)) continue
+    const last = found[found.length - 1]
+    if (last && last[1] === i) last[1] = i + 1
+    else found.push([i, i + 1])
+  }
+  return found
+}
+
+/**
+ * The walls of a building: along its outline, around every room, and open wherever a door
+ * is, even where two rooms share a wall or a room's wall is the building's own. Rooms side
+ * by side draw the same line twice, which is harmless.
  */
 export function wallPlan(layout: BuildingLayout): WallPlan {
   const { floor } = layout
-  const [west, north, east, south] = [floor.x * TILE, floor.y * TILE, (floor.x + floor.width) * TILE, (floor.y + floor.height) * TILE]
-  const segments: Segment[] = [
-    { horizontal: true, at: north, from: west, to: east, cap: OUTER_CAP, face: false },
-    { horizontal: true, at: south, from: west, to: east, cap: OUTER_CAP, face: false },
-    { horizontal: false, at: west, from: north, to: south, cap: OUTER_CAP, face: false },
-    { horizontal: false, at: east, from: north, to: south, cap: OUTER_CAP, face: false },
-  ]
+  const inside = (x: number, y: number) => inBuilding(layout, x, y)
+  const segments: Segment[] = []
+  // The outline: wherever a tile of the building meets one that is not.
+  for (let y = floor.y; y <= floor.y + floor.height; y++)
+    for (const [a, b] of runs(floor.x, floor.x + floor.width, (x) => inside(x, y - 1) !== inside(x, y)))
+      segments.push({ horizontal: true, at: y * TILE, from: a * TILE, to: b * TILE, cap: OUTER_CAP, face: false })
+  for (let x = floor.x; x <= floor.x + floor.width; x++)
+    for (const [a, b] of runs(floor.y, floor.y + floor.height, (y) => inside(x - 1, y) !== inside(x, y)))
+      segments.push({ horizontal: false, at: x * TILE, from: a * TILE, to: b * TILE, cap: OUTER_CAP, face: false })
+
   for (const room of layout.rooms) {
     const [left, top, right, bottom] = [room.x * TILE, room.y * TILE, (room.x + room.width) * TILE, (room.y + room.height) * TILE]
     segments.push(
       { horizontal: true, at: top, from: left, to: right, cap: WALL_CAP, face: false },
-      // The front wall is seen from in front: a few pixels of it show below the cap.
-      { horizontal: true, at: bottom, from: left, to: right, cap: WALL_CAP, face: bottom !== south },
       { horizontal: false, at: left, from: top, to: bottom, cap: WALL_CAP, face: false },
       { horizontal: false, at: right, from: top, to: bottom, cap: WALL_CAP, face: false },
     )
+    // The front wall is seen from in front: a few pixels of it show below the cap, where
+    // there is floor in front of it and not the outside.
+    const below = room.y + room.height
+    for (const face of [true, false])
+      for (const [a, b] of runs(room.x, room.x + room.width, (x) => inside(x, below) === face))
+        segments.push({ horizontal: true, at: bottom, from: a * TILE, to: b * TILE, cap: WALL_CAP, face })
   }
 
   const gaps = layout.doors.map((d) => ({ horizontal: d.wall === 'Front' || d.wall === 'Back', at: d.wall === 'Front' || d.wall === 'Back' ? d.y : d.x, from: d.wall === 'Front' || d.wall === 'Back' ? d.x : d.y, to: (d.wall === 'Front' || d.wall === 'Back' ? d.x : d.y) + d.length }))

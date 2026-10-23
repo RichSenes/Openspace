@@ -27,6 +27,14 @@ export interface FurniturePiece {
   y: number
 }
 
+/** A piece cut out of the building's rectangle, in tiles from its corner: an L, T or U shape, or a courtyard. */
+export interface FloorCut {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
 export type WallSide = 'Front' | 'Back' | 'Left' | 'Right'
 
 /** A room's door: its wall and how many tiles from the start of it, left or back, it opens. */
@@ -73,6 +81,7 @@ export interface OfficeView {
   floorDepth?: number | null
   /** The common floor's furniture, in pixels from the building's corner. */
   furniture?: FurniturePiece[]
+  cuts?: FloorCut[]
 }
 
 export interface TaskNoteView {
@@ -187,4 +196,5 @@ export interface FloorPlanRequest {
   depth: number
   furniture: FurniturePiece[]
   rooms: { roomId: string; left: number; top: number; layout: RoomLayoutRequest }[]
+  cuts: FloorCut[]
 }

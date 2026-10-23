@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, Minus, Plus, Rows3, Trash2 } from 'lucide-react'
+import { AppWindow, Minus, Plus, Rows3, Scissors, Trash2 } from 'lucide-react'
 import { useSaveFloorPlan } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { toCanvas } from '../art/canvas'
@@ -11,6 +11,7 @@ import { themeOf, type Theme } from '../art/themes'
 import { useToast } from '../ui/toastContext'
 import {
   addCommon,
+  addCut,
   addPiece,
   addWindow,
   BUILDING,
@@ -26,16 +27,21 @@ import {
   placeCommon,
   planRequest,
   removeCommon,
+  removeCut,
   removePiece,
   removeWindow,
   resize,
   resizeFloor,
+  setCut,
   tidyDesks,
   type Drafts,
   type Target,
 } from './arrange'
 import type { Selection } from './BuildingCanvas'
 import { DOOR } from './layout'
+
+/** As many cuts as the API takes. */
+const MAX_CUTS = 12
 
 interface Props {
   /** The office as it will look once saved. */
@@ -65,7 +71,7 @@ function useThumbnails(theme: Theme): Record<PropName, string> {
 
 /** What the picked thing is and what can be done with it, in a line. */
 function describe(target: Target | undefined, office: OfficeView, roomId: string, pieceName: string | undefined): string {
-  if (!target) return roomId === BUILDING ? 'Pick a piece of furniture to move it, or drag the yellow handles to resize the building.' : 'Pick a desk, a piece of furniture, the door or a window. Drag the back wall to move the room.'
+  if (!target) return roomId === BUILDING ? 'Pick a piece of furniture or a cut to move it, or drag the yellow handles to resize the building.' : 'Pick a desk, a piece of furniture, the door or a window. Drag the back wall to move the room.'
   switch (target.kind) {
     case 'desk':
       return `${office.rooms.find((r) => r.id === roomId)?.desks.find((d) => d.id === target.id)?.name ?? 'Desk'}: drag it or use the arrows.`
@@ -75,6 +81,8 @@ function describe(target: Target | undefined, office: OfficeView, roomId: string
       return 'Door: drag it along any wall of the room, or use the arrows.'
     case 'window':
       return 'Window: drag it along the back wall. It shows the sky on an outer wall, what is behind on an inner one.'
+    case 'cut':
+      return 'Cut: drag it, or its yellow handles, to shape the building. At an edge it makes an L, T or U, inside a courtyard.'
   }
 }
 
@@ -91,6 +99,8 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
   const arrangement = room && currentArrangement(office, drafts, room.id)
   const floor = building ? currentFloor(office, drafts) : undefined
   const target = selection?.target
+  const cutIndex = building && target?.kind === 'cut' ? target.index : undefined
+  const cut = cutIndex !== undefined ? floor?.cuts[cutIndex] : undefined
   const pieceName =
     target?.kind === 'piece' ? (building ? floor?.furniture[target.index]?.name : arrangement?.furniture[target.index]?.name) : undefined
   const changed = drafts !== NO_DRAFTS
@@ -103,6 +113,7 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
   const remove = () => {
     if (!selection || !target) return
     if (building && target.kind === 'piece') editTheFloor((f) => removeCommon(f, target.index))
+    else if (building && target.kind === 'cut') editTheFloor((f) => removeCut(f, target.index))
     else if (target.kind === 'piece') editThisRoom((a) => removePiece(a, target.index))
     else if (target.kind === 'window') editThisRoom((a) => removeWindow(a, target.index))
     else return
@@ -123,6 +134,10 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
         if (building && target.kind === 'piece') {
           const piece = floor?.furniture[target.index]
           if (piece) editTheFloor((f) => placeCommon(f, target.index, piece.x + dx, piece.y + dy))
+        } else if (building && target.kind === 'cut') {
+          // A tile at a time, as rooms move.
+          const cut = floor?.cuts[target.index]
+          if (cut) editTheFloor((f, sizes) => setCut(f, sizes, target.index, { ...cut, left: cut.left + Math.sign(dx), top: cut.top + Math.sign(dy) }))
         } else if (arrangement && target.kind === 'door') {
           // Along its wall, a tile at a time.
           const along = arrangement.door.wall === 'Left' || arrangement.door.wall === 'Right' ? Math.sign(dy) : Math.sign(dx)
@@ -182,15 +197,21 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
           <header>
             <h2>{building ? 'Building' : room?.name}</h2>
             <p className="hint">{describe(target, office, selection.roomId, pieceName)}</p>
-            {(target?.kind === 'piece' || target?.kind === 'window') && (
+            {(target?.kind === 'piece' || target?.kind === 'window' || target?.kind === 'cut') && (
               <button type="button" className="btn" onClick={remove}>
-                <Trash2 size={16} /> Remove {target.kind === 'window' ? 'window' : furnitureLabel(pieceName ?? '').toLowerCase()}
+                <Trash2 size={16} />{' '}
+                {target.kind === 'cut' ? 'Fill the cut back in' : `Remove ${target.kind === 'window' ? 'window' : furnitureLabel(pieceName ?? '').toLowerCase()}`}
               </button>
             )}
           </header>
 
           <section aria-label="Size">
-            {building && floor ? (
+            {building && floor && cut ? (
+              <>
+                <Stepper label="Cut width" value={cut.width} limits={[1, floor.width - cut.left]} onChange={(w) => editTheFloor((f, s) => setCut(f, s, cutIndex!, { ...cut, width: w }))} />
+                <Stepper label="Cut depth" value={cut.height} limits={[1, floor.depth - cut.top]} onChange={(h) => editTheFloor((f, s) => setCut(f, s, cutIndex!, { ...cut, height: h }))} />
+              </>
+            ) : building && floor ? (
               <>
                 <Stepper label="Width" value={floor.width} limits={LIMITS.floorWidth} onChange={(w) => editTheFloor((f, s) => resizeFloor(f, s, w, f.depth))} />
                 <Stepper label="Depth" value={floor.depth} limits={LIMITS.floorDepth} onChange={(d) => editTheFloor((f, s) => resizeFloor(f, s, f.width, d))} />
@@ -204,6 +225,22 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
               )
             )}
           </section>
+
+          {building && floor && (
+            <section className="arrange-actions" aria-label="Shape">
+              <button
+                type="button"
+                className="btn"
+                disabled={floor.cuts.length >= MAX_CUTS}
+                onClick={() => {
+                  editTheFloor(addCut)
+                  onSelect({ roomId: BUILDING, target: { kind: 'cut', index: floor.cuts.length } })
+                }}
+              >
+                <Scissors size={16} /> Cut a corner
+              </button>
+            </section>
+          )}
 
           {room && arrangement && (
             <section className="arrange-actions" aria-label="Room">

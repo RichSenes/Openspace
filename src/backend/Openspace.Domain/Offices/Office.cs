@@ -13,6 +13,7 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     private readonly List<Room> _rooms = [];
     private List<FurniturePiece> _furniture = [];
+    private List<FloorCut> _cuts = [];
 
     private Office(OfficeId id, string name)
         : base(id)
@@ -38,6 +39,9 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     /// <summary>The furniture of the common floor, placed by hand.</summary>
     public IReadOnlyList<FurniturePiece> Furniture => _furniture;
+
+    /// <summary>The pieces cut out of the building's rectangle, giving it its shape.</summary>
+    public IReadOnlyList<FloorCut> Cuts => _cuts;
 
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
@@ -109,7 +113,8 @@ public sealed class Office : AggregateRoot<OfficeId>
         {
             var box = new PlannedRoom(roomId, left, top, layout).Box;
             if (box.Right > FloorWidth || box.Bottom > FloorDepth
-                || _rooms.Exists(r => r != room && r.Box is { } other && FloorPlan.Overlap(box, other)))
+                || _rooms.Exists(r => r != room && r.Box is { } other && FloorPlan.Overlap(box, other))
+                || _cuts.Exists(c => FloorPlan.Overlap(box, c.Box)))
             {
                 throw new DomainException($"Room '{room.Name}' no longer fits where it stands.");
             }
@@ -143,6 +148,7 @@ public sealed class Office : AggregateRoot<OfficeId>
         FloorWidth = plan.Width;
         FloorDepth = plan.Depth;
         _furniture = [.. plan.Furniture];
+        _cuts = [.. plan.Cuts];
         foreach (var room in _rooms)
         {
             var planned = plan.Rooms.FirstOrDefault(r => r.Id == room.Id);
@@ -165,6 +171,7 @@ public sealed class Office : AggregateRoot<OfficeId>
         FloorWidth = null;
         FloorDepth = null;
         _furniture = [];
+        _cuts = [];
         foreach (var room in _rooms)
         {
             room.ClearLayout();

@@ -39,4 +39,24 @@ describe('wallPlan', () => {
     expect(plan.faces.length).toBeGreaterThan(0)
     expect(plan.faces.every((f) => f.y < (1 + 12) * 16)).toBe(true)
   })
+
+  it('follows the outline of a shaped building, around its cuts', () => {
+    // The front right corner of the 20 by 12 building is cut away: 6 by 4 tiles.
+    const layout = layoutOffice({ ...planned(room('web', { left: 0, top: 0 })), cuts: [{ left: 14, top: 8, width: 6, height: 4 }] })
+    const caps = wallPlan(layout).caps
+    // A wall across the top of the cut, at y = (1 + 8) * 16, and down its west side, at x = (1 + 14) * 16.
+    expect(walled(caps, (1 + 17) * 16, 144)).toBe(true)
+    expect(walled(caps, 240, (1 + 10) * 16)).toBe(true)
+    // No wall left where the rectangle used to end, inside the cut.
+    expect(walled(caps, (1 + 20) * 16, (1 + 10) * 16)).toBe(false)
+    expect(walled(caps, (1 + 17) * 16, (1 + 12) * 16)).toBe(false)
+  })
+
+  it('shows no face where a room looks onto a cut rather than the corridor', () => {
+    const layout = layoutOffice({ ...planned(room('web', { left: 0, top: 0 })), cuts: [{ left: 0, top: 6, width: 4, height: 6 }] })
+    const faces = wallPlan(layout).faces
+    // The room's front wall is at y = 7 * 16; the cut takes its first four tiles.
+    expect(faces.every((f) => f.x >= (1 + 4) * 16 - 2)).toBe(true)
+    expect(faces.length).toBeGreaterThan(0)
+  })
 })

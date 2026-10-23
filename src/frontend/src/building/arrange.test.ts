@@ -3,12 +3,14 @@ import type { OfficeView, RoomView } from '../api/types'
 import { FURNITURE } from '../art/fanPack'
 import {
   addCommon,
+  addCut,
   addPiece,
   addWindow,
   arrangementOf,
   boundsOf,
   commonAt,
   currentFloor,
+  cutFits,
   doorAt,
   editFloor,
   editRoom,
@@ -20,10 +22,13 @@ import {
   NO_DRAFTS,
   place,
   planRequest,
+  removeCut,
   removePiece,
   removeWindow,
   resize,
   resizeFloor,
+  setCut,
+  stretchCut,
   targetAt,
   tidyDesks,
   withDrafts,
@@ -170,7 +175,7 @@ describe('tidyDesks', () => {
 })
 
 describe('the floor plan', () => {
-  const floor = (): FloorArrangement => ({ width: 20, depth: 12, furniture: [], rooms: { a: { left: 0, top: 0 }, b: { left: 10, top: 0 } } })
+  const floor = (): FloorArrangement => ({ width: 20, depth: 12, furniture: [], rooms: { a: { left: 0, top: 0 }, b: { left: 10, top: 0 } }, cuts: [] })
   const sizes = { a: { width: 8, height: 6 }, b: { width: 8, height: 6 } }
 
   it('lets a room move where it fits and keeps it where it would overlap or leave the building', () => {
@@ -195,6 +200,61 @@ describe('the floor plan', () => {
       expect(box.x >= r.x + r.width || box.x + box.width <= r.x || box.y >= r.y + r.height || box.y + box.height <= r.y).toBe(true)
     }
     expect(commonAt(added, { x: piece.x + 8, y: piece.y + 16 })).toBe(0)
+  })
+})
+
+describe('the shape of the building', () => {
+  // Two rooms along the back wall of a 20 by 12 building: the front is free.
+  const floor = (): FloorArrangement => ({ width: 20, depth: 12, furniture: [], rooms: { a: { left: 0, top: 0 }, b: { left: 10, top: 0 } }, cuts: [] })
+  const sizes = { a: { width: 8, height: 6 }, b: { width: 8, height: 6 } }
+
+  it('cuts the first free corner, a third of the building each way', () => {
+    const cut = addCut(floor(), sizes)
+    // The back corners hold rooms: the front right one is cut.
+    expect(cut.cuts).toEqual([{ left: 14, top: 8, width: 6, height: 4 }])
+    expect(addCut(cut, sizes).cuts[1]).toEqual({ left: 0, top: 8, width: 6, height: 4 })
+  })
+
+  it('keeps cuts inside the building, out of rooms and apart from each other', () => {
+    const one = { ...floor(), cuts: [{ left: 14, top: 8, width: 6, height: 4 }] }
+    expect(cutFits(one, sizes, 0, { left: 14, top: 7, width: 6, height: 4 })).toBe(true)
+    expect(cutFits(one, sizes, 0, { left: 14, top: 5, width: 6, height: 4 })).toBe(false)
+    expect(cutFits(one, sizes, 0, { left: 16, top: 8, width: 6, height: 4 })).toBe(false)
+    expect(cutFits(one, sizes, 1, { left: 12, top: 9, width: 4, height: 2 })).toBe(false)
+    expect(setCut(one, sizes, 0, { left: 14, top: 5, width: 6, height: 4 })).toBe(one)
+  })
+
+  it('stretches a cut by any edge, never below a tile', () => {
+    const cut = { left: 4, top: 4, width: 4, height: 4 }
+    expect(stretchCut(cut, 'left', 2, 0)).toEqual({ left: 2, top: 4, width: 6, height: 4 })
+    expect(stretchCut(cut, 'top', 0, 9)).toEqual({ left: 4, top: 7, width: 4, height: 1 })
+    expect(stretchCut(cut, 'corner', 10, 5)).toEqual({ left: 4, top: 4, width: 6, height: 1 })
+  })
+
+  it('keeps rooms and furniture out of cuts', () => {
+    const shaped = { ...floor(), cuts: [{ left: 0, top: 8, width: 10, height: 4 }] }
+    expect(moveRoom(shaped, sizes, 'a', 0, 6).rooms.a).toEqual({ left: 0, top: 0 })
+    const furnished = setCut({ ...floor(), furniture: [{ name: 'plant', x: 16, y: 150 }], cuts: [{ left: 15, top: 8, width: 5, height: 4 }] }, sizes, 0, { left: 0, top: 8, width: 5, height: 4 })
+    // The plant stood where the cut went: it stepped out, to the nearest free spot.
+    expect(furnished.furniture[0].y + FURNITURE.plant.sprite.height).toBeLessThanOrEqual(8 * 16)
+  })
+
+  it('keeps an edge cut at its edge when the building grows', () => {
+    const grown = resizeFloor({ ...floor(), cuts: [{ left: 14, top: 8, width: 6, height: 4 }] }, sizes, 24, 14)
+    expect(grown.cuts).toEqual([{ left: 14, top: 8, width: 10, height: 6 }])
+    const shrunk = resizeFloor(grown, sizes, 15, 7)
+    expect([shrunk.width, shrunk.depth]).toEqual([18, 9])
+    expect(shrunk.cuts).toEqual([{ left: 14, top: 8, width: 4, height: 1 }])
+  })
+
+  it('goes with the plan to the API and away with the automatic building', () => {
+    const allsafe = office(room('web', 1))
+    const drafts = editFloor(allsafe, NO_DRAFTS, (f, s) => addCut(resizeFloor(f, s, 20, 12), s))
+    const shown = withDrafts(allsafe, drafts)
+    expect(planRequest(shown).cuts).toHaveLength(1)
+    expect(layoutOffice(shown).cuts).toHaveLength(1)
+    expect(removeCut(currentFloor(shown, drafts), 0).cuts).toEqual([])
+    expect(withDrafts(shown, { ...NO_DRAFTS, auto: true }).cuts).toEqual([])
   })
 })
 
@@ -236,6 +296,13 @@ describe('handlesOf', () => {
       { edge: 'right', x: 194, y: 104 },
       { edge: 'bottom', x: 152, y: 130 },
       { edge: 'corner', x: 194, y: 130 },
+    ])
+  })
+
+  it('adds the left and back edges of a cut', () => {
+    expect(handlesOf({ x: 2, y: 2, width: 10, height: 6 }, true).slice(3)).toEqual([
+      { edge: 'left', x: 30, y: 80 },
+      { edge: 'top', x: 112, y: 30 },
     ])
   })
 })

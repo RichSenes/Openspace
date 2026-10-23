@@ -26,7 +26,7 @@ public class WorkTaskCommandsTests
         var runtime = new FakeRuntime();
         var board = new Agents.ActivityBoard(new RecordingPublisher());
         var audit = new InMemoryAuditLog();
-        var signals = new Agents.AgentSignals(_offices, new Agents.AgentSetups(new InMemoryRoles()), _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), new Review.PendingReviews(), new Agents.PermissionRequests(), _clock);
+        var signals = new Agents.AgentSignals(_offices, new Agents.AgentSetups(new InMemoryRoles()), _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), new Review.PendingReviews(), new Agents.PermissionRequests(), new LiveOptions<Agents.AgentOptions>(() => new() { Autonomy = Agents.Autonomy.Ask }), _clock);
         _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, runtime, new FakeWorkspaces(), board, audit, signals, _clock);
     }
 
@@ -67,7 +67,7 @@ public class WorkTaskCommandsTests
         _tasks.Items[0].Start(_clock.GetUtcNow());
         _tasks.Items[0].SubmitForReview(_clock.GetUtcNow());
 
-        await _commands.SendBackAsync(id, "elliot", "Wrong colour.", default);
+        await _commands.SendBackAsync(id, "elliot", "Wrong colour.", withReview: false, default);
 
         var note = Assert.Single(_tasks.Items[0].Notes);
         Assert.Equal("elliot", note.Author.Name);

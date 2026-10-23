@@ -11,7 +11,7 @@ namespace Openspace.Infrastructure.OpenCode;
 /// is about, so one server serves every task's working copy.
 /// </summary>
 internal sealed class OpenCodeRuntime(
-    HttpClient http, IOptions<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces)
+    HttpClient http, IOptionsMonitor<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces)
 {
     public async Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken)
     {
@@ -93,7 +93,8 @@ internal sealed class OpenCodeRuntime(
             cancellationToken).ConfigureAwait(false);
         try
         {
-            var body = Message("plan", options.Value.DraftModel, instructions, text);
+            var model = options.CurrentValue.DraftModel;
+            var body = Message("plan", string.IsNullOrWhiteSpace(model) ? null : model, instructions, text);
             if (format is not null)
             {
                 body["format"] = format;
@@ -152,7 +153,7 @@ internal sealed class OpenCodeRuntime(
             config = new Dictionary<string, object>
             {
                 ["type"] = "remote",
-                ["url"] = options.Value.ToolsUrl.ToString(),
+                ["url"] = options.CurrentValue.ToolsUrl.ToString(),
                 ["enabled"] = true,
                 ["oauth"] = false,
                 ["headers"] = new Dictionary<string, string> { [TaskHeader] = taskId.ToString() },
@@ -193,7 +194,7 @@ internal sealed class OpenCodeRuntime(
         return [.. pending.RootElement.EnumerateArray().Select(p => new PermissionRequest(
             p.GetProperty("id").GetString()!,
             p.GetProperty("sessionID").GetString()!,
-            OpenCodeEventTranslator.DescribePermission(p)))];
+            OpenCodeEventTranslator.ActionOf(p)))];
     }
 
     public async Task ReplyToPermissionAsync(

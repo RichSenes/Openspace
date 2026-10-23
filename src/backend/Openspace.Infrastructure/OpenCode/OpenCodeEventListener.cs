@@ -17,6 +17,9 @@ internal sealed partial class OpenCodeEventListener(
 {
     public const string HttpClientName = "opencode-events";
 
+    /// <summary>Answers whose tokens were counted: OpenCode may report a finished answer more than once.</summary>
+    private readonly HashSet<string> _counted = [];
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var delay = TimeSpan.FromSeconds(1);
@@ -66,11 +69,26 @@ internal sealed partial class OpenCodeEventListener(
                 continue;
             }
 
+            if (signal is AgentSignal.Used { MessageId: { } answer } && !Count(answer))
+            {
+                continue;
+            }
+
             if (signal is not null)
             {
                 await DispatchAsync(signal, stoppingToken).ConfigureAwait(false);
             }
         }
+    }
+
+    private bool Count(string answer)
+    {
+        if (_counted.Count > 10_000)
+        {
+            _counted.Clear();
+        }
+
+        return _counted.Add(answer);
     }
 
     private Task DispatchAsync(AgentSignal signal, CancellationToken cancellationToken) =>

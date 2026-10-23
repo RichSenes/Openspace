@@ -37,13 +37,21 @@ export interface UsageWindow {
   resetsAt: string | null
 }
 
+/** How much of the Claude account's limits is used, as Claude Code last reported it. */
+export interface ClaudeUsage {
+  status: string
+  fiveHours: UsageWindow | null
+  week: UsageWindow | null
+  seenAt: string
+}
+
 /** What can run agents on this machine, and with which models. */
 export interface EnginesView {
   openCode: boolean
   openCodeModels: ModelOption[]
   claudeCode: boolean
   claudeCodeModels: ModelOption[]
-  claudeUsage: { status: string; fiveHours: UsageWindow | null; week: UsageWindow | null; seenAt: string } | null
+  claudeUsage: ClaudeUsage | null
   supervisor: AgentEngine
   reviewer: AgentEngine | null
 }
@@ -145,6 +153,55 @@ export interface WorkTaskView {
   epicId: string | null
   procedure: ProcedureStepView[]
   notes: TaskNoteView[]
+  /** When the task last changed status: a review counts only if written after it. */
+  statusChangedAt: string
+  /** 1, then one more each time the work is sent back. */
+  round: number
+  manualChecks: ManualCheckView[]
+  usage: RoundUsageView[]
+}
+
+/** Something a person must try by hand before merging, and how. */
+export interface ManualCheckView {
+  number: number
+  what: string
+  how: string
+  checkedAt: string | null
+}
+
+/** Tokens the agent spent on one round of a task. */
+export interface RoundUsageView {
+  round: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+/** Tokens spent by one desk over all its tasks. */
+export interface DeskUsageView {
+  officeId: string
+  officeName: string
+  deskId: string
+  deskName: string
+  tasks: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+export type Autonomy = 'Auto' | 'Ask'
+
+/** What a person changes from Openspace itself; blank models mean the engine's default. */
+export interface SettingsView {
+  autonomy: Autonomy
+  seats: number
+  claudeSupervises: boolean
+  supervisorModel: string | null
+  claudeReviews: boolean
+  reviewModel: string | null
+  draftModel: string | null
 }
 
 export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Procedure' | 'Other'
@@ -174,6 +231,8 @@ export interface DeskActivity {
   permissionId: string | null
   at: string
   headline: string
+  /** While waiting: exactly what is asked, such as the command. */
+  detail?: string | null
 }
 
 export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'

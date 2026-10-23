@@ -74,9 +74,28 @@ public sealed class WorkTaskCommands(
         await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <param name="withReview">Sends the reviewer's latest note along, as the feedback or before it.</param>
     public Task SendBackAsync(
-        WorkTaskId taskId, string reviewer, string feedback, CancellationToken cancellationToken) =>
-        UpdateAsync(taskId, (task, now) => task.SendBack(NoteAuthor.Human(reviewer), feedback, now), cancellationToken);
+        WorkTaskId taskId, string reviewer, string? feedback, bool withReview, CancellationToken cancellationToken) =>
+        UpdateAsync(taskId, (task, now) => task.SendBack(NoteAuthor.Human(reviewer), Feedback(task, feedback, withReview), now), cancellationToken);
+
+    /// <summary>A person tried a check by hand, or puts it back on the list.</summary>
+    public Task TickManualCheckAsync(WorkTaskId taskId, int number, bool done, CancellationToken cancellationToken) =>
+        UpdateAsync(taskId, (task, now) => task.TickManualCheck(number, done, now), cancellationToken);
+
+    private static string Feedback(WorkTask task, string? feedback, bool withReview)
+    {
+        var own = feedback?.Trim() ?? string.Empty;
+        if (!withReview)
+        {
+            return own;
+        }
+
+        var review = task.Notes.LastOrDefault(n => n.Author.Kind == NoteAuthorKind.Reviewer && n.WrittenAt >= task.StatusChangedAt)
+            ?? throw new Domain.Common.DomainException("There is no review of this work to send back.");
+        var text = $"Apply this review of your work:\n{review.Text}";
+        return own.Length > 0 ? $"{own}\n\n{text}" : text;
+    }
 
     public Task RetryAsync(WorkTaskId taskId, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.Requeue(now), cancellationToken);

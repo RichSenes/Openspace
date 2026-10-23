@@ -16,6 +16,7 @@ public sealed partial class TaskRunner(
     IAgentRuntime runtime,
     IWorkspaceManager workspaces,
     ActivityBoard activity,
+    AgentSignals signals,
     TimeProvider clock,
     ILogger<TaskRunner> logger)
 {
@@ -111,20 +112,22 @@ public sealed partial class TaskRunner(
     }
 
     /// <summary>
-    /// A resumed session may still be blocked on a permission asked before Openspace
-    /// restarted; OpenCode will not ask again, so the wait is picked up from it.
+    /// A resumed session may still be blocked on permissions asked before Openspace
+    /// restarted; OpenCode will not ask again, so they are picked up from it: answered on
+    /// Openspace's own when it may, the first one left shown to a person.
     /// </summary>
     private async Task RestorePendingPermissionAsync(WorkTask task, CancellationToken cancellationToken)
     {
         try
         {
             var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
-            if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId) is { } permission)
+            foreach (var permission in pending.Where(p => p.SessionId == task.Run.SessionId))
             {
-                await activity.UpdateAsync(
-                    new DeskActivity(task.OfficeId.Value, task.DeskId!.Value.Value, task.Id.Value, ActivityKind.Waiting, null,
-                        $"Wants to {permission.Description}", permission.Id, clock.GetUtcNow()),
-                    cancellationToken).ConfigureAwait(false);
+                await signals.PermissionAskedAsync(task.Run.SessionId, permission.Id, permission.Action, cancellationToken).ConfigureAwait(false);
+                if (activity.ForTask(task.Id.Value) is { Kind: ActivityKind.Waiting })
+                {
+                    break;
+                }
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

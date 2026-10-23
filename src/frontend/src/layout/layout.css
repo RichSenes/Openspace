@@ -44,8 +44,14 @@
   border-bottom-color: var(--accent);
 }
 
-.link {
+.topbar-end {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.link {
   display: inline-flex;
   align-items: center;
   gap: 6px;

@@ -46,10 +46,10 @@ describe('waitingDesks', () => {
     const offices = [
       { id: 'e-corp', name: 'E Corp', repositoryPath: null, theme: 'cozy', rooms: [{ id: 'web', name: 'Web', context: '', procedure: [], desks: [{ id: 'frontend', name: 'Frontend', agentName: 'build', model: null, roleId: null }] }] },
     ]
-    const list = [activity('frontend', 'Wants to bash ls -la', 'Waiting'), activity('tester', 'Testing', 'Working')]
+    const list = [{ ...activity('frontend', 'Can I install the dependencies?', 'Waiting'), detail: 'npm ci' }, activity('tester', 'Testing', 'Working')]
 
     expect(waitingDesks(list, offices)).toEqual([
-      { taskId: 't1', officeName: 'E Corp', deskName: 'Frontend', request: 'Wants to bash ls -la' },
+      { taskId: 't1', officeName: 'E Corp', deskName: 'Frontend', request: 'Can I install the dependencies?', detail: 'npm ci' },
     ])
   })
 })

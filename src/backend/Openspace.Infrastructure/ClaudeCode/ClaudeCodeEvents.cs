@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Openspace.Application.Agents;
 using Openspace.Domain.Work;
 using Openspace.Infrastructure.OpenCode;
 
@@ -39,10 +40,11 @@ internal sealed class ClaudeCodeEvents(string sessionId)
                 return [];
             case "result":
                 Ended = true;
+                var spent = Tokens(root);
                 var result = Text(root, "result");
                 if (root.TryGetProperty("is_error", out var error) && error.ValueKind == JsonValueKind.True)
                 {
-                    return [new AgentSignal.Failed(sessionId, $"Claude Code stopped: {Shorten(result ?? Text(root, "subtype") ?? "unknown error", 300)}")];
+                    return [.. spent, new AgentSignal.Failed(sessionId, $"Claude Code stopped: {Shorten(result ?? Text(root, "subtype") ?? "unknown error", 300)}")];
                 }
 
                 if (!string.IsNullOrWhiteSpace(result))
@@ -50,10 +52,23 @@ internal sealed class ClaudeCodeEvents(string sessionId)
                     LastReply = result.Trim();
                 }
 
-                return [new AgentSignal.Finished(sessionId)];
+                return [.. spent, new AgentSignal.Finished(sessionId)];
             default:
                 return [];
         }
+    }
+
+    /// <summary>What the whole run spent, as the result reports it.</summary>
+    private AgentSignal[] Tokens(JsonElement root)
+    {
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+
+        long Count(string name) => usage.TryGetProperty(name, out var n) && n.ValueKind == JsonValueKind.Number ? n.GetInt64() : 0;
+        return [new AgentSignal.Used(sessionId, new TokenCount(
+            Count("input_tokens"), Count("output_tokens"), Count("cache_read_input_tokens"), Count("cache_creation_input_tokens")))];
     }
 
     private List<AgentSignal> FromAssistant(JsonElement root)
@@ -122,7 +137,7 @@ internal sealed class ClaudeCodeEvents(string sessionId)
             "Read" => (AuditKind.Read, $"Read {Name(File())}", File()),
             "Edit" or "MultiEdit" or "NotebookEdit" => (AuditKind.Change, $"Changed {Name(File())}", EditDetail(input) ?? File()),
             "Write" => (AuditKind.Change, $"Wrote {Name(File())}", File()),
-            "Bash" => (AuditKind.Command, $"Ran {Text(input, "description") ?? Text(input, "command") ?? "a command"}", $"$ {Text(input, "command")}\n{output}"),
+            "Bash" => (AuditKind.Command, ActionPhrases.Done(new AgentAction(ActionKind.Run, Text(input, "command") ?? "a command")), $"$ {Text(input, "command")}\n{output}"),
             "Grep" or "Glob" =>
                 (AuditKind.Search, Text(input, "pattern") is { } pattern ? $"Searched the code for {pattern}" : "Searched the code", output),
             "WebFetch" or "WebSearch" => (AuditKind.Other, $"Looked up {Text(input, "url") ?? Text(input, "query") ?? "something online"}", null),
@@ -152,7 +167,7 @@ internal sealed class ClaudeCodeEvents(string sessionId)
         return $"--- {Text(input, "file_path")}\n{string.Join('\n', Lines(before, '-'))}\n{string.Join('\n', Lines(after, '+'))}";
     }
 
-    /// <summary>What the agent is doing, to show in its bubble: "Editing header.php", "Running npm test".</summary>
+    /// <summary>What the agent is doing, to show in its bubble: "Editing header.php", "Running the tests".</summary>
     internal static string Doing(string tool, JsonElement input)
     {
         var file = Text(input, "file_path") ?? Text(input, "notebook_path");
@@ -162,10 +177,9 @@ internal sealed class ClaudeCodeEvents(string sessionId)
             "Read" => $"Reading {name ?? "a file"}",
             "Edit" or "MultiEdit" or "NotebookEdit" => $"Editing {name ?? "a file"}",
             "Write" => $"Writing {name ?? "a file"}",
-            "Bash" => $"Running {Text(input, "description") ?? Text(input, "command") ?? "a command"}",
-            "Grep" or "Glob" => $"Searching {Text(input, "pattern") ?? "the code"}",
-            "WebFetch" => $"Fetching {Text(input, "url") ?? "a page"}",
-            "WebSearch" => $"Looking up {Text(input, "query") ?? "something online"}",
+            "Bash" => ActionPhrases.Doing(new AgentAction(ActionKind.Run, Text(input, "command") ?? string.Empty)),
+            "Grep" or "Glob" => "Searching the code",
+            "WebFetch" or "WebSearch" => "Looking something up online",
             _ => $"Using {tool}",
         };
     }

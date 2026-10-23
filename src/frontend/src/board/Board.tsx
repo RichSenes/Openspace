@@ -1,29 +1,37 @@
 import { useMemo, useState } from 'react'
-import { Check, Plus, Sparkles, TriangleAlert } from 'lucide-react'
-import { useEpics, useOfficeTasks } from '../api/hooks'
+import { Check, Hourglass, ListChecks, Plus, Sparkles, TriangleAlert } from 'lucide-react'
+import { useEngines, useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { desksOf } from './deskLookup'
 import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
-import { COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { checksDone, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
-export function Board({ office }: { office: OfficeView }) {
+interface Props {
+  office: OfficeView
+  /** A task to open at once, e.g. picked from an agent in the building. */
+  initialTaskId?: string
+}
+
+export function Board({ office, initialTaskId }: Props) {
   const tasks = useOfficeTasks(office.id)
   const [creating, setCreating] = useState(false)
   const [planning, setPlanning] = useState(false)
   const [epicFilter, setEpicFilter] = useState<EpicFilter>('all')
   const epics = useEpics(office.id)
   const epicTitle = (id: string | null) => epics.data?.find((e) => e.id === id)?.title
-  const [openTaskId, setOpenTaskId] = useState<string>()
+  const [openTaskId, setOpenTaskId] = useState<string | undefined>(initialTaskId)
+  const reviewerOn = Boolean(useEngines().data?.reviewer)
   const desks = useMemo(() => desksOf(office), [office])
   const groups = useMemo(() => groupByColumn(filterByEpic(tasks.data ?? [], epicFilter)), [tasks.data, epicFilter])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
 
   return (
-    <section className="board">
+    <section className={openTask ? 'board has-drawer' : 'board'}>
+      <div className="board-main">
       <header className="board-head">
         <h1>{office.name}</h1>
         <div className="row">
@@ -67,6 +75,8 @@ export function Board({ office }: { office: OfficeView }) {
                 <ul className="cards">
                   {items.map((task) => {
                     const desk = desks.find((d) => d.id === task.deskId)
+                    const verdict = reviewVerdictOf(task, reviewerOn)
+                    const checks = checksDone(task)
                     return (
                       <li key={task.id}>
                         <button
@@ -82,14 +92,25 @@ export function Board({ office }: { office: OfficeView }) {
                             {task.notes.length > 0 &&
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
-                          {reviewVerdictOf(task) === 'ok' && (
+                          {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
+                          {verdict === 'reviewing' && (
+                            <span className="card-review">
+                              <Hourglass size={12} aria-hidden /> Claude is reviewing…
+                            </span>
+                          )}
+                          {verdict === 'ok' && (
                             <span className="card-review card-review-ok">
                               <Check size={12} aria-hidden /> Claude: ready to accept
                             </span>
                           )}
-                          {reviewVerdictOf(task) === 'changes' && (
+                          {verdict === 'changes' && (
                             <span className="card-review card-review-changes">
                               <TriangleAlert size={12} aria-hidden /> Claude: changes suggested
+                            </span>
+                          )}
+                          {checks.total > 0 && (task.status === 'Review' || task.status === 'Done') && (
+                            <span className="card-review">
+                              <ListChecks size={12} aria-hidden /> Tried by hand: {checks.done} of {checks.total}
                             </span>
                           )}
                         </button>
@@ -103,6 +124,8 @@ export function Board({ office }: { office: OfficeView }) {
         })}
       </div>
 
+      </div>
+
       <NewTaskDialog office={office} desks={desks} open={creating} onClose={() => setCreating(false)} />
       <SupervisorDialog
         office={office}
@@ -111,7 +134,7 @@ export function Board({ office }: { office: OfficeView }) {
         onClose={() => setPlanning(false)}
         onShowEpic={(id) => setEpicFilter(id)}
       />
-      {openTask && <TaskDrawer task={openTask} desks={desks} onClose={() => setOpenTaskId(undefined)} />}
+      {openTask && <TaskDrawer key={openTask.id} task={openTask} desks={desks} reviewerOn={reviewerOn} onClose={() => setOpenTaskId(undefined)} />}
     </section>
   )
 }

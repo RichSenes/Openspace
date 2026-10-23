@@ -32,8 +32,13 @@ public sealed partial class TaskReviewer(
         that it is correct, tested where the project has tests, and free of secrets or personal
         data; and that the evidence of the required procedure fits the change.
         Judge from the code and the evidence: never ask for changes only because you could not
-        run something yourself. A finding names a real problem in the work, with its file.
+        run something yourself, or because the agent's notes count things a little differently.
+        A finding names a real problem in the work, with its file.
         Be concrete and brief. Answer "ok" when you would accept the work as it is.
+        In manualChecks list what a person must still try by hand before merging, because no
+        test covers it (a screen, a flow on a phone, an email), each with how to try it: where
+        to go, what to do, what should happen. Leave out the checks already listed, and never
+        list running the tests or other commands again: that is the agent's job, not a person's.
         Write in the language the task is written in.
         """;
 
@@ -52,6 +57,16 @@ public sealed partial class TaskReviewer(
                     type = "object",
                     properties = new { file = new { type = "string" }, problem = new { type = "string" } },
                     required = new[] { "file", "problem" },
+                },
+            },
+            manualChecks = new
+            {
+                type = "array",
+                items = new
+                {
+                    type = "object",
+                    properties = new { what = new { type = "string" }, how = new { type = "string" } },
+                    required = new[] { "what", "how" },
                 },
             },
         },
@@ -85,7 +100,7 @@ public sealed partial class TaskReviewer(
         }
 
         var verdict = Verdict.Read(answer);
-        await NoteAsync(taskId, NoteAuthor.Reviewer(Name), verdict.ToNote(), cancellationToken).ConfigureAwait(false);
+        await NoteAsync(taskId, NoteAuthor.Reviewer(Name), verdict.ToNote(), cancellationToken, verdict.ManualChecks).ConfigureAwait(false);
     }
 
     /// <summary>What the reviewer reads first: the request, the procedure with its evidence, the agent's notes.</summary>
@@ -117,6 +132,15 @@ public sealed partial class TaskReviewer(
             }
         }
 
+        if (task.ManualChecks.Count > 0)
+        {
+            brief.AppendLine().AppendLine("Checks already listed for a person to try by hand:");
+            foreach (var check in task.ManualChecks)
+            {
+                brief.AppendLine(CultureInfo.InvariantCulture, $"- {check.What}");
+            }
+        }
+
         if (task.Run?.Branch is { } branch)
         {
             brief.AppendLine().AppendLine(CultureInfo.InvariantCulture, $"The work is in branch {branch}, not committed yet.");
@@ -125,7 +149,8 @@ public sealed partial class TaskReviewer(
         return brief.ToString();
     }
 
-    private async Task NoteAsync(WorkTaskId taskId, NoteAuthor author, string text, CancellationToken cancellationToken)
+    private async Task NoteAsync(
+        WorkTaskId taskId, NoteAuthor author, string text, CancellationToken cancellationToken, IReadOnlyList<(string What, string How)>? checks = null)
     {
         // Read again: the person may have accepted or sent back the work meanwhile.
         var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -141,6 +166,11 @@ public sealed partial class TaskReviewer(
             audit.Add(AuditEntry.Record(task.Id, now, AuditKind.Lifecycle, $"Reviewed by {Name}"));
         }
 
+        foreach (var (what, how) in (checks ?? []).Take(WorkTask.MaxManualChecks - task.ManualChecks.Count))
+        {
+            task.AddManualCheck(what, how, now);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -149,7 +179,8 @@ public sealed partial class TaskReviewer(
 }
 
 /// <summary>The reviewer's answer, as a note people read at a glance: the verdict comes first.</summary>
-internal sealed record Verdict(bool Ok, string Summary, IReadOnlyList<(string File, string Problem)> Findings)
+internal sealed record Verdict(
+    bool Ok, string Summary, IReadOnlyList<(string File, string Problem)> Findings, IReadOnlyList<(string What, string How)> ManualChecks)
 {
     public static Verdict Read(string json)
     {
@@ -161,7 +192,14 @@ internal sealed record Verdict(bool Ok, string Summary, IReadOnlyList<(string Fi
                 .Where(x => x.Item2.Length > 0)
                 .ToList()
             : [];
-        return new Verdict(Text(root, "verdict") == "ok" && findings.Count == 0, Text(root, "summary"), findings);
+        var checks = root.TryGetProperty("manualChecks", out var c) && c.ValueKind == JsonValueKind.Array
+            ? c.EnumerateArray()
+                .Select(x => (Text(x, "what"), Text(x, "how")))
+                .Where(x => x.Item1.Length > 0)
+                .Select(x => (x.Item1.Length <= 300 ? x.Item1 : x.Item1[..300], x.Item2))
+                .ToList()
+            : [];
+        return new Verdict(Text(root, "verdict") == "ok" && findings.Count == 0, Text(root, "summary"), findings, checks);
     }
 
     public string ToNote()

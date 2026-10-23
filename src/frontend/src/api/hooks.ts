@@ -15,6 +15,9 @@ import type {
   RoleView,
   FloorPlanRequest,
   WorkTaskView,
+  ClaudeUsage,
+  DeskUsageView,
+  SettingsView,
 } from './types'
 
 export const keys = {
@@ -32,6 +35,8 @@ export const keys = {
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
+  settings: ['settings'] as const,
+  deskUsage: ['usage', 'desks'] as const,
 }
 
 interface Created {
@@ -122,6 +127,24 @@ export function useTaskText(kind: 'notes' | 'send-back') {
   return useWrite(
     (input: { taskId: string; text: string }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/${kind}`, { text: input.text }),
+    keys.tasks,
+  )
+}
+
+/** Sends work back with feedback, the reviewer's latest note, or both. */
+export function useSendBack() {
+  return useWrite(
+    (input: { taskId: string; text: string | null; withReview: boolean }) =>
+      request<void>('POST', `/api/tasks/${input.taskId}/send-back`, { text: input.text, withReview: input.withReview }),
+    keys.tasks,
+  )
+}
+
+/** Ticks a check a person tried by hand, or puts it back on the list. */
+export function useTickCheck() {
+  return useWrite(
+    (input: { taskId: string; number: number; done: boolean }) =>
+      request<void>('PUT', `/api/tasks/${input.taskId}/checks/${input.number}`, { done: input.done }),
     keys.tasks,
   )
 }
@@ -324,4 +347,34 @@ export function useWriteReport(officeId: string) {
         : request<ReportView>('POST', `/api/epics/${input.epicId}/report`, { language: input.language }),
     keys.reports,
   )
+}
+
+export function useSettings() {
+  return useQuery({ queryKey: keys.settings, queryFn: () => request<SettingsView>('GET', '/api/settings') })
+}
+
+/** Saves the settings; they apply at once, so engines are read again too. */
+export function useSaveSettings() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (settings: SettingsView) => request<SettingsView>('PUT', '/api/settings', settings),
+    onSuccess: (saved) => {
+      client.setQueryData(keys.settings, saved)
+      void client.invalidateQueries({ queryKey: keys.engines })
+    },
+  })
+}
+
+/** Asks Claude Code now how much of the account is used: a tiny question to the smallest model. */
+export function useCheckClaudeUsage() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => request<ClaudeUsage>('POST', '/api/engines/claude-usage'),
+    onSuccess: (usage) => client.setQueryData<EnginesView>(keys.engines, (e) => (e ? { ...e, claudeUsage: usage } : e)),
+  })
+}
+
+/** Tokens spent desk by desk; refreshed with the tasks. */
+export function useDeskUsage() {
+  return useQuery({ queryKey: keys.deskUsage, queryFn: () => request<DeskUsageView[]>('GET', '/api/usage/desks') })
 }

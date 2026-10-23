@@ -16,11 +16,12 @@ internal static partial class AgentSignalDispatch
             var work = signal switch
             {
                 AgentSignal.Progress p => signals.ProgressAsync(p.SessionId, p.Step, p.Doing, cancellationToken),
-                AgentSignal.PermissionAsked p => signals.PermissionAskedAsync(p.SessionId, p.PermissionId, p.Description, cancellationToken),
+                AgentSignal.PermissionAsked p => signals.PermissionAskedAsync(p.SessionId, p.PermissionId, p.Action, cancellationToken),
                 AgentSignal.Finished f => signals.FinishedAsync(f.SessionId, cancellationToken),
                 AgentSignal.PermissionReplied r => signals.PermissionRepliedAsync(r.SessionId, r.PermissionId, r.Allowed, cancellationToken),
                 AgentSignal.ToolFinished t => signals.ToolFinishedAsync(t.SessionId, t.CallId, t.Kind, t.Summary, t.Detail, t.Succeeded, cancellationToken),
                 AgentSignal.Failed f => signals.FailedAsync(f.SessionId, f.Reason, cancellationToken),
+                AgentSignal.Used u => signals.UsedAsync(u.SessionId, u.Tokens, cancellationToken),
                 _ => Task.CompletedTask,
             };
             await work.ConfigureAwait(false);

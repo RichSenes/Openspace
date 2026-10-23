@@ -31,9 +31,9 @@ public class ClaudeCodeEventsTests
         var started = Assert.Single(events.Read(ToolUse("toolu_1", "Bash", """{"command":"npm test","description":"Run the tests"}""")));
         var finished = Assert.Single(events.Read(ToolResult("toolu_1", "12 passed")));
 
-        Assert.Equal(new AgentSignal.Progress("claude-1", null, "Running Run the tests"), started);
+        Assert.Equal(new AgentSignal.Progress("claude-1", null, "Running the tests"), started);
         var log = Assert.IsType<AgentSignal.ToolFinished>(finished);
-        Assert.Equal((AuditKind.Command, "Ran Run the tests", "$ npm test\n12 passed", true), (log.Kind, log.Summary, log.Detail, log.Succeeded));
+        Assert.Equal((AuditKind.Command, "Ran the tests", "$ npm test\n12 passed", true), (log.Kind, log.Summary, log.Detail, log.Succeeded));
     }
 
     [Fact]
@@ -78,6 +78,17 @@ public class ClaudeCodeEventsTests
 
         Assert.Equal(new AgentSignal.Finished("claude-1"), end);
         Assert.Equal(("Added the logout button.", true), (events.LastReply, events.Ended));
+    }
+
+    [Fact]
+    public void The_result_reports_what_the_run_spent()
+    {
+        var events = new ClaudeCodeEvents("claude-1");
+
+        var signals = events.Read("""{"type":"result","is_error":false,"result":"Done.","usage":{"input_tokens":12,"cache_creation_input_tokens":3000,"cache_read_input_tokens":45000,"output_tokens":800}}""");
+
+        Assert.Equal(new AgentSignal.Used("claude-1", new TokenCount(12, 800, 45000, 3000)), signals[0]);
+        Assert.Equal(new AgentSignal.Finished("claude-1"), signals[1]);
     }
 
     [Fact]
@@ -201,8 +212,8 @@ public class ClaudeCodeRuntimeTests : IDisposable
     {
         using var input = JsonDocument.Parse("""{"command":"npm test"}""");
 
-        Assert.Equal("run npm test", ClaudeCodePermissions.Describe("Bash", input.RootElement));
-        Assert.Equal("edit header.php", ClaudeCodePermissions.Describe("Edit", JsonDocument.Parse("""{"file_path":"/a/header.php"}""").RootElement));
+        Assert.Equal(new AgentAction(ActionKind.Run, "npm test"), ClaudeCodePermissions.Action("Bash", input.RootElement));
+        Assert.Equal(new AgentAction(ActionKind.Edit, "/a/header.php"), ClaudeCodePermissions.Action("Edit", JsonDocument.Parse("""{"file_path":"/a/header.php"}""").RootElement));
         using var allow = JsonDocument.Parse(ClaudeCodePermissions.Reply(true, input.RootElement));
         using var deny = JsonDocument.Parse(ClaudeCodePermissions.Reply(false, input.RootElement));
         Assert.Equal(("allow", "npm test"), (allow.RootElement.GetProperty("behavior").GetString(), allow.RootElement.GetProperty("updatedInput").GetProperty("command").GetString()));

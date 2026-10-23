@@ -19,6 +19,7 @@ public enum ActivityKind
 /// <param name="Step">The step the agent is on, from its own todo list, in its words.</param>
 /// <param name="Doing">The concrete action under way, e.g. "Editing header.php".</param>
 /// <param name="PermissionId">Set while waiting for a permission.</param>
+/// <param name="Detail">While waiting: exactly what is asked, such as the command.</param>
 public sealed record DeskActivity(
     Guid OfficeId,
     Guid DeskId,
@@ -27,7 +28,8 @@ public sealed record DeskActivity(
     string? Step,
     string? Doing,
     string? PermissionId,
-    DateTimeOffset At)
+    DateTimeOffset At,
+    string? Detail = null)
 {
     /// <summary>The one line a bubble shows.</summary>
     public string Headline => Step ?? Doing ?? string.Empty;

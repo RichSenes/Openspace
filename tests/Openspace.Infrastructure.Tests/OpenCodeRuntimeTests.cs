@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Openspace.Application.Abstractions;
+using Openspace.Application.Agents;
 using Openspace.Domain.Roles;
 using Openspace.Infrastructure.OpenCode;
 
@@ -27,7 +28,7 @@ public class OpenCodeRuntimeTests
     {
         var server = new FakeServer(answer);
         var http = new HttpClient(server) { BaseAddress = new Uri("http://opencode.test/") };
-        var options = Microsoft.Extensions.Options.Options.Create(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp") });
+        var options = new LiveOptions<OpenCodeOptions>(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp") });
         var workspaces = Microsoft.Extensions.Options.Options.Create(new Git.WorkspaceOptions { Root = Path.Combine(Path.GetTempPath(), "openspace-runtime-tests") });
         return (new OpenCodeRuntime(http, options, workspaces), server);
     }
@@ -192,7 +193,7 @@ public class OpenCodeRuntimeTests
 
         var pending = await runtime.PendingPermissionsAsync(Workspace, default);
 
-        Assert.Equal(new PermissionRequest("per_1", "ses_1", "run ls -la, ls wp-content/themes"), Assert.Single(pending));
+        Assert.Equal(new PermissionRequest("per_1", "ses_1", new AgentAction(ActionKind.Run, "ls -la && ls wp-content/themes")), Assert.Single(pending));
         Assert.Equal("/permission?directory=%2Fsrv%2Fworktrees%2Fabc", server.Requests[0].PathAndQuery);
     }
 

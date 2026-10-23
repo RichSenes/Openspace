@@ -16,6 +16,10 @@ const task = (status: WorkTaskView['status'], createdAt = '2026-01-01T10:00:00Z'
   epicId: null,
   procedure: [],
   notes: [],
+  statusChangedAt: createdAt,
+  round: 1,
+  manualChecks: [],
+  usage: [],
 })
 
 const activity = (kind: DeskActivity['kind'], doing: string | null = null): DeskActivity => ({

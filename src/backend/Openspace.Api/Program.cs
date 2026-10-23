@@ -3,7 +3,9 @@ using Openspace.Api;
 using Openspace.Api.Endpoints;
 using Openspace.Api.Mcp;
 using Openspace.Api.Realtime;
+using Openspace.Api.Settings;
 using Openspace.Application;
+using Openspace.Application.Agents;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Queue;
 using Openspace.Infrastructure;
@@ -14,6 +16,13 @@ using Openspace.Infrastructure.OpenCode;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+// Settings changed from Openspace itself come last, so they win over appsettings.
+var settingsFile = Path.GetFullPath(
+    builder.Configuration[$"{SettingsFileOptions.SectionName}:Path"] ?? new SettingsFileOptions().Path,
+    builder.Environment.ContentRootPath);
+builder.Configuration.AddJsonFile(settingsFile, optional: true, reloadOnChange: false);
+builder.Services.Configure<SettingsFileOptions>(o => o.Path = settingsFile);
+
 builder.Services.AddSingleton<IDomainEventPublisher, SignalRDomainEventPublisher>();
 builder.Services.AddSingleton<IActivityPublisher, SignalRActivityPublisher>();
 builder.Services
@@ -21,6 +30,7 @@ builder.Services
     .AddInfrastructure(builder.Configuration.GetConnectionString("Openspace")
         ?? throw new InvalidOperationException("Missing connection string 'Openspace'."))
     .AddAgents();
+builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection(AgentOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
@@ -58,6 +68,7 @@ app.MapRoleEndpoints();
 app.MapEpicEndpoints();
 app.MapReportEndpoints();
 app.MapEngineEndpoints();
+app.MapSettingsEndpoints();
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");
 

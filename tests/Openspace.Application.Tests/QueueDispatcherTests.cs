@@ -24,7 +24,7 @@ public class QueueDispatcherTests
     }
 
     private QueueDispatcher Dispatcher(int seats) =>
-        new(_tasks, _unitOfWork, Options.Create(new QueueOptions { Seats = seats }), _clock);
+        new(_tasks, _unitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), _clock);
 
     private WorkTask Enqueue(Desk desk, string title)
     {

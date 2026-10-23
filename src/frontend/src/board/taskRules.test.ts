@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf } from './taskRules'
+import { actionsFor, checksDone, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -16,6 +16,10 @@ const task = (title: string, status: TaskStatus): WorkTaskView => ({
   epicId: null,
   procedure: [],
   notes: [],
+  statusChangedAt: '2015-06-24T09:00:00Z',
+  round: 1,
+  manualChecks: [],
+  usage: [],
 })
 
 describe('groupByColumn', () => {
@@ -75,5 +79,50 @@ describe('reviewVerdictOf', () => {
   it('says nothing without a review, or once the work left review', () => {
     expect(reviewVerdictOf({ ...task('Logout', 'Review'), notes: [note('System', 'OK then')] })).toBeUndefined()
     expect(reviewVerdictOf({ ...task('Logout', 'Done'), notes: [note('Reviewer', 'OK: ready to accept.')] })).toBeUndefined()
+  })
+})
+
+describe('reviewVerdictOf across rounds', () => {
+  const at = (authorKind: 'Desk' | 'Reviewer' | 'System', text: string, writtenAt: string) => ({ authorKind, authorName: null, deskId: null, text, writtenAt })
+  const resubmitted = {
+    ...task('Logout', 'Review'),
+    statusChangedAt: '2015-06-24T10:00:00.1234567+00:00',
+    notes: [at('Reviewer', 'Changes suggested. Untested.', '2015-06-24T09:30:00Z'), at('Desk', 'Added the test.', '2015-06-24T10:00:00Z')],
+  }
+  const now = timeOf('2015-06-24T10:05:00Z')
+
+  it('forgets the review of work since sent back and says a new one is under way', () => {
+    expect(reviewVerdictOf(resubmitted, true, now)).toBe('reviewing')
+    expect(reviewVerdictOf(resubmitted, false, now)).toBeUndefined()
+  })
+
+  it('reads the new review once it comes', () => {
+    const reviewed = { ...resubmitted, notes: [...resubmitted.notes, at('Reviewer', 'OK: ready to accept.', '2015-06-24T10:03:00.9999999Z')] }
+    expect(reviewVerdictOf(reviewed, true, now)).toBe('ok')
+  })
+
+  it('stops waiting when the review failed or never came', () => {
+    const failed = { ...resubmitted, notes: [...resubmitted.notes, at('System', 'The review by Claude could not run (limit).', '2015-06-24T10:01:00Z')] }
+    expect(reviewVerdictOf(failed, true, now)).toBeUndefined()
+    expect(reviewVerdictOf(resubmitted, true, timeOf('2015-06-24T11:00:00Z'))).toBeUndefined()
+  })
+})
+
+describe('checks and tokens', () => {
+  it('counts the checks tried by hand', () => {
+    const checks = [
+      { number: 1, what: 'Logout works', how: '', checkedAt: '2015-06-24T10:00:00Z' },
+      { number: 2, what: 'Menu opens', how: '', checkedAt: null },
+    ]
+    expect(checksDone({ ...task('Logout', 'Review'), manualChecks: checks })).toEqual({ done: 1, total: 2 })
+  })
+
+  it('writes token counts short and adds rounds up', () => {
+    expect([compactTokens(950), compactTokens(1234), compactTokens(12_400), compactTokens(1_300_000)]).toEqual(['950', '1.2k', '12k', '1.3M'])
+    const total = totalTokens([
+      { round: 1, input: 10, output: 5, cacheRead: 100, cacheWrite: 1 },
+      { round: 2, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+    ])
+    expect([total.input, total.output, total.cacheRead, total.cacheWrite]).toEqual([11, 6, 100, 1])
   })
 })

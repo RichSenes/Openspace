@@ -1,4 +1,4 @@
-import type { TaskStatus, WorkTaskView } from '../api/types'
+import type { RoundUsageView, TaskNoteView, TaskStatus, WorkTaskView } from '../api/types'
 
 export interface Column {
   status: TaskStatus
@@ -54,15 +54,50 @@ export function filterByEpic(tasks: WorkTaskView[], filter: EpicFilter): WorkTas
   return tasks.filter((t) => t.epicId === filter)
 }
 
-export type ReviewVerdict = 'ok' | 'changes'
+/** Time of an ISO date from the API, whatever its fraction of a second. */
+export const timeOf = (iso: string) => Date.parse(iso.replace(/(\.\d{3})\d+/, '$1'))
+
+/** Longest a review may take before Openspace stops saying one is under way. */
+export const REVIEW_PATIENCE_MS = 30 * 60_000
+
+export type ReviewVerdict = 'ok' | 'changes' | 'reviewing'
 
 /**
- * What the reviewer said about the work as it is now: its latest note, as long as the work
- * has not been sent back since. Undefined when nobody reviewed it.
+ * What the reviewer said about the work as it is now: its note written since the work last
+ * reached review. Older notes are about work since sent back. While none has come yet and
+ * a reviewer is on, the review is under way, unless it failed or takes far too long.
  */
-export function reviewVerdictOf(task: WorkTaskView): ReviewVerdict | undefined {
+export function reviewVerdictOf(task: WorkTaskView, reviewerOn = false, now = Date.now()): ReviewVerdict | undefined {
   if (task.status !== 'Review') return undefined
-  const latest = [...task.notes].reverse().find((n) => n.authorKind === 'Reviewer')
-  if (!latest) return undefined
-  return latest.text.startsWith('OK') ? 'ok' : 'changes'
+  const since = timeOf(task.statusChangedAt)
+  const latest = currentReview(task)
+  if (latest) return latest.text.startsWith('OK') ? 'ok' : 'changes'
+  const failed = task.notes.some((n) => n.authorKind === 'System' && timeOf(n.writtenAt) >= since && n.text.startsWith('The review by Claude could not run'))
+  return reviewerOn && !failed && now - since < REVIEW_PATIENCE_MS ? 'reviewing' : undefined
+}
+
+/** The reviewer's note about the work as it is now, if it came. */
+export function currentReview(task: WorkTaskView): TaskNoteView | undefined {
+  const since = timeOf(task.statusChangedAt)
+  return [...task.notes].reverse().find((n) => n.authorKind === 'Reviewer' && timeOf(n.writtenAt) >= since)
+}
+
+/** How many checks a person tried by hand, out of those listed. */
+export function checksDone(task: WorkTaskView): { done: number; total: number } {
+  return { done: task.manualChecks.filter((c) => c.checkedAt).length, total: task.manualChecks.length }
+}
+
+/** Token counts in a few characters: 950, 12.4k, 1.3M. */
+export function compactTokens(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, '')}k`
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+}
+
+/** Everything a task's rounds spent. */
+export function totalTokens(usage: RoundUsageView[]): RoundUsageView {
+  return usage.reduce(
+    (sum, r) => ({ ...sum, input: sum.input + r.input, output: sum.output + r.output, cacheRead: sum.cacheRead + r.cacheRead, cacheWrite: sum.cacheWrite + r.cacheWrite }),
+    { round: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  )
 }

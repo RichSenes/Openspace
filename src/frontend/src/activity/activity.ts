@@ -19,6 +19,8 @@ export interface WaitingDesk {
   officeName: string
   deskName: string
   request: string
+  /** Exactly what is asked, such as the command. */
+  detail: string | null
 }
 
 /** Every desk, in any office, blocked until a person answers. */
@@ -33,5 +35,6 @@ export function waitingDesks(list: DeskActivity[] | undefined, offices: OfficeVi
       officeName: desks.get(a.deskId)?.officeName ?? 'An office',
       deskName: desks.get(a.deskId)?.deskName ?? 'A desk',
       request: a.headline,
+      detail: a.detail ?? null,
     }))
 }

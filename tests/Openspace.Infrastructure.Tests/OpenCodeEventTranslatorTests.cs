@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Openspace.Application.Agents;
 using Openspace.Domain.Work;
 using Openspace.Infrastructure.OpenCode;
 
@@ -43,7 +44,7 @@ public class OpenCodeEventTranslatorTests
     [InlineData("edit", """{"filePath":"/srv/worktrees/abc/theme/header.php"}""", null, "Editing header.php")]
     [InlineData("read", """{"filePath":"/srv/worktrees/abc/index.html"}""", null, "Reading index.html")]
     [InlineData("write", """{"filePath":"/srv/worktrees/abc/new.css"}""", null, "Writing new.css")]
-    [InlineData("bash", """{"command":"npm test"}""", "npm test", "Running npm test")]
+    [InlineData("bash", """{"command":"npm test"}""", "npm test", "Running the tests")]
     [InlineData("grep", """{"pattern":"logout"}""", null, "Searching the code")]
     [InlineData("mystery", "{}", null, "Using mystery")]
     public void A_running_tool_becomes_a_short_phrase(string tool, string input, string? title, string expected)
@@ -62,13 +63,24 @@ public class OpenCodeEventTranslatorTests
     }
 
     [Fact]
-    public void Long_phrases_are_cut_to_fit_a_bubble()
+    public void A_command_nothing_recognises_still_reads_as_a_sentence()
     {
         var command = new string('x', 200);
         var signal = (AgentSignal.Progress?)Translate(Tool("bash", "running", "{\"command\":\"" + command + "\"}"));
 
-        Assert.Equal(80, signal?.Doing?.Length);
-        Assert.EndsWith("…", signal?.Doing, StringComparison.Ordinal);
+        Assert.Equal("Running a command", signal?.Doing);
+    }
+
+    [Fact]
+    public void A_finished_answer_reports_its_tokens_once_complete()
+    {
+        const string Answer = """{"type":"message.updated","properties":{"info":{"id":"msg_1","sessionID":"ses_1","role":"assistant","time":{"created":1,COMPLETED},"tokens":{"input":900,"output":120,"reasoning":30,"cache":{"read":4000,"write":250}}}}}""";
+
+        Assert.Null(Translate(Answer.Replace("COMPLETED", "\"x\":0", StringComparison.Ordinal)));
+        Assert.Equal(
+            new AgentSignal.Used("ses_1", new TokenCount(900, 150, 4000, 250), "msg_1"),
+            Translate(Answer.Replace("COMPLETED", "\"completed\":2", StringComparison.Ordinal)));
+        Assert.Null(Translate("""{"type":"message.updated","properties":{"info":{"id":"msg_0","sessionID":"ses_1","role":"user","time":{"created":1,"completed":2},"tokens":{}}}}"""));
     }
 
     [Fact]
@@ -94,7 +106,7 @@ public class OpenCodeEventTranslatorTests
             {"type":"permission.asked","properties":{"id":"per_1","sessionID":"ses_1","permission":"bash","patterns":["rm -rf build"],"metadata":{},"always":[]}}
             """);
 
-        Assert.Equal(new AgentSignal.PermissionAsked("ses_1", "per_1", "run rm -rf build"), signal);
+        Assert.Equal(new AgentSignal.PermissionAsked("ses_1", "per_1", new AgentAction(ActionKind.Run, "rm -rf build")), signal);
     }
 
     [Fact]
@@ -123,7 +135,7 @@ public class OpenCodeEventTranslatorTests
         var signal = (AgentSignal.ToolFinished?)Translate(Done("bash", "completed", """{"command":"npm test"}""",
             ""","title":"npm test","output":"1 failing","metadata":{"exit":1}"""));
 
-        Assert.Equal((AuditKind.Command, "Ran npm test", "$ npm test\n1 failing", false),
+        Assert.Equal((AuditKind.Command, "Ran the tests", "$ npm test\n1 failing", false),
             (signal?.Kind, signal?.Summary, signal?.Detail, signal?.Succeeded));
     }
 
@@ -162,16 +174,16 @@ public class OpenCodeEventTranslatorTests
     }
 
     [Theory]
-    [InlineData("edit", "header.php", "edit header.php")]
-    [InlineData("external_directory", "/srv/other", "go outside its folder: /srv/other")]
-    [InlineData("webfetch", "https://example.org", "fetch https://example.org")]
-    [InlineData("question", "", "use question")]
-    public void Permission_requests_read_as_plain_verbs(string permission, string pattern, string expected)
+    [InlineData("edit", "header.php", ActionKind.Edit, "header.php")]
+    [InlineData("external_directory", "/srv/other", ActionKind.OutsideFolder, "/srv/other")]
+    [InlineData("webfetch", "https://example.org", ActionKind.Fetch, "https://example.org")]
+    [InlineData("question", "", ActionKind.Other, "question")]
+    public void Permission_requests_say_what_kind_of_action_they_are(string permission, string pattern, ActionKind kind, string target)
     {
         var patterns = pattern.Length > 0 ? "[\"" + pattern + "\"]" : "[]";
         var signal = (AgentSignal.PermissionAsked?)Translate(
             "{\"type\":\"permission.asked\",\"properties\":{\"id\":\"per_1\",\"sessionID\":\"ses_1\",\"permission\":\"" + permission + "\",\"patterns\":" + patterns + ",\"metadata\":{},\"always\":[]}}");
 
-        Assert.Equal(expected, signal?.Description);
+        Assert.Equal(new AgentAction(kind, target), signal?.Action);
     }
 }

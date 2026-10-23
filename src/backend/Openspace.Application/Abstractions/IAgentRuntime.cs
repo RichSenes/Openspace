@@ -48,5 +48,5 @@ public interface IAgentRuntime
         string permissionId, string workspacePath, bool allow, CancellationToken cancellationToken);
 }
 
-/// <param name="Description">What is asked, e.g. "bash ls -la".</param>
-public sealed record PermissionRequest(string Id, string SessionId, string Description);
+/// <param name="Action">What is asked, e.g. to run "ls -la".</param>
+public sealed record PermissionRequest(string Id, string SessionId, Agents.AgentAction Action);

@@ -327,6 +327,54 @@ internal sealed partial class ClaudeCodeRuntime(
         return Answer(output, jsonSchema is not null);
     }
 
+    /// <summary>
+    /// Reads how much of the account's limits is used, with the smallest question there is
+    /// to the smallest model: Claude Code reports the limits with every answer. Null when
+    /// Claude Code is not there or said nothing about them.
+    /// </summary>
+    public async Task<ClaudeUsageView?> CheckUsageAsync(CancellationToken cancellationToken)
+    {
+        if (!await IsAvailableAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        string[] args =
+        [
+            "-p", "--output-format", "stream-json", "--verbose", "--restricted", "--permission-prompts", "none",
+            "--strict-mcp-config", "--no-session-persistence", "--tools", string.Empty, "--model", "haiku",
+        ];
+        using var process = Start(Path.GetTempPath(), args, "Reply with the single word OK.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(2));
+        var seen = usage.Latest;
+        try
+        {
+            var errors = process.StandardError.ReadToEndAsync(timeout.Token);
+            while (await process.StandardOutput.ReadLineAsync(timeout.Token).ConfigureAwait(false) is { } line)
+            {
+                try
+                {
+                    new ClaudeCodeEvents("usage").Read(line, usage);
+                }
+                catch (JsonException ex)
+                {
+                    LogUnreadable(logger, ex.Message);
+                }
+            }
+
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            _ = await errors.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Kill(process);
+            throw;
+        }
+
+        return ReferenceEquals(usage.Latest, seen) ? null : usage.Latest;
+    }
+
     /// <summary>The answer in Claude Code's JSON output: the structured one when a schema was given.</summary>
     internal static string Answer(string output, bool structured)
     {

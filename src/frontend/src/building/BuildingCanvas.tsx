@@ -12,6 +12,7 @@ import { STATION, themeColors } from '../art/station'
 import { themeOf, type Theme } from '../art/themes'
 import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import { agentStateOf, lookOf } from './agents'
+import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
   arrangementOf,
   boundsOf,
@@ -60,6 +61,15 @@ interface Props {
   controls?: ReactNode
   /** Present while the person arranges rooms: things can then be picked up and moved. */
   arrange?: ArrangeControls
+  /** A click on an agent or its bubble, with where it happened on the canvas; null for a click elsewhere. */
+  onPickDesk?: (pick: DeskPick | null) => void
+}
+
+export interface DeskPick {
+  deskId: string
+  /** Canvas pixels: where to show what belongs to the desk. */
+  x: number
+  y: number
 }
 
 /** A room being arranged, or the building itself (BUILDING), and possibly the thing picked in it. */
@@ -86,16 +96,18 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange }: Props) {
+export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange, onPickDesk }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
   const fitAll = useRef<() => void>(() => {})
   const arrangeRef = useRef(arrange)
+  const pickRef = useRef(onPickDesk)
 
   // Refreshed after every render so the canvas callbacks always see the latest props.
   useEffect(() => {
     arrangeRef.current = arrange
+    pickRef.current = onPickDesk
     draw.current = () => {
       const app = appRef.current
       if (!app) return
@@ -156,7 +168,7 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
         view.auto = true
         if (view.layout) flyTo(view, fit(worldRect(view.layout), app.screen))
       }
-      listeners.push(...attachNavigation(app, () => arrangeRef.current))
+      listeners.push(...attachNavigation(app, () => arrangeRef.current, (pick) => pickRef.current?.(pick)))
       draw.current()
       // The art moves at its own pace; people who prefer less motion get still rooms.
       if (!reducedMotion()) {
@@ -188,7 +200,7 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
         <span className="hint">
           {arrange
             ? 'Drag desks, furniture, doors and windows · drag a back wall to move its room · arrows nudge · Delete removes'
-            : 'Scroll to zoom · drag to move · double-click a room'}
+            : 'Scroll to zoom · drag to move · double-click a room · click an agent'}
         </span>
         <button type="button" className="btn" onClick={() => fitAll.current()}>
           <Maximize size={16} /> Fit
@@ -216,6 +228,8 @@ interface View {
   names?: Map<string, Text>
   /** The outline of what is selected while arranging. */
   selection?: Graphics
+  /** Where the speech bubbles were placed, in world pixels: they can be clicked. */
+  bubbles?: PlacedBubble[]
   /** Frames of pixel art shown so far. */
   tick: number
   animation?: number
@@ -273,7 +287,11 @@ type Grip =
  * Wheel to zoom at the cursor, left-drag to pan, double-click to fly into a room. While
  * arranging, a press picks up what is under it instead. Returns the cleanups.
  */
-function attachNavigation(app: Application, arrange: () => ArrangeControls | undefined): (() => void)[] {
+function attachNavigation(
+  app: Application,
+  arrange: () => ArrangeControls | undefined,
+  pickDesk: (pick: DeskPick | null) => void,
+): (() => void)[] {
   const canvas = app.canvas
   const view = viewOf(app)
   const point = (e: MouseEvent) => {
@@ -293,6 +311,16 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
       (r) => world.x >= r.x * TILE && world.x < (r.x + r.width) * TILE && world.y >= r.y * TILE && world.y < (r.y + r.height) * TILE,
     )
   const inFloor = (world: { x: number; y: number }) => !!view.layout && inBuilding(view.layout, Math.floor(world.x / TILE), Math.floor(world.y / TILE))
+  /** The agent, or its bubble, under a point of the world. */
+  const deskAt = (world: { x: number; y: number }) => {
+    const bubble = [...(view.bubbles ?? [])].reverse().find(
+      (b) => world.x >= b.left && world.x < b.left + b.width && world.y >= b.top && world.y < b.top + b.height,
+    )
+    if (bubble) return bubble.deskId
+    return view.layout?.rooms
+      .flatMap((r) => r.desks)
+      .find((d) => world.x >= d.x && world.x < d.x + STATION.width && world.y >= d.y && world.y < d.y + STATION.height)?.id
+  }
   const cutAt = (world: { x: number; y: number }) =>
     view.layout?.cuts.findIndex((c) => world.x >= c.x * TILE && world.x < (c.x + c.width) * TILE && world.y >= c.y * TILE && world.y < (c.y + c.height) * TILE) ?? -1
 
@@ -382,6 +410,8 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
       if (arrange()) {
         const hover = gripAt(e)
         canvas.style.cursor = hover?.kind === 'stretch' ? EDGE_CURSORS[hover.edge] : hover ? 'move' : 'grab'
+      } else {
+        canvas.style.cursor = deskAt(toWorld(view.camera, point(e))) ? 'pointer' : 'grab'
       }
       return
     }
@@ -457,6 +487,11 @@ function attachNavigation(app: Application, arrange: () => ArrangeControls | und
       const world = toWorld(view.camera, point(e))
       const room = roomAt(world)
       controls.onSelect(room ? { roomId: room.id } : inFloor(world) ? { roomId: BUILDING } : null)
+    } else if (!controls && drag.moved < 4) {
+      // A click on an agent opens what belongs to it; anywhere else closes it.
+      const at = point(e)
+      const desk = deskAt(toWorld(view.camera, at))
+      pickDesk(desk ? { deskId: desk, ...at } : null)
     }
     drag = undefined
     grip = undefined
@@ -531,7 +566,16 @@ function drawBuilding(
   layout: BuildingLayout,
   scene: Scene,
   selected: Selection | null | undefined,
-): { world: Container; rooms: Map<string, RoomPainter>; hall: { paint: () => void }; walls: Graphics; names: Map<string, Text>; selection: Graphics; scene: Scene } {
+): {
+  world: Container
+  rooms: Map<string, RoomPainter>
+  hall: { paint: () => void }
+  walls: Graphics
+  names: Map<string, Text>
+  selection: Graphics
+  scene: Scene
+  bubbles: PlacedBubble[]
+} {
   const world = new Container()
   const labels = new Container()
   const bubbles = new Container()
@@ -548,6 +592,7 @@ function drawBuilding(
   sources.push(hall.source)
   world.addChild(walls, hall.sprite)
   const names = new Map<string, Text>()
+  const said: { text: Text; activity: DeskActivity; deskId: string; x: number; y: number }[] = []
 
   for (const room of layout.rooms) {
     labels.addChild(label(room.name, room.x * TILE + 6, room.y * TILE + 4, COLORS.label, 8))
@@ -557,15 +602,33 @@ function drawBuilding(
       labels.addChild(name)
       const activity = scene.activities.get(desk.id)
       // Bubbles would hide what is being arranged.
-      if (activity?.headline && selected === undefined) bubbles.addChild(bubble(activity, desk.x + STATION.width / 2, desk.y - 1))
+      if (activity?.headline && selected === undefined)
+        said.push({ text: bubbleWords(activity), activity, deskId: desk.id, x: desk.x + STATION.width / 2, y: desk.y - 1 })
     }
+  }
+
+  // Bubbles are measured first, then placed so that neighbours never cover each other.
+  const placed = placeBubbles(
+    said.map((s) => ({
+      deskId: s.deskId,
+      anchorX: s.x,
+      anchorY: s.y,
+      width: Math.min(BUBBLE_WIDTH, Math.ceil(s.text.width) + 8),
+      height: Math.ceil(s.text.height) + 6,
+      urgent: s.activity.kind === 'Waiting',
+    })),
+  )
+  // Waiting bubbles are drawn last, on top of everything else.
+  for (const spot of [...placed].reverse()) {
+    const s = said.find((x) => x.deskId === spot.deskId)!
+    bubbles.addChild(bubble(s.activity, s.text, spot))
   }
 
   const selection = new Graphics()
   outline(selection, layout, selected)
   // Names, then bubbles, go on top of every room, so they can spill over walls.
   world.addChild(labels, bubbles, selection)
-  return { world, rooms, hall: hall.painter, walls, names, selection, scene }
+  return { world, rooms, hall: hall.painter, walls, names, selection, scene, bubbles: placed }
 }
 
 /** Frames the room being arranged, or the building, and inside it the thing picked. */
@@ -781,31 +844,40 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   }
 }
 
-/** A speech bubble whose tail points at (x, y). */
-function bubble(activity: DeskActivity, x: number, y: number): Container {
-  const waiting = activity.kind === 'Waiting'
+/** The words of a bubble, wrapped to its width; a long word breaks rather than spill out. */
+function bubbleWords(activity: DeskActivity): Text {
   const text = new Text({
-    text: waiting ? `${activity.headline} · needs your OK` : activity.headline,
+    text: bubbleText(activity.headline),
     style: {
       fontFamily: 'IBM Plex Sans',
       fontSize: 7,
       lineHeight: 9,
       fill: COLORS.bubbleText,
       wordWrap: true,
+      breakWords: true,
       wordWrapWidth: BUBBLE_WIDTH - 8,
     },
   })
   text.resolution = 6
+  return text
+}
 
-  const width = Math.min(BUBBLE_WIDTH, Math.ceil(text.width) + 8)
-  const height = Math.ceil(text.height) + 6
-  const left = Math.round(x - width / 2)
-  const top = Math.round(y - 4 - height)
+/**
+ * A speech bubble placed above its desk, with a tail down to (anchorX, anchorY). A waiting
+ * agent's bubble is amber with a dark frame: told apart by its frame and its question too.
+ */
+function bubble(activity: DeskActivity, text: Text, spot: PlacedBubble): Container {
+  const waiting = activity.kind === 'Waiting'
   const fill = waiting ? COLORS.waiting : activity.kind === 'Stopped' ? COLORS.mute : COLORS.bubble
+  const { left, top, width, height, anchorX: x, anchorY: y } = spot
+  const bottom = top + height
 
   const shape = new Graphics()
   shape.roundRect(left, top, width, height, 3).fill(fill)
-  shape.poly([x - 3, top + height, x + 3, top + height, x, y]).fill(fill)
+  if (waiting) shape.roundRect(left, top, width, height, 3).stroke({ width: 1, color: COLORS.roomEdge })
+  // A tail that grows when the bubble had to climb above a neighbour's.
+  const tailX = Math.max(left + 4, Math.min(left + width - 4, x))
+  shape.poly([tailX - 3, bottom, tailX + 3, bottom, x, y]).fill(fill)
   text.position.set(left + 4, top + 3)
 
   const group = new Container()

@@ -150,6 +150,19 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_desk_look_survives_a_round_trip()
+    {
+        var (office, frontend, backend) = await FurnishECorpAsync();
+        var look = DeskLook.Create("medium", "brown", "short", "green", "headset", null, "skeleton");
+
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().DressDeskAsync(office, frontend, look, default));
+        var desks = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0].Desks;
+
+        Assert.Equal(look, desks.Single(d => d.Id == frontend.Value).Look);
+        Assert.Null(desks.Single(d => d.Id == backend.Value).Look);
+    }
+
+    [Fact]
     public async Task A_floor_plan_survives_a_round_trip()
     {
         var (office, frontend, _) = await FurnishECorpAsync();

@@ -182,4 +182,34 @@ public class OfficeTests
         Assert.Throws<DomainException>(() => office.RenameDesk(other.Id, "theme DEVELOPER", Now));
         office.RenameDesk(desk.Id, "Theme developer", Now);
     }
+
+    [Fact]
+    public void A_desk_can_be_dressed_by_hand_and_given_back_its_picked_look()
+    {
+        var (office, desk) = ECorpWithDesk();
+
+        office.DressDesk(desk.Id, DeskLook.Create("tan", "black", "bun", "red", "glasses", "hoodie"), Now);
+
+        Assert.Equal(("tan", "bun", "glasses", "hoodie", (string?)null), (desk.Look!.Skin, desk.Look.HairStyle, desk.Look.Accessory, desk.Look.Outfit, desk.Look.Costume));
+        Assert.IsType<DeskDressed>(office.DomainEvents[^1]);
+        office.DressDesk(desk.Id, null, Now);
+        Assert.Null(desk.Look);
+    }
+
+    [Theory]
+    [InlineData("", "black", "bun", "red", null)]
+    [InlineData("tan", "black", "bun", "red", "pointy hat")]
+    [InlineData("tan", "black", "bun", "<script>", null)]
+    public void A_look_is_made_of_single_words(string skin, string hair, string style, string cloth, string? accessory)
+    {
+        Assert.Throws<DomainException>(() => DeskLook.Create(skin, hair, style, cloth, accessory));
+    }
+
+    [Fact]
+    public void Blank_optional_parts_of_a_look_mean_none()
+    {
+        var look = DeskLook.Create("fair", "grey", "short", "blue", " ", "", null);
+
+        Assert.Equal(((string?)null, (string?)null), (look.Accessory, look.Outfit));
+    }
 }

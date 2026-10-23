@@ -107,8 +107,10 @@ Later, in rough order of appearance:
   of the building; dragged and stretched by any edge it makes an L, T or U at an
   edge, or a courtyard inside. Walls follow the outline, rooms and furniture stay
   out of the cuts, and windows facing one show the sky.
-- **Agents dressed by hand.** Outfits, costumes and accessories chosen per desk or
-  per role instead of derived from the desk id.
+- ~~**Agents dressed by hand.**~~ Done: "Look" beside each desk in Rooms, or "Change
+  look" on a desk in Arrange, picks skin, hair, clothes, outfit, accessory or a
+  costume with the agent shown typing as it will be; desks never dressed keep the
+  look picked from their id.
 - **The city.** A map of the town where each office is a building (a house, a
   tower, a warehouse) among roads with moving cars, random decorations and light
   that follows the time of day. Clicking a building zooms into it and fades to

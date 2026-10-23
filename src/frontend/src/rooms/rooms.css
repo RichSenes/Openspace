@@ -134,6 +134,15 @@
   gap: 8px;
 }
 
+.desk-line > span {
+  flex: 1;
+}
+
+.desk-line > .btn {
+  min-height: 26px;
+  padding: 0 8px;
+}
+
 .desk-role select {
   min-height: 30px;
   padding: 4px 8px;

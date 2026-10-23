@@ -64,8 +64,9 @@ public sealed record RoomView(
 }
 
 /// <param name="Spot">Where the desk stands in its room; null when it is placed automatically.</param>
-public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot)
+/// <param name="Look">How its agent looks, chosen by hand; null when picked from the desk's id.</param>
+public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot, DeskLook? Look)
 {
     public static DeskView From(Desk desk) =>
-        new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot);
+        new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot, desk.Look);
 }

@@ -21,6 +21,8 @@ public sealed record OfficeRepositorySet(OfficeId OfficeId, string Path, DateTim
 
 public sealed record DeskRoleChanged(OfficeId OfficeId, DeskId DeskId, RoleId? RoleId, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record DeskDressed(OfficeId OfficeId, DeskId DeskId, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record DeskRenamed(OfficeId OfficeId, DeskId DeskId, string Name, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record RoomProcedureSet(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;

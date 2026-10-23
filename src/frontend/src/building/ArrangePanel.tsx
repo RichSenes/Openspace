@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, Minus, Plus, Rows3, Scissors, Trash2 } from 'lucide-react'
+import { AppWindow, Minus, Plus, Rows3, Scissors, Shirt, Trash2 } from 'lucide-react'
 import { useSaveFloorPlan } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { toCanvas } from '../art/canvas'
@@ -39,6 +39,7 @@ import {
 } from './arrange'
 import type { Selection } from './BuildingCanvas'
 import { DOOR } from './layout'
+import { LookDialog } from './LookDialog'
 
 /** As many cuts as the API takes. */
 const MAX_CUTS = 12
@@ -93,6 +94,7 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
   const savePlan = useSaveFloorPlan(office.id)
   const toast = useToast()
   const [error, setError] = useState<string>()
+  const [dressing, setDressing] = useState<string>()
 
   const building = selection?.roomId === BUILDING
   const room = building ? undefined : office.rooms.find((r) => r.id === selection?.roomId)
@@ -124,7 +126,7 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!selection || !target) return
-      if (e.target instanceof HTMLElement && e.target.closest('input, select, textarea')) return
+      if (e.target instanceof HTMLElement && e.target.closest('input, select, textarea, dialog')) return
       const step = e.shiftKey ? 8 : 1
       const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
       const move = moves[e.key]
@@ -201,6 +203,11 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
               <button type="button" className="btn" onClick={remove}>
                 <Trash2 size={16} />{' '}
                 {target.kind === 'cut' ? 'Fill the cut back in' : `Remove ${target.kind === 'window' ? 'window' : furnitureLabel(pieceName ?? '').toLowerCase()}`}
+              </button>
+            )}
+            {target?.kind === 'desk' && (
+              <button type="button" className="btn" onClick={() => setDressing(target.id)}>
+                <Shirt size={16} /> Change look
               </button>
             )}
           </header>
@@ -283,6 +290,12 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
         </>
       )}
 
+      <LookDialog
+        officeId={office.id}
+        theme={office.theme}
+        desk={saved.rooms.flatMap((r) => r.desks).find((d) => d.id === dressing)}
+        onClose={() => setDressing(undefined)}
+      />
       {error && (
         <p className="error" role="alert">
           {error}

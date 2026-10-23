@@ -82,6 +82,16 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                     spot.Property(s => s.X).HasColumnName("SpotX");
                     spot.Property(s => s.Y).HasColumnName("SpotY");
                 });
+                desk.OwnsOne(d => d.Look, look =>
+                {
+                    look.Property(l => l.Skin).HasColumnName("LookSkin").IsRequired();
+                    look.Property(l => l.Hair).HasColumnName("LookHair").IsRequired();
+                    look.Property(l => l.HairStyle).HasColumnName("LookHairStyle").IsRequired();
+                    look.Property(l => l.Cloth).HasColumnName("LookCloth").IsRequired();
+                    look.Property(l => l.Accessory).HasColumnName("LookAccessory");
+                    look.Property(l => l.Outfit).HasColumnName("LookOutfit");
+                    look.Property(l => l.Costume).HasColumnName("LookCostume");
+                });
             });
 
             room.Navigation(r => r.Desks).UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
 import type {
+  DeskLook,
   AuditEntryView,
   BranchList,
   DeskActivity,
@@ -251,6 +252,17 @@ export function useApproveEpic() {
   return useWrite(
     (epicId: string) => request<{ approved: number }>('POST', `/api/epics/${epicId}/approve`, {}),
     keys.tasks,
+  )
+}
+
+/** Dresses a desk's agent; null gives it back the look picked from its id. */
+export function useDressDesk(officeId: string) {
+  return useWrite(
+    (input: { deskId: string; look: DeskLook | null }) =>
+      input.look
+        ? request<void>('PUT', `/api/offices/${officeId}/desks/${input.deskId}/look`, input.look)
+        : request<void>('DELETE', `/api/offices/${officeId}/desks/${input.deskId}/look`),
+    keys.offices,
   )
 }
 

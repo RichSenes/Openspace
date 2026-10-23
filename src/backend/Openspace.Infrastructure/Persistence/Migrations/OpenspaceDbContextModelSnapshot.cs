@@ -241,6 +241,37 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Openspace.Domain.Offices.Office", b =>
                 {
+                    b.OwnsMany("Openspace.Domain.Offices.FloorCut", "Cuts", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("Height")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("Left")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<Guid>("OfficeId")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<int>("Top")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("Width")
+                                .HasColumnType("INTEGER");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("OfficeId");
+
+                            b1.ToTable("FloorCuts", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("OfficeId");
+                        });
+
                     b.OwnsMany("Openspace.Domain.Offices.FurniturePiece", "Furniture", b1 =>
                         {
                             b1.Property<int>("Id")
@@ -445,6 +476,8 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
                             b1.Navigation("Furniture");
                         });
+
+                    b.Navigation("Cuts");
 
                     b.Navigation("Furniture");
 

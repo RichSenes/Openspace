@@ -155,13 +155,14 @@ public sealed class PersistenceTests : IAsyncLifetime
         var (office, frontend, _) = await FurnishECorpAsync();
         var room = new RoomId((await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0].Id);
         var layout = RoomLayout.Create(10, 5, new Dictionary<DeskId, Spot> { [frontend] = new(20, 24) }, [], new DoorPlacement(Wall.Left, 2), [16, 80]);
-        var plan = FloorPlan.Create(24, 14, [new("vendingMachine", 300, 150), new("plant", 20, 200)], [new PlannedRoom(room, 3, 1, layout)]);
+        var plan = FloorPlan.Create(24, 14, [new("vendingMachine", 300, 150), new("plant", 20, 200)], [new PlannedRoom(room, 3, 1, layout)], [new FloorCut(16, 0, 8, 6)]);
 
         await InScope(sp => sp.GetRequiredService<OfficeCommands>().PlanFloorAsync(office, plan, default));
         var view = await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default));
 
         Assert.Equal((24, 14), (view.FloorWidth, view.FloorDepth));
         Assert.Equal(["plant", "vendingMachine"], view.Furniture.Select(f => f.Name).Order());
+        Assert.Equal(new FloorCut(16, 0, 8, 6), Assert.Single(view.Cuts));
         var planned = Assert.Single(view.Rooms);
         Assert.Equal((3, 1, 10, 5), (planned.Left, planned.Top, planned.Width, planned.Depth));
         Assert.Equal(new DoorPlacement(Wall.Left, 2), planned.Door);
@@ -171,6 +172,7 @@ public sealed class PersistenceTests : IAsyncLifetime
         var cleared = await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default));
         Assert.Equal(((int?)null, (int?)null, (DoorPlacement?)null), (cleared.FloorWidth, cleared.Rooms[0].Left, cleared.Rooms[0].Door));
         Assert.Empty(cleared.Furniture);
+        Assert.Empty(cleared.Cuts);
     }
 
     [Fact]

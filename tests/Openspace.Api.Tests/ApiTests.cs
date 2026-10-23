@@ -123,7 +123,9 @@ public sealed class ApiTests : IDisposable
 
     private sealed record PlannedRoom(int? Left, int? Top, Door? Door, List<int> Windows);
 
-    private sealed record PlannedOffice(int? FloorWidth, int? FloorDepth, List<Piece> Furniture, List<PlannedRoom> Rooms);
+    private sealed record Cut(int Left, int Top, int Width, int Height);
+
+    private sealed record PlannedOffice(int? FloorWidth, int? FloorDepth, List<Piece> Furniture, List<PlannedRoom> Rooms, List<Cut> Cuts);
 
     [Fact]
     public async Task An_office_floor_can_be_drawn_by_hand_and_given_back()
@@ -135,6 +137,7 @@ public sealed class ApiTests : IDisposable
             width = 20,
             depth = 12,
             furniture = new[] { new { name = "waterCooler", x = 200, y = 150 } },
+            cuts = new[] { new { left = 14, top = 6, width = 6, height = 6 } },
             rooms = new[]
             {
                 new
@@ -159,8 +162,10 @@ public sealed class ApiTests : IDisposable
         var room = Assert.Single(planned.Rooms);
         Assert.Equal((2, 1, new Door("Back", 3)), (room.Left, room.Top, room.Door));
         Assert.Equal([16], room.Windows);
+        Assert.Equal(new Cut(14, 6, 6, 6), Assert.Single(planned.Cuts));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, outside.StatusCode);
         Assert.Equal(((int?)null, (int?)null), (cleared.FloorWidth, Assert.Single(cleared.Rooms).Left));
+        Assert.Empty(cleared.Cuts);
     }
 
     [Fact]

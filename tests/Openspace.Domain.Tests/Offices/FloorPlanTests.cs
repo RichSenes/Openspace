@@ -105,4 +105,47 @@ public class FloorPlanTests
         Assert.Throws<DomainException>(() => Room(8, 4, null, 128));
         Assert.Throws<DomainException>(() => Room(8, 4, null, [.. Enumerable.Repeat(0, RoomLayout.MaxWindows + 1)]));
     }
+
+    [Fact]
+    public void Cuts_give_the_building_its_shape_and_go_with_the_plan()
+    {
+        var (office, web, _) = Allsafe();
+
+        // An L: the top right quarter of a 20 by 12 building is cut away.
+        office.PlanFloor(FloorPlan.Create(20, 12, [], [new PlannedRoom(web.Id, 0, 0, Room())], [new FloorCut(10, 0, 10, 6)]), Now);
+        Assert.Equal(new FloorCut(10, 0, 10, 6), Assert.Single(office.Cuts));
+
+        office.ClearFloorPlan(Now);
+        Assert.Empty(office.Cuts);
+    }
+
+    [Fact]
+    public void Nothing_stands_where_the_building_is_cut_away()
+    {
+        var (_, web, _) = Allsafe();
+        FloorCut[] courtyard = [new(8, 4, 4, 4)];
+
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [new PlannedRoom(web.Id, 6, 4, Room())], courtyard));
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [new("plant", 9 * 16, 5 * 16)], [], courtyard));
+        FloorPlan.Create(20, 12, [new("plant", 13 * 16, 5 * 16)], [new PlannedRoom(web.Id, 0, 0, Room())], courtyard);
+    }
+
+    [Fact]
+    public void Cuts_stay_inside_the_building_apart_from_each_other_and_leave_some_of_it()
+    {
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [], [new FloorCut(15, 0, 6, 4)]));
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [], [new FloorCut(0, 0, 0, 4)]));
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [], [new FloorCut(0, 0, 6, 4), new FloorCut(5, 3, 4, 4)]));
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [], [new FloorCut(0, 0, 20, 12)]));
+        Assert.Throws<DomainException>(() => FloorPlan.Create(20, 12, [], [], [.. Enumerable.Range(0, FloorPlan.MaxCuts + 1).Select(i => new FloorCut(i, 0, 1, 1))]));
+    }
+
+    [Fact]
+    public void A_room_cannot_grow_into_a_cut()
+    {
+        var (office, web, _) = Allsafe();
+        office.PlanFloor(FloorPlan.Create(20, 12, [], [new PlannedRoom(web.Id, 0, 0, Room())], [new FloorCut(10, 0, 10, 6)]), Now);
+
+        Assert.Throws<DomainException>(() => office.ArrangeRoom(web.Id, Room(12), Now));
+    }
 }

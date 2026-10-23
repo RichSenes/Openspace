@@ -44,7 +44,7 @@ internal static class OfficeEndpoints
 
     public sealed record PlannedRoomRequest(Guid RoomId, int Left, int Top, LayoutRequest Layout);
 
-    public sealed record FloorPlanRequest(int Width, int Depth, IReadOnlyList<FurniturePiece>? Furniture, IReadOnlyList<PlannedRoomRequest>? Rooms);
+    public sealed record FloorPlanRequest(int Width, int Depth, IReadOnlyList<FurniturePiece>? Furniture, IReadOnlyList<PlannedRoomRequest>? Rooms, IReadOnlyList<FloorCut>? Cuts = null);
 
     public sealed record DeskSpotRequest(Guid DeskId, int X, int Y);
 
@@ -107,7 +107,8 @@ internal static class OfficeEndpoints
                 request.Width,
                 request.Depth,
                 request.Furniture ?? [],
-                (request.Rooms ?? []).Select(r => new PlannedRoom(new RoomId(r.RoomId), r.Left, r.Top, r.Layout.ToLayout())));
+                (request.Rooms ?? []).Select(r => new PlannedRoom(new RoomId(r.RoomId), r.Left, r.Top, r.Layout.ToLayout())),
+                request.Cuts);
             await commands.PlanFloorAsync(new OfficeId(officeId), plan, ct);
             return Results.NoContent();
         });

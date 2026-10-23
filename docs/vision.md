@@ -86,6 +86,14 @@ In scope:
 
 Later, in rough order of appearance:
 
+- ~~**Claude Code.**~~ Done: desks choose their engine, OpenCode with any of its
+  models (picked from the list OpenCode gives) or Claude Code with the person's
+  own account. Claude Code plans, drafts and reviews finished work with a note
+  before a person does; the Agents page shows how much of the account is used.
+- **Local models and routines.** Small models running on this machine (through
+  Ollama or similar, wired into OpenCode) for simple recurring jobs such as sorting
+  email, on a schedule, outside the office and its repositories.
+
 - **Notification sounds.** A sound when an agent needs you, when work reaches
   review, when a task fails, and other moments worth hearing. Customisable per
   kind of event, per room or per single desk, with sensible defaults and a quick

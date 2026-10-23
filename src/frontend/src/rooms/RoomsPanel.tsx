@@ -4,6 +4,8 @@ import { ApiError } from '../api/client'
 import {
   INITIALIZABLE,
   useAddDesk,
+  useChangeDeskAgent,
+  useEngines,
   useOpenRoom,
   useRenameDesk,
   useRoles,
@@ -14,6 +16,9 @@ import {
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
+import { EngineFields } from '../engines/EngineFields'
+import { ENGINE_LABEL, type EngineChoice } from '../engines/engines'
+import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { formatSteps, parseSteps } from './procedure'
 import './rooms.css'
@@ -121,7 +126,9 @@ function RepositoryForm({ office }: { office: OfficeView }) {
 
 function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; room: RoomView }) {
   const [context, setContext] = useState(room.context)
-  const [desk, setDesk] = useState({ name: '', agentName: 'build', model: '', roleId: '' })
+  const fresh = { name: '', agentName: 'build', model: '', roleId: '', engine: 'OpenCode' as const }
+  const [desk, setDesk] = useState<{ name: string; roleId: string } & EngineChoice>(fresh)
+  const engines = useEngines()
   const updateContext = useUpdateRoomContext(officeId)
   const addDesk = useAddDesk(officeId)
   const roles = useRoles()
@@ -135,11 +142,11 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
   const submitDesk = (e: FormEvent) => {
     e.preventDefault()
     addDesk.mutate(
-      { roomId: room.id, name: desk.name, agentName: desk.agentName, model: desk.model.trim() || null, roleId: desk.roleId || null },
+      { roomId: room.id, name: desk.name, agentName: desk.agentName, model: desk.model.trim() || null, roleId: desk.roleId || null, engine: desk.engine },
       {
         onSuccess: () => {
           toast(`${desk.name.trim()} added to ${room.name}`)
-          setDesk({ name: '', agentName: 'build', model: '', roleId: '' })
+          setDesk(fresh)
         },
       },
     )
@@ -203,27 +210,7 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
               ))}
             </select>
           </label>
-          <details className="advanced">
-            <summary className="hint">Advanced: OpenCode engine and model</summary>
-            <label className="field">
-              <span>OpenCode agent that runs the desk (build works, plan only reads)</span>
-              <input
-                className="input mono"
-                value={desk.agentName}
-                onChange={(e) => setDesk({ ...desk, agentName: e.target.value })}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Model (optional, wins over the role&apos;s)</span>
-              <input
-                className="input mono"
-                value={desk.model}
-                onChange={(e) => setDesk({ ...desk, model: e.target.value })}
-                placeholder="provider/model"
-              />
-            </label>
-          </details>
+          <EngineFields value={desk} onChange={(choice) => setDesk({ ...desk, ...choice })} engines={engines.data} />
           <div className="row">
             <button type="submit" className="btn" disabled={addDesk.isPending}>
               <Plus size={16} /> Add desk
@@ -239,6 +226,7 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
 function DeskItem({ officeId, theme, desk, roles }: { officeId: string; theme: string; desk: DeskView; roles: RoleView[] }) {
   const [renaming, setRenaming] = useState(false)
   const [dressing, setDressing] = useState(false)
+  const [rewiring, setRewiring] = useState(false)
   const [name, setName] = useState(desk.name)
   const rename = useRenameDesk(officeId)
   const setRole = useSetDeskRole(officeId)
@@ -283,8 +271,12 @@ function DeskItem({ officeId, theme, desk, roles }: { officeId: string; theme: s
         </div>
       )}
       <span className="hint">
-        {role ? role.name : 'No role'} · engine <span className="mono">{desk.agentName}</span>
-        {desk.model && <span className="mono"> · {desk.model}</span>}
+        {role ? role.name : 'No role'} · {ENGINE_LABEL[desk.engine ?? 'OpenCode']}
+        {(desk.engine ?? 'OpenCode') === 'OpenCode' && desk.agentName !== 'build' && <span className="mono"> · {desk.agentName}</span>}
+        {desk.model && <span className="mono"> · {desk.model}</span>}{' '}
+        <button type="button" className="btn btn-quiet desk-engine-btn" onClick={() => setRewiring(true)} aria-label={`Engine of ${desk.name}`}>
+          Change
+        </button>
       </span>
       <label className="desk-role">
         <span className="sr-only">Role of {desk.name}</span>
@@ -309,7 +301,46 @@ function DeskItem({ officeId, theme, desk, roles }: { officeId: string; theme: s
       </label>
       {(rename.error ?? setRole.error) && <p className="error">{(rename.error ?? setRole.error)!.message}</p>}
       <LookDialog officeId={officeId} theme={theme} desk={dressing ? desk : undefined} onClose={() => setDressing(false)} />
+      <Dialog title={`What runs ${desk.name}`} open={rewiring} onClose={() => setRewiring(false)}>
+        <EngineForm officeId={officeId} desk={desk} onDone={() => setRewiring(false)} />
+      </Dialog>
     </li>
+  )
+}
+
+/** Engine, model and agent of a desk, changed from its next task on. */
+function EngineForm({ officeId, desk, onDone }: { officeId: string; desk: DeskView; onDone: () => void }) {
+  const [choice, setChoice] = useState<EngineChoice>({ engine: desk.engine ?? 'OpenCode', agentName: desk.agentName, model: desk.model ?? '' })
+  const engines = useEngines()
+  const change = useChangeDeskAgent(officeId)
+  const toast = useToast()
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    change.mutate(
+      { deskId: desk.id, engine: choice.engine, agentName: choice.agentName, model: choice.model || null },
+      {
+        onSuccess: () => {
+          toast(`${desk.name} now runs on ${ENGINE_LABEL[choice.engine]}, from its next task`)
+          onDone()
+        },
+      },
+    )
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <EngineFields value={choice} onChange={setChoice} engines={engines.data} />
+      {change.error && <p className="error">{change.error.message}</p>}
+      <div className="row">
+        <button type="button" className="btn" onClick={onDone}>
+          Cancel
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={change.isPending}>
+          Save
+        </button>
+      </div>
+    </form>
   )
 }
 

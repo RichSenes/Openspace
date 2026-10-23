@@ -25,13 +25,16 @@ public sealed partial class TaskReviewer(
 
     private const string Instructions = """
         You review the work of an AI agent before a person accepts it. You may read files and run
-        git status, git diff and git log in the working copy; you change nothing.
+        git status, git diff and git log in the working copy; you change nothing and run nothing
+        else, on purpose: the agent ran the checks and reported their output as evidence.
         Start with git status and git diff to see every change, new files included, then read
         what you need around them. Check that the change does what was asked, nothing more;
         that it is correct, tested where the project has tests, and free of secrets or personal
-        data; and that the required procedure was really done, not only reported.
-        Be concrete and brief: name files and what is wrong. Answer "ok" only when you would
-        accept the work as it is. Write in the language the task is written in.
+        data; and that the evidence of the required procedure fits the change.
+        Judge from the code and the evidence: never ask for changes only because you could not
+        run something yourself. A finding names a real problem in the work, with its file.
+        Be concrete and brief. Answer "ok" when you would accept the work as it is.
+        Write in the language the task is written in.
         """;
 
     private static readonly string Schema = JsonSerializer.Serialize(new

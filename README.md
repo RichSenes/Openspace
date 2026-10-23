@@ -1,18 +1,19 @@
 # Openspace
 
-A pixel-art control room for [OpenCode](https://opencode.ai) agents.
+A pixel-art control room for [OpenCode](https://opencode.ai) and
+[Claude Code](https://claude.com/claude-code) agents.
 
 Every project is an office, every area of competence is a room, every agent sits
 at a desk. Walk through the building, see who is working and what they are doing,
 assign tasks, review changes and read reports, instead of scrolling a terminal.
 
-> **Status:** early but working. Agents run through OpenCode in their own git worktrees, with live speech bubbles, review with diffs, and commits on task branches.
+> **Status:** early but working. Agents run through OpenCode or Claude Code in their own git worktrees, with live speech bubbles, a review by Claude before yours, diffs, and commits on task branches.
 
 ## Concepts
 
 | Building | Office | Room | Desk | Role |
 | --- | --- | --- | --- | --- |
-| The whole instance | A project | An area of competence | A seat for an OpenCode agent | How that agent works and what it may do alone |
+| The whole instance | A project | An area of competence | A seat for an agent, on OpenCode or Claude Code | How that agent works and what it may do alone |
 
 The full picture, glossary and first-prototype scope are in
 [docs/vision.md](docs/vision.md).
@@ -70,6 +71,10 @@ Each project has its own README with detailed specifications.
 ## Requirements
 
 - [OpenCode](https://opencode.ai) running in server mode (`opencode serve`)
+- Optionally [Claude Code](https://claude.com/claude-code), signed in: when it is
+  installed it plans, drafts and reviews finished work, and desks can run on it.
+  It uses the account it is signed in with and that account's limits; Openspace
+  never needs an API key for it
 - .NET SDK 10
 - Node.js 22 or later
 

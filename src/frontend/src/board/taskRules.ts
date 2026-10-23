@@ -53,3 +53,16 @@ export function filterByEpic(tasks: WorkTaskView[], filter: EpicFilter): WorkTas
   if (filter === 'none') return tasks.filter((t) => t.epicId === null)
   return tasks.filter((t) => t.epicId === filter)
 }
+
+export type ReviewVerdict = 'ok' | 'changes'
+
+/**
+ * What the reviewer said about the work as it is now: its latest note, as long as the work
+ * has not been sent back since. Undefined when nobody reviewed it.
+ */
+export function reviewVerdictOf(task: WorkTaskView): ReviewVerdict | undefined {
+  if (task.status !== 'Review') return undefined
+  const latest = [...task.notes].reverse().find((n) => n.authorKind === 'Reviewer')
+  if (!latest) return undefined
+  return latest.text.startsWith('OK') ? 'ok' : 'changes'
+}

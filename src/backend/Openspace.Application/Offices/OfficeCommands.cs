@@ -144,7 +144,8 @@ public sealed class OfficeCommands(
         string agentName,
         string? model,
         RoleId? roleId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        AgentEngine engine = AgentEngine.OpenCode)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         if (roleId is { } role)
@@ -152,8 +153,17 @@ public sealed class OfficeCommands(
             await roles.GetAsync(role, cancellationToken).ConfigureAwait(false);
         }
 
-        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model), clock.GetUtcNow(), roleId);
+        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model, engine), clock.GetUtcNow(), roleId);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return desk.Id;
+    }
+
+    /// <summary>Changes what runs the agent at a desk: engine, agent and model. Applies from its next task.</summary>
+    public async Task ChangeDeskAgentAsync(
+        OfficeId officeId, DeskId deskId, AgentEngine engine, string agentName, string? model, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.ReassignDesk(deskId, AgentProfile.Create(agentName, model, engine), clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 }

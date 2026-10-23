@@ -46,4 +46,34 @@ public class AgentProfileTests
     {
         Assert.Equal(AgentProfile.Create("tester", "local/a"), AgentProfile.Create("tester", "local/a"));
     }
+
+    [Fact]
+    public void Desks_run_on_OpenCode_unless_told_otherwise()
+    {
+        Assert.Equal(AgentEngine.OpenCode, AgentProfile.Create("build").Engine);
+        Assert.Equal(AgentEngine.ClaudeCode, AgentProfile.Create("build", null, AgentEngine.ClaudeCode).Engine);
+    }
+
+    [Theory]
+    [InlineData("sonnet")]
+    [InlineData("claude-opus-5-5")]
+    [InlineData("opus[1m]")]
+    public void Claude_Code_takes_its_own_model_names(string model)
+    {
+        Assert.Equal(model, AgentProfile.Create("build", model, AgentEngine.ClaudeCode).Model);
+    }
+
+    [Theory]
+    [InlineData("anthropic/claude-sonnet")]
+    [InlineData("two words")]
+    public void Claude_Code_refuses_other_model_names(string model)
+    {
+        Assert.Throws<DomainException>(() => AgentProfile.Create("build", model, AgentEngine.ClaudeCode));
+    }
+
+    [Fact]
+    public void OpenCode_still_wants_a_provider()
+    {
+        Assert.Throws<DomainException>(() => AgentProfile.Create("build", "sonnet"));
+    }
 }

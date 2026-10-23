@@ -39,6 +39,7 @@ public sealed class SqliteFixture : IAsyncLifetime
             // Never reach a real OpenCode from tests: port 9 refuses at once.
             o.BaseUrl = new Uri("http://127.0.0.1:9");
         });
+        services.Configure<ClaudeCode.ClaudeCodeOptions>(o => o.Enabled = false);
         _services = services.BuildServiceProvider();
 
         await _services.MigrateDatabaseAsync();

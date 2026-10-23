@@ -73,29 +73,8 @@ internal sealed partial class OpenCodeEventListener(
         }
     }
 
-    private async Task DispatchAsync(AgentSignal signal, CancellationToken cancellationToken)
-    {
-        await using var scope = scopes.CreateAsyncScope();
-        var signals = scope.ServiceProvider.GetRequiredService<AgentSignals>();
-        try
-        {
-            var work = signal switch
-            {
-                AgentSignal.Progress p => signals.ProgressAsync(p.SessionId, p.Step, p.Doing, cancellationToken),
-                AgentSignal.PermissionAsked p => signals.PermissionAskedAsync(p.SessionId, p.PermissionId, p.Description, cancellationToken),
-                AgentSignal.Finished f => signals.FinishedAsync(f.SessionId, cancellationToken),
-                AgentSignal.PermissionReplied r => signals.PermissionRepliedAsync(r.SessionId, r.PermissionId, r.Allowed, cancellationToken),
-                AgentSignal.ToolFinished t => signals.ToolFinishedAsync(t.SessionId, t.CallId, t.Kind, t.Summary, t.Detail, t.Succeeded, cancellationToken),
-                AgentSignal.Failed f => signals.FailedAsync(f.SessionId, f.Reason, cancellationToken),
-                _ => Task.CompletedTask,
-            };
-            await work.ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogHandlingFailed(logger, ex, signal.GetType().Name, signal.SessionId);
-        }
-    }
+    private Task DispatchAsync(AgentSignal signal, CancellationToken cancellationToken) =>
+        AgentSignalDispatch.DispatchAsync(scopes, signal, logger, cancellationToken);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Following OpenCode events")]
     private static partial void LogConnected(ILogger logger);
@@ -105,7 +84,4 @@ internal sealed partial class OpenCodeEventListener(
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Skipped an unreadable OpenCode event: {Reason}")]
     private static partial void LogUnreadable(ILogger logger, string reason);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Could not handle {Signal} for session {SessionId}")]
-    private static partial void LogHandlingFailed(ILogger logger, Exception exception, string signal, string sessionId);
 }

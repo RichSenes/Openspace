@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using System.Text.Json;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Openspace.Application;
 using Openspace.Application.Agents;
 using Openspace.Domain.Work;
+using Openspace.Infrastructure.ClaudeCode;
 
 namespace Openspace.Api.Mcp;
 
@@ -54,6 +56,31 @@ internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor 
             await signals.CompleteStepAsync(task, step, evidence, cancellationToken);
             return $"Step {step} recorded.";
         });
+
+    /// <summary>
+    /// Claude Code calls this before a tool the agent's role does not allow outright, and
+    /// waits: the person answers in Openspace. Not meant for agents to call themselves.
+    /// </summary>
+    [McpServerTool(Name = "permission")]
+    [Description("Asks the person in Openspace whether a tool call may run. Called by Claude Code itself; do not call it.")]
+    public async Task<string> PermissionAsync(
+        [Description("The tool that wants to run.")] string tool_name,
+        [Description("The tool's input.")] JsonElement input,
+        CancellationToken cancellationToken,
+        [Description("The id of the tool call.")] string? tool_use_id = null)
+    {
+        try
+        {
+            var allowed = await RunAsync(async task =>
+                (await signals.RequestPermissionAsync(task, ClaudeCodePermissions.Describe(tool_name, input), cancellationToken)).ToString());
+            return ClaudeCodePermissions.Reply(allowed == bool.TrueString, input);
+        }
+        catch (McpException)
+        {
+            // No task to ask about: nobody can allow it.
+            return ClaudeCodePermissions.Reply(false, input);
+        }
+    }
 
     private async Task<string> RunAsync(Func<WorkTaskId, Task<string>> action)
     {

@@ -26,7 +26,7 @@ public class WorkTaskCommandsTests
         var runtime = new FakeRuntime();
         var board = new Agents.ActivityBoard(new RecordingPublisher());
         var audit = new InMemoryAuditLog();
-        var signals = new Agents.AgentSignals(_offices, new Agents.AgentSetups(new InMemoryRoles()), _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), _clock);
+        var signals = new Agents.AgentSignals(_offices, new Agents.AgentSetups(new InMemoryRoles()), _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), new Review.PendingReviews(), new Agents.PermissionRequests(), _clock);
         _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, runtime, new FakeWorkspaces(), board, audit, signals, _clock);
     }
 

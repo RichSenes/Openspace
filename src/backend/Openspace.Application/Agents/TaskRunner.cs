@@ -145,8 +145,13 @@ public sealed partial class TaskRunner(
             return $"{problem.Message} Fix the repository in Rooms, then try again.";
         }
 
-        return await runtime.HasAgentAsync(desk.Agent.AgentName, office.RepositoryPath, cancellationToken).ConfigureAwait(false)
-            ? null
+        if (await runtime.HasAgentAsync(desk.Agent, office.RepositoryPath, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return desk.Agent.Engine == AgentEngine.ClaudeCode
+            ? "Claude Code is not available on this machine. Install it and sign in, or give the desk OpenCode, then try again."
             : $"OpenCode has no agent named '{desk.Agent.AgentName}'. Create it in OpenCode or give the desk another agent, then try again.";
     }
 

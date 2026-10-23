@@ -28,6 +28,9 @@ public static class DependencyInjection
         services.AddScoped<TaskRunner>();
         services.AddScoped<AgentSignals>();
         services.AddSingleton<ActivityBoard>();
+        services.AddSingleton<Review.PendingReviews>();
+        services.AddSingleton<PermissionRequests>();
+        services.AddScoped<Review.TaskReviewer>();
         return services;
     }
 }

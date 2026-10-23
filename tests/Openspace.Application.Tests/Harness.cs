@@ -37,6 +37,10 @@ internal sealed class Harness
 
     public InMemoryReports Reports { get; } = new();
 
+    public Review.PendingReviews Reviews { get; } = new();
+
+    public PermissionRequests Permissions { get; } = new();
+
     public ActivityBoard Activity { get; }
 
     public Office Office { get; }
@@ -72,7 +76,9 @@ internal sealed class Harness
         new QueueDispatcher(Tasks, UnitOfWork, Options.Create(new QueueOptions { Seats = seats }), Clock),
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Clock, NullLogger<TaskRunner>.Instance);
 
-    public AgentSignals Signals() => new(Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Clock);
+    public AgentSignals Signals() => new(Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions, Clock);
+
+    public Review.TaskReviewer Reviewer() => new(Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);
 
     public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
 

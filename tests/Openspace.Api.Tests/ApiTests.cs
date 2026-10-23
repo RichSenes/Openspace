@@ -176,6 +176,41 @@ public sealed class ApiTests : IDisposable
 
     private sealed record DressedOffice(List<DressedRoom> Rooms);
 
+    private sealed record Engines(bool OpenCode, List<JsonElement> OpenCodeModels, bool ClaudeCode, string Supervisor, string? Reviewer);
+
+    private sealed record EngineDesk(Guid Id, string Engine, string? Model);
+
+    private sealed record EngineRoom(List<EngineDesk> Desks);
+
+    private sealed record EngineOffice(List<EngineRoom> Rooms);
+
+    [Fact]
+    public async Task Engines_say_what_can_run_agents_here()
+    {
+        var engines = await GetAsync<Engines>("/api/engines");
+
+        // In tests OpenCode is unreachable and Claude Code switched off.
+        Assert.Equal((false, false, "OpenCode", (string?)null), (engines.OpenCode, engines.ClaudeCode, engines.Supervisor, engines.Reviewer));
+        Assert.Empty(engines.OpenCodeModels);
+    }
+
+    [Fact]
+    public async Task A_desk_can_move_to_Claude_Code_and_back()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var url = $"/api/offices/{officeId}/desks/{deskId}/agent";
+
+        var toClaude = await _http.PutAsJsonAsync(url, new { engine = "ClaudeCode", agentName = "build", model = "sonnet" });
+        var claude = Assert.Single(Assert.Single((await GetAsync<EngineOffice>($"/api/offices/{officeId}")).Rooms).Desks);
+        var badModel = await _http.PutAsJsonAsync(url, new { engine = "OpenCode", agentName = "build", model = "sonnet" });
+        var back = await _http.PutAsJsonAsync(url, new { engine = "OpenCode", agentName = "build", model = "opencode/big-pickle" });
+        var openCode = Assert.Single(Assert.Single((await GetAsync<EngineOffice>($"/api/offices/{officeId}")).Rooms).Desks);
+
+        Assert.Equal((HttpStatusCode.NoContent, HttpStatusCode.UnprocessableEntity, HttpStatusCode.NoContent), (toClaude.StatusCode, badModel.StatusCode, back.StatusCode));
+        Assert.Equal(("ClaudeCode", "sonnet"), (claude.Engine, claude.Model));
+        Assert.Equal(("OpenCode", "opencode/big-pickle"), (openCode.Engine, openCode.Model));
+    }
+
     [Fact]
     public async Task A_desk_can_be_dressed_and_undressed()
     {

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Openspace.Application.Abstractions;
+using Openspace.Domain.Offices;
 
 namespace Openspace.Api.Tests;
 
@@ -17,7 +18,8 @@ public sealed class SupervisorApiTests : IDisposable
                   {"title":"Check it on staging","description":"Manual check.","desk":"Somebody"}]}
                 """);
 
-        public Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken) => throw new NotSupportedException();

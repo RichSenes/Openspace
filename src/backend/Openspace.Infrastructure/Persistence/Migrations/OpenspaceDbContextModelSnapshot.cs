@@ -380,6 +380,13 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                                 .HasColumnType("TEXT")
                                                 .HasColumnName("AgentName");
 
+                                            b3.Property<string>("Engine")
+                                                .IsRequired()
+                                                .ValueGeneratedOnAdd()
+                                                .HasColumnType("TEXT")
+                                                .HasDefaultValue("OpenCode")
+                                                .HasColumnName("AgentEngine");
+
                                             b3.Property<string>("Model")
                                                 .HasColumnType("TEXT")
                                                 .HasColumnName("Model");

@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
-import { useDeleteRole, useDraftRole, useRoles, useSaveRole } from '../api/hooks'
+import { useDeleteRole, useDraftRole, useEngines, useRoles, useSaveRole } from '../api/hooks'
 import type { PermissionLevel, RoleInput, RoleView } from '../api/types'
+import { modelOptions } from '../engines/engines'
+import { EnginesCard } from '../engines/EnginesCard'
 import { useToast } from '../ui/toastContext'
 import { CAPABILITIES, formFrom, PERMISSION_LABEL, permissionSummary } from './roleForm'
 import './agents.css'
@@ -19,6 +21,7 @@ export function AgentsPanel() {
         <p className="hint">
           A role tells an agent what it is for, how to work and what it may do without asking. Give roles to desks in Rooms.
         </p>
+        <EnginesCard />
       </header>
 
       <div className="agents-body">
@@ -57,6 +60,7 @@ function RoleEditor({ role, onSaved, onDeleted }: EditorProps) {
   const save = useSaveRole()
   const remove = useDeleteRole()
   const draft = useDraftRole()
+  const engines = useEngines()
   const toast = useToast()
   const set = <K extends keyof RoleInput>(key: K, value: RoleInput[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -83,8 +87,15 @@ function RoleEditor({ role, onSaved, onDeleted }: EditorProps) {
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Accessibility reviewer" required />
         </label>
         <label className="field">
-          <span>Model (optional, desks can override it)</span>
-          <input className="input mono" value={form.model ?? ''} onChange={(e) => set('model', e.target.value)} placeholder="provider/model" />
+          <span>OpenCode model (desks can override it; Claude Code desks use their own)</span>
+          <select className="input" value={form.model ?? ''} onChange={(e) => set('model', e.target.value)}>
+            <option value="">The agent&apos;s default</option>
+            {modelOptions(engines.data, 'OpenCode', form.model ?? '').map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

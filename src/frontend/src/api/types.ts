@@ -20,6 +20,32 @@ export interface DeskView {
   spot?: { x: number; y: number } | null
   /** How its agent looks, chosen by hand; null when picked from the desk's id. */
   look?: DeskLook | null
+  /** What runs its agent; OpenCode when not said. */
+  engine?: AgentEngine
+}
+
+export type AgentEngine = 'OpenCode' | 'ClaudeCode'
+
+export interface ModelOption {
+  id: string
+  name: string
+}
+
+/** One window of the Claude account's limits: used is from 0 to 1. */
+export interface UsageWindow {
+  used: number
+  resetsAt: string | null
+}
+
+/** What can run agents on this machine, and with which models. */
+export interface EnginesView {
+  openCode: boolean
+  openCodeModels: ModelOption[]
+  claudeCode: boolean
+  claudeCodeModels: ModelOption[]
+  claudeUsage: { status: string; fiveHours: UsageWindow | null; week: UsageWindow | null; seenAt: string } | null
+  supervisor: AgentEngine
+  reviewer: AgentEngine | null
 }
 
 /** A look chosen by hand: names the pixel art knows; unknown ones fall back to the picked look. */
@@ -98,7 +124,7 @@ export interface OfficeView {
 }
 
 export interface TaskNoteView {
-  authorKind: 'Human' | 'Desk' | 'System'
+  authorKind: 'Human' | 'Desk' | 'System' | 'Reviewer'
   authorName: string | null
   deskId: string | null
   text: string

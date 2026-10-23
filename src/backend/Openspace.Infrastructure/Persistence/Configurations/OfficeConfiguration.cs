@@ -75,6 +75,8 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                 {
                     agent.Property(a => a.AgentName).HasColumnName("AgentName").IsRequired();
                     agent.Property(a => a.Model).HasColumnName("Model");
+                    agent.Property(a => a.Engine).HasColumnName("AgentEngine").HasConversion<string>()
+                        .HasDefaultValue(AgentEngine.OpenCode).HasSentinel((AgentEngine)(-1));
                 });
                 desk.Navigation(d => d.Agent).IsRequired();
                 desk.OwnsOne(d => d.Spot, spot =>

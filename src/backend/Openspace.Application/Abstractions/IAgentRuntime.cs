@@ -1,9 +1,12 @@
+using Openspace.Domain.Offices;
+
 namespace Openspace.Application.Abstractions;
 
-/// <summary>Runs agents. Implemented on top of the OpenCode server.</summary>
+/// <summary>Runs agents, on the OpenCode server or with Claude Code, whichever each desk uses.</summary>
 public interface IAgentRuntime
 {
-    Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken);
+    /// <summary>Whether the desk's engine is there and knows its agent.</summary>
+    Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken);
 
     /// <summary>Opens an empty session working in the given folder, with the setup's permissions, and returns its id.</summary>
     Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken);
@@ -23,6 +26,12 @@ public interface IAgentRuntime
     /// matches <paramref name="jsonSchema"/>. Returns that JSON.
     /// </summary>
     Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lets the reviewer read a working copy, and the changes in it through git, and answer
+    /// with JSON that matches <paramref name="jsonSchema"/>. Null when no reviewer is set up.
+    /// </summary>
+    Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken);
 
     /// <summary>Gives agents working in this folder the Openspace tools, tied to this task.</summary>
     Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken);

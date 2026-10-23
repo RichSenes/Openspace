@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, Sparkles } from 'lucide-react'
+import { Check, Plus, Sparkles, TriangleAlert } from 'lucide-react'
 import { useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
@@ -7,7 +7,7 @@ import { desksOf } from './deskLookup'
 import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
-import { COLUMNS, filterByEpic, groupByColumn, type EpicFilter } from './taskRules'
+import { COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
 export function Board({ office }: { office: OfficeView }) {
@@ -82,6 +82,16 @@ export function Board({ office }: { office: OfficeView }) {
                             {task.notes.length > 0 &&
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
+                          {reviewVerdictOf(task) === 'ok' && (
+                            <span className="card-review card-review-ok">
+                              <Check size={12} aria-hidden /> Claude: ready to accept
+                            </span>
+                          )}
+                          {reviewVerdictOf(task) === 'changes' && (
+                            <span className="card-review card-review-changes">
+                              <TriangleAlert size={12} aria-hidden /> Claude: changes suggested
+                            </span>
+                          )}
                         </button>
                       </li>
                     )

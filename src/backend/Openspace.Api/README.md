@@ -49,6 +49,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | DELETE | `/api/roles/{id}` | Delete a role; `422` with code `role-in-use` while desks use it |
 | POST | `/api/roles/draft` | `{ name, description }` → `{ instructions }` drafted by the AI, not saved |
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
+| PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
+| GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
 | PUT | `/api/offices/{id}/desks/{deskId}/look` | Dress the desk's agent: `{ skin, hair, hairStyle, cloth, accessory?, outfit?, costume? }`, single words the frontend knows; unknown ones are drawn with its defaults |
 | DELETE | `/api/offices/{id}/desks/{deskId}/look` | Give the agent back the look picked from the desk's id |
 | PUT | `/api/offices/{id}/desks/{deskId}/role` | `{ roleId }` (null to remove); applies from the desk's next task |
@@ -124,10 +126,24 @@ On startup it applies pending database migrations.
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
-| `OpenCode:DraftModel` | none | Model for AI drafts and supervisor plans; none means OpenCode's default |
+| `OpenCode:DraftModel` | none | Model for AI drafts and supervisor plans when OpenCode makes them; none means OpenCode's default |
+| `ClaudeCode:Enabled` | `true` | Use Claude Code where it is installed: desks may run on it, and it supervises and reviews |
+| `ClaudeCode:Command` | `claude` | The Claude Code command; it runs with the account it is signed in with, never with an API key of Openspace |
+| `ClaudeCode:Supervise` | `true` | Claude Code plans and drafts; when it fails (limits reached, say) OpenCode does it |
+| `ClaudeCode:Review` | `true` | Claude Code reads finished work and leaves a note before a person reviews it |
+| `ClaudeCode:SupervisorModel`, `ClaudeCode:ReviewModel` | none | Models for plans and reviews, such as `opus` or `sonnet`; none means Claude Code's default |
 | `OpenCode:ToolsUrl` | `http://127.0.0.1:5145/mcp` | Where OpenCode reaches this API's MCP tools; change it with the port |
 | `Workspaces:Root` | `~/.local/share/openspace/worktrees` | One git worktree per task lives here |
 
 `appsettings.json` holds non-secret defaults. Local overrides go in
 `appsettings.Local.json` (ignored by git) or environment variables, for example
 `Queue__Seats=2`.
+
+## Claude Code
+
+Claude Code agents run as `claude -p` in the task's working copy, with `--restricted`:
+personal and project settings never apply, only the role's tools. Reading is always
+allowed; editing, commands and the web follow the role (allowed, asked, or not given at
+all). Anything to be asked goes through the `permission` tool of Openspace's MCP server,
+which waits for the person's answer in Openspace. Work counts against the limits of the
+account Claude Code is signed in with, shared with everything else done with it.

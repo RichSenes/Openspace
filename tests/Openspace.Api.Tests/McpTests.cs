@@ -72,7 +72,7 @@ public sealed class McpTests : IAsyncDisposable
 
         var tools = await client.ListToolsAsync();
 
-        Assert.Equal(["add_task_note", "announce", "complete_step", "get_task"], tools.Select(t => t.Name).Order());
+        Assert.Equal(["add_task_note", "announce", "complete_step", "get_task", "permission"], tools.Select(t => t.Name).Order());
     }
 
     [Fact]
@@ -88,6 +88,46 @@ public sealed class McpTests : IAsyncDisposable
         var task = await http.GetFromJsonAsync<JsonElement>($"/api/tasks/{taskId}");
         var note = task.GetProperty("notes")[0];
         Assert.Equal(("Desk", "The header is shared with admin."), (note.GetProperty("authorKind").GetString(), note.GetProperty("text").GetString()));
+    }
+
+    [Fact]
+    public async Task Claude_Code_waits_for_the_person_to_allow_a_tool()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+        using var http = _app.CreateClient();
+
+        var asking = client.CallToolAsync("permission", new Dictionary<string, object?>
+        {
+            ["tool_name"] = "Bash",
+            ["input"] = new Dictionary<string, object?> { ["command"] = "npm test" },
+            ["tool_use_id"] = "toolu_1",
+        }).AsTask();
+        JsonElement waiting = default;
+        for (var i = 0; i < 50 && waiting.ValueKind != JsonValueKind.Object; i++)
+        {
+            await Task.Delay(50);
+            var activity = await http.GetFromJsonAsync<JsonElement>("/api/activity");
+            waiting = activity.EnumerateArray().FirstOrDefault(a => a.GetProperty("kind").GetString() == "Waiting");
+        }
+
+        Assert.Equal("Wants to run npm test", waiting.GetProperty("doing").GetString());
+        Assert.False(asking.IsCompleted);
+        (await http.PostAsJsonAsync($"/api/tasks/{taskId}/permission", new { allow = true })).EnsureSuccessStatusCode();
+
+        using var answer = JsonDocument.Parse(Text(await asking));
+        Assert.Equal("allow", answer.RootElement.GetProperty("behavior").GetString());
+        Assert.Equal("npm test", answer.RootElement.GetProperty("updatedInput").GetProperty("command").GetString());
+    }
+
+    [Fact]
+    public async Task Without_a_task_a_permission_is_refused_at_once()
+    {
+        await using var client = await ConnectAsync(null);
+
+        var result = await client.CallToolAsync("permission", new Dictionary<string, object?> { ["tool_name"] = "Bash", ["input"] = new Dictionary<string, object?>() });
+
+        Assert.Contains("\"deny\"", Text(result), StringComparison.Ordinal);
     }
 
     [Fact]

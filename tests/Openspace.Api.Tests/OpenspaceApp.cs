@@ -37,6 +37,8 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
         // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
         builder.UseSetting("OpenCode:BaseUrl", "http://127.0.0.1:9");
+        // Never the Claude Code of the machine running the tests: it would use a real account.
+        builder.UseSetting("ClaudeCode:Enabled", "false");
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));

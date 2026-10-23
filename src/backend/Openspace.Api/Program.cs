@@ -7,6 +7,7 @@ using Openspace.Application;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Queue;
 using Openspace.Infrastructure;
+using Openspace.Infrastructure.ClaudeCode;
 using Openspace.Infrastructure.Git;
 using Openspace.Infrastructure.OpenCode;
 
@@ -22,6 +23,7 @@ builder.Services
     .AddAgents();
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
+builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
 builder.Services.Configure<WorkspaceOptions>(options =>
 {
     builder.Configuration.GetSection(WorkspaceOptions.SectionName).Bind(options);
@@ -55,6 +57,7 @@ app.MapTaskEndpoints();
 app.MapRoleEndpoints();
 app.MapEpicEndpoints();
 app.MapReportEndpoints();
+app.MapEngineEndpoints();
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");
 

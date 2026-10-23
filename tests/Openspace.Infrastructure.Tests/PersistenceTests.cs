@@ -150,6 +150,18 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_desk_engine_survives_a_round_trip()
+    {
+        var (office, frontend, backend) = await FurnishECorpAsync();
+
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().ChangeDeskAgentAsync(office, frontend, AgentEngine.ClaudeCode, "build", "opus", default));
+        var desks = (await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).Rooms[0].Desks;
+
+        Assert.Equal((AgentEngine.ClaudeCode, "opus"), (desks.Single(d => d.Id == frontend.Value).Engine, desks.Single(d => d.Id == frontend.Value).Model));
+        Assert.Equal(AgentEngine.OpenCode, desks.Single(d => d.Id == backend.Value).Engine);
+    }
+
+    [Fact]
     public async Task A_desk_look_survives_a_round_trip()
     {
         var (office, frontend, backend) = await FurnishECorpAsync();

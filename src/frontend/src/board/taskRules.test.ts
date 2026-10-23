@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, COLUMNS, filterByEpic, groupByColumn } from './taskRules'
+import { actionsFor, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -60,5 +60,20 @@ describe('filterByEpic', () => {
     expect(filterByEpic([inEpic, loose], 'all')).toHaveLength(2)
     expect(filterByEpic([inEpic, loose], 'contact').map((t) => t.title)).toEqual(['form'])
     expect(filterByEpic([inEpic, loose], 'none').map((t) => t.title)).toEqual(['logout'])
+  })
+})
+
+describe('reviewVerdictOf', () => {
+  const note = (authorKind: 'Desk' | 'Reviewer' | 'System', text: string) => ({ authorKind, authorName: null, deskId: null, text, writtenAt: '2015-06-24T09:00:00Z' })
+
+  it('reads the latest review of work waiting for you', () => {
+    const reviewed = { ...task('Logout', 'Review'), notes: [note('Desk', 'Added it.'), note('Reviewer', 'Changes suggested. Untested.')] }
+    expect(reviewVerdictOf(reviewed)).toBe('changes')
+    expect(reviewVerdictOf({ ...reviewed, notes: [...reviewed.notes, note('Reviewer', 'OK: ready to accept.')] })).toBe('ok')
+  })
+
+  it('says nothing without a review, or once the work left review', () => {
+    expect(reviewVerdictOf({ ...task('Logout', 'Review'), notes: [note('System', 'OK then')] })).toBeUndefined()
+    expect(reviewVerdictOf({ ...task('Logout', 'Done'), notes: [note('Reviewer', 'OK: ready to accept.')] })).toBeUndefined()
   })
 })

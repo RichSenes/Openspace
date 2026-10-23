@@ -186,6 +186,24 @@
   list-style: none;
 }
 
+.note-reviewer {
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.card-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.card-review-changes {
+  color: var(--accent);
+}
+
 .note p {
   margin: 2px 0 0;
   white-space: pre-wrap;

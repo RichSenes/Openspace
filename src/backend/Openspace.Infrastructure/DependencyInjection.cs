@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Queue;
+using Openspace.Infrastructure.ClaudeCode;
 using Openspace.Infrastructure.Git;
 using Openspace.Infrastructure.Hosting;
 using Openspace.Infrastructure.OpenCode;
@@ -34,8 +35,12 @@ public static class DependencyInjection
     public static IServiceCollection AddAgents(this IServiceCollection services)
     {
         // Planning and drafting wait for the model to answer: allow minutes, not seconds.
-        services.AddHttpClient<IAgentRuntime, OpenCodeRuntime>(ConfigureOpenCode)
+        services.AddHttpClient<OpenCodeRuntime>(ConfigureOpenCode)
             .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(5));
+        services.AddSingleton<ClaudeCodeRuntime>();
+        services.AddSingleton<ClaudeCodeUsage>();
+        services.AddScoped<IAgentRuntime, AgentRuntimeRouter>();
+        services.AddScoped<IAgentEngines, AgentEngines>();
         services.AddHttpClient(OpenCodeEventListener.HttpClientName, ConfigureOpenCode)
             .ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
         // Plain AddSingleton: AddHostedService would deduplicate two factories of the same return type.
@@ -45,6 +50,7 @@ public static class DependencyInjection
         services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<QueueOptions>>().Value.Enabled
             ? ActivatorUtilities.CreateInstance<QueueRunnerService>(sp)
             : new IdleService());
+        services.AddHostedService<ReviewRunnerService>();
         return services;
     }
 

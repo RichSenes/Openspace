@@ -147,3 +147,8 @@
   min-height: 30px;
   padding: 4px 8px;
 }
+
+.desk-engine-btn {
+  min-height: 22px;
+  padding: 0 6px;
+}

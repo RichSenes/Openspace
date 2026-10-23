@@ -16,6 +16,8 @@ public sealed partial class AgentSignals(
     ActivityBoard activity,
     IAuditLog audit,
     IActivityPublisher publisher,
+    Review.PendingReviews reviews,
+    PermissionRequests permissions,
     TimeProvider clock)
 {
     /// <param name="step">The agent's current todo item, if this update is about its plan.</param>
@@ -96,6 +98,29 @@ public sealed partial class AgentSignals(
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The agent asked, through the Openspace tools, to do something its role does not allow
+    /// outright. It waits until a person answers in Openspace: true to allow it once.
+    /// </summary>
+    public async Task<bool> RequestPermissionAsync(WorkTaskId taskId, string description, CancellationToken cancellationToken)
+    {
+        var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var id = permissions.Open(task.Run!.SessionId, task.Run.WorkspacePath, Guard(description, "Permission", 200));
+        // Another request of the same agent may be on show: this one waits its turn.
+        if (activity.ForTask(task.Id.Value) is not { Kind: ActivityKind.Waiting })
+        {
+            await PermissionAskedAsync(task.Run.SessionId, id, description, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await LogAsync(
+                AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked permission: {description}", externalId: id),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return await permissions.WaitAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>A permission was answered in OpenCode itself.</summary>
     public async Task PermissionRepliedAsync(string sessionId, string permissionId, bool allowed, CancellationToken cancellationToken)
     {
@@ -149,6 +174,7 @@ public sealed partial class AgentSignals(
         task.SubmitForReview(now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await ShowAsync(task, ActivityKind.Stopped, null, "Done: waiting for review", null, cancellationToken).ConfigureAwait(false);
+        reviews.Enqueue(task.Id);
     }
 
     /// <summary>How many times an agent is sent back to its missing steps before the task fails.</summary>

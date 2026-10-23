@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
 import type {
   DeskLook,
+  AgentEngine,
+  EnginesView,
   AuditEntryView,
   BranchList,
   DeskActivity,
@@ -29,6 +31,7 @@ export const keys = {
   reports: ['reports'] as const,
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
+  engines: ['engines'] as const,
 }
 
 interface Created {
@@ -77,12 +80,13 @@ export function useUpdateRoomContext(officeId: string) {
 
 export function useAddDesk(officeId: string) {
   return useWrite(
-    (input: { roomId: string; name: string; agentName: string; model: string | null; roleId: string | null }) =>
+    (input: { roomId: string; name: string; agentName: string; model: string | null; roleId: string | null; engine: AgentEngine }) =>
       request<Created>('POST', `/api/offices/${officeId}/rooms/${input.roomId}/desks`, {
         name: input.name,
         agentName: input.agentName,
         model: input.model,
         roleId: input.roleId,
+        engine: input.engine,
       }),
     keys.offices,
   )
@@ -252,6 +256,28 @@ export function useApproveEpic() {
   return useWrite(
     (epicId: string) => request<{ approved: number }>('POST', `/api/epics/${epicId}/approve`, {}),
     keys.tasks,
+  )
+}
+
+/** What can run agents here; refreshed every minute, for the Claude account's usage. */
+export function useEngines() {
+  return useQuery({
+    queryKey: keys.engines,
+    queryFn: () => request<EnginesView>('GET', '/api/engines'),
+    refetchInterval: 60_000,
+  })
+}
+
+/** Changes what runs a desk's agent: engine, agent and model. */
+export function useChangeDeskAgent(officeId: string) {
+  return useWrite(
+    (input: { deskId: string; engine: AgentEngine; agentName: string; model: string | null }) =>
+      request<void>('PUT', `/api/offices/${officeId}/desks/${input.deskId}/agent`, {
+        engine: input.engine,
+        agentName: input.agentName,
+        model: input.model,
+      }),
+    keys.offices,
   )
 }
 

@@ -107,8 +107,29 @@ internal sealed class FakeRuntime : IAgentRuntime
 
     private int _sessions;
 
-    public Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken) =>
-        Task.FromResult(Agents.Contains(agentName));
+    public Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken) =>
+        Task.FromResult(agent.Engine == AgentEngine.ClaudeCode ? ClaudeCode : Agents.Contains(agent.AgentName));
+
+    /// <summary>Whether Claude Code is there; no reviewer when it is not.</summary>
+    public bool ClaudeCode { get; set; } = true;
+
+    /// <summary>The reviewer's answer; null for no reviewer.</summary>
+    public string? Review { get; set; }
+
+    public Exception? FailOnReview { get; set; }
+
+    public List<(string Folder, string Text)> ReviewRequests { get; } = [];
+
+    public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    {
+        if (FailOnReview is not null)
+        {
+            throw FailOnReview;
+        }
+
+        ReviewRequests.Add((folder, text));
+        return Task.FromResult(Review);
+    }
 
     public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {

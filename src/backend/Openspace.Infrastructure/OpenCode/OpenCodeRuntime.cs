@@ -11,7 +11,7 @@ namespace Openspace.Infrastructure.OpenCode;
 /// is about, so one server serves every task's working copy.
 /// </summary>
 internal sealed class OpenCodeRuntime(
-    HttpClient http, IOptions<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces) : IAgentRuntime
+    HttpClient http, IOptions<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces)
 {
     public async Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken)
     {
@@ -111,6 +111,34 @@ internal sealed class OpenCodeRuntime(
         {
             using var _ = await http.DeleteAsync(In($"session/{sessionId}", folder), CancellationToken.None).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>Every model OpenCode can use, as <c>provider/model</c>, its default first.</summary>
+    public async Task<IReadOnlyList<ModelOption>> ModelsAsync(CancellationToken cancellationToken)
+    {
+        using var config = await GetJsonAsync("config/providers", cancellationToken).ConfigureAwait(false);
+        var root = config.RootElement;
+        var defaults = root.TryGetProperty("default", out var d) && d.ValueKind == JsonValueKind.Object
+            ? d.EnumerateObject().Select(p => $"{p.Name}/{p.Value.GetString()}").ToHashSet()
+            : [];
+        var models = new List<ModelOption>();
+        foreach (var provider in root.GetProperty("providers").EnumerateArray())
+        {
+            var providerId = provider.GetProperty("id").GetString()!;
+            var providerName = provider.TryGetProperty("name", out var pn) ? pn.GetString() : providerId;
+            if (!provider.TryGetProperty("models", out var list) || list.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var model in list.EnumerateObject())
+            {
+                var name = model.Value.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString()! : model.Name;
+                models.Add(new ModelOption($"{providerId}/{model.Name}", $"{name} · {providerName}"));
+            }
+        }
+
+        return [.. models.OrderBy(m => defaults.Contains(m.Id) ? 0 : 1).ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>The header that tells the Openspace tools which task a call belongs to.</summary>

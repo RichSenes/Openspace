@@ -53,7 +53,9 @@ internal static class OfficeEndpoints
 
     public sealed record RepositoryRequest(string Path, bool Initialize = false);
 
-    public sealed record DeskRequest(string Name, string AgentName, string? Model, Guid? RoleId = null);
+    public sealed record DeskRequest(string Name, string AgentName, string? Model, Guid? RoleId = null, AgentEngine Engine = AgentEngine.OpenCode);
+
+    public sealed record DeskAgentRequest(AgentEngine Engine, string AgentName, string? Model);
 
     public sealed record DeskRoleRequest(Guid? RoleId);
 
@@ -148,7 +150,7 @@ internal static class OfficeEndpoints
         {
             var id = await commands.AddDeskAsync(
                 new OfficeId(officeId), new RoomId(roomId), request.Name, request.AgentName, request.Model,
-                request.RoleId is { } role ? new RoleId(role) : null, ct);
+                request.RoleId is { } role ? new RoleId(role) : null, ct, request.Engine);
             return Results.Ok(new { id = id.Value });
         });
 
@@ -156,6 +158,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid deskId, NameRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.RenameDeskAsync(new OfficeId(officeId), new DeskId(deskId), request.Name, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/agent", async (
+            Guid officeId, Guid deskId, DeskAgentRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.ChangeDeskAgentAsync(new OfficeId(officeId), new DeskId(deskId), request.Engine, request.AgentName, request.Model, ct);
             return Results.NoContent();
         });
 

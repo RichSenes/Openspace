@@ -55,7 +55,7 @@ public sealed partial class AgentSignals(
     public async Task<int> AddManualCheckAsync(WorkTaskId taskId, string what, string? how, CancellationToken cancellationToken)
     {
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
-        var number = task.AddManualCheck(what, how);
+        var number = task.AddManualCheck(what, how, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return number;
     }
@@ -72,7 +72,7 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        task.RecordUsage(tokens);
+        task.RecordUsage(tokens, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

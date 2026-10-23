@@ -66,6 +66,9 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         WorkTaskNoteAdded x => x.TaskId,
         WorkTaskMerged x => x.TaskId,
         WorkTaskStepCompleted x => x.TaskId,
+        WorkTaskCheckListed x => x.TaskId,
+        WorkTaskCheckTicked x => x.TaskId,
+        WorkTaskTokensSpent x => x.TaskId,
         _ => null,
     };
 }

@@ -359,18 +359,18 @@ public sealed class PersistenceTests : IAsyncLifetime
         {
             var task = (await sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().FindAsync(taskId, default))!;
             task.Start(_db.Clock.GetUtcNow());
-            task.RecordUsage(new TokenCount(1000, 200, 3000, 400));
-            task.AddManualCheck("The header fits a phone", "Open it at 360px.");
+            task.RecordUsage(new TokenCount(1000, 200, 3000, 400), _db.Clock.GetUtcNow());
+            task.AddManualCheck("The header fits a phone", "Open it at 360px.", _db.Clock.GetUtcNow());
             task.SubmitForReview(_db.Clock.GetUtcNow());
             task.SendBack(NoteAuthor.Human("elliot"), "Smaller.", _db.Clock.GetUtcNow());
-            task.RecordUsage(new TokenCount(10, 2, 0, 0));
+            task.RecordUsage(new TokenCount(10, 2, 0, 0), _db.Clock.GetUtcNow());
             await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
         });
         _db.Clock.Advance(TimeSpan.FromMinutes(1));
         await InScope(async sp =>
         {
             var task = (await sp.GetRequiredService<Application.Abstractions.IWorkTaskRepository>().FindAsync(taskId, default))!;
-            task.RecordUsage(new TokenCount(5, 1, 0, 0));
+            task.RecordUsage(new TokenCount(5, 1, 0, 0), _db.Clock.GetUtcNow());
             await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
         });
 

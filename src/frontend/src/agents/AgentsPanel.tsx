@@ -4,6 +4,7 @@ import { useDeleteRole, useDraftRole, useEngines, useRoles, useSaveRole } from '
 import type { PermissionLevel, RoleInput, RoleView } from '../api/types'
 import { modelOptions } from '../engines/engines'
 import { EnginesCard } from '../engines/EnginesCard'
+import { DeskUsage } from './DeskUsage'
 import { useToast } from '../ui/toastContext'
 import { CAPABILITIES, formFrom, PERMISSION_LABEL, permissionSummary } from './roleForm'
 import './agents.css'
@@ -45,6 +46,8 @@ export function AgentsPanel() {
 
         <RoleEditor key={current?.id ?? 'new'} role={current} onSaved={setSelected} onDeleted={() => setSelected('new')} />
       </div>
+
+      <DeskUsage />
     </section>
   )
 }

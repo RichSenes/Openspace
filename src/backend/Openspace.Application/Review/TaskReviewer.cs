@@ -32,11 +32,13 @@ public sealed partial class TaskReviewer(
         that it is correct, tested where the project has tests, and free of secrets or personal
         data; and that the evidence of the required procedure fits the change.
         Judge from the code and the evidence: never ask for changes only because you could not
-        run something yourself. A finding names a real problem in the work, with its file.
+        run something yourself, or because the agent's notes count things a little differently.
+        A finding names a real problem in the work, with its file.
         Be concrete and brief. Answer "ok" when you would accept the work as it is.
         In manualChecks list what a person must still try by hand before merging, because no
         test covers it (a screen, a flow on a phone, an email), each with how to try it: where
-        to go, what to do, what should happen. Leave out the checks already listed.
+        to go, what to do, what should happen. Leave out the checks already listed, and never
+        list running the tests or other commands again: that is the agent's job, not a person's.
         Write in the language the task is written in.
         """;
 
@@ -166,7 +168,7 @@ public sealed partial class TaskReviewer(
 
         foreach (var (what, how) in (checks ?? []).Take(WorkTask.MaxManualChecks - task.ManualChecks.Count))
         {
-            task.AddManualCheck(what, how);
+            task.AddManualCheck(what, how, now);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

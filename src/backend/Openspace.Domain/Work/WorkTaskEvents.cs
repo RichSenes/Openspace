@@ -19,3 +19,9 @@ public sealed record WorkTaskMerged(WorkTaskId TaskId, string TargetBranch, Date
 public sealed record WorkTaskRunAttached(WorkTaskId TaskId, string Branch, string WorkspacePath, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record WorkTaskStepCompleted(WorkTaskId TaskId, int Number, string Text, string Evidence, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record WorkTaskCheckListed(WorkTaskId TaskId, int Number, string What, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record WorkTaskCheckTicked(WorkTaskId TaskId, int Number, bool Done, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record WorkTaskTokensSpent(WorkTaskId TaskId, int Round, TokenCount Tokens, DateTimeOffset OccurredAt) : IDomainEvent;

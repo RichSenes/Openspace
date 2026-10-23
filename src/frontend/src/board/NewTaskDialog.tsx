@@ -10,12 +10,14 @@ interface Props {
   desks: DeskWithRoom[]
   open: boolean
   onClose: () => void
+  /** The desk chosen when the dialog opens, e.g. the agent it was opened from. */
+  initialDeskId?: string
 }
 
-export function NewTaskDialog({ office, desks, open, onClose }: Props) {
+export function NewTaskDialog({ office, desks, open, onClose, initialDeskId }: Props) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [deskId, setDeskId] = useState('')
+  const [deskId, setDeskId] = useState(initialDeskId ?? '')
   const create = useCreateTask()
   const toast = useToast()
 

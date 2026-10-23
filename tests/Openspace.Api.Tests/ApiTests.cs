@@ -442,7 +442,7 @@ public sealed class ApiTests : IDisposable
             var tasks = scope.ServiceProvider.GetRequiredService<Application.Abstractions.IWorkTaskRepository>();
             var task = (await tasks.FindAsync(new Domain.Work.WorkTaskId(created.Id), default))!;
             task.Start(DateTimeOffset.UtcNow);
-            task.AddManualCheck("The footer fits a phone", "Open the site at 360px.");
+            task.AddManualCheck("The footer fits a phone", "Open the site at 360px.", DateTimeOffset.UtcNow);
             task.SubmitForReview(DateTimeOffset.UtcNow);
             await scope.ServiceProvider.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
         }

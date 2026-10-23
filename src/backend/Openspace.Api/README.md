@@ -24,7 +24,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks` | `{ officeId, deskId?, title, description? }`: queued with a desk, proposed without |
 | POST | `/api/tasks/{id}/approve` | Approve a proposed task: `{ deskId? }` |
 | POST | `/api/tasks/{id}/accept` | Accept work in review |
-| POST | `/api/tasks/{id}/send-back` | Back to the queue with feedback: `{ text }` |
+| POST | `/api/tasks/{id}/send-back` | Back to the queue for another round: `{ text?, withReview? }`; with `withReview` the reviewer's note on this round goes along, after the text or alone |
+| PUT | `/api/tasks/{id}/checks/{number}` | Tick a check a person tried by hand, or untick it: `{ done }`; in review or done |
 | POST | `/api/tasks/{id}/retry` | Requeue a failed task |
 | POST | `/api/tasks/{id}/discard` | Drop an open task |
 | POST | `/api/tasks/{id}/notes` | Add a note as the operator: `{ text }` |
@@ -51,6 +52,10 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
+| POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
+| GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
+| GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
+| PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
 | PUT | `/api/offices/{id}/desks/{deskId}/look` | Dress the desk's agent: `{ skin, hair, hairStyle, cloth, accessory?, outfit?, costume? }`, single words the frontend knows; unknown ones are drawn with its defaults |
 | DELETE | `/api/offices/{id}/desks/{deskId}/look` | Give the agent back the look picked from the desk's id |
 | PUT | `/api/offices/{id}/desks/{deskId}/role` | `{ roleId }` (null to remove); applies from the desk's next task |
@@ -75,6 +80,8 @@ the agent having to name it.
 | `add_task_note` | `{ text }`: a note on the task signed by the desk |
 | `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
 | `complete_step` | `{ step, evidence }`: reports a step of the task's required procedure as done |
+| `add_manual_check` | `{ what, how }`: lists something a person must try by hand before merging, and how |
+| `permission` | Called by Claude Code itself before a tool its role does not allow outright |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
 error the agent can read. There is no authentication: the endpoint is meant for
@@ -87,7 +94,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | Message | Payload | Sent when |
 | --- | --- | --- |
 | `OfficeChanged` | office id | an office, room or desk changes |
-| `TaskChanged` | task id | a task is created, changes status or gets a note |
+| `TaskChanged` | task id | a task is created, changes status, gets a note or a check, or spends tokens |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
@@ -121,6 +128,8 @@ On startup it applies pending database migrations.
 | --- | --- | --- |
 | `ConnectionStrings:Openspace` | `Data Source=openspace.db` | SQLite database file |
 | `Queue:Seats` | `1` | Agents allowed to work at the same time |
+| `Agents:Autonomy` | `Auto` | `Auto`: Openspace answers agents' requests itself and asks a person only about risky ones; `Ask`: every request waits for a person |
+| `Settings:Path` | `openspace.settings.json` | Where changes made in Settings are kept; it overrides the other files |
 | `Operator:Name` | `operator` | Who you are: recorded as requester and note author |
 | `Queue:Enabled` | `true` | Run the queue in the background |
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
@@ -137,7 +146,26 @@ On startup it applies pending database migrations.
 
 `appsettings.json` holds non-secret defaults. Local overrides go in
 `appsettings.Local.json` (ignored by git) or environment variables, for example
-`Queue__Seats=2`.
+`Queue__Seats=2`. What you change in the Settings view is written to
+`openspace.settings.json` (ignored by git too), which comes last and wins; it is
+read again at once, so those settings need no restart.
+
+## Permissions in auto mode
+
+A role says what an agent may do without asking. Beyond that, in auto mode
+Openspace answers requests itself and records each one in the task's log
+("Allowed on its own: run the tests · npm test"). A person still decides when a
+request pushes or deploys, reaches a live service, changes the machine or
+another one, goes outside the task's working copy, deletes recursively above it,
+sends data to the web, runs a script piped from the web, or touches `.env`
+files, keys and credentials. The same rules apply to OpenCode and Claude Code.
+
+## Rounds, checks and tokens
+
+A task's first round of work is 1; each send back starts the next. Agents list
+what a person must try by hand with `add_manual_check`, the reviewer adds what
+is missing, and ticks are cleared when the work goes back. Tokens are counted
+per round, as OpenCode reports each answer and Claude Code each run.
 
 ## Claude Code
 

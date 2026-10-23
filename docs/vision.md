@@ -90,6 +90,14 @@ Later, in rough order of appearance:
   models (picked from the list OpenCode gives) or Claude Code with the person's
   own account. Claude Code plans, drafts and reviews finished work with a note
   before a person does; the Agents page shows how much of the account is used.
+- ~~**Lessons of the first real office.**~~ Done: auto permissions that ask only
+  about risky actions, bubbles and requests in plain words, one "needs you" button
+  instead of pop-ups, a card for each agent in the building, send back with the
+  review, rounds of work, checks to try by hand before merging, tokens per round
+  and per desk, and a Settings view.
+- **Task dependencies.** The supervisor says which proposed tasks wait for others
+  (a fix that needs an analysis first); the queue holds them until those are
+  accepted, and the Board shows what each one waits for.
 - **Local models and routines.** Small models running on this machine (through
   Ollama or similar, wired into OpenCode) for simple recurring jobs such as sorting
   email, on a schedule, outside the office and its repositories.

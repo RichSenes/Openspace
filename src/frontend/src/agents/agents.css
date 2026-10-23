@@ -124,3 +124,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+.desk-usage {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.desk-usage h2 {
+  font-size: 15px;
+}

@@ -13,6 +13,7 @@ public static class AuditTrail
         WorkTaskStatusChanged e => Lifecycle(e.TaskId, e.OccurredAt, Describe(e.From, e.To)),
         WorkTaskRunAttached e => Lifecycle(e.TaskId, e.OccurredAt, $"Working copy ready on branch {e.Branch}", e.WorkspacePath),
         WorkTaskMerged e => Lifecycle(e.TaskId, e.OccurredAt, $"Merged into {e.TargetBranch}"),
+        WorkTaskCheckListed e => AuditEntry.Record(e.TaskId, e.OccurredAt, AuditKind.Procedure, $"Listed a check to try by hand: {e.What}"),
         WorkTaskStepCompleted e => AuditEntry.Record(e.TaskId, e.OccurredAt, AuditKind.Procedure, $"Procedure step {e.Number} done: {e.Text}", e.Evidence),
         WorkTaskNoteAdded e => AuditEntry.Record(e.TaskId, e.OccurredAt, AuditKind.Note, $"Note from {Author(e.Note.Author)}", e.Note.Text),
         _ => null,

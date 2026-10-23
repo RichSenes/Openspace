@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
 import { useActivity, useOfficeTasks, useSetOfficeTheme } from '../api/hooks'
@@ -6,8 +6,12 @@ import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
 import { editFloor, editRoom, moveRoom, NO_DRAFTS, placeIn, resize, resizeFloor, setCut, withDrafts, type Drafts } from './arrange'
+import { desksOf } from '../board/deskLookup'
+import { NewTaskDialog } from '../board/NewTaskDialog'
+import { AgentCard } from './AgentCard'
 import { ArrangePanel } from './ArrangePanel'
-import { BuildingCanvas, type Selection } from './BuildingCanvas'
+import { BuildingCanvas, type DeskPick, type Selection } from './BuildingCanvas'
+import { LookDialog } from './LookDialog'
 import './building.css'
 
 const lightsKey = (officeId: string) => `openspace.lights-off.${officeId}`
@@ -38,9 +42,19 @@ function useLightsOff(officeId: string): [boolean, (off: boolean) => void] {
 interface Props {
   office: OfficeView
   onOpenRooms: () => void
+  /** Shows a task on the Board. */
+  onOpenTask: (taskId: string) => void
 }
 
-export function BuildingView({ office, onOpenRooms }: Props) {
+/** Where the card of a clicked agent goes: beside the click, kept inside the building. */
+function cardPlace(pick: DeskPick, box: DOMRect | undefined): React.CSSProperties {
+  const width = box?.width ?? 1000
+  const height = box?.height ?? 600
+  const left = pick.x + 16 + 320 < width ? pick.x + 16 : Math.max(16, pick.x - 16 - 320)
+  return { left, top: Math.max(16, Math.min(pick.y - 40, height - 340)) }
+}
+
+export function BuildingView({ office, onOpenRooms, onOpenTask }: Props) {
   const tasks = useOfficeTasks(office.id)
   const activity = useActivity()
   const bubbles = useMemo(() => activityByDesk(activity.data, office.id), [activity.data, office.id])
@@ -52,6 +66,12 @@ export function BuildingView({ office, onOpenRooms }: Props) {
   const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
   const shown = useMemo(() => withDrafts(office, drafts), [office, drafts])
+  const wrapper = useRef<HTMLDivElement>(null)
+  const [picked, setPicked] = useState<{ pick: DeskPick; style: React.CSSProperties }>()
+  const [giving, setGiving] = useState<string>()
+  const [dressing, setDressing] = useState<string>()
+  const desks = useMemo(() => desksOf(office), [office])
+  const pickedDesk = desks.find((d) => d.id === picked?.pick.deskId)
   /** Changes the drafts from the office as they show it, whatever changed in between. */
   const edit = (change: (shown: OfficeView, drafts: Drafts) => Drafts) => setDrafts((d) => change(withDrafts(office, d), d))
   const stopArranging = () => {
@@ -73,8 +93,9 @@ export function BuildingView({ office, onOpenRooms }: Props) {
   }
 
   return (
-    <div className={arranging ? 'building arranging' : 'building'}>
+    <div className={arranging ? 'building arranging' : 'building'} ref={wrapper}>
       <BuildingCanvas
+        onPickDesk={(pick) => setPicked(pick ? { pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) } : undefined)}
         office={shown}
         tasks={tasks.data ?? noTasks}
         activities={bubbles}
@@ -99,6 +120,7 @@ export function BuildingView({ office, onOpenRooms }: Props) {
               type="button"
               className="btn"
               onClick={() => {
+                setPicked(undefined)
                 setArranging(true)
                 setSelection({ roomId: office.rooms[0].id })
               }}
@@ -131,6 +153,21 @@ export function BuildingView({ office, onOpenRooms }: Props) {
           )
         }
       />
+      {pickedDesk && picked && !arranging && (
+        <AgentCard
+          desk={pickedDesk}
+          theme={office.theme}
+          activity={bubbles.get(pickedDesk.id)}
+          tasks={(tasks.data ?? []).filter((t) => t.deskId === pickedDesk.id)}
+          style={picked.style}
+          onClose={() => setPicked(undefined)}
+          onOpenTask={onOpenTask}
+          onNewTask={() => setGiving(pickedDesk.id)}
+          onLook={() => setDressing(pickedDesk.id)}
+        />
+      )}
+      {giving && <NewTaskDialog key={giving} office={office} desks={desks} open initialDeskId={giving} onClose={() => setGiving(undefined)} />}
+      <LookDialog officeId={office.id} theme={office.theme} desk={desks.find((d) => d.id === dressing)} onClose={() => setDressing(undefined)} />
       {arranging && (
         <ArrangePanel
           office={shown}

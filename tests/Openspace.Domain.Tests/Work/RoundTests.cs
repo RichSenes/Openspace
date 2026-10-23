@@ -30,22 +30,22 @@ public class RoundTests
     public void Tokens_are_counted_on_the_round_they_were_spent_in()
     {
         var task = RunningTask();
-        task.RecordUsage(new TokenCount(1000, 200, 3000, 400));
-        task.RecordUsage(new TokenCount(500, 100, 0, 0));
+        task.RecordUsage(new TokenCount(1000, 200, 3000, 400), Now);
+        task.RecordUsage(new TokenCount(500, 100, 0, 0), Now);
         task.SubmitForReview(Now);
         task.SendBack(NoteAuthor.Human("elliot"), "Make it red.", Now);
-        task.RecordUsage(new TokenCount(10, 5, 0, 0));
+        task.RecordUsage(new TokenCount(10, 5, 0, 0), Now);
 
         Assert.Equal([(1, 1500L, 300L), (2, 10L, 5L)], task.Usage.Select(u => (u.Round, u.Input, u.Output)));
         Assert.Equal(new TokenCount(1510, 305, 3000, 400), task.TotalTokens);
-        Assert.Throws<DomainException>(() => task.RecordUsage(new TokenCount(-1, 0, 0, 0)));
+        Assert.Throws<DomainException>(() => task.RecordUsage(new TokenCount(-1, 0, 0, 0), Now));
     }
 
     [Fact]
     public void Checks_are_ticked_in_review_and_untouched_again_when_the_work_goes_back()
     {
         var task = RunningTask();
-        task.AddManualCheck("The button signs you out", " Tap Logout. ");
+        task.AddManualCheck("The button signs you out", " Tap Logout. ", Now);
         Assert.Throws<DomainException>(() => task.TickManualCheck(1, true, Now));
         task.SubmitForReview(Now);
 
@@ -54,7 +54,7 @@ public class RoundTests
 
         task.SendBack(NoteAuthor.Human("elliot"), "The menu broke.", Now.AddMinutes(2));
         Assert.False(task.ManualChecks[0].IsChecked);
-        Assert.Throws<DomainException>(() => task.AddManualCheck("Too late", null));
+        Assert.Throws<DomainException>(() => task.AddManualCheck("Too late", null, Now));
     }
 
     [Fact]
@@ -63,10 +63,10 @@ public class RoundTests
         var task = RunningTask();
         for (var i = 1; i <= WorkTask.MaxManualChecks; i++)
         {
-            Assert.Equal(i, task.AddManualCheck($"Check {i}", null));
+            Assert.Equal(i, task.AddManualCheck($"Check {i}", null, Now));
         }
 
-        Assert.Throws<DomainException>(() => task.AddManualCheck("One more", null));
-        Assert.Equal(3, task.AddManualCheck("check 3", "Repeated"));
+        Assert.Throws<DomainException>(() => task.AddManualCheck("One more", null, Now));
+        Assert.Equal(3, task.AddManualCheck("check 3", "Repeated", Now));
     }
 }

@@ -308,7 +308,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// Lists something a person must try by hand before merging. The same check listed twice
     /// is kept once. Returns its number.
     /// </summary>
-    public int AddManualCheck(string what, string? how)
+    public int AddManualCheck(string what, string? how, DateTimeOffset now)
     {
         if (Status is not (WorkTaskStatus.Running or WorkTaskStatus.Review))
         {
@@ -328,6 +328,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
         var check = new ManualCheck(_manualChecks.Count + 1, text, how?.Trim() is { Length: > 0 } h ? h[..Math.Min(h.Length, 1000)] : string.Empty);
         _manualChecks.Add(check);
+        Raise(new WorkTaskCheckListed(Id, check.Number, check.What, now));
         return check.Number;
     }
 
@@ -342,10 +343,11 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         var check = _manualChecks.Find(c => c.Number == number)
             ?? throw new DomainException($"There is no check {number} on this task.");
         check.Tick(done, now);
+        Raise(new WorkTaskCheckTicked(Id, number, done, now));
     }
 
     /// <summary>Counts what the agent spent on the current round.</summary>
-    public void RecordUsage(TokenCount tokens)
+    public void RecordUsage(TokenCount tokens, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(tokens);
         if (tokens.Input < 0 || tokens.Output < 0 || tokens.CacheRead < 0 || tokens.CacheWrite < 0)
@@ -361,6 +363,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         round.Add(tokens);
+        Raise(new WorkTaskTokensSpent(Id, Round, tokens, now));
     }
 
     public void Discard(DateTimeOffset now) => MoveTo(WorkTaskStatus.Discarded, now);

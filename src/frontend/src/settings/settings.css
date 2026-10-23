@@ -1,0 +1,78 @@
+.settings {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  max-width: 760px;
+  padding: 16px 20px 32px;
+}
+
+.settings-head {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-head h1 {
+  font-size: 20px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.settings-card legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+
+.settings-card h2 {
+  font-size: 15px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  cursor: pointer;
+}
+
+.choice input {
+  margin-top: 3px;
+}
+
+.choice > span {
+  display: grid;
+  gap: 2px;
+}
+
+.seats .input {
+  max-width: 120px;
+}
+
+.accounts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.accounts dt {
+  font-weight: 600;
+}
+
+.accounts dd {
+  margin: 0;
+}

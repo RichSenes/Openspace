@@ -1,7 +1,9 @@
+import { NeedsYou } from '../activity/NeedsYou'
+import { ClaudeMeter } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
 import './layout.css'
 
-export type View = 'building' | 'board' | 'rooms' | 'reports' | 'agents'
+export type View = 'building' | 'board' | 'rooms' | 'reports' | 'agents' | 'settings'
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'building', label: 'Building' },
@@ -9,6 +11,7 @@ const VIEWS: { id: View; label: string }[] = [
   { id: 'rooms', label: 'Rooms' },
   { id: 'reports', label: 'Reports' },
   { id: 'agents', label: 'Agents' },
+  { id: 'settings', label: 'Settings' },
 ]
 
 const LINK_LABEL: Record<LinkState, string> = {
@@ -40,9 +43,13 @@ export function TopBar({ view, onView, link }: Props) {
           </button>
         ))}
       </nav>
-      <span className={`link link-${link}`} title="Connection to the Openspace server">
-        {LINK_LABEL[link]}
-      </span>
+      <div className="topbar-end">
+        <NeedsYou />
+        <ClaudeMeter onOpen={() => onView('settings')} />
+        <span className={`link link-${link}`} title="Connection to the Openspace server">
+          {LINK_LABEL[link]}
+        </span>
+      </div>
     </header>
   )
 }

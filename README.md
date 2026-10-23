@@ -45,11 +45,15 @@ Each project has its own README with detailed specifications.
 3. While it works, the agent's todo list and tool calls become speech bubbles.
    Through Openspace's own MCP tools it can also leave notes on the task,
    announce what it is doing and re-read its brief.
-   If it asks for a permission, the desk waits for your answer.
-4. When it stops, the task goes to review with the agent's summary as a note and
-   the diff of its changes.
+   If it asks for a permission, Openspace answers on its own in auto mode
+   and the desk waits for your answer only for risky actions, such as
+   pushing, deploying or touching secrets.
+4. When it stops, the task goes to review with the agent's summary as a note,
+   the diff of its changes, the checks to try by hand and the tokens it spent.
+   Claude Code reviews it first when it is there.
 5. Accept commits the work on the task branch. Send back resumes the same
-   session with your feedback. Discard throws it all away.
+   session with your feedback, the review, or both: a new round. Discard
+   throws it all away.
 6. If the room has a required procedure (for example "back up every file before
    changing it"), the agent reports each step with evidence, and the work does
    not reach review until all of them are done.

@@ -184,3 +184,27 @@ textarea.input {
     animation: none !important;
   }
 }
+
+/* Token counts: numbers line up, labels on the left. */
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-table th,
+.token-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+.token-table th:first-child {
+  text-align: left;
+  font-weight: 400;
+}
+
+.token-table thead th {
+  color: var(--mute);
+  font-weight: 400;
+}

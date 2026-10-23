@@ -38,3 +38,31 @@
   height: 100%;
   background: var(--accent);
 }
+
+.claude-usage {
+  display: grid;
+  gap: 10px;
+}
+
+.claude-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--mute);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.claude-meter:hover {
+  color: var(--ink);
+}
+
+.claude-meter-limited {
+  border-color: var(--danger);
+  color: var(--ink);
+}

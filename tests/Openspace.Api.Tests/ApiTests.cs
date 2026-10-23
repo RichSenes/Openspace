@@ -168,6 +168,32 @@ public sealed class ApiTests : IDisposable
         Assert.Empty(cleared.Cuts);
     }
 
+    private sealed record Look(string Skin, string Hair, string HairStyle, string Cloth, string? Accessory, string? Outfit, string? Costume);
+
+    private sealed record DressedDesk(Guid Id, Look? Look);
+
+    private sealed record DressedRoom(List<DressedDesk> Desks);
+
+    private sealed record DressedOffice(List<DressedRoom> Rooms);
+
+    [Fact]
+    public async Task A_desk_can_be_dressed_and_undressed()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var url = $"/api/offices/{officeId}/desks/{deskId}/look";
+
+        var put = await _http.PutAsJsonAsync(url, new { skin = "deep", hair = "auburn", hairStyle = "long", cloth = "purple", outfit = "coat" });
+        var dressed = Assert.Single(Assert.Single((await GetAsync<DressedOffice>($"/api/offices/{officeId}")).Rooms).Desks).Look;
+        var bad = await _http.PutAsJsonAsync(url, new { skin = "deep", hair = "auburn", hairStyle = "long", cloth = "two words" });
+        (await _http.DeleteAsync(url)).EnsureSuccessStatusCode();
+        var undressed = Assert.Single(Assert.Single((await GetAsync<DressedOffice>($"/api/offices/{officeId}")).Rooms).Desks).Look;
+
+        Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        Assert.Equal(new Look("deep", "auburn", "long", "purple", null, "coat", null), dressed);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+        Assert.Null(undressed);
+    }
+
     [Fact]
     public async Task A_task_goes_from_queue_to_discarded_with_notes_by_the_operator()
     {

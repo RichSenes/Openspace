@@ -392,6 +392,51 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                                 .HasForeignKey("DeskId");
                                         });
 
+                                    b2.OwnsOne("Openspace.Domain.Offices.DeskLook", "Look", b3 =>
+                                        {
+                                            b3.Property<Guid>("DeskId")
+                                                .HasColumnType("TEXT");
+
+                                            b3.Property<string>("Accessory")
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookAccessory");
+
+                                            b3.Property<string>("Cloth")
+                                                .IsRequired()
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookCloth");
+
+                                            b3.Property<string>("Costume")
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookCostume");
+
+                                            b3.Property<string>("Hair")
+                                                .IsRequired()
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookHair");
+
+                                            b3.Property<string>("HairStyle")
+                                                .IsRequired()
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookHairStyle");
+
+                                            b3.Property<string>("Outfit")
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookOutfit");
+
+                                            b3.Property<string>("Skin")
+                                                .IsRequired()
+                                                .HasColumnType("TEXT")
+                                                .HasColumnName("LookSkin");
+
+                                            b3.HasKey("DeskId");
+
+                                            b3.ToTable("Desks");
+
+                                            b3.WithOwner()
+                                                .HasForeignKey("DeskId");
+                                        });
+
                                     b2.OwnsOne("Openspace.Domain.Offices.Spot", "Spot", b3 =>
                                         {
                                             b3.Property<Guid>("DeskId")
@@ -415,6 +460,8 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
                                     b2.Navigation("Agent")
                                         .IsRequired();
+
+                                    b2.Navigation("Look");
 
                                     b2.Navigation("Spot");
                                 });

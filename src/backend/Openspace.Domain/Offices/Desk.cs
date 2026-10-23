@@ -30,7 +30,12 @@ public sealed class Desk
     /// <summary>Where the desk stands in its room; null when the room places it automatically.</summary>
     public Spot? Spot { get; private set; }
 
+    /// <summary>How its agent looks, chosen by hand; null to let Openspace pick from the desk's id.</summary>
+    public DeskLook? Look { get; private set; }
+
     internal void MoveTo(Spot? spot) => Spot = spot;
+
+    internal void Dress(DeskLook? look) => Look = look;
 
     internal void Reassign(AgentProfile agent) => Agent = agent;
 

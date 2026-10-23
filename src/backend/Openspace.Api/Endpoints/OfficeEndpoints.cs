@@ -42,6 +42,9 @@ internal static class OfficeEndpoints
         }
     }
 
+    public sealed record DeskLookRequest(
+        string Skin, string Hair, string HairStyle, string Cloth, string? Accessory, string? Outfit, string? Costume);
+
     public sealed record PlannedRoomRequest(Guid RoomId, int Left, int Top, LayoutRequest Layout);
 
     public sealed record FloorPlanRequest(int Width, int Depth, IReadOnlyList<FurniturePiece>? Furniture, IReadOnlyList<PlannedRoomRequest>? Rooms, IReadOnlyList<FloorCut>? Cuts = null);
@@ -153,6 +156,21 @@ internal static class OfficeEndpoints
             Guid officeId, Guid deskId, NameRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.RenameDeskAsync(new OfficeId(officeId), new DeskId(deskId), request.Name, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/look", async (
+            Guid officeId, Guid deskId, DeskLookRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            var look = DeskLook.Create(request.Skin, request.Hair, request.HairStyle, request.Cloth, request.Accessory, request.Outfit, request.Costume);
+            await commands.DressDeskAsync(new OfficeId(officeId), new DeskId(deskId), look, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapDelete("/{officeId:guid}/desks/{deskId:guid}/look", async (
+            Guid officeId, Guid deskId, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.DressDeskAsync(new OfficeId(officeId), new DeskId(deskId), null, ct);
             return Results.NoContent();
         });
 

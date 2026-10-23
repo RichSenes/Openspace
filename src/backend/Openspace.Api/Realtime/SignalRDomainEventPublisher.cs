@@ -55,6 +55,7 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         DeskReassigned x => x.OfficeId,
         DeskRoleChanged x => x.OfficeId,
         DeskRenamed x => x.OfficeId,
+        DeskDressed x => x.OfficeId,
         _ => null,
     };
 

@@ -101,6 +101,13 @@ public sealed class OfficeCommands(
     }
 
     /// <summary>Gives a desk a role, or takes it away with null. Applies from the desk's next task.</summary>
+    public async Task DressDeskAsync(OfficeId officeId, DeskId deskId, DeskLook? look, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.DressDesk(deskId, look, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task SetDeskRoleAsync(OfficeId officeId, DeskId deskId, RoleId? roleId, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

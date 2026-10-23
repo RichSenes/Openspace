@@ -217,6 +217,13 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new DeskRoleChanged(Id, deskId, roleId, now));
     }
 
+    /// <summary>Dresses the agent at a desk; null gives it back the look picked from its id.</summary>
+    public void DressDesk(DeskId deskId, DeskLook? look, DateTimeOffset now)
+    {
+        FindDesk(deskId).Dress(look);
+        Raise(new DeskDressed(Id, deskId, now));
+    }
+
     public bool UsesRole(RoleId roleId) => _rooms.Exists(r => r.Desks.Any(d => d.RoleId == roleId));
 
     public bool HasDesk(DeskId deskId) => _rooms.Exists(r => r.Desks.Any(d => d.Id == deskId));

@@ -24,7 +24,7 @@ internal sealed class OpenCodeRuntime(
         string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(setup);
-        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions) };
+        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions, setup.PrivatePaths ?? []) };
 
         using var response = await http
             .PostAsJsonAsync(In("session", workspacePath), body, cancellationToken)
@@ -62,11 +62,11 @@ internal sealed class OpenCodeRuntime(
     }
 
     public async Task<string> PlanAsync(
-        string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
         using var schema = JsonDocument.Parse(jsonSchema);
         var format = new { type = "json_schema", schema = schema.RootElement, retryCount = 2 };
-        using var reply = await AskReadOnlyAsync(folder, "Openspace plan", instructions, text, format, cancellationToken).ConfigureAwait(false);
+        using var reply = await AskReadOnlyAsync(folder, "Openspace plan", instructions, text, format, cancellationToken, privatePaths).ConfigureAwait(false);
         var info = reply.RootElement.GetProperty("info");
         if (info.TryGetProperty("structured", out var structured) && structured.ValueKind == JsonValueKind.Object)
         {
@@ -84,12 +84,12 @@ internal sealed class OpenCodeRuntime(
     /// or use the web. The session is deleted afterwards.
     /// </summary>
     private async Task<JsonDocument> AskReadOnlyAsync(
-        string folder, string title, string instructions, string text, object? format, CancellationToken cancellationToken)
+        string folder, string title, string instructions, string text, object? format, CancellationToken cancellationToken, IReadOnlyList<string>? privatePaths = null)
     {
         var sessionId = await CreateSessionAsync(
             folder,
             title,
-            new AgentSetup("plan", null, null, new RolePermissions(PermissionLevel.Deny, PermissionLevel.Deny, PermissionLevel.Deny)),
+            new AgentSetup("plan", null, null, new RolePermissions(PermissionLevel.Deny, PermissionLevel.Deny, PermissionLevel.Deny), PrivatePaths: privatePaths),
             cancellationToken).ConfigureAwait(false);
         try
         {
@@ -232,7 +232,8 @@ internal sealed class OpenCodeRuntime(
     /// that always keeps the agent inside its own folder unless a person agrees.
     /// Read-only sessions (all denied) may not leave it at all.
     /// </summary>
-    private static object[] Rules(RolePermissions? permissions)
+    /// <summary>What an agent may touch, in OpenCode's terms. Later rules win, so private folders come last.</summary>
+    internal static object[] Rules(RolePermissions? permissions, IReadOnlyList<string> privatePaths)
     {
         var outside = permissions is { Edit: PermissionLevel.Deny, Bash: PermissionLevel.Deny, Web: PermissionLevel.Deny } ? "deny" : "ask";
         var rules = new List<object> { new { permission = "external_directory", pattern = "*", action = outside } };
@@ -243,8 +244,22 @@ internal sealed class OpenCodeRuntime(
             rules.Add(new { permission = "webfetch", pattern = "*", action = Action(permissions.Web) });
         }
 
+        foreach (var folder in privatePaths)
+        {
+            foreach (var permission in PathPermissions)
+            {
+                rules.Add(new { permission, pattern = folder, action = "deny" });
+                rules.Add(new { permission, pattern = $"{folder}/*", action = "deny" });
+            }
+
+            rules.Add(new { permission = "bash", pattern = $"*{folder}*", action = "deny" });
+        }
+
         return [.. rules];
     }
+
+    /// <summary>OpenCode permissions that name a path, all refused for private folders.</summary>
+    private static readonly string[] PathPermissions = ["external_directory", "read", "edit", "glob", "grep", "list"];
 
     private static string Action(PermissionLevel level) => level switch
     {

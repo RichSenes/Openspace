@@ -123,14 +123,22 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        if (MayAllowOnItsOwn(task, action))
+        var privatePaths = await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false);
+        if (PermissionPolicy.PrivateFolder(action, privatePaths) is { } folder)
+        {
+            await runtime.ReplyToPermissionAsync(permissionId, task.Run!.WorkspacePath, false, cancellationToken).ConfigureAwait(false);
+            await RefusePrivateAsync(task, action, folder, permissionId, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0))
         {
             await runtime.ReplyToPermissionAsync(permissionId, task.Run!.WorkspacePath, true, cancellationToken).ConfigureAwait(false);
             await LogAsync(AllowedOnItsOwn(task, action, permissionId), cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        await LogAsync(Asked(task, action, permissionId), cancellationToken).ConfigureAwait(false);
+        await LogAsync(Asked(task, action, permissionId, privatePaths.Count > 0), cancellationToken).ConfigureAwait(false);
         await ShowWaitingAsync(task, permissionId, action, cancellationToken).ConfigureAwait(false);
     }
 
@@ -143,14 +151,21 @@ public sealed partial class AgentSignals(
     {
         ArgumentNullException.ThrowIfNull(action);
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
-        if (MayAllowOnItsOwn(task, action))
+        var privatePaths = await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false);
+        if (PermissionPolicy.PrivateFolder(action, privatePaths) is { } folder)
+        {
+            await RefusePrivateAsync(task, action, folder, null, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0))
         {
             await LogAsync(AllowedOnItsOwn(task, action, null), cancellationToken).ConfigureAwait(false);
             return true;
         }
 
         var id = permissions.Open(task.Run!.SessionId, task.Run.WorkspacePath, action with { Target = Guard(action.Target, "Permission", 2000) });
-        await LogAsync(Asked(task, action, id), cancellationToken).ConfigureAwait(false);
+        await LogAsync(Asked(task, action, id, privatePaths.Count > 0), cancellationToken).ConfigureAwait(false);
 
         // Another request of the same agent may be on show: this one waits its turn.
         if (activity.ForTask(task.Id.Value) is not { Kind: ActivityKind.Waiting })
@@ -161,12 +176,27 @@ public sealed partial class AgentSignals(
         return await permissions.WaitAsync(id, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task<IReadOnlyList<string>> PrivatePathsAsync(WorkTask task, CancellationToken cancellationToken) =>
+        (await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false)).PrivatePaths;
+
+    /// <summary>A request naming a private folder: refused at once, and said so on the task.</summary>
+    private async Task RefusePrivateAsync(WorkTask task, AgentAction action, string folder, string? permissionId, CancellationToken cancellationToken)
+    {
+        var now = clock.GetUtcNow();
+        task.AddNote(NoteAuthor.System, $"Refused on its own: the agent asked to {ActionPhrases.Request(action)}, which touches the private folder {folder}. Nobody was asked: private folders are never opened.", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await LogAsync(
+            AuditEntry.Record(task.Id, now, AuditKind.Permission, $"Refused on its own: {ActionPhrases.Request(action)}", $"Private folder: {folder}", externalId: permissionId),
+            cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Whether Openspace answers this request without a person: in auto mode, unless it is risky.</summary>
-    public bool MayAllowOnItsOwn(WorkTask task, AgentAction action)
+    /// <param name="guarded">The office has private folders: commands climbing above the copy need a person too.</param>
+    public bool MayAllowOnItsOwn(WorkTask task, AgentAction action, bool guarded = false)
     {
         ArgumentNullException.ThrowIfNull(task);
         return agentOptions.CurrentValue.Autonomy == Autonomy.Auto
-            && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath) is null;
+            && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath, guarded) is null;
     }
 
     /// <summary>A permission was answered in OpenCode itself.</summary>
@@ -192,21 +222,22 @@ public sealed partial class AgentSignals(
             .ConfigureAwait(false);
 
         var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
-        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action)) is { } next)
+        var guarded = (await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false)).Count > 0;
+        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action, guarded)) is { } next)
         {
             await ShowWaitingAsync(task, next.Id, next.Action, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private AuditEntry Asked(WorkTask task, AgentAction action, string permissionId) =>
-        AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked to {ActionPhrases.Request(action)}", Reason(task, action), externalId: permissionId);
+    private AuditEntry Asked(WorkTask task, AgentAction action, string permissionId, bool guarded) =>
+        AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Asked to {ActionPhrases.Request(action)}", Reason(task, action, guarded), externalId: permissionId);
 
     private AuditEntry AllowedOnItsOwn(WorkTask task, AgentAction action, string? permissionId) =>
         AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Permission, $"Allowed on its own: {ActionPhrases.Request(action)}", action.Target, externalId: permissionId);
 
     /// <summary>Why a person is asked: in auto mode, what makes the request risky.</summary>
-    private string? Reason(WorkTask task, AgentAction action) =>
-        agentOptions.CurrentValue.Autonomy == Autonomy.Auto && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath) is { } why
+    private string? Reason(WorkTask task, AgentAction action, bool guarded) =>
+        agentOptions.CurrentValue.Autonomy == Autonomy.Auto && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath, guarded) is { } why
             ? $"{action.Target}\nA person decides because {why}."
             : action.Target;
 
@@ -267,7 +298,7 @@ public sealed partial class AgentSignals(
 
         var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
         var (_, desk) = office.Locate(task.DeskId!.Value);
-        var setup = await setups.ForDeskAsync(desk, cancellationToken).ConfigureAwait(false);
+        var setup = await setups.ForDeskAsync(desk, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
         await ShowAsync(task, ActivityKind.Working, null, "Back to the required procedure", null, cancellationToken).ConfigureAwait(false);
         await runtime.PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, setup, Briefing.ForMissingSteps(task), cancellationToken)
             .ConfigureAwait(false);

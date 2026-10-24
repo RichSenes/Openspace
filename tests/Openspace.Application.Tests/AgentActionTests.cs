@@ -76,4 +76,24 @@ public class AgentActionTests
         Assert.NotNull(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.OutsideFolder, "/srv/other"), Workspace));
         Assert.Null(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.Fetch, "https://example.org/docs"), Workspace));
     }
+
+    [Theory]
+    [InlineData("cat ../../media/library/prompts.db")]
+    [InlineData("cd .. && ls")]
+    [InlineData("ls ..")]
+    public void In_an_office_with_private_folders_climbing_above_the_copy_needs_a_person(string command)
+    {
+        Assert.Contains("climbs above", PermissionPolicy.NeedsPerson(Run(command), Workspace, guarded: true), StringComparison.Ordinal);
+        Assert.Null(PermissionPolicy.NeedsPerson(Run("npm run build -- --outDir dist/..app"), Workspace, guarded: true));
+    }
+
+    [Fact]
+    public void An_action_naming_a_private_folder_is_found_whatever_its_kind()
+    {
+        string[] folders = ["/srv/media/library"];
+
+        Assert.Equal("/srv/media/library", PermissionPolicy.PrivateFolder(Run("sqlite3 /srv/media/library/prompts.db .tables"), folders));
+        Assert.Equal("/srv/media/library", PermissionPolicy.PrivateFolder(new AgentAction(ActionKind.OutsideFolder, "/srv/media/library/thumbs"), folders));
+        Assert.Null(PermissionPolicy.PrivateFolder(Run("npm test"), folders));
+    }
 }

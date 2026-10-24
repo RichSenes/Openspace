@@ -31,9 +31,29 @@ public static partial class PermissionPolicy
     private static readonly string[] HarmlessRoots = ["/dev/", "/tmp/", "/usr/", "/bin/", "/proc/"];
 
     /// <returns>Why a person must decide, or null when Openspace may allow it.</returns>
-    public static string? NeedsPerson(AgentAction action, string workspacePath)
+    /// <summary>
+    /// The private folder an action names, if any: such actions are refused whatever the
+    /// mode, without asking anyone.
+    /// </summary>
+    public static string? PrivateFolder(AgentAction action, IReadOnlyList<string> privatePaths)
     {
         ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(privatePaths);
+        return privatePaths.FirstOrDefault(p => action.Target.Contains(p, StringComparison.Ordinal));
+    }
+
+    /// <param name="guarded">
+    /// The office has private folders: then climbing above the working copy with <c>..</c>,
+    /// a way around naming them, is for a person to decide too.
+    /// </param>
+    public static string? NeedsPerson(AgentAction action, string workspacePath, bool guarded = false)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (guarded && action.Kind is ActionKind.Run or ActionKind.Edit or ActionKind.Write && ParentPathPattern().IsMatch(action.Target))
+        {
+            return "it climbs above the task's working copy, in an office with private folders";
+        }
+
         return action.Kind switch
         {
             ActionKind.OutsideFolder => "it reaches outside the task's working copy",
@@ -109,6 +129,9 @@ public static partial class PermissionPolicy
     }
 
     /// <summary>Environment files (not their examples), keys, keystores and credentials.</summary>
+    [GeneratedRegex(@"(^|[\s'""=/])\.\.(/|\s|$)")]
+    private static partial Regex ParentPathPattern();
+
     [GeneratedRegex(@"(^|[\s/'""=])\.env(\.(?!example|sample|template)[\w-]+)?($|[\s'""])|\.pem\b|\.p12\b|\.keystore\b|\.jks\b|id_rsa|id_ed25519|\.ssh/|credentials\.json|\.npmrc\b|\.netrc\b", RegexOptions.IgnoreCase)]
     private static partial Regex SecretPattern();
 

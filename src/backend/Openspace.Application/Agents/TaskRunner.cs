@@ -64,7 +64,7 @@ public sealed partial class TaskRunner(
                 return;
             }
 
-            var setup = await setups.ForDeskAsync(desk, cancellationToken).ConfigureAwait(false);
+            var setup = await setups.ForDeskAsync(desk, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
             string message;
             if (task.Run is null)
             {

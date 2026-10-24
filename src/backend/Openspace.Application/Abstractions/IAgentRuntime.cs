@@ -28,13 +28,17 @@ public interface IAgentRuntime
     /// Lets a model read a folder (it may not change anything) and answer with JSON that
     /// matches <paramref name="jsonSchema"/>. Returns that JSON.
     /// </summary>
-    Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken);
+    /// <param name="privatePaths">Folders the model may never touch, whatever it is asked.</param>
+    Task<string> PlanAsync(
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken);
 
     /// <summary>
     /// Lets the reviewer read a working copy, and the changes in it through git, and answer
     /// with JSON that matches <paramref name="jsonSchema"/>. Null when no reviewer is set up.
     /// </summary>
-    Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken);
+    /// <param name="privatePaths">Folders the reviewer may never touch, whatever it is asked.</param>
+    Task<string?> ReviewAsync(
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken);
 
     /// <summary>Gives agents working in this folder the Openspace tools, tied to this task.</summary>
     Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken);

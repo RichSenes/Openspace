@@ -86,13 +86,13 @@ public sealed class Supervisor(
         }
 
         var prompt = Prompt(office, desks, request.Trim());
-        var (title, planned) = await AskAsync(office.RepositoryPath, prompt, desks, cancellationToken).ConfigureAwait(false);
+        var (title, planned) = await AskAsync(office.RepositoryPath, prompt, desks, office.PrivatePaths, cancellationToken).ConfigureAwait(false);
 
         // Small models sometimes drop or misspell the desk. The plan itself is fine, so
         // instead of planning again ask one short question: which desk for each task.
         if (desks.Count > 1 && planned.Any(p => Match(desks, p.Desk) is null))
         {
-            planned = await AssignDesksAsync(office.RepositoryPath, planned, desks, cancellationToken).ConfigureAwait(false);
+            planned = await AssignDesksAsync(office.RepositoryPath, planned, desks, office.PrivatePaths, cancellationToken).ConfigureAwait(false);
         }
 
         if (planned.Count == 0)
@@ -141,7 +141,7 @@ public sealed class Supervisor(
 
     /// <summary>Fills in the desk of tasks that have none, with a short answer limited to real desk names.</summary>
     private async Task<List<Planned>> AssignDesksAsync(
-        string folder, List<Planned> planned, List<DeskInfo> desks, CancellationToken cancellationToken)
+        string folder, List<Planned> planned, List<DeskInfo> desks, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
         var names = desks.Select(d => d.Name).ToArray();
         var schema = JsonSerializer.Serialize(new
@@ -178,7 +178,7 @@ public sealed class Supervisor(
         try
         {
             var json = await runtime
-                .PlanAsync(folder, "You assign tasks to the desks of a team of AI agents, by what each desk is for.", question.ToString(), schema, cancellationToken)
+                .PlanAsync(folder, "You assign tasks to the desks of a team of AI agents, by what each desk is for.", question.ToString(), schema, privatePaths, cancellationToken)
                 .ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             var chosen = doc.RootElement.TryGetProperty("desks", out var list) && list.ValueKind == JsonValueKind.Array
@@ -196,12 +196,12 @@ public sealed class Supervisor(
     }
 
     private async Task<(string Title, List<Planned> Tasks)> AskAsync(
-        string folder, string prompt, List<DeskInfo> desks, CancellationToken cancellationToken)
+        string folder, string prompt, List<DeskInfo> desks, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
         try
         {
             var json = await runtime
-                .PlanAsync(folder, Instructions, prompt, Schema(desks.Select(d => d.Name)), cancellationToken)
+                .PlanAsync(folder, Instructions + Agents.Briefing.PrivateRule(privatePaths), prompt, Schema(desks.Select(d => d.Name)), privatePaths, cancellationToken)
                 .ConfigureAwait(false);
             return Read(json);
         }

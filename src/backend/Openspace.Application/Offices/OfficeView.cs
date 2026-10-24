@@ -4,6 +4,7 @@ namespace Openspace.Application.Offices;
 
 /// <param name="FloorWidth">The building's size in tiles, like <paramref name="FloorDepth"/>; null while it is laid out automatically.</param>
 /// <param name="Furniture">The furniture of the common floor, in pixels from the building's corner.</param>
+/// <param name="PrivatePaths">Folders no agent of the office may touch in any way.</param>
 /// <param name="Cuts">The pieces cut out of the building's rectangle, in tiles from its corner.</param>
 public sealed record OfficeView(
     Guid Id,
@@ -14,7 +15,8 @@ public sealed record OfficeView(
     int? FloorWidth,
     int? FloorDepth,
     IReadOnlyList<FurniturePiece> Furniture,
-    IReadOnlyList<FloorCut> Cuts)
+    IReadOnlyList<FloorCut> Cuts,
+    IReadOnlyList<string> PrivatePaths)
 {
     public static OfficeView From(Office office)
     {
@@ -28,7 +30,8 @@ public sealed record OfficeView(
             office.FloorWidth,
             office.FloorDepth,
             [.. office.Furniture],
-            [.. office.Cuts]);
+            [.. office.Cuts],
+            [.. office.PrivatePaths]);
     }
 }
 

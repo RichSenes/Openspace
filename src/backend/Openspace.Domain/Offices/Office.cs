@@ -12,7 +12,11 @@ public sealed class Office : AggregateRoot<OfficeId>
     public const string DefaultTheme = "cozy";
 
     private readonly List<Room> _rooms = [];
+    public const int MaxPrivatePaths = 20;
+
     private List<FurniturePiece> _furniture = [];
+
+    private List<string> _privatePaths = [];
     private List<FloorCut> _cuts = [];
 
     private Office(OfficeId id, string name)
@@ -42,6 +46,12 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     /// <summary>The pieces cut out of the building's rectangle, giving it its shape.</summary>
     public IReadOnlyList<FloorCut> Cuts => _cuts;
+
+    /// <summary>
+    /// Folders of the person's own that no agent of this office may open, list, read, search or
+    /// change, whatever it is asked: Openspace refuses every action that names them.
+    /// </summary>
+    public IReadOnlyList<string> PrivatePaths => _privatePaths;
 
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
@@ -96,6 +106,34 @@ public sealed class Office : AggregateRoot<OfficeId>
         }
 
         return name;
+    }
+
+    /// <summary>Replaces the private folders: absolute paths, kept without a trailing slash.</summary>
+    public void SetPrivatePaths(IEnumerable<string> paths, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        var cleaned = new List<string>();
+        foreach (var raw in paths.Where(p => !string.IsNullOrWhiteSpace(p)))
+        {
+            var path = Guard.NotBlank(raw, "Private folder", 1024).TrimEnd('/', '\\');
+            if (!System.IO.Path.IsPathFullyQualified(path) || path.Length < 2)
+            {
+                throw new DomainException($"Private folder '{raw.Trim()}' must be an absolute path, and not the whole disk.");
+            }
+
+            if (!cleaned.Contains(path, StringComparer.Ordinal))
+            {
+                cleaned.Add(path);
+            }
+        }
+
+        if (cleaned.Count > MaxPrivatePaths)
+        {
+            throw new DomainException($"An office lists at most {MaxPrivatePaths} private folders.");
+        }
+
+        _privatePaths = cleaned;
+        Raise(new OfficePrivatePathsSet(Id, now));
     }
 
     public void SetRepository(string path, DateTimeOffset now)

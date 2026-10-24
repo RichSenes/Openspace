@@ -25,6 +25,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
             piece.Property(p => p.Name).IsRequired();
         });
         builder.Navigation(o => o.Furniture).HasField("_furniture").UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.PrimitiveCollection(o => o.PrivatePaths).HasField("_privatePaths").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.OwnsMany(o => o.Cuts, cut =>
         {
             cut.ToTable("FloorCuts");

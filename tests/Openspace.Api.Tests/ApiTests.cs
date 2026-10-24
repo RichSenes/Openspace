@@ -529,4 +529,17 @@ public sealed class ApiTests : IDisposable
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Private_folders_are_set_and_read_back_and_must_be_absolute()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/private-paths", new { paths = (string[])["/srv/media/library/"] })).EnsureSuccessStatusCode();
+        var relative = await _http.PutAsJsonAsync($"/api/offices/{officeId}/private-paths", new { paths = (string[])["media"] });
+
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+        Assert.Equal("/srv/media/library", office.GetProperty("privatePaths")[0].GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, relative.StatusCode);
+    }
 }

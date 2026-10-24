@@ -19,6 +19,9 @@ internal static class OfficeEndpoints
     /// <param name="Mood">A theme for this room only; null to follow the office.</param>
     public sealed record MoodRequest(string? Mood);
 
+    /// <param name="Paths">Absolute folders no agent of the office may touch; empty clears them.</param>
+    public sealed record PrivatePathsRequest(IReadOnlyList<string>? Paths);
+
     /// <param name="Command">What tells whether the room's code works, e.g. <c>dotnet test</c>; null removes it.</param>
     public sealed record CheckRequest(string? Command);
 
@@ -137,6 +140,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid roomId, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.ClearRoomLayoutAsync(new OfficeId(officeId), new RoomId(roomId), ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/private-paths", async (
+            Guid officeId, PrivatePathsRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetPrivatePathsAsync(new OfficeId(officeId), request.Paths ?? [], ct);
             return Results.NoContent();
         });
 

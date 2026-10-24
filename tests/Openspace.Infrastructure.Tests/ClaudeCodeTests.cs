@@ -152,13 +152,45 @@ public class ClaudeCodeRuntimeTests : IDisposable
         return path;
     }
 
-    private static ClaudeCodeRuntime Runtime(string command, bool enabled = true) => new(
+    private static ClaudeCodeRuntime Runtime(string command, bool enabled = true, Func<AgentSignal, Task>? dispatch = null) => new(
         Options.Create(new ClaudeCodeOptions { Command = command, Enabled = enabled }),
         Options.Create(new OpenCodeOptions { ToolsUrl = new Uri("http://127.0.0.1:5145/mcp") }),
         new PermissionRequests(),
         new ClaudeCodeUsage(TimeProvider.System),
         new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
-        NullLogger<ClaudeCodeRuntime>.Instance);
+        NullLogger<ClaudeCodeRuntime>.Instance,
+        dispatch);
+
+    [Fact]
+    public async Task The_end_of_a_run_can_start_the_next_one_on_the_same_session()
+    {
+        // As a procedure reminder does: the run ends, and its end resumes the session at once.
+        var finished = new List<AgentSignal>();
+        var second = new TaskCompletionSource();
+        ClaudeCodeRuntime? runtime = null;
+        var setup = new AgentSetup("build", null, null, null, Domain.Offices.AgentEngine.ClaudeCode);
+        string? session = null;
+        runtime = Runtime(FakeClaude("""{"type":"result","is_error":false,"result":"Stopped early."}"""), dispatch: async signal =>
+        {
+            finished.Add(signal);
+            if (finished.Count == 1)
+            {
+                await runtime!.PromptAsync(session!, _folder, setup, "Finish the procedure.", default);
+            }
+            else
+            {
+                second.TrySetResult();
+            }
+        });
+        session = runtime.CreateSession(_folder);
+
+        await runtime.PromptAsync(session, _folder, setup, "Do the task.", default);
+
+        await second.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.All(finished, s => Assert.IsType<AgentSignal.Finished>(s));
+        Assert.Equal(2, finished.Count);
+        runtime.Dispose();
+    }
 
     [Fact]
     public void A_role_gets_its_tools_and_uses_without_asking_only_what_it_allows()

@@ -26,8 +26,12 @@ internal sealed partial class ClaudeCodeRuntime(
     PermissionRequests permissions,
     ClaudeCodeUsage usage,
     IServiceScopeFactory scopes,
-    ILogger<ClaudeCodeRuntime> logger) : IDisposable
+    ILogger<ClaudeCodeRuntime> logger,
+    Func<AgentSignal, Task>? dispatch = null) : IDisposable
 {
+    /// <summary>Where signals go: the application, or a test.</summary>
+    private readonly Func<AgentSignal, Task> _dispatch = dispatch ?? (signal => AgentSignalDispatch.DispatchAsync(scopes, signal, logger, CancellationToken.None));
+
     /// <summary>Session ids of Claude Code start with this, so they are told from OpenCode's.</summary>
     public const string SessionPrefix = "claude-";
 
@@ -118,7 +122,21 @@ internal sealed partial class ClaudeCodeRuntime(
         session.Aborted = false;
         var process = Start(workspacePath, args, text);
         session.Process = process;
-        session.Following = Task.Run(() => FollowAsync(sessionId, session, process), CancellationToken.None);
+        var reading = Task.Run(() => ReadRunAsync(sessionId, session, process), CancellationToken.None);
+        session.Following = reading;
+        _ = AnnounceEndAsync(reading);
+    }
+
+    /// <summary>
+    /// Says how a run ended once it is fully read. Apart from the reading, so whatever the end
+    /// sets off (a reminder resuming this same session, say) does not wait for itself.
+    /// </summary>
+    private async Task AnnounceEndAsync(Task<IReadOnlyList<AgentSignal>> reading)
+    {
+        foreach (var signal in await reading.ConfigureAwait(false))
+        {
+            await _dispatch(signal).ConfigureAwait(false);
+        }
     }
 
     /// <summary>The command line of an agent's run: the role's tools, Openspace's tools, and nothing of anyone's settings.</summary>
@@ -190,7 +208,8 @@ internal sealed partial class ClaudeCodeRuntime(
         });
     }
 
-    private async Task FollowAsync(string sessionId, Session session, Process process)
+    /// <summary>Reads a run to its end, passing on its progress; returns how it ended, nothing when aborted.</summary>
+    private async Task<IReadOnlyList<AgentSignal>> ReadRunAsync(string sessionId, Session session, Process process)
     {
         var events = new ClaudeCodeEvents(sessionId);
         var ending = new List<AgentSignal>();
@@ -228,7 +247,7 @@ internal sealed partial class ClaudeCodeRuntime(
                     }
                     else
                     {
-                        await AgentSignalDispatch.DispatchAsync(scopes, signal, logger, CancellationToken.None).ConfigureAwait(false);
+                        await _dispatch(signal).ConfigureAwait(false);
                     }
                 }
             }
@@ -248,7 +267,7 @@ internal sealed partial class ClaudeCodeRuntime(
 
         if (session.Aborted)
         {
-            return;
+            return [];
         }
 
         if (ending.Count == 0)
@@ -258,10 +277,7 @@ internal sealed partial class ClaudeCodeRuntime(
                 sessionId, $"Claude Code stopped without finishing{(detail.Length > 0 ? $": {detail[..Math.Min(300, detail.Length)]}" : ".")}", usage));
         }
 
-        foreach (var signal in ending)
-        {
-            await AgentSignalDispatch.DispatchAsync(scopes, signal, logger, CancellationToken.None).ConfigureAwait(false);
-        }
+        return ending;
     }
 
     public Task AbortAsync(string sessionId)

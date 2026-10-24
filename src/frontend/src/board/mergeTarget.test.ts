@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultMergeTarget } from './mergeTarget'
+import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
 
 describe('defaultMergeTarget', () => {
   it('prefers the branch you have checked out', () => {
@@ -14,5 +14,19 @@ describe('defaultMergeTarget', () => {
     expect(defaultMergeTarget({ current: null, branches: ['release'] })).toBe('release')
     expect(defaultMergeTarget({ current: null, branches: [] })).toBe('')
     expect(defaultMergeTarget(undefined)).toBe('')
+  })
+})
+
+describe('mergeBlocker', () => {
+  const list = { current: 'beta', branches: ['beta', 'main'], uncommittedChanges: 11 }
+
+  it('warns before merging into a checkout with uncommitted changes', () => {
+    expect(mergeBlocker(list, 'beta')).toContain('11 uncommitted changes')
+  })
+
+  it('lets other branches and a clean checkout through', () => {
+    expect(mergeBlocker(list, 'main')).toBeNull()
+    expect(mergeBlocker({ ...list, uncommittedChanges: 0 }, 'beta')).toBeNull()
+    expect(mergeBlocker(undefined, 'beta')).toBeNull()
   })
 })

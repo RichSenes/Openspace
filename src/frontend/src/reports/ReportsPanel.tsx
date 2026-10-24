@@ -96,7 +96,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             <FileText size={16} /> Write epic report
           </button>
         </form>
-        <form className="report-form" onSubmit={writeChangelog}>
+        <form className="report-form report-form-wide" onSubmit={writeChangelog}>
           <div className="field">
             <span>A changelog for the people who use it</span>
             <p className="hint report-form-hint">

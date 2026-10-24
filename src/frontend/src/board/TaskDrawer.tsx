@@ -12,7 +12,7 @@ import {
   useTaskDiff,
   useTaskText,
 } from '../api/hooks'
-import { defaultMergeTarget } from './mergeTarget'
+import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
 import { TaskLog } from './TaskLog'
 import type { WorkTaskView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
@@ -48,6 +48,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
   const merge = useMergeTask()
   const [mergeTarget, setMergeTarget] = useState('')
   const target = mergeTarget || defaultMergeTarget(branches.data)
+  const mergeBlocked = mergeBlocker(branches.data, target)
   const [approveDesk, setApproveDesk] = useState(task.deskId ?? '')
   const [feedback, setFeedback] = useState('')
   const [writingFeedback, setWritingFeedback] = useState(false)
@@ -266,11 +267,16 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
                     ))}
                   </select>
                 </label>
+                {mergeBlocked && (
+                  <p className="merge-blocker" role="alert">
+                    {mergeBlocked}
+                  </p>
+                )}
                 <div className="row">
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={!target || merge.isPending}
+                    disabled={!target || Boolean(mergeBlocked) || merge.isPending}
                     onClick={() => merge.mutate({ taskId: task.id, target }, { onSuccess: () => toast(`Merged into ${target}`) })}
                   >
                     Merge into {target || '…'}

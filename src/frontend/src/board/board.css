@@ -712,3 +712,7 @@
 .column-more {
   justify-content: center;
 }
+
+.card-review svg {
+  flex-shrink: 0;
+}

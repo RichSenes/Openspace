@@ -21,8 +21,9 @@ internal abstract record AgentSignal(string SessionId)
 
     public sealed record Failed(string SessionId, string Reason) : AgentSignal(SessionId);
 
-    /// <summary>The engine's account is over its usage limits; they reset at <paramref name="Until"/> when known.</summary>
-    public sealed record OutOfLimits(string SessionId, AgentEngine Engine, DateTimeOffset? Until, string Reason) : AgentSignal(SessionId);
+    /// <summary>The agent's account is over its usage limits; they reset at <paramref name="Until"/> when known.</summary>
+    /// <param name="Scope">The account, as <see cref="EngineLimits"/> names it.</param>
+    public sealed record OutOfLimits(string SessionId, string Scope, DateTimeOffset? Until, string Reason) : AgentSignal(SessionId);
 
     /// <summary>Tokens a session spent; <paramref name="MessageId"/> names the answer, so it is counted once.</summary>
     public sealed record Used(string SessionId, TokenCount Tokens, string? MessageId = null) : AgentSignal(SessionId);

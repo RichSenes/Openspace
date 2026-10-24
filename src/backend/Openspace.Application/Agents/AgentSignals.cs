@@ -282,11 +282,12 @@ public sealed partial class AgentSignals(
     }
 
     /// <summary>
-    /// The engine stopped because its account is over its usage limits: the task goes back
-    /// in the queue, and the engine's desks wait until <paramref name="until"/>.
+    /// The agent's account is over its usage limits: the task goes back in the queue, the
+    /// session stops retrying, and the desks on that account wait until <paramref name="until"/>.
     /// </summary>
+    /// <param name="scope">The account, as <see cref="EngineLimits"/> names it.</param>
     public async Task OutOfLimitsAsync(
-        string sessionId, Domain.Offices.AgentEngine engine, DateTimeOffset? until, string reason, CancellationToken cancellationToken)
+        string sessionId, string scope, DateTimeOffset? until, string reason, CancellationToken cancellationToken)
     {
         var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
         if (task is null)
@@ -294,9 +295,9 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        limits.Pause(engine, until);
+        limits.Pause(scope, until);
         var now = clock.GetUtcNow();
-        var resumes = limits.PausedUntil(engine) ?? now;
+        var resumes = limits.PausedUntil(scope) ?? now;
         task.AddNote(
             NoteAuthor.System,
             $"{reason} Back in the queue: it starts again by itself after {resumes.ToLocalTime():HH:mm}, where it left off.",
@@ -304,6 +305,9 @@ public sealed partial class AgentSignals(
         task.Requeue(now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
+
+        // OpenCode would keep retrying until the reset: the queue starts it again instead.
+        await runtime.AbortAsync(sessionId, task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task FailedAsync(string sessionId, string reason, CancellationToken cancellationToken)

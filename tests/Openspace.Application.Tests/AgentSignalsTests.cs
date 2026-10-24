@@ -245,11 +245,11 @@ public class AgentSignalsTests
         await _h.Runner(seats: 2).RunQueueAsync(default);
         var resets = Harness.Start.AddHours(2);
 
-        await _h.Signals().OutOfLimitsAsync(task.Run!.SessionId, AgentEngine.ClaudeCode, resets, "The Claude account is over its usage limits.", default);
+        await _h.Signals().OutOfLimitsAsync(task.Run!.SessionId, EngineLimits.ClaudeCode, resets, "The Claude account is over its usage limits.", default);
 
         Assert.Equal(WorkTaskStatus.Queued, task.Status);
         Assert.Contains("starts again by itself", task.Notes[^1].Text, StringComparison.Ordinal);
-        Assert.Equal(resets, _h.Limits.PausedUntil(AgentEngine.ClaudeCode));
+        Assert.Equal(resets, _h.Limits.PausedUntil(EngineLimits.ClaudeCode));
 
         var docs = WorkTask.Assign(_h.Office, openCodeDesk.Id, "Update the README", null, "angela", Harness.Start);
         _h.Tasks.Add(docs);
@@ -265,10 +265,37 @@ public class AgentSignalsTests
     [Fact]
     public void Without_a_reset_time_the_pause_lasts_the_default()
     {
-        _h.Limits.Pause(AgentEngine.ClaudeCode, null);
+        _h.Limits.Pause(EngineLimits.ClaudeCode, null);
 
-        Assert.Equal(Harness.Start + EngineLimits.DefaultPause, _h.Limits.PausedUntil(AgentEngine.ClaudeCode));
-        _h.Limits.Resume(AgentEngine.ClaudeCode);
-        Assert.Null(_h.Limits.PausedUntil(AgentEngine.ClaudeCode));
+        Assert.Equal(Harness.Start + EngineLimits.DefaultPause, _h.Limits.PausedUntil(EngineLimits.ClaudeCode));
+        _h.Limits.Resume(EngineLimits.ClaudeCode);
+        Assert.Null(_h.Limits.PausedUntil(EngineLimits.ClaudeCode));
+    }
+
+    [Fact]
+    public async Task Free_models_over_their_limits_pause_their_desks_only()
+    {
+        await _h.OfficeCommands().ChangeDeskAgentAsync(_h.Office.Id, _h.Desk.Id, AgentEngine.OpenCode, "build", "opencode/deepseek-v4.1-flash-free", default);
+        var paid = _h.Office.AddDesk(_h.Room.Id, "Paid", AgentProfile.Create("build", "anthropic/claude-sonnet"), Harness.Start);
+        var task = _h.Enqueue();
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+
+        await _h.Signals().OutOfLimitsAsync(task.Run!.SessionId, EngineLimits.OpenCodeProvider("opencode"), Harness.Start.AddHours(15), "OpenCode: Free limit reached.", default);
+
+        Assert.Equal(task.Run.SessionId, Assert.Single(_h.Runtime.Aborted));
+        var other = WorkTask.Assign(_h.Office, paid.Id, "Write the release notes", null, "angela", Harness.Start);
+        _h.Tasks.Add(other);
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal((WorkTaskStatus.Queued, WorkTaskStatus.Running), (task.Status, other.Status));
+        Assert.Equal("OpenCode's own models", Assert.Single(_h.Limits.Pauses()).Label);
+    }
+
+    [Theory]
+    [InlineData(AgentEngine.ClaudeCode, "sonnet", EngineLimits.ClaudeCode)]
+    [InlineData(AgentEngine.OpenCode, "opencode/big-pickle", "opencode:opencode")]
+    [InlineData(AgentEngine.OpenCode, null, null)]
+    public void A_desk_spends_the_account_of_its_engine_or_its_model_s_provider(AgentEngine engine, string? model, string? scope)
+    {
+        Assert.Equal(scope, EngineLimits.ScopeOf(AgentProfile.Create("build", model, engine)));
     }
 }

@@ -5,6 +5,7 @@ import { useEngines, useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { desksOf } from './deskLookup'
+import { pauseOf } from '../engines/engines'
 import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
@@ -29,7 +30,7 @@ export function Board({ office, initialTaskId }: Props) {
   const [openTaskId, setOpenTaskId] = useState<string | undefined>(initialTaskId)
   const engines = useEngines().data
   const reviewerOn = Boolean(engines?.reviewer)
-  const claudePaused = engines?.claudePausedUntil
+
   const desks = useMemo(() => desksOf(office), [office])
   const [query, setQuery] = useState('')
   const [showMerged, setShowMerged] = usePersistentState<'yes' | 'no'>('openspace.show-merged', 'no')
@@ -115,10 +116,11 @@ export function Board({ office, initialTaskId }: Props) {
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
                           {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
-                          {task.status === 'Queued' && claudePaused && desk?.engine === 'ClaudeCode' && (
+                          {task.status === 'Queued' && pauseOf(engines, desk) && (
                             <span className="card-review">
-                              <Hourglass size={12} aria-hidden /> Waits for Claude&apos;s limits until{' '}
-                              {new Date(claudePaused).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                              <Hourglass size={12} aria-hidden /> Paused until{' '}
+                              {new Date(pauseOf(engines, desk)!.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}:{' '}
+                              {pauseOf(engines, desk)!.label} over their limit
                             </span>
                           )}
                           {task.status === 'Done' && task.branch !== null && (

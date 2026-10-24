@@ -78,3 +78,15 @@ export function ClaudeMeter({ onOpen }: { onOpen: () => void }) {
 }
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+
+/** Other accounts over their limits, OpenCode providers' above all: Claude's shows in its meter. */
+export function LimitPauses({ onOpen }: { onOpen: () => void }) {
+  const pauses = (useEngines().data?.pauses ?? []).filter((p) => p.scope !== 'claude-code')
+  if (pauses.length === 0) return null
+  return (
+    <button type="button" className="claude-meter claude-meter-limited" onClick={onOpen} title="Desks on these models wait in the queue">
+      <TriangleAlert size={14} aria-hidden />
+      <span>{pauses.map((p) => `${p.label}: paused until ${new Date(p.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`).join(' · ')}</span>
+    </button>
+  )
+}

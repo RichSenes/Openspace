@@ -33,7 +33,7 @@ public sealed class QueueDispatcher(
         var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var started = new List<WorkTaskId>();
-        var claudePaused = limits.PausedUntil(AgentEngine.ClaudeCode) is not null;
+        var anyPaused = limits.Pauses().Count > 0;
         var officeCache = new Dictionary<OfficeId, Office>();
 
         foreach (var task in queued)
@@ -48,8 +48,8 @@ public sealed class QueueDispatcher(
                 continue;
             }
 
-            // Desks of an engine over its limits keep their tasks queued until it is back.
-            if (claudePaused && await EngineOfAsync(task, desk, officeCache, cancellationToken).ConfigureAwait(false) == AgentEngine.ClaudeCode)
+            // Desks on an account over its limits keep their tasks queued until it is back.
+            if (anyPaused && limits.PausedUntil(await ScopeOfAsync(task, desk, officeCache, cancellationToken).ConfigureAwait(false)) is not null)
             {
                 continue;
             }
@@ -68,7 +68,7 @@ public sealed class QueueDispatcher(
         return started;
     }
 
-    private async Task<AgentEngine?> EngineOfAsync(WorkTask task, DeskId desk, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
+    private async Task<string?> ScopeOfAsync(WorkTask task, DeskId desk, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
     {
         if (!cache.TryGetValue(task.OfficeId, out var office))
         {
@@ -76,6 +76,6 @@ public sealed class QueueDispatcher(
             cache[task.OfficeId] = office;
         }
 
-        return office.HasDesk(desk) ? office.Locate(desk).Desk.Agent.Engine : null;
+        return office.HasDesk(desk) ? EngineLimits.ScopeOf(office.Locate(desk).Desk.Agent) : null;
     }
 }

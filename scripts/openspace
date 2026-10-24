@@ -66,7 +66,8 @@ launch() {
   local name="$1" dir="$2"
   shift 2
   # The new session's first process writes its own id: it is the group to stop later.
-  (cd "$dir" && setsid bash -c 'echo $$ >"$0"; exec "$@"' "$STATE/$name.pgid" "$@" >"$STATE/logs/$name.log" 2>&1 </dev/null &)
+  # exec: no shell stays behind holding the terminal, so the script ends as soon as all is up.
+  (cd "$dir" && exec setsid bash -c 'echo $$ >"$0"; exec "$@"' "$STATE/$name.pgid" "$@") >"$STATE/logs/$name.log" 2>&1 </dev/null &
   for _ in $(seq 20); do [ -s "$STATE/$name.pgid" ] && return; sleep 0.1; done
 }
 

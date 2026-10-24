@@ -65,6 +65,21 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new OfficeThemeChanged(Id, Theme, now));
     }
 
+    public const int MaxCheckLength = 1000;
+
+    /// <summary>Sets the command that checks a room's code after a merge; null or blank removes it.</summary>
+    public void SetRoomCheck(RoomId roomId, string? command, DateTimeOffset now)
+    {
+        var text = command?.Trim();
+        if (text?.Length > MaxCheckLength)
+        {
+            throw new DomainException($"A check command is at most {MaxCheckLength} characters.");
+        }
+
+        FindRoom(roomId).SetCheck(string.IsNullOrEmpty(text) ? null : text);
+        Raise(new RoomCheckSet(Id, roomId, now));
+    }
+
     /// <summary>Gives a room its own look, whatever the office's; null or blank follows the office again.</summary>
     public void ChangeRoomMood(RoomId roomId, string? mood, DateTimeOffset now)
     {

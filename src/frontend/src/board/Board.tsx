@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Check, GitMerge, Hourglass, ListChecks, Plus, Sparkles, TriangleAlert } from 'lucide-react'
+import { usePersistentState } from '../usePersistentState'
+import { Check, GitMerge, Hourglass, ListChecks, Plus, Search, Sparkles, TriangleAlert } from 'lucide-react'
 import { useEngines, useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
@@ -8,7 +9,7 @@ import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
 import { MergeDialog } from './MergeDialog'
-import { awaitingMerge, checksDone, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { awaitingMerge, checksDone, COLUMNS, searchTasks, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
 interface Props {
@@ -26,9 +27,17 @@ export function Board({ office, initialTaskId }: Props) {
   const epics = useEpics(office.id)
   const epicTitle = (id: string | null) => epics.data?.find((e) => e.id === id)?.title
   const [openTaskId, setOpenTaskId] = useState<string | undefined>(initialTaskId)
-  const reviewerOn = Boolean(useEngines().data?.reviewer)
+  const engines = useEngines().data
+  const reviewerOn = Boolean(engines?.reviewer)
+  const claudePaused = engines?.claudePausedUntil
   const desks = useMemo(() => desksOf(office), [office])
-  const groups = useMemo(() => groupByColumn(filterByEpic(tasks.data ?? [], epicFilter)), [tasks.data, epicFilter])
+  const [query, setQuery] = useState('')
+  const [showMerged, setShowMerged] = usePersistentState<'yes' | 'no'>('openspace.show-merged', 'no')
+  const { shown, hidden } = useMemo(() => {
+    const found = searchTasks(filterByEpic(tasks.data ?? [], epicFilter), query)
+    return showMerged === 'yes' ? { shown: found, hidden: 0 } : withoutMerged(found)
+  }, [tasks.data, epicFilter, query, showMerged])
+  const groups = useMemo(() => groupByColumn(shown), [shown])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
   const toMerge = awaitingMerge(tasks.data ?? []).length
 
@@ -38,6 +47,11 @@ export function Board({ office, initialTaskId }: Props) {
       <header className="board-head">
         <h1>{office.name}</h1>
         <div className="row">
+          <label className="board-search">
+            <Search size={14} aria-hidden />
+            <span className="sr-only">Search tasks</span>
+            <input className="input" type="search" placeholder="Search tasks" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
           {(epics.data?.length ?? 0) > 0 && (
             <label>
               <span className="sr-only">Show</span>
@@ -101,6 +115,12 @@ export function Board({ office, initialTaskId }: Props) {
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
                           {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
+                          {task.status === 'Queued' && claudePaused && desk?.engine === 'ClaudeCode' && (
+                            <span className="card-review">
+                              <Hourglass size={12} aria-hidden /> Waits for Claude&apos;s limits until{' '}
+                              {new Date(claudePaused).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
                           {task.status === 'Done' && task.branch !== null && (
                             <span className="card-meta hint">
                               {task.mergedInto ? `In ${task.mergedInto}` : 'Not merged yet'}
@@ -131,6 +151,11 @@ export function Board({ office, initialTaskId }: Props) {
                     )
                   })}
                 </ul>
+              )}
+              {!folded && column.status === 'Done' && (hidden > 0 || showMerged === 'yes') && (
+                <button type="button" className="btn btn-quiet column-more" onClick={() => setShowMerged(showMerged === 'yes' ? 'no' : 'yes')}>
+                  {showMerged === 'yes' ? 'Hide merged work' : `Show ${hidden} merged`}
+                </button>
               )}
             </section>
           )

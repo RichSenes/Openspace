@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, CircleSlash, GitMerge, TriangleAlert, X } from 'lucide-react'
-import { useBranches, useCatchUp, useMergeAll } from '../api/hooks'
-import type { MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
+import { Check, CircleSlash, GitMerge, ListChecks, TriangleAlert, X } from 'lucide-react'
+import { useBranches, useCatchUp, useMergeAll, useRunChecks } from '../api/hooks'
+import type { CheckOutcome, MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
@@ -31,6 +31,9 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   const [outcomes, setOutcomes] = useState<MergeOutcome[]>([])
   const [caughtUp, setCaughtUp] = useState<ReadonlySet<string>>(new Set())
   const mergeAll = useMergeAll(office.id)
+  const runChecks = useRunChecks(office.id)
+  const [checks, setChecks] = useState<{ branch: string; outcomes: CheckOutcome[] }>()
+  const hasChecks = office.rooms.some((r) => r.check)
   const catchUp = useCatchUp()
   const toast = useToast()
   const chosen = waiting.filter((t) => !skipped.has(t.id))
@@ -40,7 +43,23 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   useEffect(() => results.current?.scrollIntoView({ block: 'nearest' }), [outcomes])
   const deskOf = (taskId: string) => desks.find((d) => d.id === tasks.find((t) => t.id === taskId)?.deskId)?.name ?? 'its agent'
 
+  const check = (branch: string, taskIds: string[] | null) => {
+    setChecks(undefined)
+    runChecks.mutate(
+      { branch, taskIds },
+      {
+        onSuccess: (outcomes) => {
+          setChecks({ branch, outcomes })
+          const failed = outcomes.filter((o) => !o.passed).length
+          if (outcomes.length > 0) toast(failed === 0 ? `Checks passed on ${branch}` : `${failed} of ${outcomes.length} checks failed on ${branch}`)
+        },
+      },
+    )
+  }
+
   const close = () => {
+    setChecks(undefined)
+    runChecks.reset()
     setOutcomes([])
     setCaughtUp(new Set())
     mergeAll.reset()
@@ -61,8 +80,10 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
       {
         onSuccess: (result) => {
           setOutcomes(result)
-          const merged = result.filter((o) => o.result === 'Merged').length
-          toast(`${merged} of ${result.length} merged into ${target}`)
+          const merged = result.filter((o) => o.result === 'Merged')
+          toast(`${merged.length} of ${result.length} merged into ${target}`)
+          // A clean merge can still break the code: check what was just merged.
+          if (merged.length > 0 && hasChecks) check(target, merged.map((o) => o.taskId))
         },
       },
     )
@@ -167,7 +188,42 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
           </section>
         )}
 
-        {(mergeAll.error ?? catchUp.error) && <p className="error">{(mergeAll.error ?? catchUp.error)?.message}</p>}
+        {(runChecks.isPending || checks) && (
+          <section className="merge-results" aria-label="Checks">
+            <h3 className="pixel notes-title">
+              {runChecks.isPending ? `Checking ${target}… this can take minutes` : `Checks on ${checks?.branch}`}
+            </h3>
+            {checks?.outcomes.length === 0 && <p className="hint">None of these rooms has a check: add one in Rooms.</p>}
+            <ol className="merge-list">
+              {checks?.outcomes.map((c) => (
+                <li key={c.roomId} className={`merge-outcome ${c.passed ? 'merge-merged' : 'merge-failed'}`}>
+                  <span className="merge-mark" aria-hidden="true">
+                    {c.passed ? <Check size={14} /> : <X size={14} />}
+                  </span>
+                  <div className="merge-text">
+                    <span>
+                      <strong>{c.passed ? 'Passed' : c.exitCode === null ? 'Stopped, too long' : `Failed, exit ${c.exitCode}`}</strong> · {c.room} ·{' '}
+                      {c.seconds}s
+                    </span>
+                    <span className="hint mono">{c.command}</span>
+                    <details open={!c.passed}>
+                      <summary className="hint">Output</summary>
+                      <pre className="check-output mono">{c.output || '(nothing printed)'}</pre>
+                    </details>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+        {hasChecks && target && (
+          <div className="row">
+            <button type="button" className="btn" disabled={runChecks.isPending} onClick={() => check(target, null)}>
+              <ListChecks size={16} aria-hidden /> Run all checks on {target}
+            </button>
+          </div>
+        )}
+        {(mergeAll.error ?? catchUp.error ?? runChecks.error) && <p className="error">{(mergeAll.error ?? catchUp.error ?? runChecks.error)?.message}</p>}
       </div>
     </Dialog>
   )

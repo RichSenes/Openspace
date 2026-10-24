@@ -312,6 +312,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                             b1.Property<Guid>("Id")
                                 .HasColumnType("TEXT");
 
+                            b1.Property<string>("Check")
+                                .HasMaxLength(1000)
+                                .HasColumnType("TEXT");
+
                             b1.Property<string>("Context")
                                 .IsRequired()
                                 .HasColumnType("TEXT");

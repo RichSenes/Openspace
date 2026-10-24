@@ -28,6 +28,10 @@ public static class DependencyInjection
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();
+        services.AddSingleton<ICheckRunner, Checks.ShellCheckRunner>();
+        services.AddSingleton<IDatabaseBackups>(sp => new SqliteBackups(
+            connectionString, sp.GetRequiredService<IOptions<BackupOptions>>(), sp.GetRequiredService<TimeProvider>()));
+        services.AddHostedService<BackupService>();
         return services;
     }
 

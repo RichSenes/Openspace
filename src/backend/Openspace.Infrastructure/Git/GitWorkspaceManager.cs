@@ -226,6 +226,24 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         (await GitCli.RunAsync(path, cancellationToken, "diff", "--name-only", "--diff-filter=U").ConfigureAwait(false))
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+    public async Task<string> OpenScratchAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{branch}").ConfigureAwait(false))
+        {
+            throw new RejectedException("branch-missing", $"There is no branch named {branch}.");
+        }
+
+        var path = Path.Combine(options.Value.Root, $"check-{Guid.NewGuid():N}");
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", "--detach", path, branch).ConfigureAwait(false);
+        return path;
+    }
+
+    public async Task CloseScratchAsync(string repositoryPath, string path, CancellationToken cancellationToken)
+    {
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "remove", "--force", path).ConfigureAwait(false);
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "prune").ConfigureAwait(false);
+    }
+
     public async Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);

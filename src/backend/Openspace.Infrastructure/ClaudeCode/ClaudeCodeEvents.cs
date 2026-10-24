@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Openspace.Application.Agents;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 using Openspace.Infrastructure.OpenCode;
 
@@ -10,7 +11,7 @@ namespace Openspace.Infrastructure.ClaudeCode;
 /// line, into agent signals. It remembers each tool call until its result arrives, the
 /// agent's last words and how much of the account's limits is used.
 /// </summary>
-internal sealed class ClaudeCodeEvents(string sessionId)
+internal sealed partial class ClaudeCodeEvents(string sessionId)
 {
     private readonly Dictionary<string, (string Name, JsonElement Input)> _calls = [];
 
@@ -44,7 +45,7 @@ internal sealed class ClaudeCodeEvents(string sessionId)
                 var result = Text(root, "result");
                 if (root.TryGetProperty("is_error", out var error) && error.ValueKind == JsonValueKind.True)
                 {
-                    return [.. spent, new AgentSignal.Failed(sessionId, $"Claude Code stopped: {Shorten(result ?? Text(root, "subtype") ?? "unknown error", 300)}")];
+                    return [.. spent, Stopped(sessionId, $"Claude Code stopped: {Shorten(result ?? Text(root, "subtype") ?? "unknown error", 300)}", usage)];
                 }
 
                 if (!string.IsNullOrWhiteSpace(result))
@@ -57,6 +58,26 @@ internal sealed class ClaudeCodeEvents(string sessionId)
                 return [];
         }
     }
+
+    /// <summary>
+    /// Why a run stopped: the account being over its limits pauses Claude Code desks rather
+    /// than failing their tasks.
+    /// </summary>
+    public static AgentSignal Stopped(string sessionId, string reason, ClaudeCodeUsage? usage)
+    {
+        var latest = usage?.Latest;
+        if (latest?.Status != "rejected" && !OverLimits().IsMatch(reason))
+        {
+            return new AgentSignal.Failed(sessionId, reason);
+        }
+
+        // The window that is full says when work can go on; else the five hours.
+        var full = new[] { latest?.FiveHours, latest?.Week }.FirstOrDefault(w => w?.Used >= 1);
+        return new AgentSignal.OutOfLimits(sessionId, AgentEngine.ClaudeCode, (full ?? latest?.FiveHours)?.ResetsAt, "The Claude account is over its usage limits.");
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(usage|rate|session|weekly) limit|limit (reached|exceeded)|hit your limit|out of (extra )?usage", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex OverLimits();
 
     /// <summary>What the whole run spent, as the result reports it.</summary>
     private AgentSignal[] Tokens(JsonElement root)

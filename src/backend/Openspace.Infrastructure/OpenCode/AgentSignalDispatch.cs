@@ -21,6 +21,7 @@ internal static partial class AgentSignalDispatch
                 AgentSignal.PermissionReplied r => signals.PermissionRepliedAsync(r.SessionId, r.PermissionId, r.Allowed, cancellationToken),
                 AgentSignal.ToolFinished t => signals.ToolFinishedAsync(t.SessionId, t.CallId, t.Kind, t.Summary, t.Detail, t.Succeeded, cancellationToken),
                 AgentSignal.Failed f => signals.FailedAsync(f.SessionId, f.Reason, cancellationToken),
+                AgentSignal.OutOfLimits o => signals.OutOfLimitsAsync(o.SessionId, o.Engine, o.Until, o.Reason, cancellationToken),
                 AgentSignal.Used u => signals.UsedAsync(u.SessionId, u.Tokens, cancellationToken),
                 _ => Task.CompletedTask,
             };

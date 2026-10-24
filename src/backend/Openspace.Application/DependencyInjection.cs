@@ -31,7 +31,9 @@ public static class DependencyInjection
         services.AddSingleton<ActivityBoard>();
         services.AddSingleton<Review.PendingReviews>();
         services.AddSingleton<PermissionRequests>();
+        services.AddSingleton<EngineLimits>();
         services.AddScoped<Review.TaskReviewer>();
+        services.AddScoped<Checks.MergeChecks>();
         return services;
     }
 }

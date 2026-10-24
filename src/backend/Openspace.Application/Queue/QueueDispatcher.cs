@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
+using Openspace.Application.Agents;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
@@ -12,6 +13,8 @@ namespace Openspace.Application.Queue;
 /// <remarks>Not thread-safe: call it from a single place (the queue runner).</remarks>
 public sealed class QueueDispatcher(
     IWorkTaskRepository tasks,
+    IOfficeRepository offices,
+    EngineLimits limits,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
     TimeProvider clock)
@@ -30,6 +33,8 @@ public sealed class QueueDispatcher(
         var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var started = new List<WorkTaskId>();
+        var claudePaused = limits.PausedUntil(AgentEngine.ClaudeCode) is not null;
+        var officeCache = new Dictionary<OfficeId, Office>();
 
         foreach (var task in queued)
         {
@@ -38,10 +43,18 @@ public sealed class QueueDispatcher(
                 break;
             }
 
-            if (task.DeskId is not { } desk || !busyDesks.Add(desk))
+            if (task.DeskId is not { } desk || busyDesks.Contains(desk))
             {
                 continue;
             }
+
+            // Desks of an engine over its limits keep their tasks queued until it is back.
+            if (claudePaused && await EngineOfAsync(task, desk, officeCache, cancellationToken).ConfigureAwait(false) == AgentEngine.ClaudeCode)
+            {
+                continue;
+            }
+
+            busyDesks.Add(desk);
 
             task.Start(now);
             started.Add(task.Id);
@@ -53,5 +66,16 @@ public sealed class QueueDispatcher(
         }
 
         return started;
+    }
+
+    private async Task<AgentEngine?> EngineOfAsync(WorkTask task, DeskId desk, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
+    {
+        if (!cache.TryGetValue(task.OfficeId, out var office))
+        {
+            office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+            cache[task.OfficeId] = office;
+        }
+
+        return office.HasDesk(desk) ? office.Locate(desk).Desk.Agent.Engine : null;
     }
 }

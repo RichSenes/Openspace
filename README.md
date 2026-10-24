@@ -66,10 +66,16 @@ Each project has its own README with detailed specifications.
    never moves, and nothing is touched if you have uncommitted changes. Work
    that conflicts goes back to its agent, which resolves the conflict in its own
    working copy; accept it again and it merges cleanly.
+   After merging, each room's check command (`dotnet test`, `npm test`…) runs
+   on the merged branch in a throwaway copy, and says what broke.
 10. A changelog of what was accepted since the previous one is written for the
     people who use the product, in plain words and in the language you choose.
 11. Each room can have its own mood, whatever the office's theme: a bright
     studio, a dark room where only the screens are lit, a bare town hall office.
+12. Claude Code desks pause by themselves while the Claude account is over its
+    usage limits, and pick up where they left off once it resets.
+13. The database is copied once a day (Settings → Backups); restore a copy with
+    `scripts/openspace restore <file>`.
 
 ## Ground rules
 
@@ -89,6 +95,22 @@ Each project has its own README with detailed specifications.
 - Node.js 22 or later
 
 ## Getting started
+
+One command starts OpenCode, the API and the page, each in the background with
+its log, and opens nothing it finds already running:
+
+```bash
+scripts/openspace start          # then open http://localhost:5173
+scripts/openspace status
+scripts/openspace restart api    # after an update: rebuilds and restarts the API only
+scripts/openspace logs api
+scripts/openspace stop
+```
+
+Logs and process ids live in `~/.local/state/openspace`. Ports change with
+`OPENSPACE_API_PORT`, `OPENSPACE_WEB_PORT` and `OPENSPACE_OPENCODE_PORT`.
+
+### By hand
 
 Start OpenCode in server mode (any folder will do: Openspace tells it which
 folder each task works in):

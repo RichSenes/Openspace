@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, awaitingMerge, checksDone, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
+import { actionsFor, awaitingMerge, checksDone, searchTasks, withoutMerged, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -136,5 +136,29 @@ describe('awaitingMerge', () => {
     const byHand = task('By hand', 'Done')
 
     expect(awaitingMerge([late, merged, review, byHand, early]).map((t) => t.title)).toEqual(['Early', 'Late'])
+  })
+})
+
+describe('searchTasks', () => {
+  const logout = { ...task('Add a logout button', 'Done'), description: 'In the HEADER of every page' }
+  const prices = task('Round prices', 'Queued')
+
+  it('finds every word in the title or the details, in any case', () => {
+    expect(searchTasks([logout, prices], 'header LOGOUT').map((t) => t.title)).toEqual(['Add a logout button'])
+    expect(searchTasks([logout, prices], 'header prices')).toEqual([])
+  })
+
+  it('keeps everything for an empty search', () => {
+    expect(searchTasks([logout, prices], '   ')).toHaveLength(2)
+  })
+})
+
+describe('withoutMerged', () => {
+  it('leaves out done work already merged and counts it', () => {
+    const merged = { ...task('Merged', 'Done'), mergedInto: 'main' }
+    const waiting = { ...task('Waiting', 'Done'), branch: 'openspace/waiting' }
+    const result = withoutMerged([merged, waiting, task('Running', 'Running')])
+    expect(result.shown.map((t) => t.title)).toEqual(['Waiting', 'Running'])
+    expect(result.hidden).toBe(1)
   })
 })

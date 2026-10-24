@@ -54,6 +54,22 @@ export function filterByEpic(tasks: WorkTaskView[], filter: EpicFilter): WorkTas
   return tasks.filter((t) => t.epicId === filter)
 }
 
+/** Tasks whose title or details contain every word searched, in any case. */
+export function searchTasks(tasks: WorkTaskView[], query: string): WorkTaskView[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return tasks
+  return tasks.filter((t) => {
+    const text = `${t.title}\n${t.description}`.toLowerCase()
+    return words.every((w) => text.includes(w))
+  })
+}
+
+/** Done work already merged somewhere is history: the Board can leave it out. */
+export function withoutMerged(tasks: WorkTaskView[]): { shown: WorkTaskView[]; hidden: number } {
+  const shown = tasks.filter((t) => !(t.status === 'Done' && t.mergedInto !== null))
+  return { shown, hidden: tasks.length - shown.length }
+}
+
 /** Time of an ISO date from the API, whatever its fraction of a second. */
 export const timeOf = (iso: string) => Date.parse(iso.replace(/(\.\d{3})\d+/, '$1'))
 

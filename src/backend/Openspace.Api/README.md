@@ -14,6 +14,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
+| PUT | `/api/offices/{id}/rooms/{roomId}/check` | `{ command }`: what tells whether the room's code works, run after merges; `null` removes it |
+| POST | `/api/offices/{id}/checks` | `{ branch, taskIds? }`: run the rooms' checks on a branch, in a throwaway copy. With `taskIds`, only their rooms, and each task gets a note with the result. Returns `[{ roomId, room, command, passed, exitCode, output, seconds }]` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/mood` | Draw one room with its own theme: `{ mood }`, or `null` to follow the office |
 | PUT | `/api/offices/{id}/rooms/{roomId}/layout` | Arrange a room by hand: `{ width, depth, desks: [{ deskId, x, y }], furniture: [{ name, x, y }], door?: { wall, offset }, windows?: [x] }`; sizes in tiles, places in pixels from the room's corner; `wall` is `Front`, `Back`, `Left` or `Right`, `offset` in tiles; desks left out are placed automatically. On a floor plan the room must still fit |
 | PUT | `/api/offices/{id}/plan` | Draw the building by hand: `{ width, depth, furniture: [{ name, x, y }], rooms: [{ roomId, left, top, layout }], cuts?: [{ left, top, width, height }] }`; rooms and cuts in tiles from the building's corner, never overlapping; cuts take pieces out of the rectangle for an L, T or U shape or a courtyard, and nothing stands in them; `layout` as above |
@@ -60,6 +62,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
+| GET | `/api/backups` | Copies of the database, newest first: `[{ name, path, size, createdAt }]` |
+| POST | `/api/backups` | Copy the database now; `422` when it lives in memory |
 | PUT | `/api/offices/{id}/desks/{deskId}/look` | Dress the desk's agent: `{ skin, hair, hairStyle, cloth, accessory?, outfit?, costume? }`, single words the frontend knows; unknown ones are drawn with its defaults |
 | DELETE | `/api/offices/{id}/desks/{deskId}/look` | Give the agent back the look picked from the desk's id |
 | PUT | `/api/offices/{id}/desks/{deskId}/role` | `{ roleId }` (null to remove); applies from the desk's next task |
@@ -134,6 +138,10 @@ On startup it applies pending database migrations.
 | `Queue:Seats` | `1` | Agents allowed to work at the same time |
 | `Agents:Autonomy` | `Auto` | `Auto`: Openspace answers agents' requests itself and asks a person only about risky ones; `Ask`: every request waits for a person |
 | `Settings:Path` | `openspace.settings.json` | Where changes made in Settings are kept; it overrides the other files |
+| `Checks:TimeoutMinutes` | `20` | How long one room's check may run before it is stopped |
+| `Backups:Folder` | `backups` | Where database copies go, next to the database unless absolute |
+| `Backups:Keep` | `14` | Copies kept; older ones are deleted |
+| `Backups:EveryHours` | `24` | How often a copy is taken while the API runs |
 | `Operator:Name` | `operator` | Who you are: recorded as requester and note author |
 | `Queue:Enabled` | `true` | Run the queue in the background |
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
@@ -170,6 +178,14 @@ A task's first round of work is 1; each send back starts the next. Agents list
 what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
+
+## Claude Code limits
+
+When a Claude Code run stops because the account is over its usage limits, the
+task goes back to the queue instead of failing, and Claude Code desks take no
+work until the window resets (`claudePausedUntil` in `GET /api/engines`; 30
+minutes when Claude Code does not say). "Check now" in Settings ends the pause
+early once the account answers again. OpenCode desks are not affected.
 
 ## Claude Code
 

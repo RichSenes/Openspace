@@ -54,6 +54,8 @@ export interface EnginesView {
   claudeUsage: ClaudeUsage | null
   supervisor: AgentEngine
   reviewer: AgentEngine | null
+  /** While the Claude account is over its limits, when Claude Code desks take work again. */
+  claudePausedUntil?: string | null
 }
 
 /** A look chosen by hand: names the pixel art knows; unknown ones fall back to the picked look. */
@@ -109,6 +111,8 @@ export interface RoomView {
   top?: number | null
   /** A theme for this room only; null when it follows the office's. */
   mood?: string | null
+  /** The command run on a branch after the room's work is merged into it, e.g. dotnet test. */
+  check?: string | null
 }
 
 export interface ProcedureStepView {
@@ -309,4 +313,24 @@ export interface MergeOutcome {
   title: string
   result: MergeResult
   message: string | null
+}
+
+/** A copy of the database; restored with scripts/openspace restore. */
+export interface BackupView {
+  name: string
+  path: string
+  size: number
+  createdAt: string
+}
+
+/** One room's check, run on a branch after a merge. */
+export interface CheckOutcome {
+  roomId: string
+  room: string
+  command: string
+  passed: boolean
+  /** Null when it was stopped for taking too long. */
+  exitCode: number | null
+  output: string
+  seconds: number
 }

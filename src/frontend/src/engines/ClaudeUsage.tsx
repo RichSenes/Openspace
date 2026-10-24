@@ -58,19 +58,23 @@ export function ClaudeUsageMeters() {
 
 /** One line for the top bar: how much of the Claude account is left; it opens the settings. */
 export function ClaudeMeter({ onOpen }: { onOpen: () => void }) {
-  const usage: ClaudeUsage | null | undefined = useEngines().data?.claudeUsage
-  if (!usage) return null
-  const fiveHours = percent(usage.fiveHours)
-  const week = percent(usage.week)
-  const limited = usage.status !== 'allowed'
+  const engines = useEngines().data
+  const usage: ClaudeUsage | null | undefined = engines?.claudeUsage
+  const paused = engines?.claudePausedUntil
+  if (!usage && !paused) return null
+  const fiveHours = percent(usage?.fiveHours ?? null)
+  const week = percent(usage?.week ?? null)
+  const limited = Boolean(paused) || (usage !== undefined && usage !== null && usage.status !== 'allowed')
   return (
     <button type="button" className={limited ? 'claude-meter claude-meter-limited' : 'claude-meter'} onClick={onOpen} title="Your Claude account: open Settings">
       {limited && <TriangleAlert size={14} aria-hidden />}
       <span>
-        Claude{limited ? ': limit reached' : ''}
+        Claude{paused ? `: desks paused until ${clock(paused)}` : limited ? ': limit reached' : ''}
         {fiveHours !== null && ` · 5h ${100 - fiveHours}% left`}
         {week !== null && ` · week ${100 - week}% left`}
       </span>
     </button>
   )
 }
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })

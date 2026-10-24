@@ -263,6 +263,23 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
         return Task.FromResult<IReadOnlyList<string>>(["src/cart.ts"]);
     }
 
+    public List<string> Scratches { get; } = [];
+
+    public List<string> ClosedScratches { get; } = [];
+
+    public Task<string> OpenScratchAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        var path = $"/srv/worktrees/check-{Scratches.Count + 1}";
+        Scratches.Add(path);
+        return Task.FromResult(path);
+    }
+
+    public Task CloseScratchAsync(string repositoryPath, string path, CancellationToken cancellationToken)
+    {
+        ClosedScratches.Add(path);
+        return Task.CompletedTask;
+    }
+
     public Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)
     {
         Discarded.Add(workspace);
@@ -358,4 +375,18 @@ internal sealed class LiveOptions<T>(Func<T> read) : Microsoft.Extensions.Option
 internal static class Fakes
 {
     public static Agents.AgentAction Run(string command) => new(Agents.ActionKind.Run, command);
+}
+
+internal sealed class FakeCheckRunner : ICheckRunner
+{
+    /// <summary>What each command answers; anything else passes.</summary>
+    public Dictionary<string, CheckRun> Answers { get; } = [];
+
+    public List<(string Folder, string Command)> Runs { get; } = [];
+
+    public Task<CheckRun> RunAsync(string folder, string command, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        Runs.Add((folder, command));
+        return Task.FromResult(Answers.GetValueOrDefault(command, new CheckRun(0, "ok", TimeSpan.FromSeconds(2))));
+    }
 }

@@ -11,6 +11,9 @@ public interface IAgentRuntime
     /// <summary>Opens an empty session working in the given folder, with the setup's permissions, and returns its id.</summary>
     Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken);
 
+    /// <summary>The engine a session was opened with: a desk may have changed engine since.</summary>
+    AgentEngine EngineOf(string sessionId);
+
     /// <summary>Sends a message and returns at once; progress arrives as agent signals.</summary>
     Task PromptAsync(
         string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken);

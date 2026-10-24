@@ -21,6 +21,7 @@ public sealed class SupervisorApiTests : IDisposable
         public Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public AgentEngine EngineOf(string sessionId) => throw new NotSupportedException();
         public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task ConnectToolsAsync(string workspacePath, Guid taskId, CancellationToken cancellationToken) => throw new NotSupportedException();

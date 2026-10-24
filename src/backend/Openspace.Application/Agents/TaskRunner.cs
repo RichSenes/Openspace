@@ -81,6 +81,17 @@ public sealed partial class TaskRunner(
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 message = Briefing.ForNewTask(office, room, desk, task);
             }
+            else if (runtime.EngineOf(task.Run.SessionId) != setup.Engine)
+            {
+                // The desk changed engine since: its new agent cannot pick up the old
+                // session, so it opens its own in the same working copy and reads it all.
+                var sessionId = await runtime
+                    .CreateSessionAsync(task.Run.WorkspacePath, task.Title, setup, cancellationToken)
+                    .ConfigureAwait(false);
+                task.AttachRun(AgentRun.Create(sessionId, task.Run.WorkspacePath, task.Run.Branch), clock.GetUtcNow());
+                await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                message = Briefing.ForTakeOver(office, room, desk, task);
+            }
             else
             {
                 message = Briefing.ForResume(task);

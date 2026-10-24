@@ -107,6 +107,8 @@ internal sealed class FakeRuntime : IAgentRuntime
 
     private int _sessions;
 
+    private readonly Dictionary<string, AgentEngine> _engines = [];
+
     public Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken) =>
         Task.FromResult(agent.Engine == AgentEngine.ClaudeCode ? ClaudeCode : Agents.Contains(agent.AgentName));
 
@@ -134,8 +136,12 @@ internal sealed class FakeRuntime : IAgentRuntime
     public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
         SessionSetups.Add(setup);
-        return Task.FromResult($"ses_{++_sessions}");
+        var id = $"ses_{++_sessions}";
+        _engines[id] = setup.Engine;
+        return Task.FromResult(id);
     }
+
+    public AgentEngine EngineOf(string sessionId) => _engines.GetValueOrDefault(sessionId, AgentEngine.OpenCode);
 
     public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken)
     {

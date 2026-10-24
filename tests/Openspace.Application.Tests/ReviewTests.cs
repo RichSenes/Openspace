@@ -157,6 +157,37 @@ public class ReviewTests
     }
 
     [Fact]
+    public async Task Work_sent_back_to_a_desk_that_changed_engine_is_taken_over_in_the_same_copy()
+    {
+        var task = await FinishedTaskAsync();
+        var (folder, branch) = (task.Run!.WorkspacePath, task.Run.Branch);
+        await _h.OfficeCommands().ChangeDeskAgentAsync(_h.Office.Id, _h.Desk.Id, AgentEngine.ClaudeCode, "build", "sonnet", default);
+
+        await _h.Commands().SendBackAsync(task.Id, "elliot", "The footer link is still missing.", withReview: false, default);
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.NotEqual("ses_1", task.Run!.SessionId);
+        Assert.Equal((folder, branch, AgentEngine.ClaudeCode), (task.Run.WorkspacePath, task.Run.Branch, _h.Runtime.EngineOf(task.Run.SessionId)));
+        var (sessionId, _, text) = _h.Runtime.Prompts[^1];
+        Assert.Equal(task.Run.SessionId, sessionId);
+        Assert.Contains("Your task: Add a logout button", text, StringComparison.Ordinal);
+        Assert.Contains("The footer link is still missing.", text, StringComparison.Ordinal);
+        Assert.Contains("git diff", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Work_sent_back_to_the_same_engine_keeps_its_session()
+    {
+        var task = await FinishedTaskAsync();
+
+        await _h.Commands().SendBackAsync(task.Id, "elliot", "One more thing.", withReview: false, default);
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal("ses_1", task.Run!.SessionId);
+        Assert.StartsWith("Your work was reviewed and sent back.", _h.Runtime.Prompts[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_old_review_is_not_sent_back_with_new_work()
     {
         var task = await FinishedTaskAsync();

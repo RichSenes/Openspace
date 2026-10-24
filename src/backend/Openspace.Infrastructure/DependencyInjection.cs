@@ -51,6 +51,9 @@ public static class DependencyInjection
         services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<OpenCodeOptions>>().Value.ListenToEvents
             ? ActivatorUtilities.CreateInstance<OpenCodeEventListener>(sp)
             : new IdleService());
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<OpenCodeOptions>>().Value.ListenToEvents
+            ? ActivatorUtilities.CreateInstance<OpenCodeStatusSweep>(sp)
+            : new IdleService());
         services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<QueueOptions>>().Value.Enabled
             ? ActivatorUtilities.CreateInstance<QueueRunnerService>(sp)
             : new IdleService());

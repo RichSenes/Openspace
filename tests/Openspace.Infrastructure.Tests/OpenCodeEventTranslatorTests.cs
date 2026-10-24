@@ -208,4 +208,17 @@ public class OpenCodeEventTranslatorTests
         Assert.Equal(new AgentSignal.Progress("ses_1", null, "The model is not answering: trying again (3)"), retry);
         Assert.Null(Translate("""{"type":"session.status","properties":{"sessionID":"ses_1","status":{"type":"busy"}}}"""));
     }
+
+    [Fact]
+    public void A_session_already_retrying_is_read_from_the_status_list()
+    {
+        using var statuses = JsonDocument.Parse("""
+            {"ses_1":{"type":"retry","attempt":1,"message":"Free usage exceeded, subscribe to Go","action":{"reason":"free_tier_limit","provider":"opencode","title":"Free limit reached"},"next":1792886400550},
+             "ses_2":{"type":"busy"}}
+            """);
+
+        Assert.IsType<AgentSignal.OutOfLimits>(OpenCodeEventTranslator.FromStatusOf(statuses.RootElement, "ses_1"));
+        Assert.Null(OpenCodeEventTranslator.FromStatusOf(statuses.RootElement, "ses_2"));
+        Assert.Null(OpenCodeEventTranslator.FromStatusOf(statuses.RootElement, "ses_3"));
+    }
 }

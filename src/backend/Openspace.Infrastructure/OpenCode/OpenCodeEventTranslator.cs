@@ -170,6 +170,21 @@ internal static class OpenCodeEventTranslator
     }
 
     /// <summary>
+    /// A session's entry in <c>GET /session/status</c>, read as its status event would be:
+    /// how a retry that started before Openspace listened is still noticed.
+    /// </summary>
+    public static AgentSignal? FromStatusOf(JsonElement statuses, string sessionId)
+    {
+        if (statuses.ValueKind != JsonValueKind.Object || !statuses.TryGetProperty(sessionId, out var status))
+        {
+            return null;
+        }
+
+        using var props = JsonDocument.Parse(JsonSerializer.Serialize(new { sessionID = sessionId, status }));
+        return FromStatus(props.RootElement);
+    }
+
+    /// <summary>
     /// OpenCode retries a model that does not answer, silently: a provider over its limits
     /// pauses the desks on it, anything else at least shows in the bubble.
     /// </summary>

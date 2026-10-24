@@ -287,6 +287,37 @@ public class WorkTaskTests
     }
 
     [Fact]
+    public void Accepted_work_that_conflicts_goes_back_to_its_desk_as_a_new_round()
+    {
+        var task = TaskIn(WorkTaskStatus.Running);
+        task.AttachRun(SomeRun(), Now);
+        task.AddManualCheck("The cart shows the discount", null, Now);
+        task.SubmitForReview(Now);
+        task.TickManualCheck(1, true, Now);
+        task.Accept(Now);
+
+        task.ReopenToCatchUp(NoteAuthor.Human("elliot"), "Resolve the conflicts in src/cart.ts.", Now);
+
+        Assert.Equal((WorkTaskStatus.Queued, 2, true), (task.Status, task.Round, task.AwaitsMerge is false));
+        Assert.Null(task.ManualChecks[0].CheckedAt);
+        Assert.Equal("Resolve the conflicts in src/cart.ts.", task.Notes[^1].Text);
+    }
+
+    [Fact]
+    public void Merged_or_unaccepted_work_does_not_catch_up_and_done_work_is_not_approved_again()
+    {
+        var merged = TaskIn(WorkTaskStatus.Running);
+        merged.AttachRun(SomeRun(), Now);
+        merged.SubmitForReview(Now);
+        merged.Accept(Now);
+        merged.RecordMerge("main", Now);
+
+        Assert.Throws<DomainException>(() => merged.ReopenToCatchUp(NoteAuthor.Human("elliot"), "Catch up.", Now));
+        Assert.Throws<DomainException>(() => TaskIn(WorkTaskStatus.Review).ReopenToCatchUp(NoteAuthor.Human("elliot"), "Catch up.", Now));
+        Assert.Throws<DomainException>(() => merged.Approve(Now));
+    }
+
+    [Fact]
     public void Work_that_is_not_accepted_or_has_no_agent_cannot_be_merged()
     {
         var review = TaskIn(WorkTaskStatus.Running);

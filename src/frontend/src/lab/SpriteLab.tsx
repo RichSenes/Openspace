@@ -93,6 +93,26 @@ const LAYOUTS: Record<ThemeName, { prop: PropName; x: number; y: number }[]> = {
     { prop: 'sideTable', x: 110, y: 122 },
     { prop: 'whiteDog', x: 140, y: 125 },
   ],
+  brightStudio: [
+    { prop: 'rug', x: 70, y: 108 },
+    { prop: 'bookshelf', x: 6, y: 6 },
+    { prop: 'floorLamp', x: 184, y: 4 },
+    { prop: 'sideTable', x: 172, y: 120 },
+    { prop: 'whiteDog', x: 150, y: 123 },
+    { prop: 'plant', x: 206, y: 112 },
+    { prop: 'plant', x: 4, y: 112 },
+  ],
+  darkFocus: [
+    { prop: 'serverRack', x: 182, y: 4 },
+    { prop: 'serverRack', x: 200, y: 4 },
+    { prop: 'vendingMachine', x: 6, y: 4 },
+    { prop: 'plant', x: 204, y: 112 },
+  ],
+  townHall: [
+    { prop: 'whiteboard', x: 6, y: 6 },
+    { prop: 'waterCooler', x: 192, y: 10 },
+    { prop: 'plant', x: 204, y: 112 },
+  ],
 }
 
 /** A sample room: two rows of desks among the theme's furniture, sorted by depth. */
@@ -111,7 +131,7 @@ function roomPixelsAt(tick: number, name: ThemeName, dark: boolean): { width: nu
     desk(4, 'failed', 76, 64),
     desk(5, 'queued', 122, 64),
   ]
-  return { ...size, pixels: roomPixels(theme, roomShell(theme, cols, rows), items, dark) }
+  return { ...size, pixels: roomPixels(theme, roomShell(theme, cols, rows), items, dark || Boolean(theme.dark)) }
 }
 
 /**

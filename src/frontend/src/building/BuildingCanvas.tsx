@@ -584,7 +584,10 @@ function drawBuilding(
   const floor = hallFloor(layout, scene, theme)
   world.addChild(floor.sprite)
   const sources: Source[] = [floor.source]
-  const rooms = new Map(layout.rooms.map((room) => [room.id, drawRoom(room, layout, scene, theme, world, sources)]))
+  const moods = new Map(scene.office.rooms.map((r) => [r.id, r.mood]))
+  const rooms = new Map(
+    layout.rooms.map((room) => [room.id, drawRoom(room, layout, scene, themeOf(moods.get(room.id) ?? scene.office.theme), world, sources)]),
+  )
   const walls = new Graphics()
   drawWalls(walls, layout, scene, theme)
   const hall = hallFurniture(layout, scene, theme)
@@ -815,6 +818,8 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   world.addChild(sprite)
   sources.push({ canvas, x: room.x * TILE, y: room.y * TILE })
   const colors = themeColors(theme.colors)
+  // Some moods keep the lights off whatever the hour.
+  const dark = scene.dark || Boolean(theme.dark)
 
   const views = new Map(scene.office.rooms.flatMap((r) => r.desks).map((d) => [d.id, d]))
   const looks = new Map(room.desks.map((d) => [d.id, lookOf(views.get(d.id) ?? d)]))
@@ -824,7 +829,7 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
       const phase = phaseOf(new Date().getHours())
       const openings: SceneItem[] = room.windows.map((x) => {
         const view = behind(room, layout, sources, x + GLASS.x, GLASS.width, GLASS.height, tick, phase)
-        const lights: Light[] = view.outside && scene.dark ? windowLight(phase) : []
+        const lights: Light[] = view.outside && dark ? windowLight(phase) : []
         return { x, y: WINDOW.y, height: WINDOW_SIZE.height, pixels: windowPixels(view.pixels, colors), layer: 'wall', lights }
       })
       if (room.door.wall === 'Back') {
@@ -838,7 +843,7 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
           deskItem(looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme),
         ),
       ]
-      paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, scene.dark))
+      paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, dark))
       sprite.texture.source.update()
     },
   }

@@ -62,6 +62,28 @@ public static class Briefing
             .AppendLine("Another agent already worked on this task in this working copy. Look at git status and git diff to see where it stands, then go on from there: the notes from the team above say what is still wrong.")
             .ToString();
 
+    /// <summary>What an agent is asked when its accepted work no longer merges cleanly.</summary>
+    public static string ForCatchUp(string targetBranch, IReadOnlyList<string> files)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        var text = new StringBuilder()
+            .AppendLine(CultureInfo.InvariantCulture, $"Your accepted work could not be merged into {targetBranch}: it changed meanwhile.")
+            .AppendLine(CultureInfo.InvariantCulture, $"Openspace started merging {targetBranch} into your branch in this working copy.");
+        if (files.Count > 0)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"Resolve the conflicts marked in: {string.Join(", ", files)}.")
+                .AppendLine("Keep what both sides meant to do; if they truly contradict each other, keep the newer behaviour and say so in a note.");
+        }
+        else
+        {
+            text.AppendLine("Nothing conflicts any more: check that the merged code still builds.");
+        }
+
+        return text
+            .Append("Do not commit and do not abort the merge: Openspace commits it once the work is accepted again. Run the checks of your room again before your summary.")
+            .ToString();
+    }
+
     /// <summary>The message sent when an agent stops with required steps still to do.</summary>
     public static string ForMissingSteps(WorkTask task)
     {

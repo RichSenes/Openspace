@@ -175,4 +175,85 @@ public class WorkTaskCommandsTests
         Assert.Equal("merge-conflict", error.Code);
         Assert.Equal(saves, h.UnitOfWork.Saves);
     }
+
+    [Fact]
+    public async Task Merging_everything_goes_in_order_of_acceptance_and_skips_what_conflicts()
+    {
+        var h = new Harness();
+        var tasks = new List<WorkTask>();
+        foreach (var title in new[] { "First", "Second", "Third" })
+        {
+            var task = h.Enqueue(title);
+            await h.Runner().RunQueueAsync(default);
+            await h.Signals().FinishedAsync(task.Run!.SessionId, default);
+            h.Clock.Advance(TimeSpan.FromMinutes(1));
+            await h.Commands().AcceptAsync(task.Id, default);
+            tasks.Add(task);
+        }
+
+        h.Workspaces.Conflicting.Add(tasks[1].Run!.Branch);
+
+        var outcomes = await h.Commands().MergeAllAsync(h.Office.Id, "main", null, default);
+
+        Assert.Equal(
+            [("First", MergeResult.Merged), ("Second", MergeResult.Conflict), ("Third", MergeResult.Merged)],
+            outcomes.Select(o => (o.Title, o.Result)));
+        Assert.Contains("src/cart.ts", outcomes[1].Message, StringComparison.Ordinal);
+        Assert.Equal(("main", (string?)null, "main"), (tasks[0].MergedInto, tasks[1].MergedInto, tasks[2].MergedInto));
+    }
+
+    [Fact]
+    public async Task Your_uncommitted_changes_stop_the_whole_round()
+    {
+        var (h, task) = await AcceptedAsync();
+        var other = h.Enqueue("Second");
+        await h.Runner().RunQueueAsync(default);
+        await h.Signals().FinishedAsync(other.Run!.SessionId, default);
+        await h.Commands().AcceptAsync(other.Id, default);
+        h.Workspaces.MergeProblem = new RejectedException("uncommitted-changes", "Commit or stash them.");
+
+        var outcomes = await h.Commands().MergeAllAsync(h.Office.Id, "main", null, default);
+
+        Assert.Equal([MergeResult.Failed, MergeResult.NotTried], outcomes.Select(o => o.Result));
+        Assert.Null(task.MergedInto);
+    }
+
+    [Fact]
+    public async Task Only_the_chosen_tasks_are_merged()
+    {
+        var (h, task) = await AcceptedAsync();
+
+        var outcomes = await h.Commands().MergeAllAsync(h.Office.Id, "main", [WorkTaskId.New()], default);
+
+        Assert.Empty(outcomes);
+        Assert.Null(task.MergedInto);
+    }
+
+    [Fact]
+    public async Task Conflicting_work_goes_back_to_its_agent_to_catch_up()
+    {
+        var (h, task) = await AcceptedAsync();
+
+        await h.Commands().CatchUpAsync(task.Id, "main", "elliot", default);
+
+        Assert.Equal((WorkTaskStatus.Queued, 2), (task.Status, task.Round));
+        var (workspace, target) = Assert.Single(h.Workspaces.CatchUps);
+        Assert.Equal((task.Run!.WorkspacePath, task.Run.Branch, "main"), (workspace.Path, workspace.Branch, target));
+
+        await h.Runner().RunQueueAsync(default);
+        var (session, _, text) = h.Runtime.Prompts[^1];
+        Assert.Equal("ses_1", session);
+        Assert.Contains("Resolve the conflicts marked in: src/cart.ts.", text, StringComparison.Ordinal);
+        Assert.Contains("do not abort the merge", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Merged_work_cannot_be_sent_to_catch_up()
+    {
+        var (h, task) = await AcceptedAsync();
+        await h.Commands().MergeAsync(task.Id, "main", default);
+
+        await Assert.ThrowsAsync<Domain.Common.DomainException>(() => h.Commands().CatchUpAsync(task.Id, "main", "elliot", default));
+        Assert.Empty(h.Workspaces.CatchUps);
+    }
 }

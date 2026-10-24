@@ -31,6 +31,46 @@ public sealed partial class ReportWriter(
         No introduction, no sign-off.
         """;
 
+    private const string ChangelogWriter = """
+        You write the changelog of a product for the people who use it, most of them not technical.
+        Use only the facts you are given; never invent changes, results or dates. Leave out what you cannot tell.
+        Say what each change means for them: what they can do now, what works better, what no longer goes wrong. One short line per change, in plain words.
+        Never mention files, branches, tests, tools, agents, rounds of review or how the work was done.
+        Group the lines under these headings, skipping empty ones: New, Improved, Fixed. Work that changes nothing a user can notice goes in one last line under "Behind the scenes", or is left out.
+        Merge tasks that are parts of the same change into one line.
+        Write everything in the changelog language, headings included. Answer in Markdown. No introduction, no sign-off.
+        """;
+
+    /// <summary>
+    /// The changelog of what was accepted since the previous one: for people who use the
+    /// product, not for the team.
+    /// </summary>
+    public async Task<ReportView> WriteChangelogAsync(OfficeId officeId, string language, string requestedBy, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        var previous = (await reports.ListAsync(officeId, cancellationToken).ConfigureAwait(false))
+            .Where(r => r.Kind == ReportKind.Changelog)
+            .MaxBy(r => r.To);
+        var now = clock.GetUtcNow();
+        var accepted = (await tasks.ListAsync(officeId, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false))
+            .Where(t => previous?.To is not { } since || t.StatusChangedAt > since)
+            .OrderBy(t => t.StatusChangedAt)
+            .ToList();
+
+        if (accepted.Count == 0)
+        {
+            throw new Domain.Common.DomainException(previous is null
+                ? "No work was accepted yet: a changelog lists accepted work."
+                : $"No work was accepted since the previous changelog, written {previous.CreatedAt:d MMM yyyy}.");
+        }
+
+        var facts = ChangelogFacts.Build(office, accepted, previous?.To);
+        var (body, byAi) = await WriteAsync(facts, ChangelogWriter, $"Write the changelog in {language}.", cancellationToken).ConfigureAwait(false);
+        var title = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{office.Name}: changelog of {now:d MMM yyyy}");
+        var report = Report.ForChangelog(office, previous?.To, now, title, body, byAi, requestedBy, now);
+        return await SaveAsync(report, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<ReportView> WriteForPeriodAsync(
         OfficeId officeId, DateTimeOffset from, DateTimeOffset to, string scope, string language, string requestedBy,
         CancellationToken cancellationToken)
@@ -48,7 +88,7 @@ public sealed partial class ReportWriter(
         }
 
         var facts = ReportFacts.Build(office, scope, [.. worked.OrderBy(w => w.Task.CreatedAt)]);
-        var (body, byAi) = await WriteAsync(facts, language, cancellationToken).ConfigureAwait(false);
+        var (body, byAi) = await WriteAsync(facts, Writer, $"Write the report in {language}.", cancellationToken).ConfigureAwait(false);
         var report = Report.ForPeriod(office, from, to, $"{office.Name}: {scope}", body, byAi, requestedBy, clock.GetUtcNow());
         return await SaveAsync(report, cancellationToken).ConfigureAwait(false);
     }
@@ -64,17 +104,17 @@ public sealed partial class ReportWriter(
         }
 
         var facts = ReportFacts.Build(office, epic.Title, worked, epic);
-        var (body, byAi) = await WriteAsync(facts, language, cancellationToken).ConfigureAwait(false);
+        var (body, byAi) = await WriteAsync(facts, Writer, $"Write the report in {language}.", cancellationToken).ConfigureAwait(false);
         var report = Report.ForEpic(epic, epic.Title, body, byAi, requestedBy, clock.GetUtcNow());
         return await SaveAsync(report, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<(string Body, bool ByAi)> WriteAsync(string facts, string language, CancellationToken cancellationToken)
+    private async Task<(string Body, bool ByAi)> WriteAsync(string facts, string instructions, string request, CancellationToken cancellationToken)
     {
         try
         {
             var prose = await runtime
-                .DraftAsync($"{Writer}\nWrite the report in {language}.", facts, cancellationToken)
+                .DraftAsync($"{instructions}\n{request}", facts, cancellationToken)
                 .ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(prose))
             {

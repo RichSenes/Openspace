@@ -24,6 +24,9 @@ internal static class TaskEndpoints
 
     public sealed record MergeRequest(string Target);
 
+    /// <param name="TaskIds">The tasks to merge; all accepted work not merged yet when null.</param>
+    public sealed record MergeAllRequest(string Target, IReadOnlyList<Guid>? TaskIds = null);
+
     public static void MapTaskEndpoints(this IEndpointRouteBuilder app)
     {
         var tasks = app.MapGroup("/api/tasks").WithTags("Tasks");
@@ -53,6 +56,15 @@ internal static class TaskEndpoints
         tasks.MapPost("/{taskId:guid}/merge", (
             Guid taskId, MergeRequest request, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.MergeAsync(new WorkTaskId(taskId), request.Target, ct)));
+
+        tasks.MapPost("/{taskId:guid}/catch-up", (
+            Guid taskId, MergeRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>
+            NoContent(commands.CatchUpAsync(new WorkTaskId(taskId), request.Target, me.Value.Name, ct)));
+
+        app.MapPost("/api/offices/{officeId:guid}/merge", (
+            Guid officeId, MergeAllRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            commands.MergeAllAsync(new OfficeId(officeId), request.Target, request.TaskIds?.Select(id => new WorkTaskId(id)).ToList(), ct))
+            .WithTags("Tasks");
 
         app.MapGet("/api/activity", (Guid? officeId, ActivityBoard board) => board.Snapshot(officeId)).WithTags("Activity");
 

@@ -14,6 +14,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
+| PUT | `/api/offices/{id}/rooms/{roomId}/mood` | Draw one room with its own theme: `{ mood }`, or `null` to follow the office |
 | PUT | `/api/offices/{id}/rooms/{roomId}/layout` | Arrange a room by hand: `{ width, depth, desks: [{ deskId, x, y }], furniture: [{ name, x, y }], door?: { wall, offset }, windows?: [x] }`; sizes in tiles, places in pixels from the room's corner; `wall` is `Front`, `Back`, `Left` or `Right`, `offset` in tiles; desks left out are placed automatically. On a floor plan the room must still fit |
 | PUT | `/api/offices/{id}/plan` | Draw the building by hand: `{ width, depth, furniture: [{ name, x, y }], rooms: [{ roomId, left, top, layout }], cuts?: [{ left, top, width, height }] }`; rooms and cuts in tiles from the building's corner, never overlapping; cuts take pieces out of the rectangle for an L, T or U shape or a courtyard, and nothing stands in them; `layout` as above |
 | DELETE | `/api/offices/{id}/plan` | Give the whole office back to the automatic layout |
@@ -33,7 +34,9 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/tasks/{id}/log` | The task's audit log, oldest first |
 | GET | `/api/tasks/{id}/report` | A Markdown report of the task, as a download |
 | POST | `/api/tasks/{id}/permission` | Answer an agent waiting for permission: `{ allow }` |
-| POST | `/api/tasks/{id}/merge` | Merge accepted work into one of your branches: `{ target }`. `422` with code `uncommitted-changes`, `merge-conflict` or `branch-missing` when it cannot be done safely |
+| POST | `/api/tasks/{id}/merge` | Merge accepted work into one of your branches: `{ target }`. `422` with code `uncommitted-changes`, `merge-conflict`, `branch-missing` or `task-branch-missing` when it cannot be done safely |
+| POST | `/api/offices/{id}/merge` | `{ target, taskIds? }`: merge all accepted work not merged yet (or the listed tasks), first accepted first. Returns `[{ taskId, title, result, message }]` with `result` `Merged`, `Conflict`, `Failed` or `NotTried`; uncommitted changes or a missing target stop the round |
+| POST | `/api/tasks/{id}/catch-up` | `{ target }`: send accepted work that conflicts back to its desk as a new round. Openspace starts merging the target into the task branch in a fresh working copy; the agent resolves the conflicts |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
@@ -42,6 +45,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |
 | POST | `/api/offices/{id}/reports` | `{ from, to, scope, language }`: report of what happened in that period |
 | POST | `/api/epics/{id}/report` | `{ language }`: report of an epic |
+| POST | `/api/offices/{id}/changelog` | `{ language }`: changelog of the work accepted since the previous changelog, for the people using the product. `422` when nothing new was accepted |
 | GET | `/api/offices/{id}/reports` | Reports of an office, newest first |
 | GET | `/api/reports/{id}/download` | The report as a Markdown file |
 | GET | `/api/roles` | All roles |

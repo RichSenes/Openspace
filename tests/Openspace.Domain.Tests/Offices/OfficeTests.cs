@@ -53,6 +53,21 @@ public class OfficeTests
         Assert.Throws<DomainException>(() => ECorp().ChangeTheme(theme, Now));
     }
 
+    [Fact]
+    public void A_room_can_have_its_own_mood_and_go_back_to_the_office_s()
+    {
+        var office = ECorp();
+        var room = office.OpenRoom("Backend", Now);
+
+        office.ChangeRoomMood(room.Id, " darkFocus ", Now);
+        Assert.Equal("darkFocus", room.Mood);
+        Assert.IsType<RoomMoodChanged>(office.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => office.ChangeRoomMood(room.Id, "dark focus", Now));
+
+        office.ChangeRoomMood(room.Id, " ", Now);
+        Assert.Null(room.Mood);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("  ")]

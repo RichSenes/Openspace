@@ -16,6 +16,9 @@ internal static class OfficeEndpoints
 
     public sealed record ThemeRequest(string Theme);
 
+    /// <param name="Mood">A theme for this room only; null to follow the office.</param>
+    public sealed record MoodRequest(string? Mood);
+
     public sealed record LayoutRequest(
         int Width,
         int Depth,
@@ -128,6 +131,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid roomId, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.ClearRoomLayoutAsync(new OfficeId(officeId), new RoomId(roomId), ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/mood", async (
+            Guid officeId, Guid roomId, MoodRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.ChangeRoomMoodAsync(new OfficeId(officeId), new RoomId(roomId), request.Mood, ct);
             return Results.NoContent();
         });
 

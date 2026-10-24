@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { Copy, Download, FileText } from 'lucide-react'
-import { useEpics, useReports, useWriteReport } from '../api/hooks'
-import type { OfficeView } from '../api/types'
+import { Copy, Download, FileText, Megaphone } from 'lucide-react'
+import { useEpics, useReports, useWriteChangelog, useWriteReport } from '../api/hooks'
+import type { OfficeView, ReportView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import { usePersistentState } from '../usePersistentState'
 import { Markdown } from './Markdown'
@@ -15,6 +15,9 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
   const reports = useReports(office.id)
   const epics = useEpics(office.id)
   const write = useWriteReport(office.id)
+  const changelog = useWriteChangelog(office.id)
+  const writing = write.isPending || changelog.isPending
+  const lastChangelog = reports.data?.find((r) => r.kind === 'Changelog')
   const toast = useToast()
   const [language, setLanguage] = usePersistentState<LanguageName>('openspace.report-language', 'Italian')
   const [date, setDate] = useState(today())
@@ -33,6 +36,11 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
   const writeEpic = (e: FormEvent) => {
     e.preventDefault()
     write.mutate({ kind: 'epic', epicId, language }, { onSuccess: (r) => { setOpenId(r.id); toast('Report written') } })
+  }
+
+  const writeChangelog = (e: FormEvent) => {
+    e.preventDefault()
+    changelog.mutate({ language }, { onSuccess: (r) => { setOpenId(r.id); toast('Changelog written') } })
   }
 
   const copy = async () => {
@@ -68,7 +76,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             <span>A day of work</span>
             <input className="input" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} required />
           </label>
-          <button type="submit" className="btn btn-primary" disabled={write.isPending}>
+          <button type="submit" className="btn btn-primary" disabled={writing}>
             <FileText size={16} /> Write day report
           </button>
         </form>
@@ -84,13 +92,25 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
               ))}
             </select>
           </label>
-          <button type="submit" className="btn" disabled={write.isPending || !epicId}>
+          <button type="submit" className="btn" disabled={writing || !epicId}>
             <FileText size={16} /> Write epic report
           </button>
         </form>
+        <form className="report-form" onSubmit={writeChangelog}>
+          <div className="field">
+            <span>A changelog for the people who use it</span>
+            <p className="hint report-form-hint">
+              What changed for them, in plain words, from the work accepted
+              {lastChangelog ? ` since the last one (${when(lastChangelog.createdAt)})` : ' so far'}.
+            </p>
+          </div>
+          <button type="submit" className="btn" disabled={writing}>
+            <Megaphone size={16} /> Write changelog
+          </button>
+        </form>
       </div>
-      {write.isPending && <p className="hint">The reporter is reading the log… this can take a minute.</p>}
-      {write.error && <p className="error">{write.error.message}</p>}
+      {writing && <p className="hint">The writer is reading the work… this can take a minute.</p>}
+      {(write.error ?? changelog.error) && <p className="error">{(write.error ?? changelog.error)?.message}</p>}
 
       {reports.data?.length === 0 ? (
         <p className="hint">No reports yet. Write the first one above.</p>
@@ -102,7 +122,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
                 <button type="button" className="report-item" aria-current={r.id === open?.id ? 'true' : undefined} onClick={() => setOpenId(r.id)}>
                   <span className="report-title">{r.title}</span>
                   <span className="hint">
-                    {when(r.createdAt)} · {r.kind === 'Epic' ? 'Epic' : 'Day'}
+                    {when(r.createdAt)} · {KIND_LABEL[r.kind]}
                     {!r.writtenByAi && ' · facts only'}
                   </span>
                 </button>
@@ -133,3 +153,5 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
     </section>
   )
 }
+
+const KIND_LABEL: Record<ReportView['kind'], string> = { Period: 'Day', Epic: 'Epic', Changelog: 'Changelog' }

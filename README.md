@@ -61,9 +61,15 @@ Each project has its own README with detailed specifications.
    kept in the task's audit log, and can be downloaded as a Markdown report.
 8. Reports of a day or of an epic are written from the audit log in the
    language you choose, ready to copy into an email or a chat.
-9. Accepted work can then be merged into the branch you choose, from the task
-   itself. Your checkout never moves, and nothing is touched if you have
-   uncommitted changes or the work conflicts.
+9. Accepted work is merged into the branch you choose, one task at a time or
+   all at once from the Merge desk, in the order it was accepted. Your checkout
+   never moves, and nothing is touched if you have uncommitted changes. Work
+   that conflicts goes back to its agent, which resolves the conflict in its own
+   working copy; accept it again and it merges cleanly.
+10. A changelog of what was accepted since the previous one is written for the
+    people who use the product, in plain words and in the language you choose.
+11. Each room can have its own mood, whatever the office's theme: a bright
+    studio, a dark room where only the screens are lit, a bare town hall office.
 
 ## Ground rules
 

@@ -95,4 +95,53 @@ public class ReportTests
         Assert.Contains("## Build the form", facts, StringComparison.Ordinal);
         Assert.Equal((Domain.Reports.ReportKind.Epic, (Guid?)epic.Id.Value), (report.Kind, report.EpicId));
     }
+
+    /// <summary>A task the agent finished, Claude reviewed and a person accepted.</summary>
+    private async Task<WorkTask> AcceptedAsync(string title, string summary)
+    {
+        var task = _h.Enqueue(title);
+        await _h.Runner().RunQueueAsync(default);
+        _h.Runtime.LastReply = summary;
+        await _h.Signals().FinishedAsync(task.Run!.SessionId, default);
+        _h.Clock.Advance(TimeSpan.FromMinutes(5));
+        await _h.Commands().AcceptAsync(task.Id, default);
+        return task;
+    }
+
+    [Fact]
+    public async Task A_changelog_tells_users_what_was_accepted_since_the_previous_one()
+    {
+        await AcceptedAsync("Add a logout button", "Added a Logout link to the header of every page.");
+        _h.Runtime.Draft = "## Novità\n- Puoi uscire dal tuo account da ogni pagina.";
+
+        var first = await _h.ReportWriter().WriteChangelogAsync(_h.Office.Id, "Italian", "elliot", default);
+
+        var (instructions, facts) = Assert.Single(_h.Runtime.DraftRequests);
+        Assert.Contains("Never mention files, branches, tests", instructions, StringComparison.Ordinal);
+        Assert.Contains("Write the changelog in Italian.", instructions, StringComparison.Ordinal);
+        Assert.Contains("## Add a logout button", facts, StringComparison.Ordinal);
+        Assert.Contains("The agent's summary: Added a Logout link", facts, StringComparison.Ordinal);
+        Assert.Equal((Domain.Reports.ReportKind.Changelog, (DateTimeOffset?)null, true), (first.Kind, first.PeriodStart, first.WrittenByAi));
+
+        _h.Clock.Advance(TimeSpan.FromHours(1));
+        await AcceptedAsync("Round prices to two decimals", "Prices now show two decimals.");
+
+        var second = await _h.ReportWriter().WriteChangelogAsync(_h.Office.Id, "Italian", "elliot", default);
+
+        Assert.Equal(first.PeriodEnd, second.PeriodStart);
+        Assert.DoesNotContain("logout", _h.Runtime.DraftRequests[^1].Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("## Round prices", _h.Runtime.DraftRequests[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_changelog_needs_new_accepted_work()
+    {
+        await Assert.ThrowsAsync<Domain.Common.DomainException>(() => _h.ReportWriter().WriteChangelogAsync(_h.Office.Id, "English", "elliot", default));
+
+        await AcceptedAsync("Add a logout button", "Done.");
+        await _h.ReportWriter().WriteChangelogAsync(_h.Office.Id, "English", "elliot", default);
+
+        var error = await Assert.ThrowsAsync<Domain.Common.DomainException>(() => _h.ReportWriter().WriteChangelogAsync(_h.Office.Id, "English", "elliot", default));
+        Assert.Contains("since the previous changelog", error.Message, StringComparison.Ordinal);
+    }
 }

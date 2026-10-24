@@ -322,6 +322,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                             b1.Property<int?>("Left")
                                 .HasColumnType("INTEGER");
 
+                            b1.Property<string>("Mood")
+                                .HasMaxLength(40)
+                                .HasColumnType("TEXT");
+
                             b1.Property<string>("Name")
                                 .IsRequired()
                                 .HasColumnType("TEXT");

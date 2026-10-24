@@ -1,4 +1,13 @@
-import { BACK_ROOM_ARCADE_COLORS, COZY_EVENING_COLORS, NEON_DISTRICT_COLORS, SECURITY_FIRM_COLORS, type ThemeColors } from './palette'
+import {
+  BACK_ROOM_ARCADE_COLORS,
+  BRIGHT_STUDIO_COLORS,
+  COZY_EVENING_COLORS,
+  DARK_FOCUS_COLORS,
+  NEON_DISTRICT_COLORS,
+  SECURITY_FIRM_COLORS,
+  TOWN_HALL_COLORS,
+  type ThemeColors,
+} from './palette'
 import type { PropName } from './sheets/props'
 import { DESK, FLOOR, WALL } from './sheets/room'
 import {
@@ -27,6 +36,8 @@ export interface Theme {
   furniture: PropName[]
   /** What stands in the corridors, in turn. */
   hall: PropName[]
+  /** Always in the dark, whatever the hour: only screens and lamps light it. */
+  dark?: boolean
 }
 
 export const THEMES = {
@@ -65,6 +76,34 @@ export const THEMES = {
     desk: BACK_ROOM_ARCADE_DESK,
     furniture: ['arcadeCabinet', 'itemPedestal', 'vendingMachine', 'serverRack', 'sideTable', 'whiteDog'],
     hall: ['arcadeCabinet', 'vendingMachine', 'plant'],
+  },
+  brightStudio: {
+    label: 'Bright studio',
+    colors: BRIGHT_STUDIO_COLORS,
+    floor: FLOOR,
+    wall: WALL,
+    desk: DESK,
+    furniture: ['plant', 'rug', 'bookshelf', 'floorLamp', 'sideTable', 'whiteDog'],
+    hall: ['plant', 'waterCooler', 'sideTable'],
+  },
+  darkFocus: {
+    label: 'Dark focus',
+    colors: DARK_FOCUS_COLORS,
+    floor: NEON_DISTRICT_FLOOR,
+    wall: NEON_DISTRICT_WALL,
+    desk: NEON_DISTRICT_DESK,
+    furniture: ['serverRack', 'vendingMachine', 'plant'],
+    hall: ['serverRack', 'vendingMachine'],
+    dark: true,
+  },
+  townHall: {
+    label: 'Town hall',
+    colors: TOWN_HALL_COLORS,
+    floor: SECURITY_FIRM_FLOOR,
+    wall: SECURITY_FIRM_WALL,
+    desk: SECURITY_FIRM_DESK,
+    furniture: ['waterCooler', 'whiteboard', 'plant'],
+    hall: ['waterCooler', 'plant'],
   },
 } satisfies Record<string, Theme>
 

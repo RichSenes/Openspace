@@ -227,4 +227,39 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
         Assert.Equal("<header>from you</header>\n", await File.ReadAllTextAsync(Path.Combine(Repo, "index.html")));
         Assert.NotEqual(string.Empty, (await Git("branch", "--list", branch)).Trim());
     }
+
+    [Fact]
+    public async Task A_conflict_names_its_files()
+    {
+        var branch = await AcceptedBranchAsync("index.html", "<header>from the agent</header>\n");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<header>from you</header>\n");
+        await Git("commit", "--quiet", "--all", "--message", "Your change");
+
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() =>
+            _manager.MergeAsync(Repo, branch, "main", "Merge", default));
+
+        Assert.Contains("in index.html", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Catching_up_reopens_the_working_copy_with_the_conflict_marked_for_the_agent()
+    {
+        var branch = await AcceptedBranchAsync("index.html", "<header>from the agent</header>\n");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<header>from you</header>\n");
+        await Git("commit", "--quiet", "--all", "--message", "Your change");
+        var workspace = new Application.Abstractions.Workspace(Path.Combine(_root, "worktrees", "a1b2c3d4"), branch);
+
+        var files = await _manager.StartCatchUpAsync(Repo, workspace, "main", default);
+
+        Assert.Equal(["index.html"], files);
+        Assert.Contains("<<<<<<<", await File.ReadAllTextAsync(Path.Combine(workspace.Path, "index.html")), StringComparison.Ordinal);
+        Assert.Equal("main", (await Git("branch", "--show-current")).Trim());
+        Assert.Equal("<header>from you</header>\n", await File.ReadAllTextAsync(Path.Combine(Repo, "index.html")));
+
+        // Resolved and accepted again: the merge is committed on the task branch and goes in cleanly.
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, "index.html"), "<header>from you and the agent</header>\n");
+        await _manager.CommitAsync(Repo, workspace.Path, "Logout", default);
+        await _manager.MergeAsync(Repo, branch, "main", "Merge task: Logout", default);
+        Assert.Equal("<header>from you and the agent</header>\n", await File.ReadAllTextAsync(Path.Combine(Repo, "index.html")));
+    }
 }

@@ -21,6 +21,7 @@ import { ENGINE_LABEL, type EngineChoice } from '../engines/engines'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { formatSteps, parseSteps } from './procedure'
+import { MoodPicker } from '../building/MoodPicker'
 import './rooms.css'
 
 export function RoomsPanel({ office }: { office: OfficeView }) {
@@ -155,6 +156,8 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
   return (
     <article className="room-card">
       <h2>{room.name}</h2>
+
+      <MoodPicker officeId={officeId} officeTheme={theme} room={room} />
 
       <form className="stack" onSubmit={saveContext}>
         <label className="field">

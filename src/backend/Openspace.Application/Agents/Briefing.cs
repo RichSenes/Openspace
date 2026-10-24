@@ -51,6 +51,17 @@ public static class Briefing
             .ToString();
     }
 
+    /// <summary>
+    /// The brief of an agent taking over a task another engine started: the whole task, and
+    /// where to find what was done so far.
+    /// </summary>
+    public static string ForTakeOver(Office office, Room room, Desk desk, WorkTask task) =>
+        new StringBuilder()
+            .AppendLine(ForNewTask(office, room, desk, task))
+            .AppendLine()
+            .AppendLine("Another agent already worked on this task in this working copy. Look at git status and git diff to see where it stands, then go on from there: the notes from the team above say what is still wrong.")
+            .ToString();
+
     /// <summary>The message sent when an agent stops with required steps still to do.</summary>
     public static string ForMissingSteps(WorkTask task)
     {

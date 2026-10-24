@@ -41,6 +41,9 @@ internal sealed partial class AgentRuntimeRouter(
             : openCode.CreateSessionAsync(workspacePath, title, setup, cancellationToken);
     }
 
+    public AgentEngine EngineOf(string sessionId) =>
+        ClaudeCodeRuntime.Owns(sessionId) ? AgentEngine.ClaudeCode : AgentEngine.OpenCode;
+
     public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken) =>
         ClaudeCodeRuntime.Owns(sessionId)
             ? claude.PromptAsync(sessionId, workspacePath, setup, text, cancellationToken)

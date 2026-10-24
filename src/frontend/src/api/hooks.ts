@@ -161,6 +161,14 @@ export function useSetRepository(officeId: string) {
   )
 }
 
+/** Replaces the office's private folders: Openspace refuses every agent action that names them. */
+export function useSetPrivatePaths(officeId: string) {
+  return useWrite(
+    (paths: string[]) => request<void>('PUT', `/api/offices/${officeId}/private-paths`, { paths }),
+    keys.offices,
+  )
+}
+
 export function useSetOfficeTheme(officeId: string) {
   return useWrite((theme: string) => request<void>('PUT', `/api/offices/${officeId}/theme`, { theme }), keys.offices)
 }

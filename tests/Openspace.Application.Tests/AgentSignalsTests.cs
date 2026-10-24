@@ -298,4 +298,41 @@ public class AgentSignalsTests
     {
         Assert.Equal(scope, EngineLimits.ScopeOf(AgentProfile.Create("build", model, engine)));
     }
+
+    private const string Private = "/srv/media/library";
+
+    [Theory]
+    [InlineData(Autonomy.Auto)]
+    [InlineData(Autonomy.Ask)]
+    public async Task A_request_naming_a_private_folder_is_refused_without_asking_anyone(Autonomy mode)
+    {
+        _h.Autonomy = mode;
+        _h.Office.SetPrivatePaths([Private], Harness.Start);
+        var task = await RunningTaskAsync();
+
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run($"ls {Private}/photos"), default);
+        var asked = await _h.Signals().RequestPermissionAsync(task.Id, new AgentAction(ActionKind.OutsideFolder, $"{Private}/prompts.db"), default);
+
+        Assert.Equal(("per_1", false), Assert.Single(_h.Runtime.PermissionReplies));
+        Assert.False(asked);
+        Assert.NotEqual(ActivityKind.Waiting, _h.Activity.ForTask(task.Id.Value)?.Kind);
+        Assert.Contains("touches the private folder /srv/media/library", task.Notes[^1].Text, StringComparison.Ordinal);
+        Assert.Contains(_h.Audit.Items, e => e.Summary.StartsWith("Refused on its own", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Every_agent_planner_and_reviewer_of_the_office_is_told_and_its_engine_given_the_folders()
+    {
+        _h.Office.SetPrivatePaths([Private], Harness.Start);
+        var task = await RunningTaskAsync();
+
+        Assert.Contains($"PRIVATE FOLDERS", _h.Runtime.Prompts[0].Text, StringComparison.Ordinal);
+        Assert.Contains($"- {Private}", _h.Runtime.Prompts[0].Text, StringComparison.Ordinal);
+        Assert.Equal([Private], _h.Runtime.SessionSetups[0].PrivatePaths);
+
+        await _h.Signals().FinishedAsync("ses_1", default);
+        _h.Runtime.Review = """{"verdict":"ok","summary":"Fine.","findings":[]}""";
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+        Assert.Equal([Private], Assert.Single(_h.Runtime.PrivatePathsSeen));
+    }
 }

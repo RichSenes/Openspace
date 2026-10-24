@@ -13,6 +13,7 @@ namespace Openspace.Application.Review;
 /// never changes anything; the person still decides.
 /// </summary>
 public sealed partial class TaskReviewer(
+    IOfficeRepository offices,
     IWorkTaskRepository tasks,
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
@@ -84,7 +85,10 @@ public sealed partial class TaskReviewer(
         string? answer;
         try
         {
-            answer = await runtime.ReviewAsync(task.Run.WorkspacePath, Instructions, Brief(task), Schema, cancellationToken).ConfigureAwait(false);
+            var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+            answer = await runtime
+                .ReviewAsync(task.Run.WorkspacePath, Instructions + Agents.Briefing.PrivateRule(office.PrivatePaths), Brief(task), Schema, office.PrivatePaths, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

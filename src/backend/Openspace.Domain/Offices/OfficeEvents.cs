@@ -11,6 +11,8 @@ public sealed record RoomOpened(OfficeId OfficeId, RoomId RoomId, string Name, D
 
 public sealed record DeskAdded(OfficeId OfficeId, RoomId RoomId, DeskId DeskId, AgentProfile Agent, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record OfficePrivatePathsSet(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record RoomCheckSet(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record RoomMoodChanged(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;

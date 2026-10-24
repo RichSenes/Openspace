@@ -77,8 +77,11 @@ internal sealed class FakeRuntime : IAgentRuntime
 
     public List<(string Folder, string Text)> PlanRequests { get; } = [];
 
-    public Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    public List<IReadOnlyList<string>> PrivatePathsSeen { get; } = [];
+
+    public Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
+        PrivatePathsSeen.Add(privatePaths);
         if (FailOnPlan is not null)
         {
             throw FailOnPlan;
@@ -122,8 +125,9 @@ internal sealed class FakeRuntime : IAgentRuntime
 
     public List<(string Folder, string Text)> ReviewRequests { get; } = [];
 
-    public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
+        PrivatePathsSeen.Add(privatePaths);
         if (FailOnReview is not null)
         {
             throw FailOnReview;

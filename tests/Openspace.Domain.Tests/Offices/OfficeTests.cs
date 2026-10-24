@@ -227,4 +227,18 @@ public class OfficeTests
 
         Assert.Equal(((string?)null, (string?)null), (look.Accessory, look.Outfit));
     }
+
+    [Fact]
+    public void Private_folders_are_absolute_kept_once_and_without_a_trailing_slash()
+    {
+        var office = ECorp();
+
+        office.SetPrivatePaths(["/srv/media/library/", "/srv/media/library", " ", "/opt/trainer"], Now);
+
+        Assert.Equal(["/srv/media/library", "/opt/trainer"], office.PrivatePaths);
+        Assert.IsType<OfficePrivatePathsSet>(office.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => office.SetPrivatePaths(["media/library"], Now));
+        Assert.Throws<DomainException>(() => office.SetPrivatePaths(["/"], Now));
+        Assert.Throws<DomainException>(() => office.SetPrivatePaths(Enumerable.Range(0, 21).Select(i => $"/srv/p{i}"), Now));
+    }
 }

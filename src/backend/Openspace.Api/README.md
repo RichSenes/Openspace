@@ -14,6 +14,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |
 | PUT | `/api/offices/{id}/rooms/{roomId}/context` | Set a room's context: `{ context }` |
+| PUT | `/api/offices/{id}/private-paths` | `{ paths }`: absolute folders no agent of the office may touch, replacing the list (20 at most) |
 | PUT | `/api/offices/{id}/rooms/{roomId}/check` | `{ command }`: what tells whether the room's code works, run after merges; `null` removes it |
 | POST | `/api/offices/{id}/checks` | `{ branch, taskIds? }`: run the rooms' checks on a branch, in a throwaway copy. With `taskIds`, only their rooms, and each task gets a note with the result. Returns `[{ roomId, room, command, passed, exitCode, output, seconds }]` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/mood` | Draw one room with its own theme: `{ mood }`, or `null` to follow the office |
@@ -178,6 +179,23 @@ A task's first round of work is 1; each send back starts the next. Agents list
 what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
+
+## Private folders
+
+An office can list folders of the person's own that no agent may touch: photos,
+models, personal documents. Every layer refuses them:
+
+- the brief of every agent, and the instructions of the planner and of the
+  reviewer, list them as off limits;
+- OpenCode sessions get deny rules for them (read, edit, search, list, folders
+  outside the copy, and any command naming them), after everything else, so no
+  earlier rule lets them through;
+- Claude Code runs get `--disallowedTools` rules for reading (which covers
+  searching), editing and any command naming them;
+- any permission request naming them is refused at once, in any mode, without
+  asking anyone, and the task gets a note saying so;
+- in such offices a command climbing above the working copy with `..` is never
+  allowed on its own.
 
 ## Usage limits
 

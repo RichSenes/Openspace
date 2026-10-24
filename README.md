@@ -76,6 +76,9 @@ Each project has its own README with detailed specifications.
     usage limits, and pick up where they left off once it resets.
 13. The database is copied once a day (Settings → Backups); restore a copy with
     `scripts/openspace restore <file>`.
+14. An office can list private folders (photos, models, personal documents):
+    no agent of it may open, read, search or change them. Openspace and both
+    engines refuse them, and every agent is told so.
 
 ## Ground rules
 

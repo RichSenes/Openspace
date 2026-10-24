@@ -154,6 +154,24 @@ public class OpenCodeRuntimeTests
     }
 
     [Fact]
+    public async Task Private_folders_are_denied_last_so_nothing_allowed_before_reaches_them()
+    {
+        var (runtime, server) = Create(_ => (HttpStatusCode.OK, """{"id":"ses_1"}"""));
+        var setup = new AgentSetup("build", null, null, new RolePermissions(PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow), PrivatePaths: ["/srv/media/library"]);
+
+        await runtime.CreateSessionAsync(Workspace, "Gallery", setup, default);
+
+        using var session = JsonDocument.Parse(server.Requests[0].Body!);
+        var rules = session.RootElement.GetProperty("permission").EnumerateArray()
+            .Select(r => (r.GetProperty("permission").GetString(), r.GetProperty("pattern").GetString(), r.GetProperty("action").GetString()))
+            .ToList();
+        Assert.Equal(("bash", "*/srv/media/library*", "deny"), rules[^1]);
+        Assert.Contains(("read", "/srv/media/library/*", "deny"), rules);
+        Assert.Contains(("external_directory", "/srv/media/library", "deny"), rules);
+        Assert.True(rules.FindIndex(r => r.Item3 == "deny") > rules.FindLastIndex(r => r.Item2 == "*"));
+    }
+
+    [Fact]
     public async Task Without_a_role_the_session_keeps_OpenCode_defaults_but_stays_in_its_folder()
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.OK, """{"id":"ses_1"}"""));
@@ -207,7 +225,7 @@ public class OpenCodeRuntimeTests
             _ => (HttpStatusCode.OK, "true"),
         });
 
-        var json = await runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request: contact page", """{"type":"object"}""", default);
+        var json = await runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request: contact page", """{"type":"object"}""", [], default);
 
         Assert.Equal("""{"title":"Contact","tasks":[]}""", json);
         Assert.StartsWith("/session?directory=%2Fsrv%2Frepos%2Fe-corp", server.Requests[0].PathAndQuery, StringComparison.Ordinal);
@@ -228,7 +246,7 @@ public class OpenCodeRuntimeTests
         });
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request", """{"type":"object"}""", default));
+            runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request", """{"type":"object"}""", [], default));
 
         Assert.Contains("schema mismatch", error.Message, StringComparison.Ordinal);
     }

@@ -149,6 +149,7 @@ internal sealed partial class ClaudeCodeRuntime(
         args.Add("--allowedTools");
         args.AddRange(allowed);
         args.AddRange(["--permission-prompt-tool", PermissionTool, "--strict-mcp-config", "--mcp-config", McpConfig(workspacePath)]);
+        args.AddRange(Forbidden(setup.PrivatePaths ?? []));
         if (setup.Model is { } model)
         {
             args.AddRange(["--model", model]);
@@ -161,6 +162,27 @@ internal sealed partial class ClaudeCodeRuntime(
 
         args.AddRange([resume ? "--resume" : "--session-id", sessionId[SessionPrefix.Length..]]);
         return args;
+    }
+
+    /// <summary>
+    /// Deny rules for private folders: reading (which covers searching), editing and any command
+    /// naming them. Claude Code applies deny rules before anything allowed.
+    /// </summary>
+    internal static List<string> Forbidden(IReadOnlyList<string> privatePaths)
+    {
+        if (privatePaths.Count == 0)
+        {
+            return [];
+        }
+
+        // An absolute path in a Claude Code rule starts with two slashes.
+        List<string> rules = ["--disallowedTools"];
+        foreach (var folder in privatePaths)
+        {
+            rules.AddRange([$"Read(/{folder}/**)", $"Edit(/{folder}/**)", $"Bash(*{folder}*)"]);
+        }
+
+        return rules;
     }
 
     /// <summary>
@@ -299,9 +321,11 @@ internal sealed partial class ClaudeCodeRuntime(
     /// nobody for anything else. Returns the JSON that matches the schema, or the answer's text.
     /// </summary>
     public async Task<string> AskAsync(
-        string folder, string instructions, string text, string? jsonSchema, IReadOnlyList<string> tools, IReadOnlyList<string> allowed, string? model, CancellationToken cancellationToken)
+        string folder, string instructions, string text, string? jsonSchema, IReadOnlyList<string> tools, IReadOnlyList<string> allowed, string? model,
+        CancellationToken cancellationToken, IReadOnlyList<string>? privatePaths = null)
     {
         var args = new List<string> { "-p", "--output-format", "json", "--restricted", "--permission-prompts", "none", "--strict-mcp-config", "--no-session-persistence" };
+        args.AddRange(Forbidden(privatePaths ?? []));
         args.Add("--tools");
         args.AddRange(tools.Count > 0 ? tools : [string.Empty]);
         if (allowed.Count > 0)

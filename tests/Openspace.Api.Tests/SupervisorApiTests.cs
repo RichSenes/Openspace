@@ -11,7 +11,7 @@ public sealed class SupervisorApiTests : IDisposable
     /// <summary>Answers every plan with the same two tasks; everything else is not needed here.</summary>
     internal sealed class PlanningRuntime : IAgentRuntime
     {
-        public Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken) =>
+        public Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken) =>
             Task.FromResult("""
                 {"title":"Contact page","tasks":[
                   {"title":"Build the contact form","description":"In the theme.","desk":"Frontend"},
@@ -19,7 +19,7 @@ public sealed class SupervisorApiTests : IDisposable
                 """);
 
         public Task<bool> HasAgentAsync(AgentProfile agent, string workspacePath, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+        public Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task<string> CreateSessionAsync(string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken) => throw new NotSupportedException();
         public AgentEngine EngineOf(string sessionId) => throw new NotSupportedException();
         public Task PromptAsync(string sessionId, string workspacePath, AgentSetup setup, string text, CancellationToken cancellationToken) => throw new NotSupportedException();

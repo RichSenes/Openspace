@@ -67,13 +67,14 @@ internal sealed partial class AgentRuntimeRouter(
         return await openCode.DraftAsync(instructions, text, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<string> PlanAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    public async Task<string> PlanAsync(
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
         if (await SupervisesAsync(cancellationToken).ConfigureAwait(false))
         {
             try
             {
-                return await claude.AskAsync(folder, instructions, text, jsonSchema, ReadingTools, ReadingTools, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.SupervisorModel), cancellationToken)
+                return await claude.AskAsync(folder, instructions, text, jsonSchema, ReadingTools, ReadingTools, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.SupervisorModel), cancellationToken, privatePaths)
                     .ConfigureAwait(false);
             }
             catch (InvalidOperationException ex)
@@ -83,17 +84,18 @@ internal sealed partial class AgentRuntimeRouter(
             }
         }
 
-        return await openCode.PlanAsync(folder, instructions, text, jsonSchema, cancellationToken).ConfigureAwait(false);
+        return await openCode.PlanAsync(folder, instructions, text, jsonSchema, privatePaths, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<string?> ReviewAsync(string folder, string instructions, string text, string jsonSchema, CancellationToken cancellationToken)
+    public async Task<string?> ReviewAsync(
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
         if (!options.CurrentValue.Review || !await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
 
-        return await claude.AskAsync(folder, instructions, text, jsonSchema, ReviewTools, ReviewAllowed, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.ReviewModel), cancellationToken)
+        return await claude.AskAsync(folder, instructions, text, jsonSchema, ReviewTools, ReviewAllowed, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.ReviewModel), cancellationToken, privatePaths)
             .ConfigureAwait(false);
     }
 

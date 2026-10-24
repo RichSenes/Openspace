@@ -145,6 +145,8 @@ export interface OfficeView {
   /** The common floor's furniture, in pixels from the building's corner. */
   furniture?: FurniturePiece[]
   cuts?: FloorCut[]
+  /** Folders no agent of the office may open, list, read, search or change. */
+  privatePaths?: string[]
 }
 
 export interface TaskNoteView {

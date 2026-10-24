@@ -222,6 +222,19 @@ public class ClaudeCodeRuntimeTests : IDisposable
     }
 
     [Fact]
+    public void Private_folders_are_denied_to_Claude_Code_reads_edits_and_commands()
+    {
+        using var runtime = Runtime("claude");
+        var setup = new AgentSetup("build", null, null, new RolePermissions(PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow), Domain.Offices.AgentEngine.ClaudeCode, ["/srv/media/library"]);
+
+        var args = runtime.SessionArguments(runtime.CreateSession("/srv/worktrees/a"), resume: false, setup, "/srv/worktrees/a");
+
+        var denied = args.Skip(args.IndexOf("--disallowedTools") + 1).Take(3).ToList();
+        Assert.Equal(["Read(//srv/media/library/**)", "Edit(//srv/media/library/**)", "Bash(*/srv/media/library*)"], denied);
+        Assert.Empty(ClaudeCodeRuntime.Forbidden([]));
+    }
+
+    [Fact]
     public void The_structured_answer_is_read_from_the_last_line()
     {
         var output = "Warning: no stdin\n" + """{"type":"result","is_error":false,"result":"done","structured_output":{"tasks":[]}}""";

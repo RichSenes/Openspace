@@ -14,6 +14,7 @@ import {
   useSetRoomProcedure,
   useUpdateRoomContext,
   useSetRoomCheck,
+  useSetPrivatePaths,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
@@ -48,6 +49,7 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
       </header>
 
       <RepositoryForm office={office} />
+      <PrivateFoldersForm key={(office.privatePaths ?? []).join('\n')} office={office} />
 
       <form className="room-new" onSubmit={submit}>
         <label className="field">
@@ -415,6 +417,41 @@ function CheckForm({ officeId, room }: { officeId: string; room: RoomView }) {
       <div className="row">
         <button type="submit" className="btn" disabled={!changed || save.isPending}>
           Save check
+        </button>
+      </div>
+      {save.error && <p className="error">{save.error.message}</p>}
+    </form>
+  )
+}
+
+/**
+ * Folders of yours no agent of this office may touch: Openspace and both engines refuse
+ * them, and every agent is told so. One absolute path per line.
+ */
+function PrivateFoldersForm({ office }: { office: OfficeView }) {
+  const saved = (office.privatePaths ?? []).join('\n')
+  const [text, setText] = useState(saved)
+  const save = useSetPrivatePaths(office.id)
+  const toast = useToast()
+  const paths = text.split('\n').map((l) => l.trim()).filter(Boolean)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    save.mutate(paths, { onSuccess: () => toast(paths.length ? `${paths.length} private ${paths.length === 1 ? 'folder' : 'folders'} saved` : 'No private folders now') })
+  }
+
+  return (
+    <form className="stack private-folders" onSubmit={submit}>
+      <label className="field">
+        <span>
+          Private folders: one absolute path per line. No agent of this office may open, list, read, search or change them;
+          Openspace refuses any request that names them without asking you, and each agent is told so.
+        </span>
+        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'/home/you/photos\n/home/you/ai/models'} />
+      </label>
+      <div className="row">
+        <button type="submit" className="btn" disabled={paths.join('\n') === saved || save.isPending}>
+          Save private folders
         </button>
       </div>
       {save.error && <p className="error">{save.error.message}</p>}

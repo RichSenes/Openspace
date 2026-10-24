@@ -32,6 +32,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("PrivatePaths")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RepositoryPath")
                         .HasColumnType("TEXT");
 

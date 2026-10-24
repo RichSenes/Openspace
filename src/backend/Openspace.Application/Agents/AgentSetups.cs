@@ -10,7 +10,8 @@ public sealed class AgentSetups(IRoleRepository roles)
     /// The desk's engine, agent and model, completed by its role: the desk's own model wins
     /// over the role's. Role models are OpenCode's, so Claude Code desks only use their own.
     /// </summary>
-    public async Task<AgentSetup> ForDeskAsync(Desk desk, CancellationToken cancellationToken)
+    /// <param name="privatePaths">The office's private folders, which the agent's engine must refuse.</param>
+    public async Task<AgentSetup> ForDeskAsync(Desk desk, CancellationToken cancellationToken, IReadOnlyList<string>? privatePaths = null)
     {
         ArgumentNullException.ThrowIfNull(desk);
         var role = desk.RoleId is { } id ? await roles.FindAsync(id, cancellationToken).ConfigureAwait(false) : null;
@@ -19,6 +20,7 @@ public sealed class AgentSetups(IRoleRepository roles)
             desk.Agent.Engine == AgentEngine.ClaudeCode ? desk.Agent.Model : desk.Agent.Model ?? role?.Model,
             string.IsNullOrEmpty(role?.Instructions) ? null : role.Instructions,
             role?.Permissions,
-            desk.Agent.Engine);
+            desk.Agent.Engine,
+            privatePaths);
     }
 }

@@ -111,7 +111,7 @@ public class ClaudeCodeEventsTests
 
         var end = Assert.IsType<AgentSignal.OutOfLimits>(Assert.Single(events.Read("""{"type":"result","is_error":true,"result":"Usage limit reached, resets at 6pm"}""", usage)));
 
-        Assert.Equal((AgentEngine.ClaudeCode, DateTimeOffset.FromUnixTimeSeconds(1792787400)), (end.Engine, end.Until));
+        Assert.Equal(("claude-code", DateTimeOffset.FromUnixTimeSeconds(1792787400)), (end.Scope, end.Until));
         Assert.IsType<AgentSignal.OutOfLimits>(ClaudeCodeEvents.Stopped("claude-2", "Claude Code stopped without finishing: You've hit your limit", null));
     }
 

@@ -56,6 +56,16 @@ export interface EnginesView {
   reviewer: AgentEngine | null
   /** While the Claude account is over its limits, when Claude Code desks take work again. */
   claudePausedUntil?: string | null
+  /** Every account over its limits now: Claude's, or an OpenCode provider's. */
+  pauses?: LimitPause[] | null
+}
+
+/** An account over its usage limits: its desks keep their tasks queued until it resumes. */
+export interface LimitPause {
+  /** "claude-code", or "opencode:<provider>" for an OpenCode provider. */
+  scope: string
+  label: string
+  until: string
 }
 
 /** A look chosen by hand: names the pixel art knows; unknown ones fall back to the picked look. */

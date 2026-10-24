@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EnginesView } from '../api/types'
-import { modelOptions } from './engines'
+import { modelOptions, pauseOf, scopeOf } from './engines'
 
 const engines: EnginesView = {
   openCode: true,
@@ -24,5 +24,19 @@ describe('modelOptions', () => {
 
   it('offers nothing while the engines are unknown', () => {
     expect(modelOptions(undefined, 'OpenCode', '')).toEqual([])
+  })
+})
+
+describe('scopeOf and pauseOf', () => {
+  it('names the account a desk spends, as the API does', () => {
+    expect(scopeOf({ engine: 'ClaudeCode', model: 'sonnet' })).toBe('claude-code')
+    expect(scopeOf({ engine: 'OpenCode', model: 'opencode/big-pickle' })).toBe('opencode:opencode')
+    expect(scopeOf({ engine: 'OpenCode', model: null })).toBeNull()
+  })
+
+  it('finds the pause of a desk on a paused account only', () => {
+    const engines = { pauses: [{ scope: 'opencode:opencode', label: 'OpenCode models of opencode', until: '2026-10-25T00:00:00Z' }] } as EnginesView
+    expect(pauseOf(engines, { engine: 'OpenCode', model: 'opencode/deepseek-v4.1-flash-free' })?.until).toBe('2026-10-25T00:00:00Z')
+    expect(pauseOf(engines, { engine: 'ClaudeCode', model: 'sonnet' })).toBeUndefined()
   })
 })

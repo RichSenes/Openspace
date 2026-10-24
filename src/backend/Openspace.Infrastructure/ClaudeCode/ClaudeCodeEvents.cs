@@ -73,7 +73,7 @@ internal sealed partial class ClaudeCodeEvents(string sessionId)
 
         // The window that is full says when work can go on; else the five hours.
         var full = new[] { latest?.FiveHours, latest?.Week }.FirstOrDefault(w => w?.Used >= 1);
-        return new AgentSignal.OutOfLimits(sessionId, AgentEngine.ClaudeCode, (full ?? latest?.FiveHours)?.ResetsAt, "The Claude account is over its usage limits.");
+        return new AgentSignal.OutOfLimits(sessionId, EngineLimits.ClaudeCode, (full ?? latest?.FiveHours)?.ResetsAt, "The Claude account is over its usage limits.");
     }
 
     [System.Text.RegularExpressions.GeneratedRegex(@"(usage|rate|session|weekly) limit|limit (reached|exceeded)|hit your limit|out of (extra )?usage", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]

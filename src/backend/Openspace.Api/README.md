@@ -179,13 +179,16 @@ what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
 
-## Claude Code limits
+## Usage limits
 
-When a Claude Code run stops because the account is over its usage limits, the
-task goes back to the queue instead of failing, and Claude Code desks take no
-work until the window resets (`claudePausedUntil` in `GET /api/engines`; 30
-minutes when Claude Code does not say). "Check now" in Settings ends the pause
-early once the account answers again. OpenCode desks are not affected.
+When an account is over its usage limits, its tasks go back to the queue
+instead of failing or hanging, and the desks spending it take no work until the
+reset; the others go on. Claude Code says so when a run stops; OpenCode retries
+silently, and Openspace reads its `session.status` "retry" events (a provider's
+free tier running out, say), stops the session and pauses the desks on that
+provider. `GET /api/engines` lists the pauses (`pauses`, and
+`claudePausedUntil`); without a reset time a pause lasts 30 minutes. "Check
+now" in Settings ends Claude's pause early once the account answers again.
 
 ## Claude Code
 

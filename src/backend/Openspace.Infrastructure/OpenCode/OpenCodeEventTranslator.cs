@@ -31,6 +31,7 @@ internal static class OpenCodeEventTranslator
                 : null,
             "session.idle" => new AgentSignal.Finished(Text(props, "sessionID")!),
             "session.error" => FromError(props),
+            "session.status" => FromStatus(props),
             _ => null,
         };
     }
@@ -166,6 +167,38 @@ internal static class OpenCodeEventTranslator
             "webfetch" or "websearch" => new AgentAction(ActionKind.Fetch, patterns.FirstOrDefault() ?? Text(metadata, "url") ?? "a page"),
             _ => new AgentAction(ActionKind.Other, what),
         };
+    }
+
+    /// <summary>
+    /// OpenCode retries a model that does not answer, silently: a provider over its limits
+    /// pauses the desks on it, anything else at least shows in the bubble.
+    /// </summary>
+    private static AgentSignal? FromStatus(JsonElement props)
+    {
+        if (Text(props, "sessionID") is not { } sessionId
+            || !props.TryGetProperty("status", out var status)
+            || Text(status, "type") != "retry")
+        {
+            return null;
+        }
+
+        var message = Text(status, "message") ?? "the model did not answer";
+        var action = status.TryGetProperty("action", out var a) ? a : default;
+        var reason = Text(action, "reason") ?? string.Empty;
+        if (reason.Contains("limit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("limit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
+        {
+            var next = status.TryGetProperty("next", out var n) && n.ValueKind == JsonValueKind.Number
+                ? DateTimeOffset.FromUnixTimeMilliseconds(n.GetInt64())
+                : (DateTimeOffset?)null;
+            var provider = Text(action, "provider") ?? "opencode";
+            return new AgentSignal.OutOfLimits(
+                sessionId, EngineLimits.OpenCodeProvider(provider), next, $"OpenCode: {Text(action, "title") ?? "usage limit reached"} ({message}).");
+        }
+
+        var attempt = status.TryGetProperty("attempt", out var at) && at.ValueKind == JsonValueKind.Number ? at.GetInt32() : 1;
+        return new AgentSignal.Progress(sessionId, null, Shorten($"The model is not answering: trying again ({attempt})"));
     }
 
     private static AgentSignal.Failed? FromError(JsonElement props)

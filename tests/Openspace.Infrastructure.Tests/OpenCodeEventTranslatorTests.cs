@@ -186,4 +186,26 @@ public class OpenCodeEventTranslatorTests
 
         Assert.Equal(new AgentAction(kind, target), signal?.Action);
     }
+
+    [Fact]
+    public void A_provider_over_its_free_limit_pauses_until_its_next_try()
+    {
+        var signal = Translate("""
+            {"type":"session.status","properties":{"sessionID":"ses_1","status":{"type":"retry","attempt":1,"message":"Free usage exceeded, subscribe to Go",
+             "action":{"reason":"free_tier_limit","provider":"opencode","title":"Free limit reached"},"next":1792886400550}}}
+            """);
+
+        var paused = Assert.IsType<AgentSignal.OutOfLimits>(signal);
+        Assert.Equal(("opencode:opencode", DateTimeOffset.FromUnixTimeMilliseconds(1792886400550)), (paused.Scope, paused.Until));
+        Assert.Contains("Free limit reached", paused.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Other_retries_show_in_the_bubble_and_a_busy_session_is_not_news()
+    {
+        var retry = Translate("""{"type":"session.status","properties":{"sessionID":"ses_1","status":{"type":"retry","attempt":3,"message":"Overloaded","next":1792886400550}}}""");
+
+        Assert.Equal(new AgentSignal.Progress("ses_1", null, "The model is not answering: trying again (3)"), retry);
+        Assert.Null(Translate("""{"type":"session.status","properties":{"sessionID":"ses_1","status":{"type":"busy"}}}"""));
+    }
 }

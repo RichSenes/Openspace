@@ -41,7 +41,8 @@ internal sealed class AgentEngines(
             usage.Latest,
             claudeCode && options.CurrentValue.Supervise ? "ClaudeCode" : "OpenCode",
             claudeCode && options.CurrentValue.Review ? "ClaudeCode" : null,
-            limits.PausedUntil(Domain.Offices.AgentEngine.ClaudeCode));
+            limits.PausedUntil(Application.Agents.EngineLimits.ClaudeCode),
+            limits.Pauses());
     }
 
     public async Task<ClaudeUsageView?> CheckClaudeUsageAsync(CancellationToken cancellationToken)
@@ -51,7 +52,7 @@ internal sealed class AgentEngines(
         // Asked by hand and answered: the desks need not wait for the reset any more.
         if (seen?.Status == "allowed" && seen.FiveHours?.Used < 1 && (seen.Week?.Used ?? 0) < 1)
         {
-            limits.Resume(Domain.Offices.AgentEngine.ClaudeCode);
+            limits.Resume(Application.Agents.EngineLimits.ClaudeCode);
         }
 
         return seen;

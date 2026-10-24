@@ -186,7 +186,8 @@ instead of failing or hanging, and the desks spending it take no work until the
 reset; the others go on. Claude Code says so when a run stops; OpenCode retries
 silently, and Openspace reads its `session.status` "retry" events (a provider's
 free tier running out, say), stops the session and pauses the desks on that
-provider. `GET /api/engines` lists the pauses (`pauses`, and
+provider. Once a minute it also asks OpenCode how running tasks' sessions are,
+so a session that was already retrying when Openspace started is noticed too. `GET /api/engines` lists the pauses (`pauses`, and
 `claudePausedUntil`); without a reset time a pause lasts 30 minutes. "Check
 now" in Settings ends Claude's pause early once the account answers again.
 

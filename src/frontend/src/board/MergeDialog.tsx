@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, CircleSlash, GitMerge, TriangleAlert, X } from 'lucide-react'
 import { useBranches, useCatchUp, useMergeAll } from '../api/hooks'
 import type { MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
-import { defaultMergeTarget } from './mergeTarget'
+import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
 import { awaitingMerge, checksDone } from './taskRules'
 
 interface Props {
@@ -34,6 +34,10 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   const catchUp = useCatchUp()
   const toast = useToast()
   const chosen = waiting.filter((t) => !skipped.has(t.id))
+  const blocker = mergeBlocker(branches.data, target)
+  const results = useRef<HTMLElement>(null)
+  // The outcome shows below the button that asked for it, in view.
+  useEffect(() => results.current?.scrollIntoView({ block: 'nearest' }), [outcomes])
   const deskOf = (taskId: string) => desks.find((d) => d.id === tasks.find((t) => t.id === taskId)?.deskId)?.name ?? 'its agent'
 
   const close = () => {
@@ -77,35 +81,6 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   return (
     <Dialog title="Merge desk" open={open} onClose={close}>
       <div className="merge-desk">
-        {outcomes.length > 0 && (
-          <section className="merge-results" aria-label="What happened">
-            <h3 className="pixel notes-title">Last round into {target}</h3>
-            <ol className="merge-list">
-              {outcomes.map((o) => (
-                <li key={o.taskId} className={`merge-outcome merge-${o.result.toLowerCase()}`}>
-                  <span className="merge-mark" aria-hidden="true">
-                    {o.result === 'Merged' ? <Check size={14} /> : o.result === 'Conflict' ? <TriangleAlert size={14} /> : o.result === 'Failed' ? <X size={14} /> : <CircleSlash size={14} />}
-                  </span>
-                  <div className="merge-text">
-                    <span>
-                      <strong>{RESULT_LABEL[o.result]}</strong> · {o.title}
-                    </span>
-                    {o.message && <span className="hint">{o.message}</span>}
-                    {o.result === 'Conflict' &&
-                      (caughtUp.has(o.taskId) ? (
-                        <span className="hint">Sent back to {deskOf(o.taskId)}: merge again once you accept it.</span>
-                      ) : (
-                        <button type="button" className="btn" disabled={catchUp.isPending} onClick={() => sendToCatchUp(o)}>
-                          Let {deskOf(o.taskId)} resolve it
-                        </button>
-                      ))}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
-
         {waiting.length === 0 ? (
           <p className="hint">Nothing waiting to be merged. Accepted work shows up here until it is in one of your branches.</p>
         ) : (
@@ -145,8 +120,13 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
               </ol>
             </fieldset>
 
+            {blocker && (
+              <p className="merge-blocker" role="alert">
+                <TriangleAlert size={14} aria-hidden /> {blocker}
+              </p>
+            )}
             <div className="row">
-              <button type="button" className="btn btn-primary" disabled={!target || chosen.length === 0 || mergeAll.isPending} onClick={merge}>
+              <button type="button" className="btn btn-primary" disabled={!target || chosen.length === 0 || Boolean(blocker) || mergeAll.isPending} onClick={merge}>
                 <GitMerge size={16} aria-hidden /> Merge {chosen.length} into {target || '…'}
               </button>
             </div>
@@ -156,6 +136,37 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
             </p>
           </>
         )}
+        {outcomes.length > 0 && (
+          <section ref={results} className="merge-results" aria-label="What happened">
+            <h3 className="pixel notes-title">
+              Last round into {target} · {outcomes.filter((o) => o.result === 'Merged').length} of {outcomes.length} merged
+            </h3>
+            <ol className="merge-list">
+              {outcomes.map((o) => (
+                <li key={o.taskId} className={`merge-outcome merge-${o.result.toLowerCase()}`}>
+                  <span className="merge-mark" aria-hidden="true">
+                    {o.result === 'Merged' ? <Check size={14} /> : o.result === 'Conflict' ? <TriangleAlert size={14} /> : o.result === 'Failed' ? <X size={14} /> : <CircleSlash size={14} />}
+                  </span>
+                  <div className="merge-text">
+                    <span>
+                      <strong>{RESULT_LABEL[o.result]}</strong> · {o.title}
+                    </span>
+                    {o.message && <span className="hint">{o.message}</span>}
+                    {o.result === 'Conflict' &&
+                      (caughtUp.has(o.taskId) ? (
+                        <span className="hint">Sent back to {deskOf(o.taskId)}: merge again once you accept it.</span>
+                      ) : (
+                        <button type="button" className="btn" disabled={catchUp.isPending} onClick={() => sendToCatchUp(o)}>
+                          Let {deskOf(o.taskId)} resolve it
+                        </button>
+                      ))}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
         {(mergeAll.error ?? catchUp.error) && <p className="error">{(mergeAll.error ?? catchUp.error)?.message}</p>}
       </div>
     </Dialog>

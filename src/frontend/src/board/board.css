@@ -662,3 +662,20 @@
 .merge-nottried .merge-mark {
   color: var(--mute);
 }
+
+.merge-blocker {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.merge-blocker svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--accent);
+}

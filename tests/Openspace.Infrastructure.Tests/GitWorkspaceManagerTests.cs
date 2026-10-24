@@ -171,6 +171,18 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
 
         Assert.Equal("main", list.Current);
         Assert.Equal(["develop", "main"], list.Branches);
+        Assert.Equal(0, list.UncommittedChanges);
+    }
+
+    [Fact]
+    public async Task Branches_count_your_uncommitted_changes_but_not_new_files()
+    {
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<p>work in progress</p>\n");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "notes.txt"), "not tracked\n");
+
+        var list = await _manager.ListBranchesAsync(Repo, default);
+
+        Assert.Equal(1, list.UncommittedChanges);
     }
 
     [Fact]

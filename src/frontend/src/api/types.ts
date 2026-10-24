@@ -220,6 +220,8 @@ export interface AuditEntryView {
 export interface BranchList {
   current: string | null
   branches: string[]
+  /** Files changed and not committed in your checkout: nothing merges into the current branch meanwhile. */
+  uncommittedChanges?: number
 }
 
 /** What a desk is doing right now: the data behind a speech bubble. */

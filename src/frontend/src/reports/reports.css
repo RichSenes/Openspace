@@ -127,3 +127,8 @@
 .report-form-hint {
   margin: 0;
 }
+
+/* The changelog explains itself, so it takes a row of its own. */
+.report-form-wide {
+  grid-column: 1 / -1;
+}

@@ -6,7 +6,8 @@ public sealed record RepositoryProblem(string Code, string Message, bool CanInit
 
 /// <param name="Current">The branch checked out in the repository folder; null when detached.</param>
 /// <param name="Branches">Local branches work can be merged into (task branches excluded).</param>
-public sealed record BranchList(string? Current, IReadOnlyList<string> Branches);
+/// <param name="UncommittedChanges">Files changed and not committed in your checkout: nothing merges into <paramref name="Current"/> while there are any.</param>
+public sealed record BranchList(string? Current, IReadOnlyList<string> Branches, int UncommittedChanges = 0);
 
 /// <summary>A private working copy for one task, on its own branch.</summary>
 public sealed record Workspace(string Path, string Branch);

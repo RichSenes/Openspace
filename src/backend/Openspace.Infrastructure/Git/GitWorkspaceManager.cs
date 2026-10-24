@@ -115,7 +115,11 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
             .Where(b => !b.StartsWith(TaskBranchPrefix, StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
             .ToList();
-        return new BranchList(current.Length > 0 ? current : null, branches);
+        var changes = await GitCli.RunAsync(repositoryPath, cancellationToken, "status", "--porcelain", "--untracked-files=no").ConfigureAwait(false);
+        return new BranchList(
+            current.Length > 0 ? current : null,
+            branches,
+            changes.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
     }
 
     public async Task MergeAsync(

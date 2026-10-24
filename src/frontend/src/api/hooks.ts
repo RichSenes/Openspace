@@ -18,6 +18,7 @@ import type {
   ClaudeUsage,
   DeskUsageView,
   SettingsView,
+  MergeOutcome,
 } from './types'
 
 export const keys = {
@@ -213,6 +214,33 @@ export function useMergeTask() {
   )
 }
 
+/** Gives a room its own mood; null follows the office's theme again. */
+export function useChangeRoomMood(officeId: string) {
+  return useWrite(
+    (input: { roomId: string; mood: string | null }) =>
+      request<void>('PUT', `/api/offices/${officeId}/rooms/${input.roomId}/mood`, { mood: input.mood }),
+    keys.offices,
+  )
+}
+
+/** Brings all accepted work, or the chosen tasks, into one branch in the order it was accepted. */
+export function useMergeAll(officeId: string) {
+  return useWrite(
+    (input: { target: string; taskIds: string[] }) =>
+      request<MergeOutcome[]>('POST', `/api/offices/${officeId}/merge`, input),
+    keys.tasks,
+  )
+}
+
+/** Sends accepted work that conflicts back to its agent, with the merge already started. */
+export function useCatchUp() {
+  return useWrite(
+    (input: { taskId: string; target: string }) =>
+      request<void>('POST', `/api/tasks/${input.taskId}/catch-up`, { target: input.target }),
+    keys.tasks,
+  )
+}
+
 /** A task's audit log. Refetched when the task changes or its log grows. */
 export function useTaskLog(taskId: string, enabled: boolean) {
   return useQuery({
@@ -345,6 +373,14 @@ export function useWriteReport(officeId: string) {
       input.kind === 'day'
         ? request<ReportView>('POST', `/api/offices/${officeId}/reports`, input)
         : request<ReportView>('POST', `/api/epics/${input.epicId}/report`, { language: input.language }),
+    keys.reports,
+  )
+}
+
+/** The changelog of what was accepted since the previous one, for people using the product. */
+export function useWriteChangelog(officeId: string) {
+  return useWrite(
+    (input: { language: string }) => request<ReportView>('POST', `/api/offices/${officeId}/changelog`, input),
     keys.reports,
   )
 }

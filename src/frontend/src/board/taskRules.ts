@@ -87,6 +87,13 @@ export function checksDone(task: WorkTaskView): { done: number; total: number } 
   return { done: task.manualChecks.filter((c) => c.checkedAt).length, total: task.manualChecks.length }
 }
 
+/** Accepted work on its own branch, not merged anywhere yet, in the order it was accepted. */
+export function awaitingMerge(tasks: readonly WorkTaskView[]): WorkTaskView[] {
+  return tasks
+    .filter((t) => t.status === 'Done' && t.branch !== null && t.mergedInto === null)
+    .toSorted((a, b) => timeOf(a.statusChangedAt) - timeOf(b.statusChangedAt))
+}
+
 /** Token counts in a few characters: 950, 12.4k, 1.3M. */
 export function compactTokens(n: number): string {
   if (n < 1000) return String(n)

@@ -104,15 +104,84 @@ public sealed class WorkTaskCommands(
     public async Task MergeAsync(WorkTaskId taskId, string targetBranch, CancellationToken cancellationToken)
     {
         var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
-        var now = clock.GetUtcNow();
-        task.RecordMerge(targetBranch, now);
-
         var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        await MergeOneAsync(office, task, targetBranch, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Brings all accepted work of an office into one branch, in the order it was accepted.
+    /// Work that conflicts is skipped and said so; a branch that cannot take anything (your
+    /// uncommitted changes, say) stops the round.
+    /// </summary>
+    /// <param name="only">The tasks to merge; all those waiting when null.</param>
+    public async Task<IReadOnlyList<MergeOutcome>> MergeAllAsync(
+        OfficeId officeId, string targetBranch, IReadOnlyCollection<WorkTaskId>? only, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        var waiting = (await tasks.ListAsync(officeId, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false))
+            .Where(t => t.AwaitsMerge && (only is null || only.Contains(t.Id)))
+            .OrderBy(t => t.StatusChangedAt)
+            .ToList();
+
+        var outcomes = new List<MergeOutcome>();
+        var stopped = false;
+        foreach (var task in waiting)
+        {
+            if (stopped)
+            {
+                outcomes.Add(new MergeOutcome(task.Id.Value, task.Title, MergeResult.NotTried, "Not tried: the branch could not take the work above."));
+                continue;
+            }
+
+            try
+            {
+                await MergeOneAsync(office, task, targetBranch, cancellationToken).ConfigureAwait(false);
+                outcomes.Add(new MergeOutcome(task.Id.Value, task.Title, MergeResult.Merged, null));
+            }
+            catch (RejectedException ex) when (ex.Code == "merge-conflict")
+            {
+                outcomes.Add(new MergeOutcome(task.Id.Value, task.Title, MergeResult.Conflict, ex.Message));
+            }
+            catch (RejectedException ex)
+            {
+                // A missing target or your own uncommitted changes: the next ones would fail the same way.
+                outcomes.Add(new MergeOutcome(task.Id.Value, task.Title, MergeResult.Failed, ex.Message));
+                stopped = ex.Code != "task-branch-missing";
+            }
+        }
+
+        return outcomes;
+    }
+
+    private async Task MergeOneAsync(Office office, WorkTask task, string targetBranch, CancellationToken cancellationToken)
+    {
+        // Checked before git is touched, recorded only once git succeeded.
+        var target = task.CheckMerge(targetBranch);
         await workspaces
-            .MergeAsync(office.RepositoryPath!, task.Run!.Branch, task.MergedInto!, $"Merge task: {task.Title}", cancellationToken)
+            .MergeAsync(office.RepositoryPath!, task.Run!.Branch, target, $"Merge task: {task.Title}", cancellationToken)
             .ConfigureAwait(false);
 
-        task.AddNote(NoteAuthor.System, $"Merged into {task.MergedInto}; branch {task.Run.Branch} deleted.", now);
+        var now = clock.GetUtcNow();
+        task.RecordMerge(target, now);
+        task.AddNote(NoteAuthor.System, $"Merged into {target}; branch {task.Run.Branch} deleted.", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends accepted work that conflicts with <paramref name="targetBranch"/> back to its desk:
+    /// Openspace starts the merge in a fresh working copy and the agent resolves what conflicts.
+    /// </summary>
+    public async Task CatchUpAsync(WorkTaskId taskId, string targetBranch, string requestedBy, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var target = task.CheckMerge(targetBranch);
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var run = task.Run!;
+        var files = await workspaces
+            .StartCatchUpAsync(office.RepositoryPath!, new Workspace(run.WorkspacePath, run.Branch), target, cancellationToken)
+            .ConfigureAwait(false);
+
+        task.ReopenToCatchUp(NoteAuthor.Human(requestedBy), Briefing.ForCatchUp(target, files), clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 

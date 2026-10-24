@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, Hourglass, ListChecks, Plus, Sparkles, TriangleAlert } from 'lucide-react'
+import { Check, GitMerge, Hourglass, ListChecks, Plus, Sparkles, TriangleAlert } from 'lucide-react'
 import { useEngines, useEpics, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
@@ -7,7 +7,8 @@ import { desksOf } from './deskLookup'
 import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
-import { checksDone, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { MergeDialog } from './MergeDialog'
+import { awaitingMerge, checksDone, COLUMNS, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
 interface Props {
@@ -20,6 +21,7 @@ export function Board({ office, initialTaskId }: Props) {
   const tasks = useOfficeTasks(office.id)
   const [creating, setCreating] = useState(false)
   const [planning, setPlanning] = useState(false)
+  const [merging, setMerging] = useState(false)
   const [epicFilter, setEpicFilter] = useState<EpicFilter>('all')
   const epics = useEpics(office.id)
   const epicTitle = (id: string | null) => epics.data?.find((e) => e.id === id)?.title
@@ -28,6 +30,7 @@ export function Board({ office, initialTaskId }: Props) {
   const desks = useMemo(() => desksOf(office), [office])
   const groups = useMemo(() => groupByColumn(filterByEpic(tasks.data ?? [], epicFilter)), [tasks.data, epicFilter])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
+  const toMerge = awaitingMerge(tasks.data ?? []).length
 
   return (
     <section className={openTask ? 'board has-drawer' : 'board'}>
@@ -49,6 +52,9 @@ export function Board({ office, initialTaskId }: Props) {
               </select>
             </label>
           )}
+          <button type="button" className="btn" onClick={() => setMerging(true)}>
+            <GitMerge size={16} /> Merge desk{toMerge > 0 && <span className="count-badge">{toMerge}</span>}
+          </button>
           <button type="button" className="btn" onClick={() => setPlanning(true)}>
             <Sparkles size={16} /> Ask the supervisor
           </button>
@@ -63,13 +69,15 @@ export function Board({ office, initialTaskId }: Props) {
       <div className="columns">
         {COLUMNS.map((column) => {
           const items = groups.get(column.status) ?? []
+          // With a task open, empty columns fold to a strip so the others keep their width.
+          const folded = Boolean(openTask) && items.length === 0
           return (
-            <section key={column.status} className="column" aria-label={column.label}>
+            <section key={column.status} className={folded ? 'column column-folded' : 'column'} aria-label={column.label}>
               <header className="column-head">
                 <StatusPill status={column.status} />
                 <span className="hint">{items.length}</span>
               </header>
-              {items.length === 0 ? (
+              {folded ? null : items.length === 0 ? (
                 <p className="hint column-empty">{column.emptyHint}</p>
               ) : (
                 <ul className="cards">
@@ -93,6 +101,11 @@ export function Board({ office, initialTaskId }: Props) {
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
                           {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
+                          {task.status === 'Done' && task.branch !== null && (
+                            <span className="card-meta hint">
+                              {task.mergedInto ? `In ${task.mergedInto}` : 'Not merged yet'}
+                            </span>
+                          )}
                           {verdict === 'reviewing' && (
                             <span className="card-review">
                               <Hourglass size={12} aria-hidden /> Claude is reviewing…
@@ -127,6 +140,7 @@ export function Board({ office, initialTaskId }: Props) {
       </div>
 
       <NewTaskDialog office={office} desks={desks} open={creating} onClose={() => setCreating(false)} />
+      <MergeDialog office={office} tasks={tasks.data ?? []} desks={desks} open={merging} onClose={() => setMerging(false)} />
       <SupervisorDialog
         office={office}
         desks={desks}

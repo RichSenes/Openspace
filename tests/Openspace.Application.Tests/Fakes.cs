@@ -226,11 +226,21 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
     public Task<BranchList> ListBranchesAsync(string repositoryPath, CancellationToken cancellationToken) =>
         Task.FromResult(new BranchList("main", ["develop", "main"]));
 
+    /// <summary>Task branches that conflict with whatever they are merged into.</summary>
+    public HashSet<string> Conflicting { get; } = [];
+
+    public List<(Workspace Workspace, string Target)> CatchUps { get; } = [];
+
     public Task MergeAsync(string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken)
     {
         if (MergeProblem is not null)
         {
             throw MergeProblem;
+        }
+
+        if (Conflicting.Contains(sourceBranch))
+        {
+            throw new RejectedException("merge-conflict", $"The work conflicts with {targetBranch} in src/cart.ts.");
         }
 
         Merges.Add((sourceBranch, targetBranch));
@@ -244,6 +254,13 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
     {
         Commits.Add((workspacePath, message));
         return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<string>> StartCatchUpAsync(
+        string repositoryPath, Workspace workspace, string targetBranch, CancellationToken cancellationToken)
+    {
+        CatchUps.Add((workspace, targetBranch));
+        return Task.FromResult<IReadOnlyList<string>>(["src/cart.ts"]);
     }
 
     public Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)

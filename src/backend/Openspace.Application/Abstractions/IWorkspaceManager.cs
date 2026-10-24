@@ -38,6 +38,14 @@ public interface IWorkspaceManager
     Task MergeAsync(
         string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Opens the task's working copy again on its branch and starts merging
+    /// <paramref name="targetBranch"/> into it, leaving any conflicts marked in the files for
+    /// the agent. Returns the files in conflict.
+    /// </summary>
+    Task<IReadOnlyList<string>> StartCatchUpAsync(
+        string repositoryPath, Workspace workspace, string targetBranch, CancellationToken cancellationToken);
+
     /// <summary>Removes the working copy and its branch.</summary>
     Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken);
 }

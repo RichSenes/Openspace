@@ -32,6 +32,7 @@ public sealed record OfficeView(
     }
 }
 
+/// <param name="Mood">The room's own theme; null when it follows the office's.</param>
 /// <param name="Width">Tiles from wall to wall; null while the room is laid out automatically, like <paramref name="Depth"/>.</param>
 public sealed record RoomView(
     Guid Id,
@@ -45,7 +46,8 @@ public sealed record RoomView(
     DoorPlacement? Door,
     IReadOnlyList<int> Windows,
     int? Left,
-    int? Top)
+    int? Top,
+    string? Mood)
 {
     public static RoomView From(Room room) =>
         new(
@@ -60,7 +62,8 @@ public sealed record RoomView(
             room.Door,
             [.. room.Windows],
             room.Left,
-            room.Top);
+            room.Top,
+            room.Mood);
 }
 
 /// <param name="Spot">Where the desk stands in its room; null when it is placed automatically.</param>

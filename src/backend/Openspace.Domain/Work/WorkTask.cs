@@ -22,7 +22,8 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         [WorkTaskStatus.Running] = [WorkTaskStatus.Review, WorkTaskStatus.Failed, WorkTaskStatus.Queued, WorkTaskStatus.Discarded],
         [WorkTaskStatus.Review] = [WorkTaskStatus.Done, WorkTaskStatus.Queued, WorkTaskStatus.Discarded],
         [WorkTaskStatus.Failed] = [WorkTaskStatus.Queued, WorkTaskStatus.Discarded],
-        [WorkTaskStatus.Done] = [],
+        // Accepted work that no longer merges goes back to its desk to catch up.
+        [WorkTaskStatus.Done] = [WorkTaskStatus.Queued],
         [WorkTaskStatus.Discarded] = [],
     };
 
@@ -106,6 +107,9 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     public bool IsClosed => Status is WorkTaskStatus.Done or WorkTaskStatus.Discarded;
 
+    /// <summary>Accepted work on a branch of its own, not merged anywhere yet.</summary>
+    public bool AwaitsMerge => Status == WorkTaskStatus.Done && Run is not null && MergedInto is null;
+
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
         Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)
@@ -167,6 +171,11 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     public void Approve(DateTimeOffset now)
     {
+        if (Status == WorkTaskStatus.Done)
+        {
+            throw InvalidTransition(WorkTaskStatus.Queued);
+        }
+
         if (Status == WorkTaskStatus.Proposed && DeskId is null)
         {
             throw new DomainException("A task needs a desk before it can be queued.");
@@ -368,8 +377,11 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     public void Discard(DateTimeOffset now) => MoveTo(WorkTaskStatus.Discarded, now);
 
-    /// <summary>Records that the accepted work now lives in <paramref name="targetBranch"/>.</summary>
-    public void RecordMerge(string targetBranch, DateTimeOffset now)
+    /// <summary>
+    /// Checks that the work can be merged into <paramref name="targetBranch"/>, before git is
+    /// touched, and returns the branch as it will be recorded.
+    /// </summary>
+    public string CheckMerge(string targetBranch)
     {
         var target = Guard.NotBlank(targetBranch, "Target branch", 200);
         if (Status != WorkTaskStatus.Done || Run is null)
@@ -382,8 +394,31 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             throw new DomainException($"This work was already merged into {MergedInto}.");
         }
 
-        MergedInto = target;
-        Raise(new WorkTaskMerged(Id, target, now));
+        return target;
+    }
+
+    /// <summary>Records that the accepted work now lives in <paramref name="targetBranch"/>.</summary>
+    public void RecordMerge(string targetBranch, DateTimeOffset now)
+    {
+        MergedInto = CheckMerge(targetBranch);
+        Raise(new WorkTaskMerged(Id, MergedInto, now));
+    }
+
+    /// <summary>
+    /// Accepted work that conflicts with where it should go goes back to its desk, as a new
+    /// round, to be brought up to date; the feedback says what conflicts.
+    /// </summary>
+    public void ReopenToCatchUp(NoteAuthor author, string feedback, DateTimeOffset now)
+    {
+        if (!AwaitsMerge)
+        {
+            throw new DomainException("Only accepted work that is not merged yet can be brought up to date.");
+        }
+
+        AddNote(author, feedback, now);
+        Round++;
+        _manualChecks.ForEach(c => c.Tick(false, now));
+        MoveTo(WorkTaskStatus.Queued, now);
     }
 
     public void AddNote(NoteAuthor author, string text, DateTimeOffset now)

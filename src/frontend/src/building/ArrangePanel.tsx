@@ -40,6 +40,7 @@ import {
 import type { Selection } from './BuildingCanvas'
 import { DOOR } from './layout'
 import { LookDialog } from './LookDialog'
+import { MoodPicker } from './MoodPicker'
 
 /** As many cuts as the API takes. */
 const MAX_CUTS = 12
@@ -89,7 +90,9 @@ function describe(target: Target | undefined, office: OfficeView, roomId: string
 
 /** Beside the building while it is arranged: sizes, furniture, doors and windows, save or cancel. */
 export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelect, onClose }: Props) {
-  const theme = themeOf(office.theme)
+  const shownRoom = office.rooms.find((r) => r.id === selection?.roomId)
+  // Furniture is suggested and shown in the colours of the room it goes in.
+  const theme = themeOf(shownRoom?.mood ?? office.theme)
   const thumbnails = useThumbnails(theme)
   const savePlan = useSaveFloorPlan(office.id)
   const toast = useToast()
@@ -248,6 +251,8 @@ export function ArrangePanel({ office, saved, drafts, onEdit, selection, onSelec
               </button>
             </section>
           )}
+
+          {room && <MoodPicker officeId={office.id} officeTheme={office.theme} room={room} />}
 
           {room && arrangement && (
             <section className="arrange-actions" aria-label="Room">

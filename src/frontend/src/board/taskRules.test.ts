@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, checksDone, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
+import { actionsFor, awaitingMerge, checksDone, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -124,5 +124,17 @@ describe('checks and tokens', () => {
       { round: 2, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
     ])
     expect([total.input, total.output, total.cacheRead, total.cacheWrite]).toEqual([11, 6, 100, 1])
+  })
+})
+
+describe('awaitingMerge', () => {
+  it('lists accepted work on a branch not merged yet, first accepted first', () => {
+    const late = { ...task('Late', 'Done'), branch: 'openspace/late', statusChangedAt: '2015-06-24T11:00:00.1234567Z' }
+    const early = { ...task('Early', 'Done'), branch: 'openspace/early', statusChangedAt: '2015-06-24T10:00:00Z' }
+    const merged = { ...task('Merged', 'Done'), branch: 'openspace/merged', mergedInto: 'main' }
+    const review = { ...task('Review', 'Review'), branch: 'openspace/review' }
+    const byHand = task('By hand', 'Done')
+
+    expect(awaitingMerge([late, merged, review, byHand, early]).map((t) => t.title)).toEqual(['Early', 'Late'])
   })
 })

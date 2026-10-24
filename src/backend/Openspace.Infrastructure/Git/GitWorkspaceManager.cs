@@ -123,7 +123,7 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
     {
         if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{sourceBranch}").ConfigureAwait(false))
         {
-            throw new RejectedException("branch-missing", $"The task branch {sourceBranch} no longer exists.");
+            throw new RejectedException("task-branch-missing", $"The task branch {sourceBranch} no longer exists.");
         }
 
         if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{targetBranch}").ConfigureAwait(false))
@@ -176,12 +176,51 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         }
         catch (InvalidOperationException)
         {
+            var files = await ConflictedFilesAsync(path, CancellationToken.None).ConfigureAwait(false);
             await SucceedsAsync(path, CancellationToken.None, "merge", "--abort").ConfigureAwait(false);
+            var where = files.Count > 0 ? $" in {string.Join(", ", files)}" : string.Empty;
             throw new RejectedException(
                 "merge-conflict",
-                $"The work conflicts with {targetBranch}. Nothing was changed: send the task back so the agent can adapt it, or merge it by hand.");
+                $"The work conflicts with {targetBranch}{where}. Nothing was changed: let its agent bring it up to date, or merge it by hand.");
         }
     }
+
+    public async Task<IReadOnlyList<string>> StartCatchUpAsync(
+        string repositoryPath, Workspace workspace, string targetBranch, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        foreach (var branch in new[] { workspace.Branch, targetBranch })
+        {
+            if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{branch}").ConfigureAwait(false))
+            {
+                throw new RejectedException("branch-missing", $"There is no branch named {branch}.");
+            }
+        }
+
+        if (Directory.Exists(workspace.Path))
+        {
+            throw new InvalidOperationException($"The working copy '{workspace.Path}' is already in use.");
+        }
+
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "prune").ConfigureAwait(false);
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", workspace.Path, workspace.Branch).ConfigureAwait(false);
+        var identity = await IdentityArgsAsync(workspace.Path, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await GitCli.RunAsync(workspace.Path, cancellationToken, [.. identity, "merge", "--no-ff", "--no-commit", targetBranch])
+                .ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            // The conflicts stay in the working copy, marked in the files, for the agent to resolve.
+        }
+
+        return await ConflictedFilesAsync(workspace.Path, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<IReadOnlyList<string>> ConflictedFilesAsync(string path, CancellationToken cancellationToken) =>
+        (await GitCli.RunAsync(path, cancellationToken, "diff", "--name-only", "--diff-filter=U").ConfigureAwait(false))
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public async Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)
     {

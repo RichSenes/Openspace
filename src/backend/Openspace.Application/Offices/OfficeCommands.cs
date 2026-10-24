@@ -129,6 +129,13 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task ChangeRoomMoodAsync(OfficeId officeId, RoomId roomId, string? mood, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.ChangeRoomMood(roomId, mood, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task UpdateRoomContextAsync(
         OfficeId officeId, RoomId roomId, string? context, CancellationToken cancellationToken)
     {

@@ -12,6 +12,7 @@ internal static class ReportEndpoints
     /// <param name="Language">The language to write in, e.g. "Italian".</param>
     public sealed record PeriodRequest(DateTimeOffset From, DateTimeOffset To, string Scope, string Language = "English");
 
+    /// <summary>For epic reports and changelogs: they choose their own scope.</summary>
     public sealed record EpicReportRequest(string Language = "English");
 
     public static void MapReportEndpoints(this IEndpointRouteBuilder app)
@@ -24,6 +25,10 @@ internal static class ReportEndpoints
             Guid epicId, EpicReportRequest r, ReportWriter writer, IOptions<OperatorOptions> me, CancellationToken ct) =>
             writer.WriteForEpicAsync(new EpicId(epicId), r.Language, me.Value.Name, ct)).WithTags("Reports");
 
+        app.MapPost("/api/offices/{officeId:guid}/changelog", (
+            Guid officeId, EpicReportRequest r, ReportWriter writer, IOptions<OperatorOptions> me, CancellationToken ct) =>
+            writer.WriteChangelogAsync(new OfficeId(officeId), r.Language, me.Value.Name, ct)).WithTags("Reports");
+
         app.MapGet("/api/offices/{officeId:guid}/reports", (Guid officeId, ReportQueries queries, CancellationToken ct) =>
             queries.ListAsync(new OfficeId(officeId), ct)).WithTags("Reports");
 
@@ -31,7 +36,7 @@ internal static class ReportEndpoints
         {
             var report = await queries.GetAsync(new ReportId(reportId), ct);
             return Results.File(
-                System.Text.Encoding.UTF8.GetBytes(report.Body), "text/markdown; charset=utf-8", $"report-{report.CreatedAt:yyyy-MM-dd}.md");
+                System.Text.Encoding.UTF8.GetBytes(report.Body), "text/markdown; charset=utf-8", $"{(report.Kind == ReportKind.Changelog ? "changelog" : "report")}-{report.CreatedAt:yyyy-MM-dd}.md");
         }).WithTags("Reports");
     }
 }

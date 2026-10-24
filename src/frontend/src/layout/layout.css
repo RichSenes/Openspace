@@ -150,6 +150,11 @@
   min-height: 0;
 }
 
+/* Pages that scroll as a whole keep their full height, bottom padding included. */
+.main > :is(.settings, .reports, .agents, .rooms) {
+  flex: 1 0 auto;
+}
+
 .empty {
   display: grid;
   place-content: center;

@@ -107,6 +107,8 @@ export interface RoomView {
   /** The back left corner in tiles from the building's; null until the floor is drawn by hand. */
   left?: number | null
   top?: number | null
+  /** A theme for this room only; null when it follows the office's. */
+  mood?: string | null
 }
 
 export interface ProcedureStepView {
@@ -267,7 +269,7 @@ export interface PlanView {
 export interface ReportView {
   id: string
   officeId: string
-  kind: 'Period' | 'Epic'
+  kind: 'Period' | 'Epic' | 'Changelog'
   title: string
   body: string
   requestedBy: string
@@ -295,4 +297,14 @@ export interface FloorPlanRequest {
   furniture: FurniturePiece[]
   rooms: { roomId: string; left: number; top: number; layout: RoomLayoutRequest }[]
   cuts: FloorCut[]
+}
+
+export type MergeResult = 'Merged' | 'Conflict' | 'Failed' | 'NotTried'
+
+/** What happened to one task when merging all accepted work. */
+export interface MergeOutcome {
+  taskId: string
+  title: string
+  result: MergeResult
+  message: string | null
 }

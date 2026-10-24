@@ -16,6 +16,9 @@ public enum ReportKind
 
     /// <summary>One epic, from the request to where it stands.</summary>
     Epic,
+
+    /// <summary>What changed for the people using the product, since the previous changelog.</summary>
+    Changelog,
 }
 
 /// <summary>A written account of work, for people who were not there. Kept as written.</summary>
@@ -80,6 +83,19 @@ public sealed class Report : AggregateRoot<ReportId>
     {
         ArgumentNullException.ThrowIfNull(epic);
         return Create(epic.OfficeId, ReportKind.Epic, title, body, writtenByAi, requestedBy, now, null, null, epic.Id);
+    }
+
+    /// <param name="from">The end of the previous changelog; null for the first one.</param>
+    public static Report ForChangelog(
+        Office office, DateTimeOffset? from, DateTimeOffset to, string title, string body, bool writtenByAi, string requestedBy, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(office);
+        if (from >= to)
+        {
+            throw new DomainException("A changelog must end after the previous one.");
+        }
+
+        return Create(office.Id, ReportKind.Changelog, title, body, writtenByAi, requestedBy, now, from, to, null);
     }
 
     private static Report Create(

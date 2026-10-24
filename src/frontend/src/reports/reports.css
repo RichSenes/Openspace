@@ -123,3 +123,7 @@
     grid-template-columns: 1fr;
   }
 }
+
+.report-form-hint {
+  margin: 0;
+}

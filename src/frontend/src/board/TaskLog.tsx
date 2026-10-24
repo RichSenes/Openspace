@@ -5,11 +5,11 @@ import { filterLog, KIND_LABEL, type LogFilter } from './auditLabels'
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
-/** Everything that happened on a task, oldest first, with the evidence one click away. */
+/** Everything that happened on a task, newest first, with the evidence one click away. */
 export function TaskLog({ taskId }: { taskId: string }) {
   const log = useTaskLog(taskId, true)
   const [filter, setFilter] = useState<LogFilter>('changes')
-  const entries = filterLog(log.data ?? [], filter)
+  const entries = filterLog(log.data ?? [], filter).toReversed()
 
   return (
     <section className="log" aria-label="Audit log">

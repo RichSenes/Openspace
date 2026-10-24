@@ -91,6 +91,19 @@ public sealed class ApiTests : IDisposable
     private sealed record ArrangedOffice(List<ArrangedRoom> Rooms);
 
     [Fact]
+    public async Task A_room_takes_its_own_mood_through_the_api()
+    {
+        var (officeId, roomId, _) = await FurnishAsync();
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/mood", new { mood = "townHall" })).EnsureSuccessStatusCode();
+        var bad = await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/mood", new { mood = "town hall" });
+
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+        Assert.Equal("townHall", office.GetProperty("rooms")[0].GetProperty("mood").GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+    }
+
+    [Fact]
     public async Task A_room_can_be_arranged_by_hand_and_given_back_to_the_automatic_layout()
     {
         var (officeId, roomId, deskId) = await FurnishAsync();
@@ -460,5 +473,37 @@ public sealed class ApiTests : IDisposable
     public async Task Desk_usage_starts_empty()
     {
         Assert.Empty(await GetAsync<List<JsonElement>>("/api/usage/desks"));
+    }
+
+    [Fact]
+    public async Task Merging_everything_with_nothing_accepted_merges_nothing()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var outcomes = await PostAsync<List<JsonElement>>($"/api/offices/{officeId}/merge", new { target = "main" });
+
+        Assert.Empty(outcomes);
+    }
+
+    [Fact]
+    public async Task A_changelog_without_accepted_work_is_refused_with_the_reason()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var response = await _http.PostAsJsonAsync($"/api/offices/{officeId}/changelog", new { language = "Italian" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Contains("No work was accepted yet", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Work_that_is_not_accepted_cannot_catch_up()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var created = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Fix the footer" });
+
+        var response = await _http.PostAsJsonAsync($"/api/tasks/{created.Id}/catch-up", new { target = "main" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 }

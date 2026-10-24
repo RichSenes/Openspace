@@ -61,14 +61,26 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public void ChangeTheme(string theme, DateTimeOffset now)
     {
+        Theme = ThemeName(theme);
+        Raise(new OfficeThemeChanged(Id, Theme, now));
+    }
+
+    /// <summary>Gives a room its own look, whatever the office's; null or blank follows the office again.</summary>
+    public void ChangeRoomMood(RoomId roomId, string? mood, DateTimeOffset now)
+    {
+        FindRoom(roomId).ChangeMood(string.IsNullOrWhiteSpace(mood) ? null : ThemeName(mood));
+        Raise(new RoomMoodChanged(Id, roomId, now));
+    }
+
+    private static string ThemeName(string theme)
+    {
         var name = Guard.NotBlank(theme, "Theme", 40);
         if (!name.All(char.IsAsciiLetterOrDigit))
         {
             throw new DomainException($"Theme '{name}' must be a single word of letters and digits.");
         }
 
-        Theme = name;
-        Raise(new OfficeThemeChanged(Id, name, now));
+        return name;
     }
 
     public void SetRepository(string path, DateTimeOffset now)

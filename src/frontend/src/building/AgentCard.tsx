@@ -1,4 +1,4 @@
-import { ListTodo, Palette, Plus, X } from 'lucide-react'
+import { ChevronRight, ListTodo, Palette, Plus, X } from 'lucide-react'
 import { useAnswerPermission } from '../api/hooks'
 import type { DeskActivity, WorkTaskView } from '../api/types'
 import type { DeskWithRoom } from '../board/deskLookup'
@@ -29,6 +29,10 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
   const toast = useToast()
   const current = tasks.find((t) => t.id === activity?.taskId && t.status === 'Running') ?? tasks.find((t) => t.status === 'Running')
   const open = tasks.filter((t) => t.id !== current?.id && OPEN.includes(t.status))
+  const done = tasks
+    .filter((t) => t.status === 'Done')
+    .toSorted((a, b) => b.statusChangedAt.localeCompare(a.statusChangedAt))
+    .slice(0, 3)
   const waiting = activity?.kind === 'Waiting' && activity.taskId === current?.id
 
   return (
@@ -49,10 +53,7 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
 
       {current ? (
         <div className="agent-card-now">
-          <button type="button" className="agent-card-task" onClick={() => onOpenTask(current.id)}>
-            <StatusPill status={current.status} />
-            <span>{current.title}</span>
-          </button>
+          <TaskRow task={current} onOpen={onOpenTask} />
           {activity?.taskId === current.id && activity.headline && <p className={waiting ? 'agent-card-ask' : 'hint'}>{activity.headline}</p>}
           {waiting && activity.detail && <code className="mono agent-card-detail">{activity.detail}</code>}
           {waiting && (
@@ -81,17 +82,30 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
       )}
 
       {open.length > 0 && (
-        <ul className="agent-card-tasks" aria-label="Its other tasks">
-          {open.slice(0, 4).map((t) => (
-            <li key={t.id}>
-              <button type="button" className="agent-card-task" onClick={() => onOpenTask(t.id)}>
-                <StatusPill status={t.status} />
-                <span>{t.title}</span>
-              </button>
-            </li>
-          ))}
-          {open.length > 4 && <li className="hint">and {open.length - 4} more on the Board</li>}
-        </ul>
+        <section className="agent-card-list" aria-label="Its other tasks">
+          <h3 className="pixel agent-card-label">Also on its desk</h3>
+          <ul className="agent-card-tasks">
+            {open.slice(0, 4).map((t) => (
+              <li key={t.id}>
+                <TaskRow task={t} onOpen={onOpenTask} />
+              </li>
+            ))}
+            {open.length > 4 && <li className="hint">and {open.length - 4} more on the Board</li>}
+          </ul>
+        </section>
+      )}
+
+      {done.length > 0 && (
+        <section className="agent-card-list" aria-label="Done lately">
+          <h3 className="pixel agent-card-label">Done lately</h3>
+          <ul className="agent-card-tasks">
+            {done.map((t) => (
+              <li key={t.id}>
+                <TaskRow task={t} onOpen={onOpenTask} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {answer.error && <p className="error">{answer.error.message}</p>}
@@ -99,15 +113,24 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
         <button type="button" className="btn" onClick={onNewTask}>
           <Plus size={16} aria-hidden /> Give a task
         </button>
-        {current && (
-          <button type="button" className="btn" onClick={() => onOpenTask(current.id)}>
-            <ListTodo size={16} aria-hidden /> Open task
-          </button>
-        )}
+        <button type="button" className="btn" disabled={!current} onClick={() => current && onOpenTask(current.id)}>
+          <ListTodo size={16} aria-hidden /> Open task
+        </button>
         <button type="button" className="btn" onClick={onLook}>
           <Palette size={16} aria-hidden /> Look
         </button>
       </div>
     </section>
+  )
+}
+
+/** A task of the desk; clicking it opens the task on the Board. */
+function TaskRow({ task, onOpen }: { task: WorkTaskView; onOpen: (taskId: string) => void }) {
+  return (
+    <button type="button" className="agent-card-task" onClick={() => onOpen(task.id)} title="Open on the Board">
+      <StatusPill status={task.status} />
+      <span className="agent-card-task-title">{task.title}</span>
+      <ChevronRight size={14} aria-hidden />
+    </button>
   )
 }

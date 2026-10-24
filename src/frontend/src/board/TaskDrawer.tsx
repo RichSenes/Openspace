@@ -166,105 +166,35 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
               <p className="hint">Claude is reviewing this work: its verdict shows up in the notes in a few minutes.</p>
             )}
 
-            {actions.length > 0 && (
-              <div className="drawer-actions">
-                {actions.includes('approve') && (
-                  <div className="approve">
-                    <label className="field">
-                      <span>Desk that will do it</span>
-                      <select className="input" value={approveDesk} onChange={(e) => setApproveDesk(e.target.value)}>
-                        <option value="">Choose a desk</option>
-                        {desks.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.roomName} · {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={!approveDesk || approve.isPending}
-                      onClick={() =>
-                        approve.mutate(
-                          { taskId: task.id, deskId: approveDesk },
-                          { onSuccess: () => toast('Task approved and queued') },
-                        )
-                      }
-                    >
-                      Approve and queue
-                    </button>
-                  </div>
-                )}
-                <div className="row">
-                  {actions.includes('accept') && (
-                    <button type="button" className="btn btn-primary" onClick={() => run('accept', 'Work accepted')}>
-                      Accept work
-                    </button>
-                  )}
-                  {actions.includes('send-back') && reviewSaysChanges && !writingFeedback && (
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={sendBack.isPending}
-                      onClick={() =>
-                        sendBack.mutate({ taskId: task.id, text: null, withReview: true }, { onSuccess: () => toast("Sent back with Claude's review") })
-                      }
-                    >
-                      Send back with Claude&apos;s review
-                    </button>
-                  )}
-                  {actions.includes('send-back') && !writingFeedback && (
-                    <button type="button" className="btn" onClick={() => setWritingFeedback(true)}>
-                      {reviewSaysChanges ? 'Write feedback' : 'Send back with feedback'}
-                    </button>
-                  )}
-                  {actions.includes('retry') && (
-                    <button type="button" className="btn btn-primary" onClick={() => run('retry', 'Back in the queue')}>
-                      Try again
-                    </button>
-                  )}
-                  {actions.includes('discard') && (
-                    <button type="button" className="btn btn-danger" onClick={() => run('discard', 'Task discarded')}>
-                      Discard task
-                    </button>
-                  )}
-                </div>
-                {actions.includes('accept') && checks.total > checks.done && (
-                  <p className="hint">
-                    {checks.total - checks.done} of {checks.total} checks still to try by hand: see below.
-                  </p>
-                )}
-                {writingFeedback && (
-                  <form className="stack" onSubmit={submitFeedback}>
-                    <label className="field">
-                      <span>What should change</span>
-                      <textarea
-                        className="input"
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        required={!(review && withReview)}
-                        autoFocus
-                      />
-                    </label>
-                    {review && (
-                      <label className="check-row">
-                        <input type="checkbox" checked={withReview} onChange={(e) => setWithReview(e.target.checked)} />
-                        <span>Send Claude&apos;s review along, after what you write</span>
-                      </label>
-                    )}
-                    <div className="row">
-                      <button type="submit" className="btn btn-primary" disabled={sendBack.isPending}>
-                        Send back
-                      </button>
-                      <button type="button" className="btn btn-quiet" onClick={() => setWritingFeedback(false)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            )}
+            <section className="notes" aria-label="Notes">
+              <h3 className="pixel notes-title">Notes · newest first</h3>
+              {task.status !== 'Discarded' && (
+                <form className="note-form" onSubmit={submitNote}>
+                  <label className="field">
+                    <span className="sr-only">Add a note</span>
+                    <textarea className="input" placeholder="Add a note for the agent or the team" value={note} onChange={(e) => setNote(e.target.value)} required />
+                  </label>
+                  <button type="submit" className="btn" disabled={addNote.isPending}>
+                    Add note
+                  </button>
+                </form>
+              )}
+              {task.notes.length === 0 ? (
+                <p className="hint">No notes yet. Agents will log what they do here.</p>
+              ) : (
+                <ol className="note-list">
+                  {[...task.notes].reverse().map((n, i) => (
+                    <li key={task.notes.length - i} className={`note note-${n.authorKind.toLowerCase()}`}>
+                      <span className="hint">
+                        {n.authorKind === 'Desk' ? deskName(n.deskId) : (n.authorName ?? 'Openspace')} · {when(n.writtenAt)}
+                      </span>
+                      <p>{n.text}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
             {task.procedure.length > 0 && (
           <section className="procedure" aria-label="Required procedure">
             <h3 className="pixel notes-title">
@@ -381,39 +311,109 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
               </section>
             )}
 
-            <section className="notes" aria-label="Notes">
-              <h3 className="pixel notes-title">Notes</h3>
-              {task.notes.length === 0 ? (
-                <p className="hint">No notes yet. Agents will log what they do here.</p>
-              ) : (
-                <ol className="note-list">
-                  {task.notes.map((n, i) => (
-                    <li key={i} className={`note note-${n.authorKind.toLowerCase()}`}>
-                      <span className="hint">
-                        {n.authorKind === 'Desk' ? deskName(n.deskId) : (n.authorName ?? 'Openspace')} · {when(n.writtenAt)}
-                      </span>
-                      <p>{n.text}</p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {task.status !== 'Discarded' && (
-                <form className="stack" onSubmit={submitNote}>
-                  <label className="field">
-                    <span>Add a note</span>
-                    <textarea className="input" value={note} onChange={(e) => setNote(e.target.value)} required />
-                  </label>
-                  <div className="row">
-                    <button type="submit" className="btn" disabled={addNote.isPending}>
-                      Add note
-                    </button>
-                  </div>
-                </form>
-              )}
-            </section>
           </>
         )}
       </div>
+
+      {tab === 'overview' && actions.length > 0 && (
+        <footer className="drawer-foot" aria-label="What you can do">
+          {actions.includes('approve') && (
+            <div className="approve">
+              <label className="field">
+                <span>Desk that will do it</span>
+                <select className="input" value={approveDesk} onChange={(e) => setApproveDesk(e.target.value)}>
+                  <option value="">Choose a desk</option>
+                  {desks.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.roomName} · {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!approveDesk || approve.isPending}
+                onClick={() =>
+                  approve.mutate(
+                    { taskId: task.id, deskId: approveDesk },
+                    { onSuccess: () => toast('Task approved and queued') },
+                  )
+                }
+              >
+                Approve and queue
+              </button>
+            </div>
+          )}
+          <div className="row">
+            {actions.includes('accept') && (
+              <button type="button" className="btn btn-primary" onClick={() => run('accept', 'Work accepted')}>
+                Accept work
+              </button>
+            )}
+            {actions.includes('send-back') && reviewSaysChanges && !writingFeedback && (
+              <button
+                type="button"
+                className="btn"
+                disabled={sendBack.isPending}
+                onClick={() =>
+                  sendBack.mutate({ taskId: task.id, text: null, withReview: true }, { onSuccess: () => toast("Sent back with Claude's review") })
+                }
+              >
+                Send back with Claude&apos;s review
+              </button>
+            )}
+            {actions.includes('send-back') && !writingFeedback && (
+              <button type="button" className="btn" onClick={() => setWritingFeedback(true)}>
+                {reviewSaysChanges ? 'Write feedback' : 'Send back with feedback'}
+              </button>
+            )}
+            {actions.includes('retry') && (
+              <button type="button" className="btn btn-primary" onClick={() => run('retry', 'Back in the queue')}>
+                Try again
+              </button>
+            )}
+            {actions.includes('discard') && (
+              <button type="button" className="btn btn-danger" onClick={() => run('discard', 'Task discarded')}>
+                Discard task
+              </button>
+            )}
+          </div>
+          {actions.includes('accept') && checks.total > checks.done && (
+            <p className="hint">
+              {checks.total - checks.done} of {checks.total} checks still to try by hand: see Try by hand.
+            </p>
+          )}
+          {writingFeedback && (
+            <form className="stack" onSubmit={submitFeedback}>
+              <label className="field">
+                <span>What should change</span>
+                <textarea
+                  className="input"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  required={!(review && withReview)}
+                  autoFocus
+                />
+              </label>
+              {review && (
+                <label className="check-row">
+                  <input type="checkbox" checked={withReview} onChange={(e) => setWithReview(e.target.checked)} />
+                  <span>Send Claude&apos;s review along, after what you write</span>
+                </label>
+              )}
+              <div className="row">
+                <button type="submit" className="btn btn-primary" disabled={sendBack.isPending}>
+                  Send back
+                </button>
+                <button type="button" className="btn btn-quiet" onClick={() => setWritingFeedback(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </footer>
+      )}
     </aside>
   )
 }

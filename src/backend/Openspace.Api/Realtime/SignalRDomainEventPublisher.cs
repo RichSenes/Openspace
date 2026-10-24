@@ -48,6 +48,7 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         OfficeThemeChanged x => x.OfficeId,
         RoomOpened x => x.OfficeId,
         RoomContextUpdated x => x.OfficeId,
+        RoomMoodChanged x => x.OfficeId,
         RoomProcedureSet x => x.OfficeId,
         RoomArranged x => x.OfficeId,
         FloorPlanned x => x.OfficeId,

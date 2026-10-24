@@ -95,6 +95,12 @@ Later, in rough order of appearance:
   instead of pop-ups, a card for each agent in the building, send back with the
   review, rounds of work, checks to try by hand before merging, tokens per round
   and per desk, and a Settings view.
+- ~~**After the second run.**~~ Done: a Merge desk that brings all accepted work
+  into a branch at once and sends what conflicts back to its agent to resolve;
+  a changelog for the people using the product; a mood per room (bright studio,
+  dark focus, town hall and the office themes); notes newest first.
+- **More room moods.** Drawn, not only painted: a dusty storeroom with cobwebs, a
+  living room with a sofa and a TV, a scientists' lab with glassware and capsules.
 - **Task dependencies.** The supervisor says which proposed tasks wait for others
   (a fix that needs an analysis first); the queue holds them until those are
   accepted, and the Board shows what each one waits for.

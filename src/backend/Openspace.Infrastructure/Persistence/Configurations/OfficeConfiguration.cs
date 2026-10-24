@@ -43,6 +43,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
             room.Property(r => r.Name).IsRequired();
             room.Property(r => r.Context).IsRequired();
             room.Property(r => r.Mood).HasMaxLength(40);
+            room.Property(r => r.Check).HasMaxLength(Office.MaxCheckLength);
             room.PrimitiveCollection(r => r.Procedure).HasField("_procedure").UsePropertyAccessMode(PropertyAccessMode.Field);
             room.Property(r => r.Width);
             room.Property(r => r.Depth);

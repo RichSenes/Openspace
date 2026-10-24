@@ -23,6 +23,12 @@ public sealed class Room
     /// <summary>Conventions, paths, do and don't: injected into every agent working here.</summary>
     public string Context { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// A command telling whether the room's code still works, such as <c>dotnet test</c>: run on
+    /// a branch after work was merged into it. Null when the room has none.
+    /// </summary>
+    public string? Check { get; private set; }
+
     /// <summary>The room's own look, one of the office themes; null to follow the office.</summary>
     public string? Mood { get; private set; }
 
@@ -61,6 +67,8 @@ public sealed class Room
     internal void UpdateContext(string? context) => Context = context?.Trim() ?? string.Empty;
 
     internal void ChangeMood(string? mood) => Mood = mood;
+
+    internal void SetCheck(string? command) => Check = command;
 
     internal void SetProcedure(IEnumerable<string> steps)
     {

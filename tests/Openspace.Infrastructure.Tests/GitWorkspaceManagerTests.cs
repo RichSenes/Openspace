@@ -274,4 +274,19 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
         await _manager.MergeAsync(Repo, branch, "main", "Merge task: Logout", default);
         Assert.Equal("<header>from you and the agent</header>\n", await File.ReadAllTextAsync(Path.Combine(Repo, "index.html")));
     }
+
+    [Fact]
+    public async Task A_scratch_copy_shows_a_branch_and_goes_without_moving_it()
+    {
+        await Git("branch", "develop");
+        var before = (await Git("rev-parse", "develop")).Trim();
+
+        var path = await _manager.OpenScratchAsync(Repo, "develop", default);
+        await File.WriteAllTextAsync(Path.Combine(path, "build.log"), "done\n");
+        await _manager.CloseScratchAsync(Repo, path, default);
+
+        Assert.False(Directory.Exists(path));
+        Assert.Equal(before, (await Git("rev-parse", "develop")).Trim());
+        Assert.Equal("main", (await Git("branch", "--show-current")).Trim());
+    }
 }

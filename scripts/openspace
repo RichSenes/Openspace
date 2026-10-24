@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# Starts, stops and restarts everything Openspace needs: the API, the web page and the
+# OpenCode server. Each runs in its own process group, with its log in the state folder.
+#
+#   scripts/openspace start            start what is not running yet
+#   scripts/openspace restart api      after an update: rebuild and restart the API only
+#   scripts/openspace stop
+#   scripts/openspace status
+#   scripts/openspace logs api         follow a log
+#   scripts/openspace restore FILE     put a database backup back (stops and restarts the API)
+#
+# Ports and folders can be changed with environment variables, e.g. OPENSPACE_API_PORT.
+# Anything else in the environment (ConnectionStrings__Openspace, Settings__Path...) is
+# passed on to the API.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+API_DIR="$ROOT/src/backend/Openspace.Api"
+WEB_DIR="$ROOT/src/frontend"
+API_PORT="${OPENSPACE_API_PORT:-5145}"
+WEB_PORT="${OPENSPACE_WEB_PORT:-5173}"
+OPENCODE_PORT="${OPENSPACE_OPENCODE_PORT:-4096}"
+STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
+SERVICES=(opencode api web)
+
+# Tools installed for the user only: .NET in ~/.dotnet, Node and OpenCode through nvm.
+export PATH="$HOME/.dotnet:$HOME/.local/bin:$PATH"
+if ! command -v npx >/dev/null 2>&1 && [ -s "$HOME/.nvm/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.nvm/nvm.sh" >/dev/null
+fi
+
+mkdir -p "$STATE/logs"
+
+say() { printf '%s\n' "$*"; }
+fail() { printf 'openspace: %s\n' "$*" >&2; exit 1; }
+
+port_of() {
+  case "$1" in
+    api) echo "$API_PORT" ;;
+    web) echo "$WEB_PORT" ;;
+    opencode) echo "$OPENCODE_PORT" ;;
+  esac
+}
+
+listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+# The process group this script started for a service, if it is still alive.
+group_of() {
+  local file="$STATE/$1.pgid"
+  [ -f "$file" ] || return 1
+  local pgid
+  pgid="$(cat "$file")"
+  if kill -0 -- "-$pgid" 2>/dev/null; then echo "$pgid"; else rm -f "$file"; return 1; fi
+}
+
+ready() {
+  case "$1" in
+    api) curl -fs "http://localhost:$API_PORT/health" >/dev/null 2>&1 ;;
+    opencode) curl -fs "http://127.0.0.1:$OPENCODE_PORT/config" >/dev/null 2>&1 ;;
+    web) listening "$WEB_PORT" ;;
+  esac
+}
+
+launch() {
+  local name="$1" dir="$2"
+  shift 2
+  # The new session's first process writes its own id: it is the group to stop later.
+  (cd "$dir" && setsid bash -c 'echo $$ >"$0"; exec "$@"' "$STATE/$name.pgid" "$@" >"$STATE/logs/$name.log" 2>&1 </dev/null &)
+  for _ in $(seq 20); do [ -s "$STATE/$name.pgid" ] && return; sleep 0.1; done
+}
+
+start_one() {
+  local name="$1" port
+  port="$(port_of "$name")"
+  if group_of "$name" >/dev/null; then say "$name: already running on port $port"; return; fi
+  if listening "$port"; then
+    say "$name: port $port is taken by something not started here; leaving it alone"
+    return
+  fi
+
+  case "$name" in
+    opencode)
+      command -v opencode >/dev/null 2>&1 || fail "opencode is not installed (npm install -g opencode-ai)"
+      launch opencode "$HOME" opencode serve --port "$OPENCODE_PORT"
+      ;;
+    api)
+      say "api: building…"
+      (cd "$API_DIR" && dotnet build -v q -nologo >"$STATE/logs/api-build.log" 2>&1) || fail "the API does not build: see $STATE/logs/api-build.log"
+      launch api "$API_DIR" env ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}" \
+        ASPNETCORE_URLS="http://localhost:$API_PORT" OpenCode__BaseUrl="http://127.0.0.1:$OPENCODE_PORT" \
+        dotnet run --no-build --no-launch-profile
+      ;;
+    web)
+      # Packages changed since the last install (the lock file says so): install them first.
+      local lock stamp="$WEB_DIR/node_modules/.openspace-lock"
+      lock="$(sha256sum "$WEB_DIR/package-lock.json" | cut -d' ' -f1)"
+      if [ ! -d "$WEB_DIR/node_modules" ] || { [ -f "$stamp" ] && [ "$(cat "$stamp")" != "$lock" ]; }; then
+        say "web: installing packages…"
+        (cd "$WEB_DIR" && npm ci --silent >"$STATE/logs/web-install.log" 2>&1) || fail "npm ci failed: see $STATE/logs/web-install.log"
+      fi
+      echo "$lock" >"$stamp"
+      launch web "$WEB_DIR" env OPENSPACE_API="http://localhost:$API_PORT" npx vite --port "$WEB_PORT" --strictPort
+      ;;
+  esac
+
+  for _ in $(seq 90); do
+    if ready "$name"; then say "$name: ready on port $port"; return; fi
+    group_of "$name" >/dev/null || fail "$name stopped while starting: see $STATE/logs/$name.log"
+    sleep 1
+  done
+  fail "$name is not answering after 90 seconds: see $STATE/logs/$name.log"
+}
+
+stop_one() {
+  local name="$1" pgid
+  if ! pgid="$(group_of "$name")"; then say "$name: not running (from here)"; return; fi
+  kill -TERM -- "-$pgid" 2>/dev/null || true
+  for _ in $(seq 20); do
+    kill -0 -- "-$pgid" 2>/dev/null || break
+    sleep 0.5
+  done
+  kill -KILL -- "-$pgid" 2>/dev/null || true
+  rm -f "$STATE/$name.pgid"
+  say "$name: stopped"
+}
+
+status_one() {
+  local name="$1" port
+  port="$(port_of "$name")"
+  if group_of "$name" >/dev/null; then
+    if ready "$name"; then say "$name: running on port $port"; else say "$name: starting or not answering on port $port"; fi
+  elif listening "$port"; then
+    say "$name: something not started here is on port $port"
+  else
+    say "$name: stopped"
+  fi
+}
+
+# The services named, in start order; all of them when none is.
+pick() {
+  if [ $# -eq 0 ] || [ "$1" = all ]; then printf '%s\n' "${SERVICES[@]}"; return; fi
+  for s in "$@"; do
+    case "$s" in api|web|opencode) echo "$s" ;; *) fail "unknown service '$s': use api, web or opencode" ;; esac
+  done
+}
+
+restore() {
+  local backup="${1:-}"
+  [ -f "$backup" ] || fail "give the backup file to restore, e.g. $API_DIR/backups/openspace-2026-10-24-0900.db"
+  # The database the API uses: its connection string when one is set, else the default file.
+  local db="openspace.db" saved
+  if [ -n "${ConnectionStrings__Openspace:-}" ]; then
+    db="$(printf '%s' "$ConnectionStrings__Openspace" | sed -n 's/.*Data Source=\([^;]*\).*/\1/p')"
+    [ -n "$db" ] || fail "cannot tell the database file from ConnectionStrings__Openspace"
+  fi
+  case "$db" in /*) ;; *) db="$API_DIR/$db" ;; esac
+  saved="$db.before-restore-$(date +%Y%m%d-%H%M%S)"
+  stop_one api
+  [ -f "$db" ] && cp "$db" "$saved" && say "the current database is kept as $saved"
+  rm -f "$db-wal" "$db-shm"
+  cp "$backup" "$db"
+  say "restored $backup"
+  start_one api
+}
+
+command="${1:-}"
+[ $# -gt 0 ] && shift
+case "$command" in
+  start) for s in $(pick "$@"); do start_one "$s"; done; say "Openspace: http://localhost:$WEB_PORT" ;;
+  stop) for s in $(pick "$@" | tac); do stop_one "$s"; done ;;
+  restart)
+    for s in $(pick "$@" | tac); do stop_one "$s"; done
+    for s in $(pick "$@"); do start_one "$s"; done
+    ;;
+  status) for s in "${SERVICES[@]}"; do status_one "$s"; done ;;
+  logs) tail -n 100 -f "$STATE/logs/$(pick "${1:-api}" | head -n 1).log" ;;
+  restore) restore "$@" ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

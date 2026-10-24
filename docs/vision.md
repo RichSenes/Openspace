@@ -101,6 +101,14 @@ Later, in rough order of appearance:
   dark focus, town hall and the office themes); notes newest first.
 - **More room moods.** Drawn, not only painted: a dusty storeroom with cobwebs, a
   living room with a sofa and a TV, a scientists' lab with glassware and capsules.
+  A second round of decorations and rooms, done together with the sprite lab,
+  once the important work is closed.
+- ~~**Running it day to day**~~ Done: checks after a merge (the rooms' own
+  check commands, run on the merged branch); the queue pausing Claude Code desks
+  while the account is over its limits and resuming them after; an archive in the
+  Board (search, merged work hidden); one command to start, stop and restart
+  everything; automatic database backups. Then task dependencies, merge requests,
+  sounds and the rest, in the order below.
 - **Task dependencies.** The supervisor says which proposed tasks wait for others
   (a fix that needs an analysis first); the queue holds them until those are
   accepted, and the Board shows what each one waits for.
@@ -137,6 +145,12 @@ Later, in rough order of appearance:
   tower, a warehouse) among roads with moving cars, random decorations and light
   that follows the time of day. Clicking a building zooms into it and fades to
   its rooms; leaving zooms back out to the street.
+  The town has **districts**, each with its own style, so different kinds of
+  projects are told apart at a glance: work offices in a business district of
+  glass and towers, personal projects in a residential one of houses and gardens,
+  creative projects in an arts quarter of warehouses and murals. Each office
+  belongs to a district, which decides where its building stands and how it is
+  drawn; projects far apart from each other sit in different districts.
 - ~~**Mouse navigation**~~ Done: wheel to zoom at the cursor, left-drag to pan,
   double-click a room to fly into it, Fit to see everything again.
 - ~~**Audit log.**~~ Done: every tool call, step, permission, note and status

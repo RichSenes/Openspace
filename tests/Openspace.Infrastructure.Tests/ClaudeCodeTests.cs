@@ -1,3 +1,4 @@
+using Openspace.Domain.Offices;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -96,9 +97,22 @@ public class ClaudeCodeEventsTests
     {
         var events = new ClaudeCodeEvents("claude-1");
 
-        var end = Assert.IsType<AgentSignal.Failed>(Assert.Single(events.Read("""{"type":"result","subtype":"success","is_error":true,"result":"Usage limit reached, resets at 6pm"}""")));
+        var end = Assert.IsType<AgentSignal.Failed>(Assert.Single(events.Read("""{"type":"result","subtype":"error_during_execution","is_error":true,"result":"The model returned an invalid answer"}""")));
 
-        Assert.Contains("Usage limit reached", end.Reason, StringComparison.Ordinal);
+        Assert.Contains("invalid answer", end.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Running_out_of_the_account_s_limits_pauses_instead_of_failing()
+    {
+        var usage = new ClaudeCodeUsage(new FakeTimeProvider());
+        var events = new ClaudeCodeEvents("claude-1");
+        events.Read("""{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","unifiedWindows":{"five_hour":{"utilization":1.0,"resetsAt":1792787400},"seven_day":{"utilization":0.7,"resetsAt":1793037600}}}}""", usage);
+
+        var end = Assert.IsType<AgentSignal.OutOfLimits>(Assert.Single(events.Read("""{"type":"result","is_error":true,"result":"Usage limit reached, resets at 6pm"}""", usage)));
+
+        Assert.Equal((AgentEngine.ClaudeCode, DateTimeOffset.FromUnixTimeSeconds(1792787400)), (end.Engine, end.Until));
+        Assert.IsType<AgentSignal.OutOfLimits>(ClaudeCodeEvents.Stopped("claude-2", "Claude Code stopped without finishing: You've hit your limit", null));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Openspace.Application.Agents;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
 namespace Openspace.Application.Tests;
@@ -233,5 +234,41 @@ public class AgentSignalsTests
         Assert.Equal(1, await _h.Signals().AddManualCheckAsync(task.Id, "the banner shows on a phone", "Again.", default));
 
         Assert.Equal("Open the home page at 360px wide.", Assert.Single(task.ManualChecks).How);
+    }
+
+    [Fact]
+    public async Task An_engine_over_its_limits_puts_the_task_back_and_its_desks_wait_until_the_reset()
+    {
+        await _h.OfficeCommands().ChangeDeskAgentAsync(_h.Office.Id, _h.Desk.Id, AgentEngine.ClaudeCode, "build", "sonnet", default);
+        var openCodeDesk = _h.Office.AddDesk(_h.Room.Id, "Docs", AgentProfile.Create("build"), Harness.Start);
+        var task = _h.Enqueue();
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+        var resets = Harness.Start.AddHours(2);
+
+        await _h.Signals().OutOfLimitsAsync(task.Run!.SessionId, AgentEngine.ClaudeCode, resets, "The Claude account is over its usage limits.", default);
+
+        Assert.Equal(WorkTaskStatus.Queued, task.Status);
+        Assert.Contains("starts again by itself", task.Notes[^1].Text, StringComparison.Ordinal);
+        Assert.Equal(resets, _h.Limits.PausedUntil(AgentEngine.ClaudeCode));
+
+        var docs = WorkTask.Assign(_h.Office, openCodeDesk.Id, "Update the README", null, "angela", Harness.Start);
+        _h.Tasks.Add(docs);
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal((WorkTaskStatus.Queued, WorkTaskStatus.Running), (task.Status, docs.Status));
+
+        _h.Clock.Advance(TimeSpan.FromHours(2) + TimeSpan.FromMinutes(1));
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal(WorkTaskStatus.Running, task.Status);
+        Assert.StartsWith("Openspace was interrupted", _h.Runtime.Prompts[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_reset_time_the_pause_lasts_the_default()
+    {
+        _h.Limits.Pause(AgentEngine.ClaudeCode, null);
+
+        Assert.Equal(Harness.Start + EngineLimits.DefaultPause, _h.Limits.PausedUntil(AgentEngine.ClaudeCode));
+        _h.Limits.Resume(AgentEngine.ClaudeCode);
+        Assert.Null(_h.Limits.PausedUntil(AgentEngine.ClaudeCode));
     }
 }

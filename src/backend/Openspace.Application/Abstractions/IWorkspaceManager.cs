@@ -47,6 +47,14 @@ public interface IWorkspaceManager
     Task<IReadOnlyList<string>> StartCatchUpAsync(
         string repositoryPath, Workspace workspace, string targetBranch, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A throwaway working copy of a branch, detached so that nothing done in it moves the
+    /// branch; your checkout is never touched. Close it with <see cref="CloseScratchAsync"/>.
+    /// </summary>
+    Task<string> OpenScratchAsync(string repositoryPath, string branch, CancellationToken cancellationToken);
+
+    Task CloseScratchAsync(string repositoryPath, string path, CancellationToken cancellationToken);
+
     /// <summary>Removes the working copy and its branch.</summary>
     Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken);
 }

@@ -19,6 +19,12 @@ internal static class OfficeEndpoints
     /// <param name="Mood">A theme for this room only; null to follow the office.</param>
     public sealed record MoodRequest(string? Mood);
 
+    /// <param name="Command">What tells whether the room's code works, e.g. <c>dotnet test</c>; null removes it.</param>
+    public sealed record CheckRequest(string? Command);
+
+    /// <param name="TaskIds">Tasks just merged: only their rooms are checked. All rooms with a check when null.</param>
+    public sealed record RunChecksRequest(string Branch, IReadOnlyList<Guid>? TaskIds = null);
+
     public sealed record LayoutRequest(
         int Width,
         int Depth,
@@ -133,6 +139,17 @@ internal static class OfficeEndpoints
             await commands.ClearRoomLayoutAsync(new OfficeId(officeId), new RoomId(roomId), ct);
             return Results.NoContent();
         });
+
+        offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/check", async (
+            Guid officeId, Guid roomId, CheckRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetRoomCheckAsync(new OfficeId(officeId), new RoomId(roomId), request.Command, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPost("/{officeId:guid}/checks", (
+            Guid officeId, RunChecksRequest request, Application.Checks.MergeChecks checks, CancellationToken ct) =>
+            checks.RunAsync(new OfficeId(officeId), request.Branch, request.TaskIds?.Select(id => new Domain.Work.WorkTaskId(id)).ToList(), ct));
 
         offices.MapPut("/{officeId:guid}/rooms/{roomId:guid}/mood", async (
             Guid officeId, Guid roomId, MoodRequest request, OfficeCommands commands, CancellationToken ct) =>

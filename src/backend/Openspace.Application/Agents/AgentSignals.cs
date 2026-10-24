@@ -20,6 +20,7 @@ public sealed partial class AgentSignals(
     Review.PendingReviews reviews,
     PermissionRequests permissions,
     IOptionsMonitor<AgentOptions> agentOptions,
+    EngineLimits limits,
     TimeProvider clock)
 {
     /// <param name="step">The agent's current todo item, if this update is about its plan.</param>
@@ -278,6 +279,31 @@ public sealed partial class AgentSignals(
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
         task.CompleteStep(number, evidence?.Trim() ?? string.Empty, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The engine stopped because its account is over its usage limits: the task goes back
+    /// in the queue, and the engine's desks wait until <paramref name="until"/>.
+    /// </summary>
+    public async Task OutOfLimitsAsync(
+        string sessionId, Domain.Offices.AgentEngine engine, DateTimeOffset? until, string reason, CancellationToken cancellationToken)
+    {
+        var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is null)
+        {
+            return;
+        }
+
+        limits.Pause(engine, until);
+        var now = clock.GetUtcNow();
+        var resumes = limits.PausedUntil(engine) ?? now;
+        task.AddNote(
+            NoteAuthor.System,
+            $"{reason} Back in the queue: it starts again by itself after {resumes.ToLocalTime():HH:mm}, where it left off.",
+            now);
+        task.Requeue(now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task FailedAsync(string sessionId, string reason, CancellationToken cancellationToken)

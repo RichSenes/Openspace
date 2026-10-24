@@ -19,6 +19,8 @@ import type {
   DeskUsageView,
   SettingsView,
   MergeOutcome,
+  CheckOutcome,
+  BackupView,
 } from './types'
 
 export const keys = {
@@ -37,6 +39,7 @@ export const keys = {
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
   settings: ['settings'] as const,
+  backups: ['backups'] as const,
   deskUsage: ['usage', 'desks'] as const,
 }
 
@@ -359,6 +362,22 @@ export function useSetRoomProcedure(officeId: string) {
   )
 }
 
+export function useSetRoomCheck(officeId: string) {
+  return useWrite(
+    (input: { roomId: string; command: string | null }) =>
+      request<void>('PUT', `/api/offices/${officeId}/rooms/${input.roomId}/check`, { command: input.command }),
+    keys.offices,
+  )
+}
+
+/** Runs the rooms' checks on a branch: only the rooms of the given tasks, or all of them. */
+export function useRunChecks(officeId: string) {
+  return useWrite(
+    (input: { branch: string; taskIds: string[] | null }) => request<CheckOutcome[]>('POST', `/api/offices/${officeId}/checks`, input),
+    keys.tasks,
+  )
+}
+
 export function useReports(officeId: string) {
   return useQuery({
     queryKey: keys.officeReports(officeId),
@@ -383,6 +402,14 @@ export function useWriteChangelog(officeId: string) {
     (input: { language: string }) => request<ReportView>('POST', `/api/offices/${officeId}/changelog`, input),
     keys.reports,
   )
+}
+
+export function useBackups() {
+  return useQuery({ queryKey: keys.backups, queryFn: () => request<BackupView[]>('GET', '/api/backups') })
+}
+
+export function useBackUp() {
+  return useWrite(() => request<BackupView>('POST', '/api/backups'), keys.backups)
 }
 
 export function useSettings() {

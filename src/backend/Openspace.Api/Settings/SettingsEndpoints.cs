@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
+using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
 using Openspace.Application.Queue;
 using Openspace.Domain.Common;
@@ -33,6 +34,8 @@ internal static class SettingsEndpoints
     {
         var settings = app.MapGroup("/api/settings").WithTags("Settings");
         settings.MapGet("/", Read);
+        app.MapGet("/api/backups", (IDatabaseBackups backups, CancellationToken ct) => backups.ListAsync(ct)).WithTags("Settings");
+        app.MapPost("/api/backups", (IDatabaseBackups backups, CancellationToken ct) => backups.BackUpAsync(ct)).WithTags("Settings");
         settings.MapPut("/", (SettingsView request, IConfiguration configuration, IOptions<SettingsFileOptions> file,
             IOptionsMonitor<AgentOptions> agents, IOptionsMonitor<QueueOptions> queue,
             IOptionsMonitor<ClaudeCodeOptions> claude, IOptionsMonitor<OpenCodeOptions> openCode) =>

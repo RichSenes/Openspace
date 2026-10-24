@@ -1,4 +1,5 @@
 using Openspace.Application.Agents;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
 namespace Openspace.Infrastructure.OpenCode;
@@ -19,6 +20,9 @@ internal abstract record AgentSignal(string SessionId)
         string SessionId, string CallId, AuditKind Kind, string Summary, string? Detail, bool Succeeded) : AgentSignal(SessionId);
 
     public sealed record Failed(string SessionId, string Reason) : AgentSignal(SessionId);
+
+    /// <summary>The engine's account is over its usage limits; they reset at <paramref name="Until"/> when known.</summary>
+    public sealed record OutOfLimits(string SessionId, AgentEngine Engine, DateTimeOffset? Until, string Reason) : AgentSignal(SessionId);
 
     /// <summary>Tokens a session spent; <paramref name="MessageId"/> names the answer, so it is counted once.</summary>
     public sealed record Used(string SessionId, TokenCount Tokens, string? MessageId = null) : AgentSignal(SessionId);

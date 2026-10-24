@@ -27,6 +27,8 @@ internal sealed class Harness
 
     public FakeWorkspaces Workspaces { get; } = new();
 
+    public FakeCheckRunner Checks { get; } = new();
+
     public RecordingPublisher Publisher { get; } = new();
 
     public InMemoryAuditLog Audit { get; } = new();
@@ -41,6 +43,8 @@ internal sealed class Harness
 
     public PermissionRequests Permissions { get; } = new();
 
+    public EngineLimits Limits { get; }
+
     public ActivityBoard Activity { get; }
 
     /// <summary>A person answers every request unless a test says otherwise.</summary>
@@ -54,6 +58,7 @@ internal sealed class Harness
 
     public Harness(bool withRepository = true)
     {
+        Limits = new EngineLimits(Clock);
         Activity = new ActivityBoard(Publisher);
         Office = Office.Open("E Corp", Start);
         Room = Office.OpenRoom("Web", Start);
@@ -76,12 +81,12 @@ internal sealed class Harness
     }
 
     public TaskRunner Runner(int seats = 1) => new(
-        new QueueDispatcher(Tasks, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
+        new QueueDispatcher(Tasks, Offices, Limits, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Clock, NullLogger<TaskRunner>.Instance);
 
     public AgentSignals Signals() => new(
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions,
-        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Clock);
+        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Clock);
 
     public Review.TaskReviewer Reviewer() => new(Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);
 
@@ -93,6 +98,9 @@ internal sealed class Harness
     public Supervisor Supervisor() => new(Offices, Roles, Epics, Tasks, UnitOfWork, Runtime, Clock);
 
     public Roles.RoleCommands RoleCommands() => new(Roles, Offices, UnitOfWork, Runtime, Clock);
+
+    public Application.Checks.MergeChecks MergeChecks() => new(
+        Offices, Tasks, Workspaces, Checks, UnitOfWork, Microsoft.Extensions.Options.Options.Create(new Application.Checks.CheckOptions()), Clock);
 
     public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Signals(), Clock);
 }

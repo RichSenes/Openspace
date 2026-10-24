@@ -506,4 +506,27 @@ public sealed class ApiTests : IDisposable
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    [Fact]
+    public async Task A_room_s_check_command_is_saved_and_read_back()
+    {
+        var (officeId, roomId, _) = await FurnishAsync();
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/check", new { command = " dotnet test " })).EnsureSuccessStatusCode();
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+        var tooLong = await _http.PutAsJsonAsync($"/api/offices/{officeId}/rooms/{roomId}/check", new { command = new string('x', 1001) });
+
+        Assert.Equal("dotnet test", office.GetProperty("rooms")[0].GetProperty("check").GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, tooLong.StatusCode);
+    }
+
+    [Fact]
+    public async Task Backups_are_listed_and_refused_for_a_database_in_memory()
+    {
+        Assert.Empty(await GetAsync<List<JsonElement>>("/api/backups"));
+
+        var response = await _http.PostAsync("/api/backups", null);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
 }

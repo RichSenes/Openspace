@@ -679,3 +679,36 @@
   margin-top: 3px;
   color: var(--accent);
 }
+
+.check-output {
+  margin: 4px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.board-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.board-search svg {
+  position: absolute;
+  left: 10px;
+  color: var(--mute);
+  pointer-events: none;
+}
+
+.board-search input {
+  width: 200px;
+  padding-left: 30px;
+}
+
+.column-more {
+  justify-content: center;
+}

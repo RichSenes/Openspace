@@ -13,6 +13,7 @@ import {
   useSetRepository,
   useSetRoomProcedure,
   useUpdateRoomContext,
+  useSetRoomCheck,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
@@ -178,6 +179,8 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
       </form>
 
       <ProcedureForm officeId={officeId} room={room} />
+
+      <CheckForm officeId={officeId} room={room} />
 
       <section className="desks" aria-label={`Desks in ${room.name}`}>
         <h3 className="pixel desks-title">Desks</h3>
@@ -373,6 +376,45 @@ function ProcedureForm({ officeId, room }: { officeId: string; room: RoomView })
       <div className="row">
         <button type="submit" className="btn" disabled={!changed || save.isPending}>
           Save procedure
+        </button>
+      </div>
+      {save.error && <p className="error">{save.error.message}</p>}
+    </form>
+  )
+}
+
+/** The command that tells whether the room's code still works, run after merges. */
+function CheckForm({ officeId, room }: { officeId: string; room: RoomView }) {
+  const [command, setCommand] = useState(room.check ?? '')
+  const save = useSetRoomCheck(officeId)
+  const toast = useToast()
+  const changed = command.trim() !== (room.check ?? '')
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    save.mutate(
+      { roomId: room.id, command: command.trim() || null },
+      { onSuccess: () => toast(command.trim() ? 'Check saved: it runs after merges' : 'Check removed') },
+    )
+  }
+
+  return (
+    <form className="stack" onSubmit={submit}>
+      <label className="field">
+        <span>
+          Check after merging: a command that fails when the room&apos;s code is broken. It runs from the repository folder in a
+          fresh copy, so install what it needs first.
+        </span>
+        <input
+          className="input mono"
+          value={command}
+          onChange={(e) => setCommand(e.target.value)}
+          placeholder="cd src/web && npm ci && npm test"
+        />
+      </label>
+      <div className="row">
+        <button type="submit" className="btn" disabled={!changed || save.isPending}>
+          Save check
         </button>
       </div>
       {save.error && <p className="error">{save.error.message}</p>}

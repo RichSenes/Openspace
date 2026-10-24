@@ -254,8 +254,8 @@ internal sealed partial class ClaudeCodeRuntime(
         if (ending.Count == 0)
         {
             var detail = errors.ToString().Trim();
-            ending.Add(new AgentSignal.Failed(
-                sessionId, $"Claude Code stopped without finishing{(detail.Length > 0 ? $": {detail[..Math.Min(300, detail.Length)]}" : ".")}"));
+            ending.Add(ClaudeCodeEvents.Stopped(
+                sessionId, $"Claude Code stopped without finishing{(detail.Length > 0 ? $": {detail[..Math.Min(300, detail.Length)]}" : ".")}", usage));
         }
 
         foreach (var signal in ending)

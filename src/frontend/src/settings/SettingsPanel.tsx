@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useEngines, useSaveSettings, useSettings } from '../api/hooks'
+import { useEngines, useSaveSettings, useSettings, useBackUp, useBackups } from '../api/hooks'
 import type { Autonomy, SettingsView } from '../api/types'
 import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
@@ -35,7 +35,40 @@ export function SettingsPanel() {
         <h2 id="claude-account">Claude account</h2>
         <ClaudeUsageMeters />
       </section>
+      <Backups />
       <Accounts />
+    </section>
+  )
+}
+
+const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+/** Copies of the database, taken every day by themselves; restored from the command line. */
+function Backups() {
+  const backups = useBackups()
+  const backUp = useBackUp()
+  const toast = useToast()
+  const latest = backups.data?.[0]
+  return (
+    <section className="settings-card" aria-labelledby="backups">
+      <h2 id="backups">Backups</h2>
+      <p className="hint">
+        Openspace copies its database once a day while it runs, and keeps the last 14 copies. Tasks, logs, reports and offices are all in
+        it; your repositories are not.
+      </p>
+      <p>{latest ? `Latest copy: ${when(latest.createdAt)}, ${(latest.size / 1_048_576).toFixed(1)} MB.` : 'No copy yet.'}</p>
+      <div className="row">
+        <button type="button" className="btn" disabled={backUp.isPending} onClick={() => backUp.mutate(undefined, { onSuccess: () => toast('Database copied') })}>
+          Back up now
+        </button>
+      </div>
+      {backUp.error && <p className="error">{backUp.error.message}</p>}
+      {latest && (
+        <p className="hint">
+          To go back to a copy, run <code className="mono">scripts/openspace restore {latest.path}</code> from the Openspace folder: it stops the
+          API, keeps the current database aside and starts again from the copy.
+        </p>
+      )}
     </section>
   )
 }

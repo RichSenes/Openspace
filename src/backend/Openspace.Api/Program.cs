@@ -22,6 +22,8 @@ var settingsFile = Path.GetFullPath(
     builder.Environment.ContentRootPath);
 builder.Configuration.AddJsonFile(settingsFile, optional: true, reloadOnChange: false);
 builder.Services.Configure<SettingsFileOptions>(o => o.Path = settingsFile);
+builder.Services.Configure<Openspace.Api.Sounds.SoundOptions>(builder.Configuration.GetSection(Openspace.Api.Sounds.SoundOptions.SectionName));
+builder.Services.AddSingleton<Openspace.Api.Sounds.SoundStore>();
 
 builder.Services.AddSingleton<IDomainEventPublisher, SignalRDomainEventPublisher>();
 builder.Services.AddSingleton<IActivityPublisher, SignalRActivityPublisher>();
@@ -72,6 +74,7 @@ app.MapEpicEndpoints();
 app.MapReportEndpoints();
 app.MapEngineEndpoints();
 app.MapSettingsEndpoints();
+Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");
 

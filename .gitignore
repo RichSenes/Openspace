@@ -33,3 +33,6 @@ src/frontend/src/art/fanpack/
 
 # Python
 __pycache__/
+
+# Sounds of your own and their settings: they stay on this machine
+sounds/

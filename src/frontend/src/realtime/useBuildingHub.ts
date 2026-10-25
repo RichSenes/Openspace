@@ -5,6 +5,7 @@ import { mergeActivity } from '../activity/activity'
 import { keys } from '../api/hooks'
 import type { DeskActivity } from '../api/types'
 import { retryDelay } from './retry'
+import { cueOfActivity, emitCue, type SoundEvent } from '../sounds/rules'
 
 export type LinkState = 'connecting' | 'live' | 'offline'
 
@@ -29,8 +30,13 @@ export function useBuildingHub(): LinkState {
     hub.on('EpicsChanged', () => void client.invalidateQueries({ queryKey: keys.epics }))
     hub.on('RolesChanged', () => void client.invalidateQueries({ queryKey: keys.roles }))
     hub.on('TaskLogChanged', (taskId: string) => void client.invalidateQueries({ queryKey: keys.log(taskId) }))
-    hub.on('DeskActivity', (activity: DeskActivity) =>
-      client.setQueryData<DeskActivity[]>(keys.activity, (list) => mergeActivity(list, activity)),
+    hub.on('DeskActivity', (activity: DeskActivity) => {
+      client.setQueryData<DeskActivity[]>(keys.activity, (list) => mergeActivity(list, activity))
+      const cue = cueOfActivity(activity)
+      if (cue) emitCue(cue)
+    })
+    hub.on('TaskCue', (c: { taskId: string; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>
+      emitCue({ event: c.cue, officeId: c.officeId, deskId: c.deskId, key: `${c.taskId}:${c.cue}:${Date.now()}` }),
     )
     hub.onreconnecting(() => setState('connecting'))
     hub.onreconnected(() => {

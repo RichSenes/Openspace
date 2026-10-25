@@ -3,6 +3,7 @@ import { useEngines, useSaveSettings, useSettings, useBackUp, useBackups } from 
 import type { Autonomy, SettingsView } from '../api/types'
 import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
+import { SoundsCard } from './SoundsCard'
 import './settings.css'
 
 const MAX_SEATS = 12
@@ -35,6 +36,7 @@ export function SettingsPanel() {
         <h2 id="claude-account">Claude account</h2>
         <ClaudeUsageMeters />
       </section>
+      <SoundsCard />
       <Backups />
       <Accounts />
     </section>

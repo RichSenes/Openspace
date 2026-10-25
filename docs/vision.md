@@ -119,7 +119,7 @@ Later, in rough order of appearance:
   Ollama or similar, wired into OpenCode) for simple recurring jobs such as sorting
   email, on a schedule, outside the office and its repositories.
 
-- **Notification sounds.** A sound when an agent needs you, when work reaches
+- ~~**Notification sounds.**~~ Done: a sound when an agent needs you, when work reaches
   review, when a task fails, and other moments worth hearing. Customisable per
   kind of event, per room or per single desk, with sensible defaults and a quick
   way to mute.

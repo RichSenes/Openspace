@@ -68,6 +68,10 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
+| GET | `/api/sounds` | `{ muted, volume, rules, files }`: which sound each moment plays (`needs-you`, `question`, `review`, `failed`), in general or for one room or desk, and your own sound files |
+| PUT | `/api/sounds` | `{ muted, volume, rules }`, each rule `{ event, roomId?, deskId?, sound }` with `sound` = `builtin:<name>`, `file:<name>` or `silent` |
+| POST | `/api/sounds/files` | A sound file of yours (form field `file`; mp3, ogg, opus, wav, m4a, webm or flac, 3 MB at most), kept on this machine |
+| GET / DELETE | `/api/sounds/files/{name}` | Play it, or delete it: the rules that used it play their default again |
 | GET | `/api/backups` | Copies of the database, newest first: `[{ name, path, size, createdAt }]` |
 | POST | `/api/backups` | Copy the database now; `422` when it lives in memory |
 | PUT | `/api/offices/{id}/desks/{deskId}/look` | Dress the desk's agent: `{ skin, hair, hairStyle, cloth, accessory?, outfit?, costume? }`, single words the frontend knows; unknown ones are drawn with its defaults |
@@ -149,6 +153,7 @@ On startup it applies pending database migrations.
 | `Backups:Folder` | `backups` | Where database copies go, next to the database unless absolute |
 | `Backups:Keep` | `14` | Copies kept; older ones are deleted |
 | `Backups:EveryHours` | `24` | How often a copy is taken while the API runs |
+| `Sounds:Folder` | `sounds` | Where sound choices and your own sound files are kept; ignored by git |
 | `GitHub:Command` | `gh` | The GitHub CLI, signed in with `gh auth login`; also looked for in `~/.local/bin` |
 | `Operator:Name` | `operator` | Who you are: recorded as requester and note author |
 | `Queue:Enabled` | `true` | Run the queue in the background |
@@ -186,6 +191,15 @@ A task's first round of work is 1; each send back starts the next. Agents list
 what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
+
+## Sounds
+
+The hub announces `TaskCue` `{ taskId, officeId, deskId, cue }` when work reaches
+review (`review`) or a task fails (`failed`); a desk starting to wait for a
+permission or for an answer comes with its `DeskActivity`. The page plays the
+sound the rules give that moment at that desk: the desk's rule first, then its
+room's, then the general one, then the default. Built-in sounds are drawn in code,
+in the spirit of the pixel art.
 
 ## Private folders
 

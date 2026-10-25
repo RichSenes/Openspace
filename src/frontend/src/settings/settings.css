@@ -76,3 +76,53 @@
 .accounts dd {
   margin: 0;
 }
+
+.sound-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sound-table th {
+  text-align: left;
+  font-weight: 400;
+  padding: 4px 8px 4px 0;
+}
+
+.sound-table td {
+  padding: 4px 0;
+}
+
+.sound-table td:last-child {
+  width: 40px;
+}
+
+.sound-exceptions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound-exceptions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sound-add {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.4fr) auto;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .sound-add {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sound-upload {
+  justify-self: start;
+}

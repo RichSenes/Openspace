@@ -17,13 +17,40 @@ const SOUNDS: Record<BuiltinSound, { wave: OscillatorType; notes: Note[] }> = {
 }
 
 let context: AudioContext | undefined
+const listeners = new Set<() => void>()
 
-/** Plays a built-in sound. Browsers let a page make sound only after the person clicked it once. */
+/**
+ * Browsers let a page make sound only once the person clicked or typed in it, and the
+ * audio must be switched on inside that very click: this does it, on the first one.
+ */
+export function unlockAudio() {
+  context ??= new AudioContext()
+  if (context.state !== 'running') {
+    void context.resume().then(() => listeners.forEach((l) => l()))
+  }
+}
+
+/** Whether the page may make sound now. */
+export const audioReady = () => context?.state === 'running'
+
+/** Tells when the page becomes able to make sound. */
+export function onAudioReady(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/** Plays a built-in sound; silent until the page was clicked once. */
 export function playBuiltin(name: BuiltinSound, volume: number) {
   const sound = SOUNDS[name]
-  if (!sound) return
-  context ??= new AudioContext()
-  void context.resume()
+  if (!sound || !context) return
+  if (context.state !== 'running') {
+    // Switched on a moment ago, in this very click: play once it is ready, never much later.
+    const asked = performance.now()
+    void context.resume().then(() => {
+      if (performance.now() - asked < 1000) playBuiltin(name, volume)
+    })
+    return
+  }
   const now = context.currentTime
   for (const [frequency, start, length] of sound.notes) {
     const oscillator = context.createOscillator()

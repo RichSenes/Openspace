@@ -197,3 +197,9 @@
     border-bottom: 1px solid var(--line);
   }
 }
+
+/* Sounds wait for a first click: said in words, with the crossed speaker, not only in colour. */
+.sound-blocked {
+  color: var(--accent);
+  white-space: nowrap;
+}

@@ -1,12 +1,28 @@
 import type { DeskActivity, SoundRule, SoundsView } from '../api/types'
 
-export type SoundEvent = 'needs-you' | 'question' | 'review' | 'failed'
+export type SoundEvent =
+  | 'needs-you'
+  | 'question'
+  | 'review'
+  | 'failed'
+  | 'verdict'
+  | 'plan-ready'
+  | 'checks-failed'
+  | 'paused'
+  | 'all-done'
+  | 'offline'
 
 export const SOUND_EVENTS: { id: SoundEvent; label: string }[] = [
   { id: 'needs-you', label: 'An agent asks for a permission' },
   { id: 'question', label: 'An agent asks you to do something' },
   { id: 'review', label: 'Work is ready for review' },
+  { id: 'verdict', label: "Claude's review of the work is in" },
   { id: 'failed', label: 'A task failed' },
+  { id: 'plan-ready', label: "The supervisor's plan is ready" },
+  { id: 'checks-failed', label: 'Checks after a merge failed' },
+  { id: 'paused', label: 'An account is paused for its limits' },
+  { id: 'all-done', label: 'An office has nothing left to do' },
+  { id: 'offline', label: 'The connection to Openspace was lost' },
 ]
 
 /** Sounds drawn in code, like the pixel art: no files, no licences. */
@@ -17,6 +33,9 @@ export const BUILTINS = {
   fail: 'Falling tones',
   coin: 'Coin',
   blip: 'Blip',
+  powerDown: 'Power down',
+  fanfare: 'Fanfare',
+  alarm: 'Alarm',
 } as const
 
 export type BuiltinSound = keyof typeof BUILTINS
@@ -25,7 +44,14 @@ export const DEFAULT_SOUND: Record<SoundEvent, string> = {
   'needs-you': 'builtin:chime',
   question: 'builtin:knock',
   review: 'builtin:levelUp',
+  verdict: 'builtin:blip',
   failed: 'builtin:fail',
+  'plan-ready': 'builtin:coin',
+  'checks-failed': 'builtin:alarm',
+  paused: 'builtin:powerDown',
+  'all-done': 'builtin:fanfare',
+  // Openspace is restarted often while it is built: quiet unless chosen.
+  offline: 'silent',
 }
 
 /** A moment worth a sound, from the live updates. */

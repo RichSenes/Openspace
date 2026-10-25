@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useOffices, useSounds } from '../api/hooks'
+import { useEngines, useOffices, useSounds } from '../api/hooks'
 import { playSound } from './player'
-import { onCue, resolveSound } from './rules'
+import { emitCue, onCue, resolveSound } from './rules'
 
 /** Plays the sound of each moment the live updates announce, as the sound settings say. */
 export function useSoundCues() {
@@ -9,6 +9,16 @@ export function useSoundCues() {
   const offices = useOffices().data
   const latest = useRef({ sounds, offices })
   const played = useRef(new Set<string>())
+  const pauses = useEngines().data?.pauses
+  const knownPauses = useRef<Set<string> | undefined>(undefined)
+
+  // A new pause for an account's limits is a moment; the ones already there when the page opened are not.
+  useEffect(() => {
+    if (!pauses) return
+    const now = new Set(pauses.map((p) => `${p.scope}:${p.until}`))
+    if (knownPauses.current) for (const key of now) if (!knownPauses.current.has(key)) emitCue({ event: 'paused', key })
+    knownPauses.current = now
+  }, [pauses])
 
   useEffect(() => {
     latest.current = { sounds, offices }

@@ -506,7 +506,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         ArgumentNullException.ThrowIfNull(author);
         var note = new TaskNote(author, Guard.NotBlank(text, "Note", MaxNoteLength), now);
         _notes.Add(note);
-        Raise(new WorkTaskNoteAdded(Id, note, now));
+        Raise(new WorkTaskNoteAdded(Id, note, now, OfficeId, DeskId));
     }
 
     private void MoveTo(WorkTaskStatus target, DateTimeOffset now)

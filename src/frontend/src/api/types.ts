@@ -372,7 +372,7 @@ export interface CheckOutcome {
 
 /** Which sound a moment plays: in general, for a room, or for one desk. */
 export interface SoundRule {
-  event: 'needs-you' | 'question' | 'review' | 'failed'
+  event: import('../sounds/rules').SoundEvent
   roomId: string | null
   deskId: string | null
   /** builtin:name, file:name or silent. */

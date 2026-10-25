@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DeskActivity, SoundRule } from '../api/types'
-import { cueOfActivity, DEFAULT_SOUND, resolveSound, soundLabel } from './rules'
+import { BUILTINS, cueOfActivity, DEFAULT_SOUND, resolveSound, SOUND_EVENTS, soundLabel } from './rules'
 
 describe('resolveSound', () => {
   const config: { rules: SoundRule[] } = {
@@ -37,5 +37,15 @@ describe('cueOfActivity', () => {
     expect(cueOfActivity(waiting(true))).toMatchObject({ event: 'question', deskId: 'stats', key: 'per_1' })
     expect(cueOfActivity(waiting(false))?.event).toBe('needs-you')
     expect(cueOfActivity({ ...waiting(false), kind: 'Working', permissionId: null })).toBeNull()
+  })
+})
+
+describe('the moments', () => {
+  it('each has a label and a default that exists, and losing the connection is quiet unless chosen', () => {
+    expect(Object.keys(DEFAULT_SOUND).sort()).toEqual(SOUND_EVENTS.map((e) => e.id).sort())
+    for (const sound of Object.values(DEFAULT_SOUND)) {
+      expect(sound === 'silent' || sound.slice(8) in BUILTINS).toBe(true)
+    }
+    expect(DEFAULT_SOUND.offline).toBe('silent')
   })
 })

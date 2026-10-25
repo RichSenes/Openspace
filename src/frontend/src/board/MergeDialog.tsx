@@ -3,6 +3,7 @@ import { Check, CircleSlash, ExternalLink, GitMerge, GitPullRequest, ListChecks,
 import { useBranches, useCatchUp, useCheckPullRequest, useMergeAll, useOpenPullRequest, usePush, useRunChecks } from '../api/hooks'
 import type { CheckOutcome, MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
+import { emitCue } from '../sounds/rules'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
 import { defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
@@ -58,6 +59,7 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
           setChecks({ branch, outcomes })
           const failed = outcomes.filter((o) => !o.passed).length
           if (outcomes.length > 0) toast(failed === 0 ? `Checks passed on ${branch}` : `${failed} of ${outcomes.length} checks failed on ${branch}`)
+          if (failed > 0) emitCue({ event: 'checks-failed', officeId: office.id, key: `checks:${branch}:${Date.now()}` })
         },
       },
     )

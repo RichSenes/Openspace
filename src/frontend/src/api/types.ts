@@ -253,6 +253,8 @@ export interface DeskActivity {
   headline: string
   /** While waiting: exactly what is asked, such as the command. */
   detail?: string | null
+  /** While waiting: the agent asks you to do or decide something, not for a permission. */
+  question?: boolean
 }
 
 export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'

@@ -6,6 +6,7 @@ import { ENGINE_LABEL } from '../engines/engines'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
 import { Portrait } from './LookDialog'
+import { answersFor } from '../activity/activity'
 
 interface Props {
   desk: DeskWithRoom
@@ -62,17 +63,17 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
                 type="button"
                 className="btn btn-primary"
                 disabled={answer.isPending}
-                onClick={() => answer.mutate({ taskId: current.id, allow: true }, { onSuccess: () => toast(`${desk.name}: allowed once`) })}
+                onClick={() => answer.mutate({ taskId: current.id, allow: true }, { onSuccess: () => toast(`${desk.name}: ${answersFor(activity.question).saidYes}`) })}
               >
-                Allow once
+                {answersFor(activity.question).yes}
               </button>
               <button
                 type="button"
                 className="btn btn-danger"
                 disabled={answer.isPending}
-                onClick={() => answer.mutate({ taskId: current.id, allow: false }, { onSuccess: () => toast(`${desk.name}: refused`) })}
+                onClick={() => answer.mutate({ taskId: current.id, allow: false }, { onSuccess: () => toast(`${desk.name}: ${answersFor(activity.question).saidNo}`) })}
               >
-                Refuse
+                {answersFor(activity.question).no}
               </button>
             </div>
           )}

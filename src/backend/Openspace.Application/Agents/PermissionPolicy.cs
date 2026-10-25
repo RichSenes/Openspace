@@ -57,6 +57,7 @@ public static partial class PermissionPolicy
         return action.Kind switch
         {
             ActionKind.OutsideFolder => "it reaches outside the task's working copy",
+            ActionKind.Question => "only a person can answer it",
             ActionKind.Edit or ActionKind.Write => FileRisk(action.Target, workspacePath),
             ActionKind.Run => CommandRisk(action.Target, workspacePath),
             _ => null,
@@ -101,6 +102,11 @@ public static partial class PermissionPolicy
             if (ActionPhrases.DeployPattern().IsMatch(part))
             {
                 return "it reaches a live service";
+            }
+
+            if (ActionPhrases.PublishScriptPattern().IsMatch(part))
+            {
+                return "it publishes or installs the app";
             }
 
             if (ActionPhrases.SystemPattern().IsMatch(part) || ActionPhrases.RemotePattern().IsMatch(part))

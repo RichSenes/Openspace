@@ -68,7 +68,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
-| GET | `/api/sounds` | `{ muted, volume, rules, files }`: which sound each moment plays (`needs-you`, `question`, `review`, `failed`), in general or for one room or desk, and your own sound files |
+| GET | `/api/sounds` | `{ muted, volume, rules, files }`: which sound each moment plays (`needs-you`, `question`, `review`, `verdict`, `failed`, `plan-ready`, `checks-failed`, `paused`, `all-done`, `offline`), in general or for one room or desk, and your own sound files |
 | PUT | `/api/sounds` | `{ muted, volume, rules }`, each rule `{ event, roomId?, deskId?, sound }` with `sound` = `builtin:<name>`, `file:<name>` or `silent` |
 | POST | `/api/sounds/files` | A sound file of yours (form field `file`; mp3, ogg, opus, wav, m4a, webm or flac, 3 MB at most), kept on this machine |
 | GET / DELETE | `/api/sounds/files/{name}` | Play it, or delete it: the rules that used it play their default again |
@@ -195,8 +195,12 @@ per round, as OpenCode reports each answer and Claude Code each run.
 ## Sounds
 
 The hub announces `TaskCue` `{ taskId, officeId, deskId, cue }` when work reaches
-review (`review`) or a task fails (`failed`); a desk starting to wait for a
-permission or for an answer comes with its `DeskActivity`. The page plays the
+review (`review`), a task fails (`failed`), Claude's verdict comes in (`verdict`)
+or an agent stopping leaves its office with nothing running or queued
+(`all-done`); a desk starting to wait for a permission or for an answer comes
+with its `DeskActivity`. The page itself notices a plan being ready, checks
+failing after a merge, an account pausing for its limits and the connection
+dropping. The page plays the
 sound the rules give that moment at that desk: the desk's rule first, then its
 room's, then the general one, then the default. Built-in sounds are drawn in code,
 in the spirit of the pixel art.

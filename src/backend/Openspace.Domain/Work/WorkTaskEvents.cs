@@ -15,7 +15,8 @@ public sealed record WorkTaskStatusChanged(
     OfficeId? OfficeId = null,
     DeskId? DeskId = null) : IDomainEvent;
 
-public sealed record WorkTaskNoteAdded(WorkTaskId TaskId, TaskNote Note, DateTimeOffset OccurredAt) : IDomainEvent;
+public sealed record WorkTaskNoteAdded(
+    WorkTaskId TaskId, TaskNote Note, DateTimeOffset OccurredAt, OfficeId? OfficeId = null, DeskId? DeskId = null) : IDomainEvent;
 
 public sealed record WorkTaskPullRequestOpened(WorkTaskId TaskId, string Url, string TargetBranch, DateTimeOffset OccurredAt) : IDomainEvent;
 

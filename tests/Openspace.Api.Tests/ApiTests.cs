@@ -311,7 +311,18 @@ public sealed class ApiTests : IDisposable
     {
         await using var hub = _app.CreateHubConnection();
         var cued = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
-        hub.On<JsonElement>("TaskCue", cue => cued.TrySetResult(cue));
+        var idle = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        hub.On<JsonElement>("TaskCue", cue =>
+        {
+            if (cue.GetProperty("cue").GetString() == "all-done")
+            {
+                idle.TrySetResult(cue);
+            }
+            else
+            {
+                cued.TrySetResult(cue);
+            }
+        });
         await hub.StartAsync();
         var (officeId, _, deskId) = await FurnishAsync();
         var created = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
@@ -327,6 +338,9 @@ public sealed class ApiTests : IDisposable
 
         var cue = await cued.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(("failed", deskId), (cue.GetProperty("cue").GetString(), cue.GetProperty("deskId").GetGuid()));
+
+        // It was the office's only task: the office has nothing left to do.
+        Assert.Equal(officeId, (await idle.Task.WaitAsync(TimeSpan.FromSeconds(5))).GetProperty("officeId").GetGuid());
     }
 
     [Fact]

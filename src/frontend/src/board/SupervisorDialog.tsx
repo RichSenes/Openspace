@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useApproveEpic, usePlan } from '../api/hooks'
+import { emitCue } from '../sounds/rules'
 import type { OfficeView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
@@ -30,7 +31,12 @@ export function SupervisorDialog({ office, desks, open, onClose, onShowEpic }: P
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    plan.mutate(text, { onSuccess: () => setText('') })
+    plan.mutate(text, {
+      onSuccess: (made) => {
+        setText('')
+        emitCue({ event: 'plan-ready', officeId: office.id, key: `plan:${made.epic.id}` })
+      },
+    })
   }
 
   const show = () => {

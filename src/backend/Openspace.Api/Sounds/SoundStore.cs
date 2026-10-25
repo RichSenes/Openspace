@@ -13,7 +13,7 @@ public sealed class SoundOptions
     public string Folder { get; set; } = "sounds";
 }
 
-/// <param name="Event">needs-you, question, review or failed.</param>
+/// <param name="Event">One of <see cref="SoundStore.Events"/>, such as needs-you or review.</param>
 /// <param name="RoomId">Only for this room's desks; null for every room.</param>
 /// <param name="DeskId">Only for this desk; it wins over its room's rule.</param>
 /// <param name="Sound">builtin:name, file:name or silent.</param>
@@ -33,8 +33,10 @@ internal sealed partial class SoundStore(IOptions<SoundOptions> options)
     public const long MaxFileBytes = 3 * 1024 * 1024;
     public const int MaxRules = 100;
 
-    public static readonly string[] Events = ["needs-you", "question", "review", "failed"];
-    public static readonly string[] Builtins = ["chime", "knock", "levelUp", "fail", "coin", "blip"];
+    public static readonly string[] Events =
+        ["needs-you", "question", "review", "failed", "verdict", "plan-ready", "checks-failed", "paused", "all-done", "offline"];
+
+    public static readonly string[] Builtins = ["chime", "knock", "levelUp", "fail", "coin", "blip", "powerDown", "fanfare", "alarm"];
     private static readonly Dictionary<string, string> Types = new(StringComparer.OrdinalIgnoreCase)
     {
         [".mp3"] = "audio/mpeg",

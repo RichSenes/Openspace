@@ -35,10 +35,13 @@ export function useBuildingHub(): LinkState {
       const cue = cueOfActivity(activity)
       if (cue) emitCue(cue)
     })
-    hub.on('TaskCue', (c: { taskId: string; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>
-      emitCue({ event: c.cue, officeId: c.officeId, deskId: c.deskId, key: `${c.taskId}:${c.cue}:${Date.now()}` }),
+    hub.on('TaskCue', (c: { taskId: string | null; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>
+      emitCue({ event: c.cue, officeId: c.officeId, deskId: c.deskId, key: `${c.taskId ?? c.officeId}:${c.cue}:${Date.now()}` }),
     )
-    hub.onreconnecting(() => setState('connecting'))
+    hub.onreconnecting(() => {
+      setState('connecting')
+      emitCue({ event: 'offline', key: `offline:${Date.now()}` })
+    })
     hub.onreconnected(() => {
       setState('live')
       void client.invalidateQueries()

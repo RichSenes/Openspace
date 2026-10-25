@@ -7,7 +7,7 @@ using Openspace.Domain.Work;
 
 namespace Openspace.Api.Realtime;
 
-internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) : IDomainEventPublisher
+internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub, IServiceScopeFactory scopes) : IDomainEventPublisher
 {
     public async Task PublishAsync(IReadOnlyList<IDomainEvent> events, CancellationToken cancellationToken)
     {
@@ -25,10 +25,25 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         }
 
         // Moments worth a sound: work ready for review, or a task that failed.
-        foreach (var change in events.OfType<WorkTaskStatusChanged>().Where(c => c.To is WorkTaskStatus.Review or WorkTaskStatus.Failed))
+        var ended = events.OfType<WorkTaskStatusChanged>().Where(c => c.To is WorkTaskStatus.Review or WorkTaskStatus.Failed).ToList();
+        foreach (var change in ended)
         {
-            var cue = new { taskId = change.TaskId.Value, officeId = change.OfficeId?.Value, deskId = change.DeskId?.Value, cue = change.To == WorkTaskStatus.Review ? "review" : "failed" };
-            await hub.Clients.All.SendAsync("TaskCue", cue, cancellationToken).ConfigureAwait(false);
+            await CueAsync(change.TaskId, change.OfficeId, change.DeskId, change.To == WorkTaskStatus.Review ? "review" : "failed", cancellationToken).ConfigureAwait(false);
+        }
+
+        // Claude's verdict arrives a while after the work reached review.
+        foreach (var note in events.OfType<WorkTaskNoteAdded>().Where(n => n.Note.Author.Kind == NoteAuthorKind.Reviewer))
+        {
+            await CueAsync(note.TaskId, note.OfficeId, note.DeskId, "verdict", cancellationToken).ConfigureAwait(false);
+        }
+
+        // An agent stopping may leave its office with nothing to do: worth knowing from afar.
+        foreach (var office in ended.Where(c => c.From == WorkTaskStatus.Running).Select(c => c.OfficeId).OfType<OfficeId>().Distinct())
+        {
+            if (!await BusyAsync(office, cancellationToken).ConfigureAwait(false))
+            {
+                await CueAsync(null, office, null, "all-done", cancellationToken).ConfigureAwait(false);
+            }
         }
 
         if (events.Any(e => e is Domain.Reports.ReportWritten))
@@ -45,6 +60,18 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
         {
             await hub.Clients.All.SendAsync("RolesChanged", cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private Task CueAsync(WorkTaskId? task, OfficeId? office, DeskId? desk, string cue, CancellationToken cancellationToken) =>
+        hub.Clients.All.SendAsync("TaskCue", new { taskId = task?.Value, officeId = office?.Value, deskId = desk?.Value, cue }, cancellationToken);
+
+    /// <summary>Whether an office still has tasks running or queued.</summary>
+    private async Task<bool> BusyAsync(OfficeId office, CancellationToken cancellationToken)
+    {
+        using var scope = scopes.CreateScope();
+        var tasks = scope.ServiceProvider.GetRequiredService<IWorkTaskRepository>();
+        return (await tasks.ListAsync(office, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false)).Count > 0
+            || (await tasks.ListAsync(office, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false)).Count > 0;
     }
 
     private static OfficeId? OfficeOf(IDomainEvent e) => e switch

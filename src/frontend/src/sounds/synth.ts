@@ -11,6 +11,9 @@ const SOUNDS: Record<BuiltinSound, { wave: OscillatorType; notes: Note[] }> = {
   fail: { wave: 'square', notes: [[392, 0, 0.14], [330, 0.15, 0.14], [262, 0.3, 0.3]] },
   coin: { wave: 'square', notes: [[988, 0, 0.07], [1319, 0.07, 0.25]] },
   blip: { wave: 'square', notes: [[880, 0, 0.06]] },
+  powerDown: { wave: 'square', notes: [[660, 0, 0.08], [494, 0.08, 0.08], [370, 0.16, 0.08], [247, 0.24, 0.25]] },
+  fanfare: { wave: 'square', notes: [[784, 0, 0.08], [784, 0.1, 0.08], [784, 0.2, 0.08], [1047, 0.32, 0.35]] },
+  alarm: { wave: 'square', notes: [[880, 0, 0.12], [660, 0.14, 0.12], [880, 0.28, 0.12], [660, 0.42, 0.12]] },
 }
 
 let context: AudioContext | undefined

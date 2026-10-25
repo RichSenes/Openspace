@@ -19,6 +19,9 @@ internal static class OfficeEndpoints
     /// <param name="Mood">A theme for this room only; null to follow the office.</param>
     public sealed record MoodRequest(string? Mood);
 
+    /// <param name="LocalOnly">True keeps the project on this machine: no push, no pull request.</param>
+    public sealed record LocalOnlyRequest(bool LocalOnly);
+
     /// <param name="Paths">Absolute folders no agent of the office may touch; empty clears them.</param>
     public sealed record PrivatePathsRequest(IReadOnlyList<string>? Paths);
 
@@ -140,6 +143,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid roomId, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.ClearRoomLayoutAsync(new OfficeId(officeId), new RoomId(roomId), ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/local-only", async (
+            Guid officeId, LocalOnlyRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.KeepLocalAsync(new OfficeId(officeId), request.LocalOnly, ct);
             return Results.NoContent();
         });
 

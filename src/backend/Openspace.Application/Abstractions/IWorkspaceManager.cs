@@ -7,7 +7,21 @@ public sealed record RepositoryProblem(string Code, string Message, bool CanInit
 /// <param name="Current">The branch checked out in the repository folder; null when detached.</param>
 /// <param name="Branches">Local branches work can be merged into (task branches excluded).</param>
 /// <param name="UncommittedChanges">Files changed and not committed in your checkout: nothing merges into <paramref name="Current"/> while there are any.</param>
-public sealed record BranchList(string? Current, IReadOnlyList<string> Branches, int UncommittedChanges = 0);
+/// <param name="Remotes">The repository's remotes, such as origin; none for a project kept on this machine.</param>
+/// <param name="Tracking">How each branch stands against its remote one, as of the last fetch.</param>
+/// <param name="PullRequests">Whether accepted work can go up as a pull request instead of a local merge.</param>
+public sealed record BranchList(
+    string? Current,
+    IReadOnlyList<string> Branches,
+    int UncommittedChanges = 0,
+    IReadOnlyList<string>? Remotes = null,
+    IReadOnlyList<BranchTracking>? Tracking = null,
+    bool PullRequests = false);
+
+/// <param name="Upstream">The remote branch it follows, such as origin/main; null when it follows none.</param>
+/// <param name="Ahead">Commits it has that the remote branch lacks: what a push would send.</param>
+/// <param name="Behind">Commits of the remote branch it lacks: to pull before pushing.</param>
+public sealed record BranchTracking(string Branch, string? Upstream, int Ahead, int Behind);
 
 /// <summary>A private working copy for one task, on its own branch.</summary>
 public sealed record Workspace(string Path, string Branch);
@@ -54,6 +68,19 @@ public interface IWorkspaceManager
     Task<string> OpenScratchAsync(string repositoryPath, string branch, CancellationToken cancellationToken);
 
     Task CloseScratchAsync(string repositoryPath, string path, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a branch to its remote (origin when it follows none yet), after fetching: refused
+    /// when the remote has commits the branch lacks. Never forces. Returns where it went.
+    /// </summary>
+    Task<string> PushAsync(string repositoryPath, string branch, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Brings a branch up to date with its remote one, fast-forward only: in your checkout
+    /// when it is that branch and has no uncommitted changes, else without touching the
+    /// checkout. Refused rather than merging or losing anything.
+    /// </summary>
+    Task UpdateFromRemoteAsync(string repositoryPath, string branch, CancellationToken cancellationToken);
 
     /// <summary>Removes the working copy and its branch.</summary>
     Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken);

@@ -67,7 +67,10 @@ Each project has its own README with detailed specifications.
    that conflicts goes back to its agent, which resolves the conflict in its own
    working copy; accept it again and it merges cleanly.
    After merging, each room's check command (`dotnet test`, `npm test`…) runs
-   on the merged branch in a throwaway copy, and says what broke.
+   on the merged branch in a throwaway copy, and says what broke. From there you
+   push the branch, never forced, or open a GitHub pull request for a task
+   instead of merging it here; an office can be kept on this machine, and then
+   it is never pushed.
 10. A changelog of what was accepted since the previous one is written for the
     people who use the product, in plain words and in the language you choose.
 11. Each room can have its own mood, whatever the office's theme: a bright

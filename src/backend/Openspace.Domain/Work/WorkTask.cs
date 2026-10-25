@@ -126,6 +126,12 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// <summary>Accepted work on a branch of its own, not merged anywhere yet.</summary>
     public bool AwaitsMerge => Status == WorkTaskStatus.Done && Run is not null && MergedInto is null;
 
+    /// <summary>The pull request the accepted work waits in, while one is open.</summary>
+    public string? PullRequestUrl { get; private set; }
+
+    /// <summary>The branch the open pull request merges into.</summary>
+    public string? PullRequestTarget { get; private set; }
+
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
         Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)
@@ -410,6 +416,11 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             throw new DomainException($"This work was already merged into {MergedInto}.");
         }
 
+        if (PullRequestUrl is not null)
+        {
+            throw new DomainException($"This work waits in a pull request: merge it there ({PullRequestUrl}).");
+        }
+
         return target;
     }
 
@@ -418,6 +429,27 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     {
         MergedInto = CheckMerge(targetBranch);
         Raise(new WorkTaskMerged(Id, MergedInto, now));
+    }
+
+    /// <summary>The accepted work went up for review in a pull request instead of a local merge.</summary>
+    public void RecordPullRequest(string url, string targetBranch, DateTimeOffset now)
+    {
+        var target = CheckMerge(targetBranch);
+        if (PullRequestUrl is not null)
+        {
+            throw new DomainException($"This work already waits in a pull request: {PullRequestUrl}");
+        }
+
+        PullRequestUrl = Guard.NotBlank(url, "Pull request", 500);
+        PullRequestTarget = target;
+        Raise(new WorkTaskPullRequestOpened(Id, PullRequestUrl, target, now));
+    }
+
+    /// <summary>The pull request was closed without merging: the work can be merged or proposed again.</summary>
+    public void ForgetPullRequest()
+    {
+        PullRequestUrl = null;
+        PullRequestTarget = null;
     }
 
     /// <summary>

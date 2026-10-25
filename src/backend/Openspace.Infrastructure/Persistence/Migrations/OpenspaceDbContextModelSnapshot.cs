@@ -28,6 +28,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<int?>("FloorWidth")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("LocalOnly")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -219,6 +222,14 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ProcedureReminders")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("PullRequestTarget")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PullRequestUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RequestedBy")
                         .IsRequired()

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, CircleSlash, GitMerge, ListChecks, TriangleAlert, X } from 'lucide-react'
-import { useBranches, useCatchUp, useMergeAll, useRunChecks } from '../api/hooks'
+import { Check, CircleSlash, ExternalLink, GitMerge, GitPullRequest, ListChecks, Upload, TriangleAlert, X } from 'lucide-react'
+import { useBranches, useCatchUp, useCheckPullRequest, useMergeAll, useOpenPullRequest, usePush, useRunChecks } from '../api/hooks'
 import type { CheckOutcome, MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
-import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
+import { defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
 import { awaitingMerge, checksDone } from './taskRules'
 
 interface Props {
@@ -34,6 +34,12 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   const runChecks = useRunChecks(office.id)
   const [checks, setChecks] = useState<{ branch: string; outcomes: CheckOutcome[] }>()
   const hasChecks = office.rooms.some((r) => r.check)
+  const push = usePush(office.id)
+  const openPullRequest = useOpenPullRequest()
+  const checkPullRequest = useCheckPullRequest()
+  const shared = !office.localOnly
+  const standing = shared ? remoteStanding(branches.data, target) : null
+  const inPullRequests = tasks.filter((t) => t.status === 'Done' && t.pullRequestUrl && !t.mergedInto)
   const catchUp = useCatchUp()
   const toast = useToast()
   const chosen = waiting.filter((t) => !skipped.has(t.id))
@@ -64,6 +70,9 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
     setCaughtUp(new Set())
     mergeAll.reset()
     catchUp.reset()
+    push.reset()
+    openPullRequest.reset()
+    checkPullRequest.reset()
     onClose()
   }
 
@@ -80,6 +89,7 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
       {
         onSuccess: (result) => {
           setOutcomes(result)
+          void branches.refetch()
           const merged = result.filter((o) => o.result === 'Merged')
           toast(`${merged.length} of ${result.length} merged into ${target}`)
           // A clean merge can still break the code: check what was just merged.
@@ -118,6 +128,23 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
               </select>
             </label>
 
+            {standing && (
+              <div className="merge-remote">
+                <span className="hint">{standing.text}</span>
+                {standing.canPush && (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={push.isPending}
+                    onClick={() => push.mutate(target, { onSuccess: (r) => toast(`Pushed ${target} to ${r.to}`) })}
+                  >
+                    <Upload size={16} aria-hidden /> Push to {branches.data?.remotes?.[0] ?? 'origin'}
+                  </button>
+                )}
+              </div>
+            )}
+            {office.localOnly && <p className="hint">Kept on this machine: no push, no pull request.</p>}
+
             <fieldset className="merge-pick">
               <legend className="pixel notes-title">Accepted, not merged yet · first accepted first</legend>
               <ol className="merge-list">
@@ -125,16 +152,31 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
                   const checks = checksDone(t)
                   return (
                     <li key={t.id}>
-                      <label className="check-row merge-row">
-                        <input type="checkbox" checked={!skipped.has(t.id)} onChange={() => toggle(t.id)} />
-                        <span className="merge-text">
-                          <span>{t.title}</span>
-                          <span className="hint">
-                            {deskOf(t.id)} · accepted {when(t.statusChangedAt)}
-                            {checks.total > checks.done && ` · ${checks.total - checks.done} of ${checks.total} checks not tried by hand`}
+                      <div className="merge-pick-row">
+                        <label className="check-row merge-row">
+                          <input type="checkbox" checked={!skipped.has(t.id)} onChange={() => toggle(t.id)} />
+                          <span className="merge-text">
+                            <span>{t.title}</span>
+                            <span className="hint">
+                              {deskOf(t.id)} · accepted {when(t.statusChangedAt)}
+                              {checks.total > checks.done && ` · ${checks.total - checks.done} of ${checks.total} checks not tried by hand`}
+                            </span>
                           </span>
-                        </span>
-                      </label>
+                        </label>
+                        {shared && branches.data?.pullRequests && (
+                          <button
+                            type="button"
+                            className="btn btn-quiet"
+                            title={`Open a pull request into ${target} instead of merging here`}
+                            disabled={!target || openPullRequest.isPending}
+                            onClick={() =>
+                              openPullRequest.mutate({ taskId: t.id, target }, { onSuccess: (r) => toast(`Pull request opened: ${r.url}`) })
+                            }
+                          >
+                            <GitPullRequest size={16} aria-hidden /> Pull request
+                          </button>
+                        )}
+                      </div>
                     </li>
                   )
                 })}
@@ -222,6 +264,39 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
               <ListChecks size={16} aria-hidden /> Run all checks on {target}
             </button>
           </div>
+        )}
+        {inPullRequests.length > 0 && (
+          <section className="merge-pick" aria-label="In pull requests">
+            <h3 className="pixel notes-title">Waiting in a pull request</h3>
+            <ol className="merge-list">
+              {inPullRequests.map((t) => (
+                <li key={t.id} className="merge-pick-row">
+                  <span className="merge-text">
+                    <span>{t.title}</span>
+                    <a className="hint" href={t.pullRequestUrl!} target="_blank" rel="noreferrer">
+                      {t.pullRequestUrl} <ExternalLink size={12} aria-hidden />
+                    </a>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-quiet"
+                    disabled={checkPullRequest.isPending}
+                    onClick={() =>
+                      checkPullRequest.mutate(t.id, {
+                        onSuccess: (r) =>
+                          toast(r.state === 'Merged' ? 'Merged on GitHub: counted as merged' : r.state === 'Closed' ? 'Closed without merging: it can be merged again' : 'Still open on GitHub'),
+                      })
+                    }
+                  >
+                    Check
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+        {(push.error ?? openPullRequest.error ?? checkPullRequest.error) && (
+          <p className="error">{(push.error ?? openPullRequest.error ?? checkPullRequest.error)?.message}</p>
         )}
         {(mergeAll.error ?? catchUp.error ?? runChecks.error) && <p className="error">{(mergeAll.error ?? catchUp.error ?? runChecks.error)?.message}</p>}
       </div>

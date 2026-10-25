@@ -53,6 +53,9 @@ public sealed class Office : AggregateRoot<OfficeId>
     /// </summary>
     public IReadOnlyList<string> PrivatePaths => _privatePaths;
 
+    /// <summary>The project stays on this machine: Openspace never pushes it or opens pull requests.</summary>
+    public bool LocalOnly { get; private set; }
+
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
 
@@ -106,6 +109,12 @@ public sealed class Office : AggregateRoot<OfficeId>
         }
 
         return name;
+    }
+
+    public void KeepLocal(bool localOnly, DateTimeOffset now)
+    {
+        LocalOnly = localOnly;
+        Raise(new OfficeLocalOnlySet(Id, localOnly, now));
     }
 
     /// <summary>Replaces the private folders: absolute paths, kept without a trailing slash.</summary>

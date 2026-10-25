@@ -130,7 +130,7 @@ export function Board({ office, initialTaskId }: Props) {
                           )}
                           {task.status === 'Done' && task.branch !== null && (
                             <span className="card-meta hint">
-                              {task.mergedInto ? `In ${task.mergedInto}` : 'Not merged yet'}
+                              {task.mergedInto ? `In ${task.mergedInto}` : task.pullRequestUrl ? 'In a pull request' : 'Not merged yet'}
                             </span>
                           )}
                           {verdict === 'reviewing' && (

@@ -27,6 +27,8 @@ internal static class TaskEndpoints
 
     public sealed record MergeRequest(string Target);
 
+    public sealed record PushRequest(string Branch);
+
     /// <param name="TaskIds">The tasks to merge; all accepted work not merged yet when null.</param>
     public sealed record MergeAllRequest(string Target, IReadOnlyList<Guid>? TaskIds = null);
 
@@ -59,6 +61,18 @@ internal static class TaskEndpoints
         tasks.MapPost("/{taskId:guid}/merge", (
             Guid taskId, MergeRequest request, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.MergeAsync(new WorkTaskId(taskId), request.Target, ct)));
+
+        tasks.MapPost("/{taskId:guid}/pull-request", async (
+            Guid taskId, MergeRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            Results.Ok(new { url = await commands.OpenPullRequestAsync(new WorkTaskId(taskId), request.Target, ct) }));
+
+        tasks.MapPost("/{taskId:guid}/pull-request/check", async (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
+            Results.Ok(new { state = (await commands.CheckPullRequestAsync(new WorkTaskId(taskId), ct)).ToString() }));
+
+        app.MapPost("/api/offices/{officeId:guid}/push", async (
+            Guid officeId, PushRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            Results.Ok(new { to = await commands.PushAsync(new OfficeId(officeId), request.Branch, ct) }))
+            .WithTags("Tasks");
 
         tasks.MapPost("/{taskId:guid}/catch-up", (
             Guid taskId, MergeRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>

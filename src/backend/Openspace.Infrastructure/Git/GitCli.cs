@@ -22,6 +22,9 @@ internal static class GitCli
         // Never wait for a person to type something, and never let an inherited
         // GIT_DIR or GIT_WORK_TREE point git somewhere other than the working directory.
         start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+
+        // Git's words in English whatever the machine's language: Openspace reads some of them.
+        start.Environment["LC_ALL"] = "C";
         start.Environment.Remove("GIT_DIR");
         start.Environment.Remove("GIT_WORK_TREE");
 

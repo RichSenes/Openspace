@@ -289,4 +289,81 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
         Assert.Equal(before, (await Git("rev-parse", "develop")).Trim());
         Assert.Equal("main", (await Git("branch", "--show-current")).Trim());
     }
+
+    /// <summary>A bare repository in the test folder, standing for GitHub, with main pushed to it.</summary>
+    private async Task<string> RemoteAsync()
+    {
+        var remote = Path.Combine(_root, "remote.git");
+        await GitCli.RunAsync(_root, default, "init", "--quiet", "--bare", "--initial-branch", "main", remote);
+        await Git("remote", "add", "origin", remote);
+        await Git("push", "--quiet", "--set-upstream", "origin", "main");
+        return remote;
+    }
+
+    [Fact]
+    public async Task Branches_say_their_remote_and_how_far_ahead_they_are()
+    {
+        await RemoteAsync();
+        await File.WriteAllTextAsync(Path.Combine(Repo, "about.html"), "<p>About</p>\n");
+        await Git("add", "--all");
+        await Git("commit", "--quiet", "--message", "About page");
+
+        var list = await _manager.ListBranchesAsync(Repo, default);
+
+        Assert.Equal(["origin"], list.Remotes);
+        Assert.Equal(new Application.Abstractions.BranchTracking("main", "origin/main", 1, 0), Assert.Single(list.Tracking!));
+    }
+
+    [Fact]
+    public async Task Pushing_sends_the_branch_and_never_over_newer_work_on_the_remote()
+    {
+        var remote = await RemoteAsync();
+        await Git("checkout", "--quiet", "-b", "develop");
+        await Git("checkout", "--quiet", "main");
+
+        Assert.Equal("origin/develop", await _manager.PushAsync(Repo, "develop", default));
+
+        // Someone else pushes to main meanwhile.
+        var other = Path.Combine(_root, "other");
+        await GitCli.RunAsync(_root, default, "clone", "--quiet", remote, other);
+        await File.WriteAllTextAsync(Path.Combine(other, "theirs.txt"), "theirs\n");
+        await GitCli.RunAsync(other, default, "add", "--all");
+        await GitCli.RunAsync(other, default, "-c", "user.name=Angela Moss", "-c", "user.email=angela@example.invalid", "commit", "--quiet", "--message", "Theirs");
+        await GitCli.RunAsync(other, default, "push", "--quiet");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "mine.txt"), "mine\n");
+        await Git("add", "--all");
+        await Git("commit", "--quiet", "--message", "Mine");
+
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() => _manager.PushAsync(Repo, "main", default));
+
+        Assert.Equal("behind-remote", error.Code);
+        Assert.Contains("never forces", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_a_remote_nothing_is_pushed()
+    {
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() => _manager.PushAsync(Repo, "main", default));
+
+        Assert.Equal("no-remote", error.Code);
+    }
+
+    [Fact]
+    public async Task A_branch_not_checked_out_is_brought_up_to_date_without_moving_your_checkout()
+    {
+        var remote = await RemoteAsync();
+        await Git("branch", "release");
+        await Git("push", "--quiet", "--set-upstream", "origin", "release");
+        var other = Path.Combine(_root, "other");
+        await GitCli.RunAsync(_root, default, "clone", "--quiet", "--branch", "release", remote, other);
+        await File.WriteAllTextAsync(Path.Combine(other, "merged.txt"), "merged on GitHub\n");
+        await GitCli.RunAsync(other, default, "add", "--all");
+        await GitCli.RunAsync(other, default, "-c", "user.name=Angela Moss", "-c", "user.email=angela@example.invalid", "commit", "--quiet", "--message", "Merged");
+        await GitCli.RunAsync(other, default, "push", "--quiet");
+
+        await _manager.UpdateFromRemoteAsync(Repo, "release", default);
+
+        Assert.Contains("merged.txt", await Git("ls-tree", "--name-only", "release"), StringComparison.Ordinal);
+        Assert.Equal("main", (await Git("branch", "--show-current")).Trim());
+    }
 }

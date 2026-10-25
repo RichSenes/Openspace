@@ -123,7 +123,7 @@ export function standing(task: WorkTaskView): string {
 /** Accepted work on its own branch, not merged anywhere yet, in the order it was accepted. */
 export function awaitingMerge(tasks: readonly WorkTaskView[]): WorkTaskView[] {
   return tasks
-    .filter((t) => t.status === 'Done' && t.branch !== null && t.mergedInto === null)
+    .filter((t) => t.status === 'Done' && t.branch !== null && t.mergedInto === null && !t.pullRequestUrl)
     .toSorted((a, b) => timeOf(a.statusChangedAt) - timeOf(b.statusChangedAt))
 }
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
 using Openspace.Application.Work;
 using Openspace.Domain.Common;
@@ -27,7 +28,7 @@ public class WorkTaskCommandsTests
         var board = new Agents.ActivityBoard(new RecordingPublisher());
         var audit = new InMemoryAuditLog();
         var signals = new Agents.AgentSignals(_offices, new Agents.AgentSetups(new InMemoryRoles()), _tasks, _unitOfWork, runtime, board, audit, new RecordingPublisher(), new Review.PendingReviews(), new Agents.PermissionRequests(), new LiveOptions<Agents.AgentOptions>(() => new() { Autonomy = Agents.Autonomy.Ask }), new Agents.EngineLimits(_clock), _clock);
-        _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, runtime, new FakeWorkspaces(), board, audit, signals, _clock);
+        _commands = new WorkTaskCommands(_offices, _tasks, _unitOfWork, runtime, new FakeWorkspaces(), board, audit, signals, new FakePullRequests(), _clock);
     }
 
     [Fact]
@@ -293,5 +294,74 @@ public class WorkTaskCommandsTests
         Assert.Contains("none could ever start", loop.Message, StringComparison.Ordinal);
         Assert.Empty(a.DependsOn);
         await Assert.ThrowsAsync<DomainException>(() => h.Commands().SetDependenciesAsync(a.Id, [a.Id], default));
+    }
+
+    [Fact]
+    public async Task Accepted_work_goes_up_as_a_pull_request_with_the_agent_s_summary_and_checks()
+    {
+        var (h, task) = await AcceptedAsync();
+
+        var url = await h.Commands().OpenPullRequestAsync(task.Id, "main", default);
+
+        Assert.Equal([task.Run!.Branch], h.Workspaces.Pushed);
+        var (branch, target, title, body) = Assert.Single(h.PullRequests.Opened);
+        Assert.Equal((task.Run.Branch, "main", task.Title), (branch, target, title));
+        Assert.Contains("## What the agent did", body, StringComparison.Ordinal);
+        Assert.Equal(url, task.PullRequestUrl);
+        Assert.Empty(await h.Commands().MergeAllAsync(h.Office.Id, "main", null, default));
+        await Assert.ThrowsAsync<DomainException>(() => h.Commands().MergeAsync(task.Id, "main", default));
+    }
+
+    [Fact]
+    public async Task A_pull_request_merged_on_GitHub_counts_as_merged_and_the_branch_here_is_updated()
+    {
+        var (h, task) = await AcceptedAsync();
+        await h.Commands().OpenPullRequestAsync(task.Id, "main", default);
+        h.PullRequests.State = PullRequestState.Merged;
+
+        Assert.Equal(PullRequestState.Merged, await h.Commands().CheckPullRequestAsync(task.Id, default));
+
+        Assert.Equal(("main", (string?)null, true), (task.MergedInto, task.PullRequestUrl, task.IsDoneForOthers));
+        Assert.Equal(["main"], h.Workspaces.Updated);
+        Assert.StartsWith("Merged on GitHub into main", task.Notes[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pull_request_closed_unmerged_lets_the_work_be_merged_again()
+    {
+        var (h, task) = await AcceptedAsync();
+        await h.Commands().OpenPullRequestAsync(task.Id, "main", default);
+        h.PullRequests.State = PullRequestState.Closed;
+
+        await h.Commands().CheckPullRequestAsync(task.Id, default);
+
+        Assert.Null(task.PullRequestUrl);
+        Assert.True(task.AwaitsMerge);
+    }
+
+    [Fact]
+    public async Task An_office_kept_local_never_pushes_nor_opens_pull_requests()
+    {
+        var (h, task) = await AcceptedAsync();
+        h.Office.KeepLocal(true, Start);
+
+        var push = await Assert.ThrowsAsync<RejectedException>(() => h.Commands().PushAsync(h.Office.Id, "main", default));
+        var pullRequest = await Assert.ThrowsAsync<RejectedException>(() => h.Commands().OpenPullRequestAsync(task.Id, "main", default));
+
+        Assert.Equal(("local-only", "local-only"), (push.Code, pullRequest.Code));
+        Assert.Empty(h.Workspaces.Pushed);
+        Assert.Empty(h.PullRequests.Opened);
+    }
+
+    [Fact]
+    public async Task Without_GitHub_signed_in_no_pull_request_is_tried()
+    {
+        var (h, task) = await AcceptedAsync();
+        h.PullRequests.Available = false;
+
+        var error = await Assert.ThrowsAsync<RejectedException>(() => h.Commands().OpenPullRequestAsync(task.Id, "main", default));
+
+        Assert.Equal("no-pull-requests", error.Code);
+        Assert.Empty(h.Workspaces.Pushed);
     }
 }

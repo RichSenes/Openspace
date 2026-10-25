@@ -15,6 +15,7 @@ public sealed class WorkTaskCommands(
     ActivityBoard activity,
     IAuditLog audit,
     AgentSignals signals,
+    IPullRequests pullRequests,
     TimeProvider clock)
 {
     public async Task<WorkTaskId> AssignAsync(
@@ -155,7 +156,7 @@ public sealed class WorkTaskCommands(
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         var waiting = (await tasks.ListAsync(officeId, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false))
-            .Where(t => t.AwaitsMerge && (only is null || only.Contains(t.Id)))
+            .Where(t => t.AwaitsMerge && t.PullRequestUrl is null && (only is null || only.Contains(t.Id)))
             .OrderBy(t => t.StatusChangedAt)
             .ToList();
 
@@ -201,6 +202,124 @@ public sealed class WorkTaskCommands(
         task.RecordMerge(target, now);
         task.AddNote(NoteAuthor.System, $"Merged into {target}; branch {task.Run.Branch} deleted.", now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sends one of your branches to its remote: only when you ask, never forced.</summary>
+    public async Task<string> PushAsync(OfficeId officeId, string branch, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        return await workspaces.PushAsync(SharedRepository(office), branch, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Proposes accepted work in a pull request instead of merging it here: its branch is
+    /// pushed and the request opened with the agent's summary and the checks to try by hand.
+    /// </summary>
+    public async Task<string> OpenPullRequestAsync(WorkTaskId taskId, string targetBranch, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var target = task.CheckMerge(targetBranch);
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var repository = SharedRepository(office);
+        if (!await pullRequests.AvailableAsync(repository, cancellationToken).ConfigureAwait(false))
+        {
+            throw new RejectedException(
+                "no-pull-requests",
+                "Pull requests need the repository's origin on GitHub and the GitHub CLI signed in: run gh auth login once.");
+        }
+
+        await workspaces.PushAsync(repository, task.Run!.Branch, cancellationToken).ConfigureAwait(false);
+        var url = await pullRequests
+            .OpenAsync(repository, task.Run.Branch, target, task.Title, PullRequestBody(task), cancellationToken)
+            .ConfigureAwait(false);
+
+        var now = clock.GetUtcNow();
+        task.RecordPullRequest(url, target, now);
+        task.AddNote(NoteAuthor.System, $"Pull request opened into {target}: {url}", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return url;
+    }
+
+    /// <summary>
+    /// Asks GitHub how the task's pull request stands. Merged there, the work counts as merged
+    /// and your branch is brought up to date when it can be without merging; closed, the work
+    /// can be merged or proposed again.
+    /// </summary>
+    public async Task<PullRequestState> CheckPullRequestAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var (url, target) = (task.PullRequestUrl, task.PullRequestTarget);
+        if (url is null || target is null)
+        {
+            throw new Domain.Common.DomainException("This work is not in a pull request.");
+        }
+
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var state = await pullRequests.StateAsync(office.RepositoryPath!, url, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        if (state == PullRequestState.Merged)
+        {
+            task.ForgetPullRequest();
+            task.RecordMerge(target, now);
+            string local;
+            try
+            {
+                await workspaces.UpdateFromRemoteAsync(office.RepositoryPath!, target, cancellationToken).ConfigureAwait(false);
+                local = $"{target} here is up to date with it.";
+            }
+            catch (RejectedException ex)
+            {
+                local = $"{target} here is not up to date yet ({ex.Message}): pull it, so the next tasks start from this work.";
+            }
+
+            task.AddNote(NoteAuthor.System, $"Merged on GitHub into {target}. {local}", now);
+        }
+        else if (state == PullRequestState.Closed)
+        {
+            task.ForgetPullRequest();
+            task.AddNote(NoteAuthor.System, $"The pull request was closed without merging ({url}): the work can be merged or proposed again.", now);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return state;
+    }
+
+    /// <summary>The repository, when the office lets it leave this machine.</summary>
+    private static string SharedRepository(Office office)
+    {
+        if (office.LocalOnly)
+        {
+            throw new RejectedException("local-only", $"{office.Name} is kept on this machine: Openspace never pushes it or opens pull requests.");
+        }
+
+        return office.RepositoryPath ?? throw new RejectedException("no-repository", $"{office.Name} has no repository yet.");
+    }
+
+    private static string PullRequestBody(WorkTask task)
+    {
+        var body = new System.Text.StringBuilder();
+        if (task.Description.Length > 0)
+        {
+            body.AppendLine(task.Description).AppendLine();
+        }
+
+        if (task.Notes.LastOrDefault(n => n.Author.Kind == NoteAuthorKind.Desk) is { } summary)
+        {
+            body.AppendLine("## What the agent did").AppendLine(summary.Text).AppendLine();
+        }
+
+        if (task.ManualChecks.Count > 0)
+        {
+            body.AppendLine("## To try by hand");
+            foreach (var check in task.ManualChecks)
+            {
+                body.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"- [{(check.CheckedAt is null ? " " : "x")}] {check.What}{(check.How.Length > 0 ? $": {check.How}" : string.Empty)}");
+            }
+
+            body.AppendLine();
+        }
+
+        return body.Append("Opened by Openspace.").ToString();
     }
 
     /// <summary>

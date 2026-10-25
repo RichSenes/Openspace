@@ -129,6 +129,13 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task KeepLocalAsync(OfficeId officeId, bool localOnly, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.KeepLocal(localOnly, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task SetPrivatePathsAsync(OfficeId officeId, IReadOnlyList<string> paths, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

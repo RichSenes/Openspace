@@ -31,6 +31,7 @@ builder.Services
         ?? throw new InvalidOperationException("Missing connection string 'Openspace'."))
     .AddAgents();
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection(AgentOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Git.GitHubOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Git.GitHubOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Persistence.BackupOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Persistence.BackupOptions.SectionName));
 builder.Services.Configure<Openspace.Application.Checks.CheckOptions>(builder.Configuration.GetSection(Openspace.Application.Checks.CheckOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));

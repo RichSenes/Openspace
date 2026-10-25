@@ -3,7 +3,7 @@ using Openspace.Domain.Offices;
 
 namespace Openspace.Application.Offices;
 
-public sealed class OfficeQueries(IOfficeRepository offices, IWorkspaceManager workspaces)
+public sealed class OfficeQueries(IOfficeRepository offices, IWorkspaceManager workspaces, IPullRequests pullRequests)
 {
     public async Task<IReadOnlyList<OfficeView>> ListAsync(CancellationToken cancellationToken)
     {
@@ -15,9 +15,15 @@ public sealed class OfficeQueries(IOfficeRepository offices, IWorkspaceManager w
     public async Task<BranchList> BranchesAsync(OfficeId id, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        return office.RepositoryPath is null
-            ? new BranchList(null, [])
-            : await workspaces.ListBranchesAsync(office.RepositoryPath, cancellationToken).ConfigureAwait(false);
+        if (office.RepositoryPath is null)
+        {
+            return new BranchList(null, []);
+        }
+
+        var list = await workspaces.ListBranchesAsync(office.RepositoryPath, cancellationToken).ConfigureAwait(false);
+        var available = !office.LocalOnly && list.Remotes is { Count: > 0 }
+            && await pullRequests.AvailableAsync(office.RepositoryPath, cancellationToken).ConfigureAwait(false);
+        return list with { PullRequests = available };
     }
 
     public async Task<OfficeView> GetAsync(OfficeId id, CancellationToken cancellationToken) =>

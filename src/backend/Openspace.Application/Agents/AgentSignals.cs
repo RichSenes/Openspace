@@ -83,7 +83,16 @@ public sealed partial class AgentSignals(
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
         var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
         var (room, desk) = office.Locate(task.DeskId!.Value);
-        return Briefing.ForNewTask(office, room, desk, task);
+        var before = new List<WorkTask>();
+        foreach (var id in task.DependsOn)
+        {
+            if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { } done)
+            {
+                before.Add(done);
+            }
+        }
+
+        return Briefing.ForNewTask(office, room, desk, task, before);
     }
 
     /// <summary>A tool call ended: it goes in the task's log, once, with its evidence.</summary>

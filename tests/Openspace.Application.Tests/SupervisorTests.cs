@@ -226,4 +226,22 @@ public class SupervisorTests
 
         Assert.Null(_h.Tasks.Items[0].DeskId);
     }
+
+    [Fact]
+    public async Task Tasks_that_need_earlier_ones_wait_for_them_and_only_for_earlier_ones()
+    {
+        _h.Runtime.Plan = """
+            {"title":"Checkout","tasks":[
+              {"desk":"Frontend","title":"Analyse the checkout","description":"Read it.","after":[]},
+              {"desk":"Frontend","title":"Fix the checkout","description":"Fix it.","after":[1, 1, 7]},
+              {"desk":"Tester","title":"Write the checklist","description":"List it.","after":[2, 3]}]}
+            """;
+
+        await _h.Supervisor().PlanAsync(_h.Office.Id, "Fix the checkout.", "elliot", default);
+
+        var (analyse, fix, checklist) = (_h.Tasks.Items[0], _h.Tasks.Items[1], _h.Tasks.Items[2]);
+        Assert.Empty(analyse.DependsOn);
+        Assert.Equal([analyse.Id], fix.DependsOn);
+        Assert.Equal([fix.Id], checklist.DependsOn);
+    }
 }

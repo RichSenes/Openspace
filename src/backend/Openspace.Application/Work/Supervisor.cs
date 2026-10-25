@@ -49,6 +49,12 @@ public sealed class Supervisor(
                         desk = new { type = "string", description = "The exact name of the desk that should do it", @enum = deskNames.ToArray() },
                         title = new { type = "string", description = "What to do, as a short imperative sentence" },
                         description = new { type = "string", description = "Everything the desk needs to do it alone: files, rules, what done means" },
+                        after = new
+                        {
+                            type = "array",
+                            items = new { type = "integer" },
+                            description = "Numbers of earlier tasks of this plan (1 is the first) whose result this one needs first; empty when it can start at once",
+                        },
                     },
                     required = TaskFields,
                 },
@@ -63,6 +69,7 @@ public sealed class Supervisor(
         Each task goes to exactly one desk from the list, chosen by what that desk is for, and must be doable by it alone in one sitting.
         Respect each desk's limits: never give code changes to a desk whose role only reviews, tests or audits.
         Order the tasks in the order they should be done. Prefer few, well described tasks over many tiny ones.
+        When a task needs another one's result first (an analysis before the fix, a model before its screen, two changes to the same files), list the earlier task's number in "after": it will wait until that work is accepted and merged. Tasks that can run side by side list nothing.
         Write titles and descriptions in the language of the request. Do not change anything.
         """;
 
@@ -120,6 +127,17 @@ public sealed class Supervisor(
             task.AddNote(NoteAuthor.System, $"Proposed by the supervisor as part of \"{epic.Title}\".{why}", now);
             tasks.Add(task);
             created.Add(task);
+        }
+
+        // Only earlier tasks of the plan can be waited for: no loops, whatever the model says.
+        var kept = planned.Take(MaxTasks).ToList();
+        for (var i = 0; i < created.Count; i++)
+        {
+            var before = (kept[i].After ?? []).Where(n => n >= 1 && n <= i).Distinct().Select(n => created[n - 1]).ToList();
+            if (before.Count > 0)
+            {
+                created[i].DependOn(before, now);
+            }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -213,7 +231,7 @@ public sealed class Supervisor(
 
     private sealed record DeskInfo(DeskId Id, string Name, string Room, string? Role, string About, string RoomRules);
 
-    private sealed record Planned(string Title, string Description, string Desk);
+    private sealed record Planned(string Title, string Description, string Desk, IReadOnlyList<int>? After = null);
 
     private async Task<List<DeskInfo>> DescribeDesksAsync(Office office, CancellationToken cancellationToken)
     {
@@ -258,7 +276,7 @@ public sealed class Supervisor(
             var title = root.TryGetProperty("title", out var t) && t.GetString() is { Length: > 0 } s ? s.Trim() : "Request";
             var items = root.TryGetProperty("tasks", out var list) && list.ValueKind == JsonValueKind.Array
                 ? list.EnumerateArray()
-                    .Select(i => new Planned(Text(i, "title"), Text(i, "description"), Text(i, "desk")))
+                    .Select(i => new Planned(Text(i, "title"), Text(i, "description"), Text(i, "desk"), Numbers(i, "after")))
                     .Where(p => p.Title.Length > 0)
                     .ToList()
                 : [];
@@ -269,6 +287,11 @@ public sealed class Supervisor(
             throw new RejectedException("planning-failed", $"The supervisor answered something that is not a plan: {ex.Message}");
         }
     }
+
+    private static List<int> Numbers(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array
+            ? [.. v.EnumerateArray().Where(n => n.ValueKind == JsonValueKind.Number && n.TryGetInt32(out _)).Select(n => n.GetInt32())]
+            : [];
 
     private static string Text(JsonElement item, string name) =>
         item.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()!.Trim() : string.Empty;

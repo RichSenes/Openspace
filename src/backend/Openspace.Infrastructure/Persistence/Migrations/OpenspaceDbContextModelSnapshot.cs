@@ -238,6 +238,11 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("_dependsOn")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DependsOn");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EpicId");

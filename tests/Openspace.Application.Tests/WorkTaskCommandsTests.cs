@@ -256,4 +256,42 @@ public class WorkTaskCommandsTests
         await Assert.ThrowsAsync<Domain.Common.DomainException>(() => h.Commands().CatchUpAsync(task.Id, "main", "elliot", default));
         Assert.Empty(h.Workspaces.CatchUps);
     }
+
+    [Fact]
+    public async Task A_task_waits_in_the_queue_until_what_it_builds_on_is_accepted_and_merged()
+    {
+        var h = new Harness();
+        var analysis = h.Enqueue("Analyse the checkout");
+        var fix = h.Enqueue("Fix the checkout");
+        await h.Commands().SetDependenciesAsync(fix.Id, [analysis.Id], default);
+
+        await h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal((WorkTaskStatus.Running, WorkTaskStatus.Queued), (analysis.Status, fix.Status));
+
+        await h.Signals().FinishedAsync(analysis.Run!.SessionId, default);
+        await h.Commands().AcceptAsync(analysis.Id, default);
+        await h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal(WorkTaskStatus.Queued, fix.Status);
+
+        await h.Commands().MergeAsync(analysis.Id, "main", default);
+        await h.Runner(seats: 2).RunQueueAsync(default);
+        Assert.Equal(WorkTaskStatus.Running, fix.Status);
+        Assert.Contains("builds on work already done and merged", h.Runtime.Prompts[^1].Text, StringComparison.Ordinal);
+        Assert.Contains("- Analyse the checkout: Added the button.", h.Runtime.Prompts[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Waiting_in_a_loop_is_refused()
+    {
+        var h = new Harness();
+        var (a, b, c) = (h.Enqueue("A"), h.Enqueue("B"), h.Enqueue("C"));
+        await h.Commands().SetDependenciesAsync(b.Id, [a.Id], default);
+        await h.Commands().SetDependenciesAsync(c.Id, [b.Id], default);
+
+        var loop = await Assert.ThrowsAsync<DomainException>(() => h.Commands().SetDependenciesAsync(a.Id, [c.Id], default));
+
+        Assert.Contains("none could ever start", loop.Message, StringComparison.Ordinal);
+        Assert.Empty(a.DependsOn);
+        await Assert.ThrowsAsync<DomainException>(() => h.Commands().SetDependenciesAsync(a.Id, [a.Id], default));
+    }
 }

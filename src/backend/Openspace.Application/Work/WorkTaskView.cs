@@ -19,7 +19,8 @@ public sealed record WorkTaskView(
     DateTimeOffset StatusChangedAt,
     int Round,
     IReadOnlyList<ManualCheckView> ManualChecks,
-    IReadOnlyList<RoundUsageView> Usage)
+    IReadOnlyList<RoundUsageView> Usage,
+    IReadOnlyList<Guid> DependsOn)
 {
     public static WorkTaskView From(WorkTask task)
     {
@@ -41,7 +42,8 @@ public sealed record WorkTaskView(
             task.StatusChangedAt,
             task.Round,
             [.. task.ManualChecks.Select(c => new ManualCheckView(c.Number, c.What, c.How, c.CheckedAt))],
-            [.. task.Usage.OrderBy(u => u.Round).Select(u => new RoundUsageView(u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite))]);
+            [.. task.Usage.OrderBy(u => u.Round).Select(u => new RoundUsageView(u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite))],
+            [.. task.DependsOn.Select(d => d.Value)]);
     }
 }
 

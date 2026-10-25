@@ -79,6 +79,10 @@ Each project has its own README with detailed specifications.
 14. An office can list private folders (photos, models, personal documents):
     no agent of it may open, read, search or change them. Openspace and both
     engines refuse them, and every agent is told so.
+15. A task can wait for others: the supervisor says which steps need earlier
+    ones (an analysis before the fix), and you can change it on the task. It
+    stays in the queue until those are accepted and merged, and its agent is
+    told what they did.
 
 ## Ground rules
 

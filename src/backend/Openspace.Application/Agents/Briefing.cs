@@ -9,7 +9,8 @@ namespace Openspace.Application.Agents;
 public static class Briefing
 {
     /// <summary>The first message of a task: who you are, where, what to do and how to report.</summary>
-    public static string ForNewTask(Office office, Room room, Desk desk, WorkTask task)
+    /// <param name="before">The tasks this one builds on, already accepted and merged.</param>
+    public static string ForNewTask(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null)
     {
         ArgumentNullException.ThrowIfNull(office);
         ArgumentNullException.ThrowIfNull(room);
@@ -29,6 +30,17 @@ public static class Briefing
         if (task.Description.Length > 0)
         {
             text.AppendLine(task.Description);
+        }
+
+        if (before is { Count: > 0 })
+        {
+            text.AppendLine().AppendLine("This task builds on work already done and merged, which your copy contains:");
+            foreach (var done in before)
+            {
+                var summary = done.Notes.LastOrDefault(n => n.Author.Kind == NoteAuthorKind.Desk)?.Text.ReplaceLineEndings(" ");
+                var shortSummary = summary is null ? string.Empty : $": {(summary.Length > 400 ? string.Concat(summary.AsSpan(0, 400), "…") : summary)}";
+                text.AppendLine(CultureInfo.InvariantCulture, $"- {done.Title}{shortSummary}");
+            }
         }
 
         AppendProcedure(text, task);
@@ -57,9 +69,9 @@ public static class Briefing
     /// The brief of an agent taking over a task another engine started: the whole task, and
     /// where to find what was done so far.
     /// </summary>
-    public static string ForTakeOver(Office office, Room room, Desk desk, WorkTask task) =>
+    public static string ForTakeOver(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null) =>
         new StringBuilder()
-            .AppendLine(ForNewTask(office, room, desk, task))
+            .AppendLine(ForNewTask(office, room, desk, task, before))
             .AppendLine()
             .AppendLine("Another agent already worked on this task in this working copy. Look at git status and git diff to see where it stands, then go on from there: the notes from the team above say what is still wrong.")
             .ToString();

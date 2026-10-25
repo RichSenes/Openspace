@@ -103,6 +103,23 @@ export function checksDone(task: WorkTaskView): { done: number; total: number } 
   return { done: task.manualChecks.filter((c) => c.checkedAt).length, total: task.manualChecks.length }
 }
 
+/** Whether work that builds on this task can start: accepted, and merged when it has a branch. As the API decides. */
+export const isDoneForOthers = (task: WorkTaskView) => task.status === 'Done' && (task.mergedInto !== null || task.branch === null)
+
+/** The tasks this one still waits for, in the order they were set; tasks no longer listed hold nothing up. */
+export function waitingFor(task: WorkTaskView, all: readonly WorkTaskView[]): WorkTaskView[] {
+  return (task.dependsOn ?? [])
+    .map((id) => all.find((t) => t.id === id))
+    .filter((t): t is WorkTaskView => t !== undefined && !isDoneForOthers(t))
+}
+
+/** Where a task another one waits for stands, in a few words. */
+export function standing(task: WorkTaskView): string {
+  if (isDoneForOthers(task)) return 'done and merged'
+  if (task.status === 'Done') return 'accepted, not merged yet'
+  return task.status === 'Discarded' ? 'discarded: it will never be done' : task.status.toLowerCase()
+}
+
 /** Accepted work on its own branch, not merged anywhere yet, in the order it was accepted. */
 export function awaitingMerge(tasks: readonly WorkTaskView[]): WorkTaskView[] {
   return tasks

@@ -112,7 +112,7 @@ Later, in rough order of appearance:
 - ~~**Private folders.**~~ Done: an office lists folders of the person's own
   (photos, models, personal documents) that every agent, planner and reviewer is
   told about and that Openspace, OpenCode and Claude Code all refuse.
-- **Task dependencies.** The supervisor says which proposed tasks wait for others
+- ~~**Task dependencies.**~~ Done: the supervisor says which proposed tasks wait for others
   (a fix that needs an analysis first); the queue holds them until those are
   accepted, and the Board shows what each one waits for.
 - **Local models and routines.** Small models running on this machine (through

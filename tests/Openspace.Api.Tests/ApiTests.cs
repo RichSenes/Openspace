@@ -542,4 +542,19 @@ public sealed class ApiTests : IDisposable
         Assert.Equal("/srv/media/library", office.GetProperty("privatePaths")[0].GetString());
         Assert.Equal(HttpStatusCode.UnprocessableEntity, relative.StatusCode);
     }
+
+    [Fact]
+    public async Task What_a_task_waits_for_is_saved_and_a_loop_is_refused()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var analysis = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Analyse the checkout" });
+        var fix = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Fix the checkout" });
+
+        (await _http.PutAsJsonAsync($"/api/tasks/{fix.Id}/dependencies", new { taskIds = (Guid[])[analysis.Id] })).EnsureSuccessStatusCode();
+        var loop = await _http.PutAsJsonAsync($"/api/tasks/{analysis.Id}/dependencies", new { taskIds = (Guid[])[fix.Id] });
+
+        var view = await GetAsync<JsonElement>($"/api/tasks/{fix.Id}");
+        Assert.Equal(analysis.Id, view.GetProperty("dependsOn")[0].GetGuid());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, loop.StatusCode);
+    }
 }

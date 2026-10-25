@@ -79,6 +79,42 @@ public sealed class WorkTaskCommands(
         WorkTaskId taskId, string reviewer, string? feedback, bool withReview, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.SendBack(NoteAuthor.Human(reviewer), Feedback(task, feedback, withReview), now), cancellationToken);
 
+    /// <summary>
+    /// Sets the tasks this one waits for; refused when it would make a loop, where tasks wait
+    /// for each other and none could ever start.
+    /// </summary>
+    public async Task SetDependenciesAsync(WorkTaskId taskId, IReadOnlyCollection<WorkTaskId> dependsOn, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var others = new List<WorkTask>();
+        foreach (var id in dependsOn.Distinct())
+        {
+            others.Add(await tasks.GetAsync(id, cancellationToken).ConfigureAwait(false));
+        }
+
+        // Walk what the new ones wait for in turn: reaching this task again would be a loop.
+        var seen = new HashSet<WorkTaskId>();
+        var next = new Queue<WorkTask>(others);
+        while (next.TryDequeue(out var current))
+        {
+            if (current.Id == task.Id)
+            {
+                throw new Domain.Common.DomainException($"\"{task.Title}\" cannot wait for that: those tasks already wait for it, and none could ever start.");
+            }
+
+            foreach (var id in current.DependsOn.Where(seen.Add))
+            {
+                if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { } further)
+                {
+                    next.Enqueue(further);
+                }
+            }
+        }
+
+        task.DependOn(others, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>A person tried a check by hand, or puts it back on the list.</summary>
     public Task TickManualCheckAsync(WorkTaskId taskId, int number, bool done, CancellationToken cancellationToken) =>
         UpdateAsync(taskId, (task, now) => task.TickManualCheck(number, done, now), cancellationToken);

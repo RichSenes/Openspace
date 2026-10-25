@@ -21,7 +21,8 @@ public sealed record WorkTaskView(
     IReadOnlyList<ManualCheckView> ManualChecks,
     IReadOnlyList<RoundUsageView> Usage,
     IReadOnlyList<Guid> DependsOn,
-    string? PullRequestUrl)
+    string? PullRequestUrl,
+    string? ReserveModel)
 {
     public static WorkTaskView From(WorkTask task)
     {
@@ -45,7 +46,8 @@ public sealed record WorkTaskView(
             [.. task.ManualChecks.Select(c => new ManualCheckView(c.Number, c.What, c.How, c.CheckedAt))],
             [.. task.Usage.OrderBy(u => u.Round).Select(u => new RoundUsageView(u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite))],
             [.. task.DependsOn.Select(d => d.Value)],
-            task.PullRequestUrl);
+            task.PullRequestUrl,
+            task.ReserveModel);
     }
 }
 

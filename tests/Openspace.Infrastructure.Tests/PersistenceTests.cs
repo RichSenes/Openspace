@@ -49,11 +49,13 @@ public sealed class PersistenceTests : IAsyncLifetime
             var office = await sp.GetRequiredService<OfficeQueries>().GetAsync(officeId, default);
             await commands.UpdateRoomContextAsync(officeId, new RoomId(office.Rooms[0].Id), "PHP 8.3 only.", default);
             await commands.ChangeRoomMoodAsync(officeId, new RoomId(office.Rooms[0].Id), "darkFocus", default);
+            await commands.SetReserveModelsAsync(officeId, ["nvidia/qwen3-coder", "mistral/devstral"], default);
         });
 
         var view = await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(officeId, default));
 
         Assert.Equal("E Corp", view.Name);
+        Assert.Equal(["nvidia/qwen3-coder", "mistral/devstral"], view.ReserveModels);
         var room = Assert.Single(view.Rooms);
         Assert.Equal(("PHP 8.3 only.", "darkFocus"), (room.Context, room.Mood));
         Assert.Collection(room.Desks.OrderBy(d => d.Name),

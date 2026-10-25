@@ -15,6 +15,8 @@ public sealed record OfficeLocalOnlySet(OfficeId OfficeId, bool LocalOnly, DateT
 
 public sealed record OfficePrivatePathsSet(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record OfficeReserveModelsSet(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record RoomCheckSet(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record RoomMoodChanged(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;

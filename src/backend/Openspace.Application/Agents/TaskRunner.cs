@@ -57,14 +57,14 @@ public sealed partial class TaskRunner(
 
         try
         {
-            var problem = await CheckAsync(office, desk, cancellationToken).ConfigureAwait(false);
+            var problem = await CheckAsync(office, AgentSetups.AgentFor(desk, task), cancellationToken).ConfigureAwait(false);
             if (problem is not null)
             {
                 await FailAsync(task, problem, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            var setup = await setups.ForDeskAsync(desk, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
+            var setup = await setups.ForTaskAsync(desk, task, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
             string message;
             if (task.Run is null)
             {
@@ -147,7 +147,7 @@ public sealed partial class TaskRunner(
         }
     }
 
-    private async Task<string?> CheckAsync(Office office, Desk desk, CancellationToken cancellationToken)
+    private async Task<string?> CheckAsync(Office office, AgentProfile agent, CancellationToken cancellationToken)
     {
         if (office.RepositoryPath is null)
         {
@@ -159,14 +159,14 @@ public sealed partial class TaskRunner(
             return $"{problem.Message} Fix the repository in Rooms, then try again.";
         }
 
-        if (await runtime.HasAgentAsync(desk.Agent, office.RepositoryPath, cancellationToken).ConfigureAwait(false))
+        if (await runtime.HasAgentAsync(agent, office.RepositoryPath, cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
 
-        return desk.Agent.Engine == AgentEngine.ClaudeCode
+        return agent.Engine == AgentEngine.ClaudeCode
             ? "Claude Code is not available on this machine. Install it and sign in, or give the desk OpenCode, then try again."
-            : $"OpenCode has no agent named '{desk.Agent.AgentName}'. Create it in OpenCode or give the desk another agent, then try again.";
+            : $"OpenCode has no agent named '{agent.AgentName}'. Create it in OpenCode or give the desk another agent, then try again.";
     }
 
     private async Task FailAsync(WorkTask task, string reason, CancellationToken cancellationToken)

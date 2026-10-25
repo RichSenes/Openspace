@@ -317,7 +317,7 @@ public sealed partial class AgentSignals(
 
         var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
         var (_, desk) = office.Locate(task.DeskId!.Value);
-        var setup = await setups.ForDeskAsync(desk, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
+        var setup = await setups.ForTaskAsync(desk, task, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
         await ShowAsync(task, ActivityKind.Working, null, "Back to the required procedure", null, cancellationToken).ConfigureAwait(false);
         await runtime.PromptAsync(task.Run!.SessionId, task.Run.WorkspacePath, setup, Briefing.ForMissingSteps(task), cancellationToken)
             .ConfigureAwait(false);

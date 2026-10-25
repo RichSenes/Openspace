@@ -16,6 +16,7 @@ import {
   useSetRoomCheck,
   useSetPrivatePaths,
   useKeepLocal,
+  useSetReserveModels,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
@@ -24,6 +25,7 @@ import { ENGINE_LABEL, type EngineChoice } from '../engines/engines'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { formatSteps, parseSteps } from './procedure'
+import { MAX_RESERVE_MODELS, parseReserve, unknownModels } from './reserve'
 import { MoodPicker } from '../building/MoodPicker'
 import './rooms.css'
 
@@ -52,6 +54,7 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
       <RepositoryForm office={office} />
       <LocalOnlyToggle office={office} />
       <PrivateFoldersForm key={(office.privatePaths ?? []).join('\n')} office={office} />
+      <ReserveModelsForm key={(office.reserveModels ?? []).join('\n')} office={office} />
 
       <form className="room-new" onSubmit={submit}>
         <label className="field">
@@ -482,5 +485,60 @@ function LocalOnlyToggle({ office }: { office: OfficeView }) {
       </label>
       {keep.error && <p className="error">{keep.error.message}</p>}
     </div>
+  )
+}
+
+/**
+ * OpenCode models that go on with a task, in this order, while its desk's account is over its
+ * limits. Usually free cloud tiers, which may keep what they are sent: not for private code.
+ */
+function ReserveModelsForm({ office }: { office: OfficeView }) {
+  const saved = (office.reserveModels ?? []).join('\n')
+  const [text, setText] = useState(saved)
+  const save = useSetReserveModels(office.id)
+  const engines = useEngines()
+  const toast = useToast()
+  const models = parseReserve(text)
+  const unknown = unknownModels(models, engines.data?.openCodeModels)
+
+  if (office.localOnly) {
+    return (
+      <p className="hint">
+        Reserve models: none, because this project stays on this machine. Its tasks wait for their desk's account when it is over
+        its limits.
+      </p>
+    )
+  }
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    save.mutate(models, {
+      onSuccess: () => toast(models.length ? `${models.length} reserve ${models.length === 1 ? 'model' : 'models'} saved` : 'No reserve models now'),
+    })
+  }
+
+  return (
+    <form className="stack private-folders" onSubmit={submit}>
+      <label className="field">
+        <span>
+          Reserve models: one OpenCode provider/model per line, at most {MAX_RESERVE_MODELS}. When a desk's account is over its
+          limits, its tasks go on with the first one that is free, and go back to the desk when its account is. Free tiers may keep
+          and train on what they are sent: use them only for code you would publish.
+        </span>
+        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'nvidia/qwen3-coder\nmistral/devstral'} />
+      </label>
+      {unknown.length > 0 && (
+        <p className="hint">
+          OpenCode does not list {unknown.join(', ')}: check the name, or connect that provider in OpenCode first.
+        </p>
+      )}
+      <div className="row">
+        <button type="submit" className="btn" disabled={models.join('\n') === saved || models.length > MAX_RESERVE_MODELS || save.isPending}>
+          Save reserve models
+        </button>
+      </div>
+      {models.length > MAX_RESERVE_MODELS && <p className="error">At most {MAX_RESERVE_MODELS} reserve models.</p>}
+      {save.error && <p className="error">{save.error.message}</p>}
+    </form>
   )
 }

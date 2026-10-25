@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useEngines, useOffices, useSounds } from '../api/hooks'
 import { playSound } from './player'
 import { emitCue, onCue, resolveSound } from './rules'
+import { audioReady, unlockAudio } from './synth'
 
 /** Plays the sound of each moment the live updates announce, as the sound settings say. */
 export function useSoundCues() {
@@ -23,6 +24,23 @@ export function useSoundCues() {
   useEffect(() => {
     latest.current = { sounds, offices }
   }, [sounds, offices])
+
+  // The first click or key anywhere switches the sound on, as browsers require.
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio()
+      if (audioReady()) {
+        window.removeEventListener('pointerdown', unlock)
+        window.removeEventListener('keydown', unlock)
+      }
+    }
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   useEffect(
     () =>

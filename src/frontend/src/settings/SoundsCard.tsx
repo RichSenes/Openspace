@@ -4,6 +4,7 @@ import { useDeleteSound, useOffices, useSaveSounds, useSounds, useUploadSound } 
 import type { SoundRule, SoundsView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import { playSound } from '../sounds/player'
+import { unlockAudio } from '../sounds/synth'
 import { BUILTINS, DEFAULT_SOUND, SOUND_EVENTS, soundLabel, type SoundEvent } from '../sounds/rules'
 
 /** Every sound a rule may name, for menus. */
@@ -92,7 +93,7 @@ export function SoundsCard() {
                   </select>
                 </td>
                 <td>
-                  <button type="button" className="btn btn-quiet" aria-label={`Play: ${e.label}`} onClick={() => playSound(chosen || DEFAULT_SOUND[e.id], config.volume)}>
+                  <button type="button" className="btn btn-quiet" aria-label={`Play: ${e.label}`} onClick={() => { unlockAudio(); playSound(chosen || DEFAULT_SOUND[e.id], config.volume) }}>
                     <Play size={16} />
                   </button>
                 </td>
@@ -161,7 +162,7 @@ export function SoundsCard() {
             <li key={f}>
               <span className="mono">{f}</span>
               <span className="row">
-                <button type="button" className="btn btn-quiet" aria-label={`Play ${f}`} onClick={() => playSound(`file:${f}`, config.volume)}>
+                <button type="button" className="btn btn-quiet" aria-label={`Play ${f}`} onClick={() => { unlockAudio(); playSound(`file:${f}`, config.volume) }}>
                   <Play size={16} />
                 </button>
                 <button

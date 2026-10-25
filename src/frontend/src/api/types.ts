@@ -149,6 +149,8 @@ export interface OfficeView {
   privatePaths?: string[]
   /** The project stays on this machine: no push, no pull request. */
   localOnly?: boolean
+  /** OpenCode models that go on with tasks while their desk's account is over its limits, in order. */
+  reserveModels?: string[]
 }
 
 export interface TaskNoteView {
@@ -183,6 +185,8 @@ export interface WorkTaskView {
   dependsOn?: string[]
   /** The pull request the accepted work waits in, while one is open. */
   pullRequestUrl?: string | null
+  /** The reserve model working on it while its desk's account is over its limits. */
+  reserveModel?: string | null
 }
 
 /** Something a person must try by hand before merging, and how. */

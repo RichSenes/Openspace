@@ -89,6 +89,10 @@ Each project has its own README with detailed specifications.
 16. Sounds tell you when an agent needs you, asks you something, finishes or
     fails, chosen per moment and per room or desk, built in or your own files
     (kept out of git). One button in the top bar mutes them.
+17. An office can name reserve models (free cloud tiers, say): while a desk's
+    account is over its limits, its tasks go on with the first reserve that
+    still has room, and go back to the desk once its account resets. Meant for
+    public code: an office kept on this machine has none.
 
 ## Ground rules
 

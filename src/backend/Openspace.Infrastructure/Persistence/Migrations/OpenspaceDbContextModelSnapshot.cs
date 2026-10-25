@@ -42,6 +42,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<string>("RepositoryPath")
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("ReserveModels")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Theme")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -233,6 +237,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("RequestedBy")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReserveModel")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Round")

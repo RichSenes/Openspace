@@ -132,6 +132,12 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// <summary>The branch the open pull request merges into.</summary>
     public string? PullRequestTarget { get; private set; }
 
+    /// <summary>
+    /// The office's reserve model working on the task in place of its desk's, while the
+    /// desk's account is over its limits; null when the desk's own agent works on it.
+    /// </summary>
+    public string? ReserveModel { get; private set; }
+
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
         Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)
@@ -204,6 +210,17 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         MoveTo(WorkTaskStatus.Queued, now);
+    }
+
+    /// <summary>Hands a queued task to a reserve model, or back to its desk with null.</summary>
+    public void UseReserve(string? model)
+    {
+        if (Status != WorkTaskStatus.Queued)
+        {
+            throw new DomainException($"Only a queued task can change model, not a {Status} one.");
+        }
+
+        ReserveModel = AgentProfile.ValidModel(model);
     }
 
     public void Start(DateTimeOffset now)

@@ -241,4 +241,32 @@ public class OfficeTests
         Assert.Throws<DomainException>(() => office.SetPrivatePaths(["/"], Now));
         Assert.Throws<DomainException>(() => office.SetPrivatePaths(Enumerable.Range(0, 21).Select(i => $"/srv/p{i}"), Now));
     }
+
+    [Fact]
+    public void Reserve_models_are_opencode_models_kept_once_and_in_order()
+    {
+        var office = ECorp();
+
+        office.SetReserveModels([" nvidia/qwen3-coder ", "mistral/devstral", "nvidia/qwen3-coder", ""], Now);
+
+        Assert.Equal(["nvidia/qwen3-coder", "mistral/devstral"], office.ReserveModels);
+        Assert.IsType<OfficeReserveModelsSet>(office.DomainEvents[^1]);
+        Assert.Throws<DomainException>(() => office.SetReserveModels(["devstral"], Now));
+        Assert.Throws<DomainException>(() => office.SetReserveModels(Enumerable.Range(0, 5).Select(i => $"free/model-{i}"), Now));
+        office.SetReserveModels([], Now);
+        Assert.Empty(office.ReserveModels);
+    }
+
+    [Fact]
+    public void An_office_kept_on_this_machine_sends_nothing_to_reserve_models()
+    {
+        var local = ECorp();
+        local.KeepLocal(true, Now);
+        Assert.Throws<DomainException>(() => local.SetReserveModels(["nvidia/qwen3-coder"], Now));
+
+        var reserved = ECorp();
+        reserved.SetReserveModels(["nvidia/qwen3-coder"], Now);
+        Assert.Throws<DomainException>(() => reserved.KeepLocal(true, Now));
+        Assert.False(reserved.LocalOnly);
+    }
 }

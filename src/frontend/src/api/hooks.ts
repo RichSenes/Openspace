@@ -204,6 +204,14 @@ export function useSetRepository(officeId: string) {
 }
 
 /** Replaces the office's private folders: Openspace refuses every agent action that names them. */
+/** Sets the office's reserve models; refused for an office kept on this machine. */
+export function useSetReserveModels(officeId: string) {
+  return useWrite(
+    (models: string[]) => request<void>('PUT', `/api/offices/${officeId}/reserve-models`, { models }),
+    keys.offices,
+  )
+}
+
 export function useSetPrivatePaths(officeId: string) {
   return useWrite(
     (paths: string[]) => request<void>('PUT', `/api/offices/${officeId}/private-paths`, { paths }),

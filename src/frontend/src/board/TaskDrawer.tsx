@@ -122,6 +122,14 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
             <dl className="facts">
               <dt>Desk</dt>
               <dd>{desk ? `${desk.roomName} · ${desk.name} (${desk.agentName})` : 'None yet'}</dd>
+              {task.reserveModel && (
+                <>
+                  <dt>On reserve</dt>
+                  <dd>
+                    <span className="mono">{task.reserveModel}</span>, while the desk's account is over its limits
+                  </dd>
+                </>
+              )}
               <dt>Asked by</dt>
               <dd>{task.requestedBy}</dd>
               <dt>Created</dt>

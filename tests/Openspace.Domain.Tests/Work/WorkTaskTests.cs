@@ -355,4 +355,19 @@ public class WorkTaskTests
         Assert.Throws<DomainException>(() => task.DependOn([other], Now));
         Assert.False(other.IsDoneForOthers);
     }
+
+    [Fact]
+    public void Only_a_queued_task_changes_to_a_reserve_model_and_back()
+    {
+        var task = QueuedTask(out _, out _);
+
+        task.UseReserve("nvidia/qwen3-coder");
+        Assert.Equal("nvidia/qwen3-coder", task.ReserveModel);
+        task.UseReserve(null);
+        Assert.Null(task.ReserveModel);
+
+        Assert.Throws<DomainException>(() => task.UseReserve("qwen3-coder"));
+        task.Start(Now);
+        Assert.Throws<DomainException>(() => task.UseReserve("nvidia/qwen3-coder"));
+    }
 }

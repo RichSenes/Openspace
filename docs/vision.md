@@ -115,6 +115,9 @@ Later, in rough order of appearance:
 - ~~**Task dependencies.**~~ Done: the supervisor says which proposed tasks wait for others
   (a fix that needs an analysis first); the queue holds them until those are
   accepted, and the Board shows what each one waits for.
+- ~~**Reserve models.**~~ Done: an office names free cloud models that go on with
+  its tasks while a desk's account is over its limits, in order, and hands them
+  back when it resets; only for offices whose code may leave this machine.
 - **Local models and routines.** Small models running on this machine (through
   Ollama or similar, wired into OpenCode) for simple recurring jobs such as sorting
   email, on a schedule, outside the office and its repositories.

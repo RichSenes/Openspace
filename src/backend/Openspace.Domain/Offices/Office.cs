@@ -13,10 +13,12 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     private readonly List<Room> _rooms = [];
     public const int MaxPrivatePaths = 20;
+    public const int MaxReserveModels = 4;
 
     private List<FurniturePiece> _furniture = [];
 
     private List<string> _privatePaths = [];
+    private List<string> _reserveModels = [];
     private List<FloorCut> _cuts = [];
 
     private Office(OfficeId id, string name)
@@ -55,6 +57,13 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     /// <summary>The project stays on this machine: Openspace never pushes it or opens pull requests.</summary>
     public bool LocalOnly { get; private set; }
+
+    /// <summary>
+    /// OpenCode models, as <c>provider/model</c> and in order of preference, that take over a
+    /// task while its desk's account is over its limits. They are usually free cloud tiers,
+    /// which may keep what they are sent: an office kept on this machine has none.
+    /// </summary>
+    public IReadOnlyList<string> ReserveModels => _reserveModels;
 
     /// <summary>Absolute path of the git repository agents work on; null until set.</summary>
     public string? RepositoryPath { get; private set; }
@@ -113,6 +122,11 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public void KeepLocal(bool localOnly, DateTimeOffset now)
     {
+        if (localOnly && _reserveModels.Count > 0)
+        {
+            throw new DomainException("This office sends work to reserve models in the cloud: remove them before keeping it on this machine.");
+        }
+
         LocalOnly = localOnly;
         Raise(new OfficeLocalOnlySet(Id, localOnly, now));
     }
@@ -143,6 +157,34 @@ public sealed class Office : AggregateRoot<OfficeId>
 
         _privatePaths = cleaned;
         Raise(new OfficePrivatePathsSet(Id, now));
+    }
+
+    /// <summary>Replaces the reserve models; an empty list leaves the office without reserve.</summary>
+    public void SetReserveModels(IEnumerable<string> models, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        var cleaned = new List<string>();
+        foreach (var raw in models.Where(m => !string.IsNullOrWhiteSpace(m)))
+        {
+            var model = AgentProfile.ValidModel(raw)!;
+            if (!cleaned.Contains(model, StringComparer.Ordinal))
+            {
+                cleaned.Add(model);
+            }
+        }
+
+        if (cleaned.Count > MaxReserveModels)
+        {
+            throw new DomainException($"An office has at most {MaxReserveModels} reserve models.");
+        }
+
+        if (cleaned.Count > 0 && LocalOnly)
+        {
+            throw new DomainException("This office keeps its work on this computer: its code cannot go to reserve models in the cloud.");
+        }
+
+        _reserveModels = cleaned;
+        Raise(new OfficeReserveModelsSet(Id, now));
     }
 
     public void SetRepository(string path, DateTimeOffset now)

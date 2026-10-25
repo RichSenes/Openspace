@@ -54,8 +54,10 @@ public sealed class QueueDispatcher(
                 continue;
             }
 
-            // Desks on an account over its limits keep their tasks queued until it is back.
-            if (anyPaused && limits.PausedUntil(await ScopeOfAsync(task, desk, officeCache, cancellationToken).ConfigureAwait(false)) is not null)
+            // Desks on an account over its limits keep their tasks queued until it is back,
+            // unless the office has a reserve model that can go on with them meanwhile.
+            if ((anyPaused || task.ReserveModel is not null)
+                && !Hand(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk, now))
             {
                 continue;
             }
@@ -88,7 +90,54 @@ public sealed class QueueDispatcher(
         return true;
     }
 
-    private async Task<string?> ScopeOfAsync(WorkTask task, DeskId desk, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
+    /// <summary>
+    /// Picks who works on the task now: its desk, when its account takes work, or else the
+    /// first reserve model of the office whose own account does.
+    /// </summary>
+    /// <returns>False when nobody can, and the task waits.</returns>
+    private bool Hand(WorkTask task, Office office, DeskId desk, DateTimeOffset now)
+    {
+        if (!office.HasDesk(desk))
+        {
+            return true;
+        }
+
+        var agent = office.Locate(desk).Desk.Agent;
+        var scope = EngineLimits.ScopeOf(agent);
+        if (limits.PausedUntil(scope) is not { } until)
+        {
+            if (task.ReserveModel is not null)
+            {
+                task.UseReserve(null);
+                task.AddNote(NoteAuthor.System, "The desk's own account takes work again: it goes on from here.", now);
+            }
+
+            return true;
+        }
+
+        var reserve = office.ReserveModels.FirstOrDefault(m =>
+        {
+            var reserveScope = EngineLimits.ScopeOf(AgentProfile.Create(agent.AgentName, m));
+            return reserveScope != scope && limits.PausedUntil(reserveScope) is null;
+        });
+        if (reserve is null)
+        {
+            return false;
+        }
+
+        if (task.ReserveModel != reserve)
+        {
+            task.UseReserve(reserve);
+            task.AddNote(
+                NoteAuthor.System,
+                $"The desk's account is over its limits until {until.ToLocalTime():HH:mm}: the reserve model {reserve} goes on with this task meanwhile.",
+                now);
+        }
+
+        return true;
+    }
+
+    private async Task<Office> OfficeOfAsync(WorkTask task, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
     {
         if (!cache.TryGetValue(task.OfficeId, out var office))
         {
@@ -96,6 +145,6 @@ public sealed class QueueDispatcher(
             cache[task.OfficeId] = office;
         }
 
-        return office.HasDesk(desk) ? EngineLimits.ScopeOf(office.Locate(desk).Desk.Agent) : null;
+        return office;
     }
 }

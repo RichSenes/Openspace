@@ -339,4 +339,20 @@ public class WorkTaskTests
         Assert.Equal(12, keys.Distinct().Count());
         Assert.All(keys, k => Assert.Equal(10, k.Length));
     }
+
+    [Fact]
+    public void What_a_task_waits_for_is_set_before_it_starts_and_within_its_office()
+    {
+        var task = QueuedTask(out var office, out var desk);
+        var other = WorkTask.Assign(office, desk.Id, "Analyse the certificates", null, Requester, Now);
+
+        task.DependOn([other, other], Now);
+        Assert.Equal([other.Id], task.DependsOn);
+        Assert.IsType<WorkTaskDependenciesSet>(task.DomainEvents[^1]);
+
+        Assert.Throws<DomainException>(() => task.DependOn([TaskIn(WorkTaskStatus.Queued)], Now));
+        task.Start(Now);
+        Assert.Throws<DomainException>(() => task.DependOn([other], Now));
+        Assert.False(other.IsDoneForOthers);
+    }
 }

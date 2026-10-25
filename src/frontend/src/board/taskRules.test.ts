@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskStatus, WorkTaskView } from '../api/types'
-import { actionsFor, awaitingMerge, checksDone, searchTasks, withoutMerged, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
+import { actionsFor, awaitingMerge, standing, waitingFor, checksDone, searchTasks, withoutMerged, COLUMNS, compactTokens, filterByEpic, groupByColumn, reviewVerdictOf, timeOf, totalTokens } from './taskRules'
 
 const task = (title: string, status: TaskStatus): WorkTaskView => ({
   id: title,
@@ -160,5 +160,20 @@ describe('withoutMerged', () => {
     const result = withoutMerged([merged, waiting, task('Running', 'Running')])
     expect(result.shown.map((t) => t.title)).toEqual(['Waiting', 'Running'])
     expect(result.hidden).toBe(1)
+  })
+})
+
+describe('waitingFor', () => {
+  it('waits until what it builds on is accepted and merged', () => {
+    const analysis = { ...task('Analyse', 'Done'), id: 'a', branch: 'openspace/a' }
+    const fix = { ...task('Fix', 'Queued'), dependsOn: ['a', 'gone'] }
+
+    expect(waitingFor(fix, [analysis, fix]).map((t) => t.title)).toEqual(['Analyse'])
+    expect(standing(analysis)).toBe('accepted, not merged yet')
+
+    const merged = { ...analysis, mergedInto: 'main' }
+    expect(waitingFor(fix, [merged, fix])).toEqual([])
+    expect(standing(merged)).toBe('done and merged')
+    expect(standing({ ...task('Old', 'Discarded') })).toContain('never be done')
   })
 })

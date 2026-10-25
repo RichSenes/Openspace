@@ -15,6 +15,8 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// <summary>Most things a person can be asked to try by hand on one task.</summary>
     public const int MaxManualChecks = 20;
 
+    public const int MaxDependencies = 10;
+
     private static readonly Dictionary<WorkTaskStatus, WorkTaskStatus[]> AllowedTransitions = new()
     {
         [WorkTaskStatus.Proposed] = [WorkTaskStatus.Queued, WorkTaskStatus.Discarded],
@@ -31,6 +33,8 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     private readonly List<ProcedureStep> _procedure = [];
     private readonly List<ManualCheck> _manualChecks = [];
     private readonly List<RoundUsage> _usage = [];
+
+    private List<Guid> _dependsOn = [];
 
     private WorkTask(
         WorkTaskId id,
@@ -104,6 +108,18 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
 
     /// <summary>The branch the accepted work was merged into, if it was.</summary>
     public string? MergedInto { get; private set; }
+
+    /// <summary>
+    /// Tasks of the same office this one builds on: it stays in the queue until each of them
+    /// is accepted and merged, so its agent starts from their work.
+    /// </summary>
+    public IReadOnlyList<WorkTaskId> DependsOn => [.. _dependsOn.Select(id => new WorkTaskId(id))];
+
+    /// <summary>
+    /// Whether work that builds on this task can start: accepted and merged, or accepted
+    /// with no branch to merge.
+    /// </summary>
+    public bool IsDoneForOthers => Status == WorkTaskStatus.Done && (MergedInto is not null || Run is null);
 
     public bool IsClosed => Status is WorkTaskStatus.Done or WorkTaskStatus.Discarded;
 
@@ -419,6 +435,38 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         Round++;
         _manualChecks.ForEach(c => c.Tick(false, now));
         MoveTo(WorkTaskStatus.Queued, now);
+    }
+
+    /// <summary>
+    /// Sets the tasks this one waits for. Cycles across several tasks are the application's
+    /// to check, as it sees all of them.
+    /// </summary>
+    public void DependOn(IEnumerable<WorkTask> tasks, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        if (Status is not (WorkTaskStatus.Proposed or WorkTaskStatus.Queued or WorkTaskStatus.Failed))
+        {
+            throw new DomainException($"What a task waits for is set before it starts, not while it is {Status}.");
+        }
+
+        var others = tasks.DistinctBy(t => t.Id).ToList();
+        if (others.Any(t => t.Id == Id))
+        {
+            throw new DomainException("A task cannot wait for itself.");
+        }
+
+        if (others.Any(t => t.OfficeId != OfficeId))
+        {
+            throw new DomainException("A task can only wait for tasks of its own office.");
+        }
+
+        if (others.Count > MaxDependencies)
+        {
+            throw new DomainException($"A task waits for at most {MaxDependencies} others.");
+        }
+
+        _dependsOn = [.. others.Select(t => t.Id.Value)];
+        Raise(new WorkTaskDependenciesSet(Id, now));
     }
 
     public void AddNote(NoteAuthor author, string text, DateTimeOffset now)

@@ -50,6 +50,8 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Navigation(t => t.Notes).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Property(t => t.ProcedureReminders);
+        builder.Ignore(t => t.DependsOn);
+        builder.PrimitiveCollection<List<Guid>>("_dependsOn").HasColumnName("DependsOn");
         builder.Ignore(t => t.MissingSteps);
         builder.OwnsMany(t => t.Procedure, step =>
         {

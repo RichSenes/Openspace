@@ -153,6 +153,15 @@ export function useTickCheck() {
   )
 }
 
+/** Sets the tasks one waits for; refused when it would make a loop. */
+export function useSetDependencies() {
+  return useWrite(
+    (input: { taskId: string; taskIds: string[] }) =>
+      request<void>('PUT', `/api/tasks/${input.taskId}/dependencies`, { taskIds: input.taskIds }),
+    keys.tasks,
+  )
+}
+
 export function useSetRepository(officeId: string) {
   return useWrite(
     (input: { path: string; initialize: boolean }) =>

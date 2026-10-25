@@ -79,7 +79,7 @@ public sealed partial class TaskRunner(
                 task.AdoptProcedure(room.Procedure);
                 task.AttachRun(AgentRun.Create(sessionId, workspace.Path, workspace.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                message = Briefing.ForNewTask(office, room, desk, task);
+                message = Briefing.ForNewTask(office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false));
             }
             else if (runtime.EngineOf(task.Run.SessionId) != setup.Engine)
             {
@@ -90,7 +90,7 @@ public sealed partial class TaskRunner(
                     .ConfigureAwait(false);
                 task.AttachRun(AgentRun.Create(sessionId, task.Run.WorkspacePath, task.Run.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                message = Briefing.ForTakeOver(office, room, desk, task);
+                message = Briefing.ForTakeOver(office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false));
             }
             else
             {
@@ -180,6 +180,21 @@ public sealed partial class TaskRunner(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Openspace tools are not available to the agent of task {TaskId}")]
     private static partial void LogToolsUnavailable(ILogger logger, Exception exception, Guid taskId);
+
+    /// <summary>The tasks this one builds on, for its brief.</summary>
+    private async Task<List<WorkTask>> BeforeAsync(WorkTask task, CancellationToken cancellationToken)
+    {
+        var before = new List<WorkTask>();
+        foreach (var id in task.DependsOn)
+        {
+            if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { } done)
+            {
+                before.Add(done);
+            }
+        }
+
+        return before;
+    }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not launch an agent for task {TaskId}")]
     private static partial void LogLaunchFailed(ILogger logger, Exception exception, Guid taskId);

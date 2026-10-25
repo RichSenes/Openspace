@@ -15,6 +15,7 @@ import {
 import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
 import { answersFor } from '../activity/activity'
 import { TaskLog } from './TaskLog'
+import { BuildsOn } from './BuildsOn'
 import type { WorkTaskView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
@@ -26,13 +27,15 @@ interface Props {
   desks: DeskWithRoom[]
   /** A reviewer reads finished work: its verdict is awaited. */
   reviewerOn?: boolean
+  /** Every task of the office: what this one builds on is chosen among them. */
+  tasks?: readonly WorkTaskView[]
   onClose: () => void
 }
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
-export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) {
+export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClose }: Props) {
   const toast = useToast()
   const command = useTaskCommand()
   const approve = useApproveTask()
@@ -167,6 +170,8 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
             {reviewVerdictOf(task, reviewerOn) === 'reviewing' && (
               <p className="hint">Claude is reviewing this work: its verdict shows up in the notes in a few minutes.</p>
             )}
+
+            <BuildsOn task={task} tasks={tasks} />
 
             <section className="notes" aria-label="Notes">
               <h3 className="pixel notes-title">Notes · newest first</h3>

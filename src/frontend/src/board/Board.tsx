@@ -10,7 +10,7 @@ import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
 import { MergeDialog } from './MergeDialog'
-import { awaitingMerge, checksDone, COLUMNS, searchTasks, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { awaitingMerge, checksDone, COLUMNS, searchTasks, waitingFor, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
 interface Props {
@@ -116,6 +116,11 @@ export function Board({ office, initialTaskId }: Props) {
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
                           {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
+                          {(task.status === 'Proposed' || task.status === 'Queued') && waitingFor(task, tasks.data ?? []).length > 0 && (
+                            <span className="card-review">
+                              <Hourglass size={12} aria-hidden /> Waits for {waitingFor(task, tasks.data ?? []).map((t) => `“${t.title}”`).join(', ')}
+                            </span>
+                          )}
                           {task.status === 'Queued' && pauseOf(engines, desk) && (
                             <span className="card-review">
                               <Hourglass size={12} aria-hidden /> Paused until{' '}
@@ -175,7 +180,7 @@ export function Board({ office, initialTaskId }: Props) {
         onClose={() => setPlanning(false)}
         onShowEpic={(id) => setEpicFilter(id)}
       />
-      {openTask && <TaskDrawer key={openTask.id} task={openTask} desks={desks} reviewerOn={reviewerOn} onClose={() => setOpenTaskId(undefined)} />}
+      {openTask && <TaskDrawer key={openTask.id} task={openTask} desks={desks} reviewerOn={reviewerOn} tasks={tasks.data ?? []} onClose={() => setOpenTaskId(undefined)} />}
     </section>
   )
 }

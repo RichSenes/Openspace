@@ -177,6 +177,8 @@ export interface WorkTaskView {
   round: number
   manualChecks: ManualCheckView[]
   usage: RoundUsageView[]
+  /** Tasks of the same office this one waits for: it starts once they are accepted and merged. */
+  dependsOn?: string[]
 }
 
 /** Something a person must try by hand before merging, and how. */

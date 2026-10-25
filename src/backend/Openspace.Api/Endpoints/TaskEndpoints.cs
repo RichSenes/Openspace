@@ -18,6 +18,9 @@ internal static class TaskEndpoints
     /// <param name="WithReview">Sends the reviewer's latest note along with the text, or alone.</param>
     public sealed record SendBackRequest(string? Text, bool WithReview = false);
 
+    /// <param name="TaskIds">The tasks of the same office this one waits for; empty waits for none.</param>
+    public sealed record DependenciesRequest(IReadOnlyList<Guid>? TaskIds);
+
     public sealed record CheckRequest(bool Done);
 
     public sealed record PermissionAnswer(bool Allow);
@@ -96,6 +99,10 @@ internal static class TaskEndpoints
 
         tasks.MapPost("/{taskId:guid}/discard", (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.DiscardAsync(new WorkTaskId(taskId), ct)));
+
+        tasks.MapPut("/{taskId:guid}/dependencies", (
+            Guid taskId, DependenciesRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            NoContent(commands.SetDependenciesAsync(new WorkTaskId(taskId), [.. (request.TaskIds ?? []).Select(id => new WorkTaskId(id))], ct)));
 
         tasks.MapPost("/{taskId:guid}/send-back", (
             Guid taskId, SendBackRequest request, WorkTaskCommands commands, IOptions<OperatorOptions> me, CancellationToken ct) =>

@@ -39,6 +39,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks/{id}/permission` | Answer an agent waiting for permission: `{ allow }` |
 | POST | `/api/tasks/{id}/merge` | Merge accepted work into one of your branches: `{ target }`. `422` with code `uncommitted-changes`, `merge-conflict`, `branch-missing` or `task-branch-missing` when it cannot be done safely |
 | POST | `/api/offices/{id}/merge` | `{ target, taskIds? }`: merge all accepted work not merged yet (or the listed tasks), first accepted first. Returns `[{ taskId, title, result, message }]` with `result` `Merged`, `Conflict`, `Failed` or `NotTried`; uncommitted changes or a missing target stop the round |
+| PUT | `/api/tasks/{id}/dependencies` | `{ taskIds }`: the tasks of the same office this one waits for (10 at most); it starts once each is accepted and merged. `422` for a loop or a task already started |
 | POST | `/api/tasks/{id}/catch-up` | `{ target }`: send accepted work that conflicts back to its desk as a new round. Openspace starts merging the target into the task branch in a fresh working copy; the agent resolves the conflicts |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |

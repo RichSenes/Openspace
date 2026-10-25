@@ -716,3 +716,36 @@
 .card-review svg {
   flex-shrink: 0;
 }
+
+.builds-on {
+  display: grid;
+  gap: 8px;
+}
+
+.builds-on-list,
+.builds-on-pick {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.builds-on-list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.builds-on-done svg {
+  color: var(--st-running);
+}
+
+.builds-on-waiting svg {
+  color: var(--accent);
+}
+
+.builds-on-pick {
+  max-height: 220px;
+  overflow-y: auto;
+}

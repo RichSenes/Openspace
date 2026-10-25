@@ -48,6 +48,12 @@ public sealed class QueueDispatcher(
                 continue;
             }
 
+            // Work that builds on other tasks waits until they are accepted and merged.
+            if (!await ReadyAsync(task, cancellationToken).ConfigureAwait(false))
+            {
+                continue;
+            }
+
             // Desks on an account over its limits keep their tasks queued until it is back.
             if (anyPaused && limits.PausedUntil(await ScopeOfAsync(task, desk, officeCache, cancellationToken).ConfigureAwait(false)) is not null)
             {
@@ -66,6 +72,20 @@ public sealed class QueueDispatcher(
         }
 
         return started;
+    }
+
+    private async Task<bool> ReadyAsync(WorkTask task, CancellationToken cancellationToken)
+    {
+        foreach (var id in task.DependsOn)
+        {
+            // A task that no longer exists holds nothing up.
+            if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { IsDoneForOthers: false })
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private async Task<string?> ScopeOfAsync(WorkTask task, DeskId desk, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)

@@ -35,4 +35,4 @@ src/frontend/src/art/fanpack/
 __pycache__/
 
 # Sounds of your own and their settings: they stay on this machine
-sounds/
+/src/backend/Openspace.Api/sounds/

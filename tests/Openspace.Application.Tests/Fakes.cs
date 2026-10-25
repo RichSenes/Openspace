@@ -284,6 +284,27 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
         return Task.CompletedTask;
     }
 
+    public List<string> Pushed { get; } = [];
+
+    public List<string> Updated { get; } = [];
+
+    public Task<string> PushAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        if (MergeProblem is not null)
+        {
+            throw MergeProblem;
+        }
+
+        Pushed.Add(branch);
+        return Task.FromResult($"origin/{branch}");
+    }
+
+    public Task UpdateFromRemoteAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        Updated.Add(branch);
+        return Task.CompletedTask;
+    }
+
     public Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken)
     {
         Discarded.Add(workspace);
@@ -393,4 +414,23 @@ internal sealed class FakeCheckRunner : ICheckRunner
         Runs.Add((folder, command));
         return Task.FromResult(Answers.GetValueOrDefault(command, new CheckRun(0, "ok", TimeSpan.FromSeconds(2))));
     }
+}
+
+internal sealed class FakePullRequests : IPullRequests
+{
+    public bool Available { get; set; } = true;
+
+    public PullRequestState State { get; set; } = PullRequestState.Open;
+
+    public List<(string Branch, string Target, string Title, string Body)> Opened { get; } = [];
+
+    public Task<bool> AvailableAsync(string repositoryPath, CancellationToken cancellationToken) => Task.FromResult(Available);
+
+    public Task<string> OpenAsync(string repositoryPath, string branch, string target, string title, string body, CancellationToken cancellationToken)
+    {
+        Opened.Add((branch, target, title, body));
+        return Task.FromResult($"https://github.com/e-corp/shop/pull/{Opened.Count}");
+    }
+
+    public Task<PullRequestState> StateAsync(string repositoryPath, string url, CancellationToken cancellationToken) => Task.FromResult(State);
 }

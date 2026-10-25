@@ -153,6 +153,37 @@ export function useTickCheck() {
   )
 }
 
+/** Sends one of your branches to its remote; never forced. */
+export function usePush(officeId: string) {
+  return useWrite(
+    (branch: string) => request<{ to: string }>('POST', `/api/offices/${officeId}/push`, { branch }),
+    keys.branches(officeId),
+  )
+}
+
+/** Proposes accepted work in a pull request instead of merging it here. */
+export function useOpenPullRequest() {
+  return useWrite(
+    (input: { taskId: string; target: string }) => request<{ url: string }>('POST', `/api/tasks/${input.taskId}/pull-request`, { target: input.target }),
+    keys.tasks,
+  )
+}
+
+/** Asks GitHub how a task's pull request stands: merged there, the work counts as merged. */
+export function useCheckPullRequest() {
+  return useWrite(
+    (taskId: string) => request<{ state: 'Open' | 'Merged' | 'Closed' }>('POST', `/api/tasks/${taskId}/pull-request/check`),
+    keys.tasks,
+  )
+}
+
+export function useKeepLocal(officeId: string) {
+  return useWrite(
+    (localOnly: boolean) => request<void>('PUT', `/api/offices/${officeId}/local-only`, { localOnly }),
+    keys.offices,
+  )
+}
+
 /** Sets the tasks one waits for; refused when it would make a loop. */
 export function useSetDependencies() {
   return useWrite(

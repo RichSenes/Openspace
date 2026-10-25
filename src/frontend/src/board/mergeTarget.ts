@@ -13,3 +13,14 @@ export function mergeBlocker(list: BranchList | undefined, target: string): stri
   if (!list || target !== list.current || changes === 0) return null
   return `${target} is checked out with ${changes} uncommitted ${changes === 1 ? 'change' : 'changes'}: nothing can be merged into it until you commit or stash them. Or choose another branch.`
 }
+
+/** How a branch stands against its remote, in words, with whether a push makes sense now. */
+export function remoteStanding(list: BranchList | undefined, branch: string): { text: string; canPush: boolean } | null {
+  const tracking = list?.tracking?.find((t) => t.branch === branch)
+  if (!list?.remotes?.length) return null
+  if (!tracking?.upstream) return { text: `${branch} is not on ${list.remotes[0]} yet.`, canPush: true }
+  if (tracking.behind > 0)
+    return { text: `${tracking.upstream} has ${tracking.behind} commit${tracking.behind === 1 ? '' : 's'} that ${branch} lacks: pull first (git pull). Openspace never forces a push.`, canPush: false }
+  if (tracking.ahead > 0) return { text: `${branch} is ${tracking.ahead} commit${tracking.ahead === 1 ? '' : 's'} ahead of ${tracking.upstream}.`, canPush: true }
+  return { text: `${branch} is up to date with ${tracking.upstream}, as of the last fetch.`, canPush: false }
+}

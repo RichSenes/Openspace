@@ -557,4 +557,18 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(analysis.Id, view.GetProperty("dependsOn")[0].GetGuid());
         Assert.Equal(HttpStatusCode.UnprocessableEntity, loop.StatusCode);
     }
+
+    [Fact]
+    public async Task An_office_kept_local_refuses_to_push()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/local-only", new { localOnly = true })).EnsureSuccessStatusCode();
+        var push = await _http.PostAsJsonAsync($"/api/offices/{officeId}/push", new { branch = "main" });
+
+        var office = await GetAsync<JsonElement>($"/api/offices/{officeId}");
+        Assert.True(office.GetProperty("localOnly").GetBoolean());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, push.StatusCode);
+        Assert.Contains("never pushes", await push.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
 }

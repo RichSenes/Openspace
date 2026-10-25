@@ -41,6 +41,10 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/merge` | `{ target, taskIds? }`: merge all accepted work not merged yet (or the listed tasks), first accepted first. Returns `[{ taskId, title, result, message }]` with `result` `Merged`, `Conflict`, `Failed` or `NotTried`; uncommitted changes or a missing target stop the round |
 | PUT | `/api/tasks/{id}/dependencies` | `{ taskIds }`: the tasks of the same office this one waits for (10 at most); it starts once each is accepted and merged. `422` for a loop or a task already started |
 | POST | `/api/tasks/{id}/catch-up` | `{ target }`: send accepted work that conflicts back to its desk as a new round. Openspace starts merging the target into the task branch in a fresh working copy; the agent resolves the conflicts |
+| POST | `/api/offices/{id}/push` | `{ branch }`: send one of your branches to its remote (origin when it follows none), after a fetch; `422` `behind-remote` when the remote has commits it lacks. Never forced |
+| POST | `/api/tasks/{id}/pull-request` | `{ target }`: push the accepted work's branch and open a GitHub pull request into the target, with the agent's summary and the checks to try by hand. Returns `{ url }` |
+| POST | `/api/tasks/{id}/pull-request/check` | `{ state }`: how the pull request stands on GitHub. Merged, the work counts as merged and the target here is fast-forwarded when it can be; closed, it can be merged again |
+| PUT | `/api/offices/{id}/local-only` | `{ localOnly }`: keep the project on this machine; push and pull requests are then refused |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
@@ -145,6 +149,7 @@ On startup it applies pending database migrations.
 | `Backups:Folder` | `backups` | Where database copies go, next to the database unless absolute |
 | `Backups:Keep` | `14` | Copies kept; older ones are deleted |
 | `Backups:EveryHours` | `24` | How often a copy is taken while the API runs |
+| `GitHub:Command` | `gh` | The GitHub CLI, signed in with `gh auth login`; also looked for in `~/.local/bin` |
 | `Operator:Name` | `operator` | Who you are: recorded as requester and note author |
 | `Queue:Enabled` | `true` | Run the queue in the background |
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |

@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();
         services.AddSingleton<ICheckRunner, Checks.ShellCheckRunner>();
+        services.AddSingleton<IPullRequests, GitHubPullRequests>();
         services.AddSingleton<IDatabaseBackups>(sp => new SqliteBackups(
             connectionString, sp.GetRequiredService<IOptions<BackupOptions>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddHostedService<BackupService>();

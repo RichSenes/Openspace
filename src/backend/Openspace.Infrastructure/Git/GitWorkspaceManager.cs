@@ -116,10 +116,117 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
             .Order(StringComparer.Ordinal)
             .ToList();
         var changes = await GitCli.RunAsync(repositoryPath, cancellationToken, "status", "--porcelain", "--untracked-files=no").ConfigureAwait(false);
+        var remotes = (await GitCli.RunAsync(repositoryPath, cancellationToken, "remote").ConfigureAwait(false))
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var tracking = (await TrackingAsync(repositoryPath, cancellationToken).ConfigureAwait(false))
+            .Where(t => branches.Contains(t.Branch))
+            .ToList();
         return new BranchList(
             current.Length > 0 ? current : null,
             branches,
-            changes.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+            changes.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length,
+            remotes,
+            tracking);
+    }
+
+    private static async Task<List<BranchTracking>> TrackingAsync(string repositoryPath, CancellationToken cancellationToken)
+    {
+        var lines = await GitCli.RunAsync(
+            repositoryPath, cancellationToken, "for-each-ref", "--format=%(refname:short)%09%(upstream:short)%09%(upstream:track)", "refs/heads").ConfigureAwait(false);
+        return [.. lines.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line =>
+        {
+            var parts = line.Split('\t');
+            var upstream = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null;
+            var track = parts.Length > 2 ? parts[2] : string.Empty;
+            return new BranchTracking(parts[0], upstream, Count(track, "ahead"), Count(track, "behind"));
+        })];
+    }
+
+    /// <summary>A number from git's "[ahead 2, behind 1]".</summary>
+    private static int Count(string track, string word)
+    {
+        var at = track.IndexOf(word + " ", StringComparison.Ordinal);
+        if (at < 0)
+        {
+            return 0;
+        }
+
+        var digits = new string([.. track[(at + word.Length + 1)..].TakeWhile(char.IsAsciiDigit)]);
+        return int.TryParse(digits, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : 0;
+    }
+
+    public async Task UpdateFromRemoteAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        var upstream = (await TrackingAsync(repositoryPath, cancellationToken).ConfigureAwait(false)).Find(t => t.Branch == branch)?.Upstream
+            ?? throw new RejectedException("no-upstream", $"{branch} follows no remote branch.");
+        var remote = upstream[..upstream.IndexOf('/', StringComparison.Ordinal)];
+        var remoteBranch = upstream[(remote.Length + 1)..];
+        var current = (await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "--show-current").ConfigureAwait(false)).Trim();
+        try
+        {
+            if (current == branch)
+            {
+                var changes = await GitCli.RunAsync(repositoryPath, cancellationToken, "status", "--porcelain", "--untracked-files=no").ConfigureAwait(false);
+                if (changes.Trim().Length > 0)
+                {
+                    throw new RejectedException("uncommitted-changes", $"{branch} has uncommitted changes: pull it yourself once they are committed.");
+                }
+
+                await GitCli.RunAsync(repositoryPath, cancellationToken, "pull", "--ff-only", "--quiet", remote, remoteBranch).ConfigureAwait(false);
+            }
+            else
+            {
+                await GitCli.RunAsync(repositoryPath, cancellationToken, "fetch", "--quiet", remote, $"{remoteBranch}:{branch}").ConfigureAwait(false);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new RejectedException("update-failed", $"{branch} could not be brought up to date with {upstream} without merging: {ex.Message}");
+        }
+    }
+
+    public async Task<string> PushAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
+    {
+        if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{branch}").ConfigureAwait(false))
+        {
+            throw new RejectedException("branch-missing", $"There is no branch named {branch}.");
+        }
+
+        var upstream = (await TrackingAsync(repositoryPath, cancellationToken).ConfigureAwait(false)).Find(t => t.Branch == branch)?.Upstream;
+        var remotes = (await GitCli.RunAsync(repositoryPath, cancellationToken, "remote").ConfigureAwait(false))
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var remote = upstream is not null ? upstream[..upstream.IndexOf('/', StringComparison.Ordinal)] : remotes.Contains("origin") ? "origin" : null;
+        if (remote is null)
+        {
+            throw new RejectedException("no-remote", "This repository has no remote to push to: it lives on this machine only.");
+        }
+
+        try
+        {
+            await GitCli.RunAsync(repositoryPath, cancellationToken, "fetch", "--quiet", remote).ConfigureAwait(false);
+            if (upstream is not null)
+            {
+                var behind = int.Parse(
+                    (await GitCli.RunAsync(repositoryPath, cancellationToken, "rev-list", "--count", $"{branch}..{upstream}").ConfigureAwait(false)).Trim(),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                if (behind > 0)
+                {
+                    throw new RejectedException(
+                        "behind-remote",
+                        $"{upstream} has {behind} commit{(behind == 1 ? string.Empty : "s")} that {branch} lacks: pull them first (git pull), then push. Openspace never forces a push.");
+                }
+
+                await GitCli.RunAsync(repositoryPath, cancellationToken, "push", remote, $"{branch}:{upstream[(remote.Length + 1)..]}").ConfigureAwait(false);
+                return upstream;
+            }
+
+            await GitCli.RunAsync(repositoryPath, cancellationToken, "push", "--set-upstream", remote, branch).ConfigureAwait(false);
+            return $"{remote}/{branch}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new RejectedException("push-failed", $"The push to {remote} did not go through: {ex.Message}");
+        }
     }
 
     public async Task MergeAsync(

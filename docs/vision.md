@@ -166,19 +166,9 @@ Later, in rough order of appearance:
 - ~~**Procedures.**~~ Done: a room's required steps go into the brief, become a
   checklist on the task that the agent fills in with evidence through
   `complete_step`, and work does not reach review until every step is reported.
-- **Merge requests** for repositories with a remote: push the task branch and
-  open a pull request instead of merging locally.
-
-Done since: the reporter writes day and epic reports from the audit log.
-
-Out of scope for now: skin import,
-creating agents with AI help, authentication and multiple users.
-
-## Work tracking
-
-Openspace has its own work tracker instead of relying on an external notes app.
-It is the single source of truth for:
-
+- ~~**Merge requests**~~ Done: push from the Merge desk, never forced; GitHub pull
+  requests for accepted work, checked back so merged ones count as merged; offices
+  kept on this machine are never pushed.
 - **Epics**: large goals, made of tasks;
 - **Proposals**: ideas or plans waiting for a human decision (a supervisor's
   breakdown is a proposal too);

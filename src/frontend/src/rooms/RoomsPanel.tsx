@@ -15,6 +15,7 @@ import {
   useUpdateRoomContext,
   useSetRoomCheck,
   useSetPrivatePaths,
+  useKeepLocal,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
@@ -49,6 +50,7 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
       </header>
 
       <RepositoryForm office={office} />
+      <LocalOnlyToggle office={office} />
       <PrivateFoldersForm key={(office.privatePaths ?? []).join('\n')} office={office} />
 
       <form className="room-new" onSubmit={submit}>
@@ -456,5 +458,29 @@ function PrivateFoldersForm({ office }: { office: OfficeView }) {
       </div>
       {save.error && <p className="error">{save.error.message}</p>}
     </form>
+  )
+}
+
+/** Keeps the project on this machine: Openspace then never pushes it nor opens pull requests. */
+function LocalOnlyToggle({ office }: { office: OfficeView }) {
+  const keep = useKeepLocal(office.id)
+  const toast = useToast()
+  return (
+    <div className="stack">
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={Boolean(office.localOnly)}
+          disabled={keep.isPending}
+          onChange={(e) =>
+            keep.mutate(e.target.checked, {
+              onSuccess: () => toast(e.target.checked ? `${office.name} stays on this machine` : `${office.name} can be pushed again`),
+            })
+          }
+        />
+        <span>Keep this project on this machine: Openspace never pushes it or opens pull requests.</span>
+      </label>
+      {keep.error && <p className="error">{keep.error.message}</p>}
+    </div>
   )
 }

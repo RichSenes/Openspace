@@ -147,6 +147,8 @@ export interface OfficeView {
   cuts?: FloorCut[]
   /** Folders no agent of the office may open, list, read, search or change. */
   privatePaths?: string[]
+  /** The project stays on this machine: no push, no pull request. */
+  localOnly?: boolean
 }
 
 export interface TaskNoteView {
@@ -179,6 +181,8 @@ export interface WorkTaskView {
   usage: RoundUsageView[]
   /** Tasks of the same office this one waits for: it starts once they are accepted and merged. */
   dependsOn?: string[]
+  /** The pull request the accepted work waits in, while one is open. */
+  pullRequestUrl?: string | null
 }
 
 /** Something a person must try by hand before merging, and how. */
@@ -240,6 +244,21 @@ export interface BranchList {
   branches: string[]
   /** Files changed and not committed in your checkout: nothing merges into the current branch meanwhile. */
   uncommittedChanges?: number
+  /** The repository's remotes, such as origin; none for a project kept on this machine. */
+  remotes?: string[]
+  /** How each branch stands against its remote one, as of the last fetch. */
+  tracking?: BranchTracking[]
+  /** Whether accepted work can go up as a pull request instead of a local merge. */
+  pullRequests?: boolean
+}
+
+export interface BranchTracking {
+  branch: string
+  upstream: string | null
+  /** Commits a push would send. */
+  ahead: number
+  /** Commits of the remote to pull before pushing. */
+  behind: number
 }
 
 /** What a desk is doing right now: the data behind a speech bubble. */

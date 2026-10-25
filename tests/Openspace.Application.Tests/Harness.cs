@@ -29,6 +29,8 @@ internal sealed class Harness
 
     public FakeCheckRunner Checks { get; } = new();
 
+    public FakePullRequests PullRequests { get; } = new();
+
     public RecordingPublisher Publisher { get; } = new();
 
     public InMemoryAuditLog Audit { get; } = new();
@@ -102,5 +104,5 @@ internal sealed class Harness
     public Application.Checks.MergeChecks MergeChecks() => new(
         Offices, Tasks, Workspaces, Checks, UnitOfWork, Microsoft.Extensions.Options.Options.Create(new Application.Checks.CheckOptions()), Clock);
 
-    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Signals(), Clock);
+    public WorkTaskCommands Commands() => new(Offices, Tasks, UnitOfWork, Runtime, Workspaces, Activity, Audit, Signals(), PullRequests, Clock);
 }

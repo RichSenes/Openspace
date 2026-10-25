@@ -20,7 +20,8 @@ public sealed record WorkTaskView(
     int Round,
     IReadOnlyList<ManualCheckView> ManualChecks,
     IReadOnlyList<RoundUsageView> Usage,
-    IReadOnlyList<Guid> DependsOn)
+    IReadOnlyList<Guid> DependsOn,
+    string? PullRequestUrl)
 {
     public static WorkTaskView From(WorkTask task)
     {
@@ -43,7 +44,8 @@ public sealed record WorkTaskView(
             task.Round,
             [.. task.ManualChecks.Select(c => new ManualCheckView(c.Number, c.What, c.How, c.CheckedAt))],
             [.. task.Usage.OrderBy(u => u.Round).Select(u => new RoundUsageView(u.Round, u.Input, u.Output, u.CacheRead, u.CacheWrite))],
-            [.. task.DependsOn.Select(d => d.Value)]);
+            [.. task.DependsOn.Select(d => d.Value)],
+            task.PullRequestUrl);
     }
 }
 

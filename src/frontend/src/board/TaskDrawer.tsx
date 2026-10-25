@@ -6,6 +6,8 @@ import {
   useApproveTask,
   useBranches,
   useMergeTask,
+  useOpenPullRequest,
+  useCheckPullRequest,
   useSendBack,
   useTaskCommand,
   useTickCheck,
@@ -47,7 +49,9 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
   const [showDiff, setShowDiff] = useState(task.status === 'Review')
   const canDiff = task.branch !== null && (task.status === 'Running' || task.status === 'Review' || task.status === 'Failed')
   const diff = useTaskDiff(task.id, canDiff && showDiff)
-  const canMerge = task.status === 'Done' && task.branch !== null && task.mergedInto === null
+  const canMerge = task.status === 'Done' && task.branch !== null && task.mergedInto === null && !task.pullRequestUrl
+  const openPullRequest = useOpenPullRequest()
+  const checkPullRequest = useCheckPullRequest()
   const branches = useBranches(task.officeId, canMerge)
   const merge = useMergeTask()
   const [mergeTarget, setMergeTarget] = useState('')
@@ -287,6 +291,18 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
                   >
                     Merge into {target || '…'}
                   </button>
+                  {branches.data?.pullRequests && (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!target || openPullRequest.isPending}
+                      onClick={() =>
+                        openPullRequest.mutate({ taskId: task.id, target }, { onSuccess: (r) => toast(`Pull request opened: ${r.url}`) })
+                      }
+                    >
+                      Open a pull request into {target || '…'}
+                    </button>
+                  )}
                 </div>
                 <p className="hint">
                   Your checkout never moves: other branches are merged in a temporary copy. With uncommitted changes or
@@ -295,6 +311,33 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
               </section>
             )}
 
+            {task.pullRequestUrl && !task.mergedInto && (
+              <section className="merge" aria-label="Pull request">
+                <p>
+                  Waiting in a pull request:{' '}
+                  <a href={task.pullRequestUrl} target="_blank" rel="noreferrer">
+                    {task.pullRequestUrl}
+                  </a>
+                </p>
+                <div className="row">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={checkPullRequest.isPending}
+                    onClick={() =>
+                      checkPullRequest.mutate(task.id, {
+                        onSuccess: (r) =>
+                          toast(r.state === 'Merged' ? 'Merged on GitHub: counted as merged' : r.state === 'Closed' ? 'Closed without merging' : 'Still open on GitHub'),
+                      })
+                    }
+                  >
+                    Check pull request
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {(openPullRequest.error ?? checkPullRequest.error) && <p className="error">{(openPullRequest.error ?? checkPullRequest.error)?.message}</p>}
             {error && <p className="error">{error.message}</p>}
 
             {canDiff && (

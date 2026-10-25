@@ -6,11 +6,14 @@ namespace Openspace.Domain.Work;
 
 public sealed record WorkTaskCreated(WorkTaskId TaskId, OfficeId OfficeId, string Title, DateTimeOffset OccurredAt) : IDomainEvent;
 
+/// <param name="DeskId">The desk working on it, if any: what a sound or a badge may follow.</param>
 public sealed record WorkTaskStatusChanged(
     WorkTaskId TaskId,
     WorkTaskStatus From,
     WorkTaskStatus To,
-    DateTimeOffset OccurredAt) : IDomainEvent;
+    DateTimeOffset OccurredAt,
+    OfficeId? OfficeId = null,
+    DeskId? DeskId = null) : IDomainEvent;
 
 public sealed record WorkTaskNoteAdded(WorkTaskId TaskId, TaskNote Note, DateTimeOffset OccurredAt) : IDomainEvent;
 

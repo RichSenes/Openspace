@@ -24,6 +24,13 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub) 
             await hub.Clients.All.SendAsync("TaskChanged", task.Value, cancellationToken).ConfigureAwait(false);
         }
 
+        // Moments worth a sound: work ready for review, or a task that failed.
+        foreach (var change in events.OfType<WorkTaskStatusChanged>().Where(c => c.To is WorkTaskStatus.Review or WorkTaskStatus.Failed))
+        {
+            var cue = new { taskId = change.TaskId.Value, officeId = change.OfficeId?.Value, deskId = change.DeskId?.Value, cue = change.To == WorkTaskStatus.Review ? "review" : "failed" };
+            await hub.Clients.All.SendAsync("TaskCue", cue, cancellationToken).ConfigureAwait(false);
+        }
+
         if (events.Any(e => e is Domain.Reports.ReportWritten))
         {
             await hub.Clients.All.SendAsync("ReportsChanged", cancellationToken).ConfigureAwait(false);

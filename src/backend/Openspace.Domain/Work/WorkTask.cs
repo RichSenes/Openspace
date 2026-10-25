@@ -519,7 +519,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         var from = Status;
         Status = target;
         StatusChangedAt = now;
-        Raise(new WorkTaskStatusChanged(Id, from, target, now));
+        Raise(new WorkTaskStatusChanged(Id, from, target, now, OfficeId, DeskId));
     }
 
     private DomainException InvalidTransition(WorkTaskStatus target) =>

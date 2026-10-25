@@ -17,6 +17,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     /// <summary>Settings changed through the API land here, never next to the real database.</summary>
     public string SettingsPath { get; } = Path.Combine(Path.GetTempPath(), $"openspace-settings-{Guid.NewGuid():N}.json");
 
+    /// <summary>Sounds uploaded through the API land here, never in the project folder.</summary>
+    public string SoundsFolder { get; } = Path.Combine(Path.GetTempPath(), $"openspace-sounds-{Guid.NewGuid():N}");
+
     private SqliteConnection KeepAlive()
     {
         _keepAlive ??= new SqliteConnection(_connectionString);
@@ -38,6 +41,7 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         KeepAlive();
         builder.UseSetting("ConnectionStrings:Openspace", _connectionString);
         builder.UseSetting("Settings:Path", SettingsPath);
+        builder.UseSetting("Sounds:Folder", SoundsFolder);
 
         // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
         builder.UseSetting("OpenCode:BaseUrl", "http://127.0.0.1:9");
@@ -60,6 +64,10 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         {
             _keepAlive?.Dispose();
             File.Delete(SettingsPath);
+            if (Directory.Exists(SoundsFolder))
+            {
+                Directory.Delete(SoundsFolder, recursive: true);
+            }
         }
     }
 }

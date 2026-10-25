@@ -307,6 +307,66 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Work_that_fails_is_cued_with_its_desk_so_the_page_can_play_its_sound()
+    {
+        await using var hub = _app.CreateHubConnection();
+        var cued = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        hub.On<JsonElement>("TaskCue", cue => cued.TrySetResult(cue));
+        await hub.StartAsync();
+        var (officeId, _, deskId) = await FurnishAsync();
+        var created = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
+
+        using (var scope = _app.Services.CreateScope())
+        {
+            var tasks = scope.ServiceProvider.GetRequiredService<Application.Abstractions.IWorkTaskRepository>();
+            var task = (await tasks.FindAsync(new Domain.Work.WorkTaskId(created.Id), default))!;
+            task.Start(DateTimeOffset.UtcNow);
+            task.Fail("The agent stopped with an error.", DateTimeOffset.UtcNow);
+            await scope.ServiceProvider.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        }
+
+        var cue = await cued.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(("failed", deskId), (cue.GetProperty("cue").GetString(), cue.GetProperty("deskId").GetGuid()));
+    }
+
+    [Fact]
+    public async Task Sounds_of_your_own_are_kept_chosen_for_a_moment_and_removed_with_their_rules()
+    {
+        Assert.Equal(0.6, (await GetAsync<JsonElement>("/api/sounds")).GetProperty("volume").GetDouble());
+        using var form = new MultipartFormDataContent();
+        var wav = new ByteArrayContent("RIFF$\0\0\0WAVEfmt "u8.ToArray());
+        wav.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/wav");
+        form.Add(wav, "file", "my bell!.wav");
+
+        var uploaded = await (await _http.PostAsync("/api/sounds/files", form)).Content.ReadFromJsonAsync<JsonElement>();
+        var name = uploaded.GetProperty("name").GetString()!;
+        var saved = await _http.PutAsJsonAsync("/api/sounds", new { muted = false, volume = 0.4, rules = new[] { new { @event = "review", roomId = (Guid?)null, deskId = (Guid?)null, sound = $"file:{name}" } } });
+        var played = await _http.GetAsync($"/api/sounds/files/{name}");
+        var unknown = await _http.PutAsJsonAsync("/api/sounds", new { muted = false, volume = 0.4, rules = new[] { new { @event = "lunch", roomId = (Guid?)null, deskId = (Guid?)null, sound = "silent" } } });
+
+        Assert.Equal("my-bell.wav", name);
+        saved.EnsureSuccessStatusCode();
+        Assert.Equal("audio/wav", played.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unknown.StatusCode);
+
+        (await _http.DeleteAsync($"/api/sounds/files/{name}")).EnsureSuccessStatusCode();
+        var after = await GetAsync<JsonElement>("/api/sounds");
+        Assert.Equal(0, after.GetProperty("rules").GetArrayLength());
+        Assert.Equal(0, after.GetProperty("files").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Only_sound_files_are_kept()
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent("echo hi"u8.ToArray()), "file", "trick.sh");
+
+        var response = await _http.PostAsync("/api/sounds/files", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task An_office_points_to_a_repository_and_can_have_one_initialized()
     {
         var (officeId, _, _) = await FurnishAsync();

@@ -369,3 +369,21 @@ export interface CheckOutcome {
   output: string
   seconds: number
 }
+
+/** Which sound a moment plays: in general, for a room, or for one desk. */
+export interface SoundRule {
+  event: 'needs-you' | 'question' | 'review' | 'failed'
+  roomId: string | null
+  deskId: string | null
+  /** builtin:name, file:name or silent. */
+  sound: string
+}
+
+export interface SoundsView {
+  muted: boolean
+  /** From 0 to 1. */
+  volume: number
+  rules: SoundRule[]
+  /** Sound files of yours, kept on this machine. */
+  files: string[]
+}

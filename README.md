@@ -86,6 +86,9 @@ Each project has its own README with detailed specifications.
     ones (an analysis before the fix), and you can change it on the task. It
     stays in the queue until those are accepted and merged, and its agent is
     told what they did.
+16. Sounds tell you when an agent needs you, asks you something, finishes or
+    fails, chosen per moment and per room or desk, built in or your own files
+    (kept out of git). One button in the top bar mutes them.
 
 ## Ground rules
 

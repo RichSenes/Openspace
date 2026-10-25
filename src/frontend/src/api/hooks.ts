@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { request } from './client'
+import { readError, request } from './client'
 import type {
   DeskLook,
   AgentEngine,
   EnginesView,
   AuditEntryView,
   BranchList,
+  SoundsView,
   DeskActivity,
   EpicView,
   OfficeView,
@@ -40,6 +41,7 @@ export const keys = {
   engines: ['engines'] as const,
   settings: ['settings'] as const,
   backups: ['backups'] as const,
+  sounds: ['sounds'] as const,
   deskUsage: ['usage', 'desks'] as const,
 }
 
@@ -450,6 +452,34 @@ export function useWriteChangelog(officeId: string) {
     (input: { language: string }) => request<ReportView>('POST', `/api/offices/${officeId}/changelog`, input),
     keys.reports,
   )
+}
+
+export function useSounds() {
+  return useQuery({ queryKey: keys.sounds, queryFn: () => request<SoundsView>('GET', '/api/sounds') })
+}
+
+/** Saves the sound choices; the page plays with them at once. */
+export function useSaveSounds() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (config: Pick<SoundsView, 'muted' | 'volume' | 'rules'>) => request<SoundsView>('PUT', '/api/sounds', config),
+    onSuccess: (saved) => client.setQueryData(keys.sounds, saved),
+  })
+}
+
+/** Keeps a sound file of yours on this machine. */
+export function useUploadSound() {
+  return useWrite(async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await fetch('/api/sounds/files', { method: 'POST', body: form })
+    if (!response.ok) throw await readError(response)
+    return (await response.json()) as { name: string }
+  }, keys.sounds)
+}
+
+export function useDeleteSound() {
+  return useWrite((name: string) => request<void>('DELETE', `/api/sounds/files/${encodeURIComponent(name)}`), keys.sounds)
 }
 
 export function useBackups() {

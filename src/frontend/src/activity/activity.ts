@@ -21,6 +21,8 @@ export interface WaitingDesk {
   request: string
   /** Exactly what is asked, such as the command. */
   detail: string | null
+  /** The agent asks you to do or decide something, not for a permission. */
+  question: boolean
 }
 
 /** Every desk, in any office, blocked until a person answers. */
@@ -36,5 +38,13 @@ export function waitingDesks(list: DeskActivity[] | undefined, offices: OfficeVi
       deskName: desks.get(a.deskId)?.deskName ?? 'A desk',
       request: a.headline,
       detail: a.detail ?? null,
+      question: Boolean(a.question),
     }))
+}
+
+/** The two answers a waiting desk gets: to a permission, or to a question the agent asked you. */
+export function answersFor(question: boolean | undefined) {
+  return question
+    ? { yes: 'Done, go on', no: 'Stop', saidYes: 'told to go on', saidNo: 'told to stop' }
+    : { yes: 'Allow once', no: 'Refuse', saidYes: 'allowed once', saidNo: 'refused' }
 }

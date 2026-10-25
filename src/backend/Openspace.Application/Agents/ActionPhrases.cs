@@ -17,6 +17,7 @@ public static partial class ActionPhrases
     /// <summary>What a command is for, checked in order on each part of the command line.</summary>
     private static readonly (Regex Pattern, Intent Intent)[] Intents =
     [
+        (PublishScriptPattern(), new("Publishing the app", "publish or install the app", "Published the app")),
         (TestPattern(), new("Running the tests", "run the tests", "Ran the tests")),
         (LintPattern(), new("Checking the code style", "check the code style", "Checked the code style")),
         (InstallPattern(), new("Installing the dependencies", "install the dependencies", "Installed the dependencies")),
@@ -40,7 +41,8 @@ public static partial class ActionPhrases
     public static string Doing(AgentAction action) => Phrase(action).Doing;
 
     /// <summary>For a permission: "Can I run the tests?".</summary>
-    public static string Asking(AgentAction action) => $"Can I {Phrase(action).Asking}?";
+    public static string Asking(AgentAction action) =>
+        action?.Kind == ActionKind.Question ? Shorten(action.Target, 300) : $"Can I {Phrase(action!).Asking}?";
 
     /// <summary>For the log: "run the tests · npm test", what was asked and exactly what.</summary>
     public static string Request(AgentAction action)
@@ -71,6 +73,7 @@ public static partial class ActionPhrases
             ActionKind.Write => new($"Writing {file}", $"create {file}", $"Wrote {file}"),
             ActionKind.Fetch => new("Looking something up online", "look something up online", "Looked something up online"),
             ActionKind.OutsideFolder => new("Looking outside its working copy", "look outside its working copy", "Looked outside its working copy"),
+            ActionKind.Question => new("Waiting for you", $"get an answer: {Shorten(action.Target, 160)}", "Got an answer"),
             _ => new($"Using {action.Target}", $"use {action.Target}", $"Used {action.Target}"),
         };
     }
@@ -155,6 +158,10 @@ public static partial class ActionPhrases
     private static partial Regex GitChangePattern();
 
     /// <summary>Anything that reaches a live service: deploys, releases, packages published.</summary>
+    /// <summary>A project's own script that publishes, deploys or installs it: tools/publish.sh, deploy.ps1.</summary>
+    [GeneratedRegex(@"(^|\s)(\S*/)?(publish|deploy)[\w.-]*\.(sh|ps1|bat|cmd)\b", RegexOptions.IgnoreCase)]
+    internal static partial Regex PublishScriptPattern();
+
     [GeneratedRegex(@"^((npx\s+)?(wrangler|vercel|netlify|firebase|flyctl|fly|heroku|supabase)|(npm|pnpm|yarn)\s+publish|dotnet\s+nuget\s+push|docker\s+push|gh|twine\s+upload|terraform\s+apply|kubectl)\b")]
     internal static partial Regex DeployPattern();
 

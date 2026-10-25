@@ -66,13 +66,13 @@ public sealed class McpTests : IAsyncDisposable
         string.Concat(result.Content.OfType<TextContentBlock>().Select(c => c.Text));
 
     [Fact]
-    public async Task The_three_tools_are_listed()
+    public async Task The_tools_are_listed()
     {
         await using var client = await ConnectAsync(null);
 
         var tools = await client.ListToolsAsync();
 
-        Assert.Equal(["add_manual_check", "add_task_note", "announce", "complete_step", "get_task", "permission"], tools.Select(t => t.Name).Order());
+        Assert.Equal(["add_manual_check", "add_task_note", "announce", "complete_step", "get_task", "permission", "wait_for_person"], tools.Select(t => t.Name).Order());
     }
 
     [Fact]
@@ -118,6 +118,34 @@ public sealed class McpTests : IAsyncDisposable
         using var answer = JsonDocument.Parse(Text(await asking));
         Assert.Equal("allow", answer.RootElement.GetProperty("behavior").GetString());
         Assert.Equal("git push origin main", answer.RootElement.GetProperty("updatedInput").GetProperty("command").GetString());
+    }
+
+    [Fact]
+    public async Task An_agent_waits_for_the_person_until_they_say_go_on()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+        using var http = _app.CreateClient();
+
+        var waitingForYou = client.CallToolAsync("wait_for_person", new Dictionary<string, object?>
+        {
+            ["question"] = "The app is open on this PC: close it, then press Done so I can install the new version.",
+        }).AsTask();
+        JsonElement waiting = default;
+        for (var i = 0; i < 50 && waiting.ValueKind != JsonValueKind.Object; i++)
+        {
+            await Task.Delay(50);
+            var activity = await http.GetFromJsonAsync<JsonElement>("/api/activity");
+            waiting = activity.EnumerateArray().FirstOrDefault(a => a.GetProperty("kind").GetString() == "Waiting");
+        }
+
+        Assert.True(waiting.GetProperty("question").GetBoolean());
+        Assert.StartsWith("The app is open on this PC", waiting.GetProperty("doing").GetString(), StringComparison.Ordinal);
+        await Task.Delay(300);
+        Assert.False(waitingForYou.IsCompleted);
+        (await http.PostAsJsonAsync($"/api/tasks/{taskId}/permission", new { allow = true })).EnsureSuccessStatusCode();
+
+        Assert.Equal("The person answered: done, go on.", Text(await waitingForYou));
     }
 
     [Fact]

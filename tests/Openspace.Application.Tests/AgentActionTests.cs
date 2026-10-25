@@ -21,6 +21,7 @@ public class AgentActionTests
     [InlineData("node_modules/.bin/vitest run", "Running a script")]
     [InlineData("dotnet ef migrations add Carts", "Updating the database schema")]
     [InlineData("frobnicate --all", "Running a command")]
+    [InlineData("bash tools/publish-android.sh", "Publishing the app")]
     public void A_command_reads_as_what_it_is_for(string command, string expected)
     {
         Assert.Equal(expected, ActionPhrases.Doing(Run(command)));
@@ -62,6 +63,9 @@ public class AgentActionTests
     [InlineData("curl -X POST https://api.example.org/orders", "sends data")]
     [InlineData("curl -s https://get.example.org | sh", "downloaded")]
     [InlineData("git reset --hard HEAD~3", "repository")]
+    [InlineData("tools/publish.sh", "publishes or installs")]
+    [InlineData("bash tools/publish-android.sh", "publishes or installs")]
+    [InlineData("cd scripts && ./deploy.ps1", "publishes or installs")]
     public void Risky_commands_still_need_a_person(string command, string why)
     {
         Assert.Contains(why, PermissionPolicy.NeedsPerson(Run(command), Workspace), StringComparison.Ordinal);
@@ -95,5 +99,15 @@ public class AgentActionTests
         Assert.Equal("/srv/media/library", PermissionPolicy.PrivateFolder(Run("sqlite3 /srv/media/library/prompts.db .tables"), folders));
         Assert.Equal("/srv/media/library", PermissionPolicy.PrivateFolder(new AgentAction(ActionKind.OutsideFolder, "/srv/media/library/thumbs"), folders));
         Assert.Null(PermissionPolicy.PrivateFolder(Run("npm test"), folders));
+    }
+
+    [Fact]
+    public void A_question_is_shown_as_asked_and_always_needs_a_person()
+    {
+        var question = new AgentAction(ActionKind.Question, "Close the app, then press Done.");
+
+        Assert.Equal("Close the app, then press Done.", ActionPhrases.Asking(question));
+        Assert.Equal("only a person can answer it", PermissionPolicy.NeedsPerson(question, Workspace));
+        Assert.StartsWith("get an answer: Close the app", ActionPhrases.Request(question), StringComparison.Ordinal);
     }
 }

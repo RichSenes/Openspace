@@ -65,6 +65,15 @@ internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor 
         CancellationToken cancellationToken) =>
         RunAsync(async task => $"Check {await signals.AddManualCheckAsync(task, what, how, cancellationToken)} listed.");
 
+    [McpServerTool(Name = "wait_for_person")]
+    [Description("Wait until the person does or decides something you cannot, such as closing an app that must be closed: say exactly what they must do. You wait here, spending nothing, until they answer; then go on as the answer says.")]
+    public Task<string> WaitForPersonAsync(
+        [Description("What the person must do or decide, in one or two clear sentences, e.g. \"Atelier is open on this PC: close it, then press Done so I can install the new version.\"")] string question,
+        CancellationToken cancellationToken) =>
+        RunAsync(async task => await signals.WaitForPersonAsync(task, question, cancellationToken)
+            ? "The person answered: done, go on."
+            : "The person said stop: do not go on. Finish now with a short summary of where things stand.");
+
     /// <summary>
     /// Claude Code calls this before a tool the agent's role does not allow outright, and
     /// waits: the person answers in Openspace. Not meant for agents to call themselves.

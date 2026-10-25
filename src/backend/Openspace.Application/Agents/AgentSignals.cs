@@ -241,11 +241,21 @@ public sealed partial class AgentSignals(
             ? $"{action.Target}\nA person decides because {why}."
             : action.Target;
 
-    private Task ShowWaitingAsync(WorkTask task, string permissionId, AgentAction action, CancellationToken cancellationToken) =>
-        activity.UpdateAsync(
+    private Task ShowWaitingAsync(WorkTask task, string permissionId, AgentAction action, CancellationToken cancellationToken)
+    {
+        var question = action.Kind == ActionKind.Question;
+        return activity.UpdateAsync(
             new DeskActivity(task.OfficeId.Value, task.DeskId!.Value.Value, task.Id.Value, ActivityKind.Waiting, null,
-                ActionPhrases.Asking(action), permissionId, clock.GetUtcNow(), ActionPhrases.Shorten(action.Target, 300)),
+                ActionPhrases.Asking(action), permissionId, clock.GetUtcNow(), question ? null : ActionPhrases.Shorten(action.Target, 300), question),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// The agent cannot go on until the person does or decides something (closing an app,
+    /// say): the desk waits, without spending anything, until the person answers. True goes on.
+    /// </summary>
+    public Task<bool> WaitForPersonAsync(WorkTaskId taskId, string question, CancellationToken cancellationToken) =>
+        RequestPermissionAsync(taskId, new AgentAction(ActionKind.Question, Guard(question, "Question", 1000)), cancellationToken);
 
     /// <summary>The agent stopped talking: its work goes to review with its summary as a note.</summary>
     public async Task FinishedAsync(string sessionId, CancellationToken cancellationToken)

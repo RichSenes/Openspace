@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Hand } from 'lucide-react'
 import { useActivity, useAnswerPermission, useOffices } from '../api/hooks'
 import { useToast } from '../ui/toastContext'
-import { waitingDesks } from './activity'
+import { waitingDesks, answersFor } from './activity'
 import './needsYou.css'
 
 /**
@@ -59,17 +59,17 @@ export function NeedsYou() {
                   type="button"
                   className="btn btn-primary"
                   disabled={answer.isPending}
-                  onClick={() => answer.mutate({ taskId: w.taskId, allow: true }, { onSuccess: () => toast(`${w.deskName}: allowed once`) })}
+                  onClick={() => answer.mutate({ taskId: w.taskId, allow: true }, { onSuccess: () => toast(`${w.deskName}: ${answersFor(w.question).saidYes}`) })}
                 >
-                  Allow once
+                  {answersFor(w.question).yes}
                 </button>
                 <button
                   type="button"
                   className="btn btn-danger"
                   disabled={answer.isPending}
-                  onClick={() => answer.mutate({ taskId: w.taskId, allow: false }, { onSuccess: () => toast(`${w.deskName}: refused`) })}
+                  onClick={() => answer.mutate({ taskId: w.taskId, allow: false }, { onSuccess: () => toast(`${w.deskName}: ${answersFor(w.question).saidNo}`) })}
                 >
-                  Refuse
+                  {answersFor(w.question).no}
                 </button>
               </div>
             </div>

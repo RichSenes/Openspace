@@ -13,6 +13,7 @@ import {
   useTaskText,
 } from '../api/hooks'
 import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
+import { answersFor } from '../activity/activity'
 import { TaskLog } from './TaskLog'
 import type { WorkTaskView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
@@ -146,17 +147,17 @@ export function TaskDrawer({ task, desks, reviewerOn = false, onClose }: Props) 
                       type="button"
                       className="btn btn-primary"
                       disabled={answer.isPending}
-                      onClick={() => answer.mutate({ taskId: task.id, allow: true }, { onSuccess: () => toast('Allowed once') })}
+                      onClick={() => answer.mutate({ taskId: task.id, allow: true }, { onSuccess: () => toast(`Agent ${answersFor(activity.question).saidYes}`) })}
                     >
-                      Allow once
+                      {answersFor(activity.question).yes}
                     </button>
                     <button
                       type="button"
                       className="btn btn-danger"
                       disabled={answer.isPending}
-                      onClick={() => answer.mutate({ taskId: task.id, allow: false }, { onSuccess: () => toast('Refused') })}
+                      onClick={() => answer.mutate({ taskId: task.id, allow: false }, { onSuccess: () => toast(`Agent ${answersFor(activity.question).saidNo}`) })}
                     >
-                      Refuse
+                      {answersFor(activity.question).no}
                     </button>
                   </div>
                 )}

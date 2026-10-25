@@ -90,6 +90,7 @@ the agent having to name it.
 | `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
 | `complete_step` | `{ step, evidence }`: reports a step of the task's required procedure as done |
 | `add_manual_check` | `{ what, how }`: lists something a person must try by hand before merging, and how |
+| `wait_for_person` | `{ question }`: the agent waits, spending nothing, until the person does or decides something (close an app, say) and answers "Done, go on" or "Stop" |
 | `permission` | Called by Claude Code itself before a tool its role does not allow outright |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
@@ -196,6 +197,9 @@ models, personal documents. Every layer refuses them:
   asking anyone, and the task gets a note saying so;
 - in such offices a command climbing above the working copy with `..` is never
   allowed on its own.
+
+A project's own publish or deploy script (`tools/publish.sh`, `deploy.ps1`…)
+always waits for a person, in any mode.
 
 ## Usage limits
 

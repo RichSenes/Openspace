@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DeskActivity } from '../api/types'
-import { activityByDesk, isActive, mergeActivity, waitingDesks } from './activity'
+import { activityByDesk, answersFor, isActive, mergeActivity, waitingDesks } from './activity'
 
 const activity = (deskId: string, headline: string, kind: DeskActivity['kind'] = 'Working', officeId = 'e-corp'): DeskActivity => ({
   officeId,
@@ -49,7 +49,14 @@ describe('waitingDesks', () => {
     const list = [{ ...activity('frontend', 'Can I install the dependencies?', 'Waiting'), detail: 'npm ci' }, activity('tester', 'Testing', 'Working')]
 
     expect(waitingDesks(list, offices)).toEqual([
-      { taskId: 't1', officeName: 'E Corp', deskName: 'Frontend', request: 'Can I install the dependencies?', detail: 'npm ci' },
+      { taskId: 't1', officeName: 'E Corp', deskName: 'Frontend', request: 'Can I install the dependencies?', detail: 'npm ci', question: false },
     ])
+  })
+})
+
+describe('answersFor', () => {
+  it('answers a question with go on or stop, and a permission with allow or refuse', () => {
+    expect(answersFor(true)).toMatchObject({ yes: 'Done, go on', no: 'Stop' })
+    expect(answersFor(false)).toMatchObject({ yes: 'Allow once', no: 'Refuse' })
   })
 })

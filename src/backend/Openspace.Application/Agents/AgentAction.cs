@@ -12,6 +12,12 @@ public enum ActionKind
 
     /// <summary>Anything that reaches outside the task's working copy.</summary>
     OutsideFolder,
+
+    /// <summary>
+    /// Something only a person can do or decide, such as closing an app: the agent waits
+    /// for the answer. Openspace never answers it on its own.
+    /// </summary>
+    Question,
     Other,
 }
 

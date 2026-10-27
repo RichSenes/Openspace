@@ -114,6 +114,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(Google.GoogleHttp.Name), sp.GetRequiredService<IOptionsMonitor<Google.GoogleOptions>>(), TimeProvider.System));
         services.AddSingleton<Application.Google.IGoogleAccounts>(sp => sp.GetRequiredService<Google.GoogleAccounts>());
         services.AddHttpClient<IMailbox, Google.GmailMailbox>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(2));
+        services.AddHttpClient<IAgenda, Google.GoogleAgenda>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(1));
         return services;
     }
 

@@ -270,6 +270,13 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   that no run looked at yet. Older mail is sorted but never answered, and the
   summary says how much is left. Messages are listed by id a page at a time, and
   only those never met are read.
+  New mail that gives a date to act on or attend (the decider asks along with the
+  label) goes to the agenda: the local model reads the dates the mail states, from
+  today on, and each becomes a Google Task due that day (a bill, a renewal) or an
+  event in the main calendar (an appointment, a booking), never with guests and
+  with `sendUpdates=none`. `agenda` (`{ "tasks": true, "calendar": true }`, or
+  `false`) says where they go; with one off, the other takes everything. The same
+  date with the same words is added once, whatever mail repeats it.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

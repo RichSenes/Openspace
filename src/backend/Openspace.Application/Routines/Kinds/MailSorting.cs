@@ -11,22 +11,29 @@ namespace Openspace.Application.Routines.Kinds;
 /// chose; what needs no reading leaves the inbox, labelled, so nothing is lost. For mail
 /// that waits for the person's answer a local model drafts a reply, which becomes a draft in
 /// the mailbox only after a yes: the person sends it, never the routine. A short summary of
-/// what stays in the inbox reaches the person's chat. Mail goes to local models only.
+/// what stays in the inbox reaches the person's chat. Dates in new mail (a bill to pay, an
+/// appointment) go to the person's agenda: tasks due that day, or calendar events without
+/// guests. Mail goes to local models only.
 /// </summary>
-public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat chat) : IRoutineKind
+public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat chat, IAgenda agenda) : IRoutineKind
 {
     public const string LabelAction = "label";
 
     public const string ReplyAction = "draft-reply";
 
+    public const string AgendaAction = "add-to-agenda";
+
     public const string KeyPrefix = "mail:";
+
+    /// <summary>What went to the agenda, by date and title, so a reminder mail does not add it twice.</summary>
+    public const string AgendaPrefix = "due:";
 
     public string Key => "mail";
 
     public string Name => "Mail";
 
     public string Description =>
-        "Sorts new mail into your labels and archives what needs no reading, drafts replies for your yes (never sends them) and sends you a short summary.";
+        "Sorts new mail into your labels and archives what needs no reading, puts dates in your agenda, drafts replies for your yes (never sends them) and sends you a short summary.";
 
     public string DefaultSettings => """
         {
@@ -38,6 +45,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
           "query": "in:inbox newer_than:2d",
           "most": 40,
           "backlog": "in:inbox",
+          "agenda": { "tasks": true, "calendar": true },
           "labelPrefix": "Openspace",
           "me": "Who you are and how you write, so reply drafts sound like you.",
           "labels": [
@@ -62,7 +70,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
     /// <summary>Of each message, the start the decider and the writer read.</summary>
     private const int Reading = 1500;
 
-    public bool CanUndo(string action) => action == LabelAction;
+    public bool CanUndo(string action) => action is LabelAction or AgendaAction;
 
     public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
     {
@@ -85,13 +93,13 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             return "No new mail.";
         }
 
-        var sorted = await SortAsync(context, settings, [.. fresh, .. old], cancellationToken).ConfigureAwait(false);
         var isOld = old.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
+        var sorted = await SortAsync(context, settings, [.. fresh, .. old], isOld, cancellationToken).ConfigureAwait(false);
 
         var away = new Dictionary<string, int>(StringComparer.Ordinal);
         var archived = new HashSet<string>(StringComparer.Ordinal);
         var waiting = 0;
-        foreach (var (message, label) in sorted.Where(s => s.Label is not null))
+        foreach (var (message, label, _) in sorted.Where(s => s.Label is not null))
         {
             var proposal = await context.ProposeAsync(
                 LabelAction,
@@ -117,6 +125,35 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         var answer = sorted.Where(s => s.Label is { Reply: true } && !s.Message.Bulk && !isOld.Contains(s.Message.Id)).Select(s => s.Message).ToList();
         var kept = fresh.Where(m => !archived.Contains(m.Id)).Except(answer).ToList();
         var backlog = older is null ? null : new Backlog(old.Count, old.Count(m => archived.Contains(m.Id)), older.Rest, older.More);
+
+        var dated = new List<AgendaItem>();
+        foreach (var message in sorted.Where(s => s.Dated).Select(s => s.Message))
+        {
+            foreach (var item in await DatesAsync(context, settings, message, cancellationToken).ConfigureAwait(false))
+            {
+                var key = AgendaPrefix + AgendaKey(item);
+                if (!await context.MeetAsync(key, key, item.Title, cancellationToken).ConfigureAwait(false))
+                {
+                    continue;
+                }
+
+                var proposal = await context.ProposeAsync(
+                    AgendaAction,
+                    Short($"{(item.IsEvent ? "Calendar" : "Tasks")}: {item.Title}", 200),
+                    $"From {message.From}, {message.Subject}. {(item.IsEvent ? "An event" : "A task")} on {When(item, CultureInfo.InvariantCulture)}{(item.Place.Length > 0 ? $", {item.Place}" : string.Empty)}.",
+                    item,
+                    cancellationToken).ConfigureAwait(false);
+                await context.MarkAsync(key, SeenState.Shown, cancellationToken).ConfigureAwait(false);
+                if (proposal.Status == ProposalStatus.Pending)
+                {
+                    waiting++;
+                }
+                else if (proposal.Status == ProposalStatus.Done)
+                {
+                    dated.Add(item);
+                }
+            }
+        }
         var gists = await GistsAsync(context, settings, [.. answer.Concat(kept).Take(MostInSummary)], cancellationToken).ConfigureAwait(false);
 
         var drafts = 0;
@@ -141,9 +178,9 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             await context.MarkAsync(KeyPrefix + message.Id, SeenState.Shown, cancellationToken).ConfigureAwait(false);
         }
 
-        var summary = Summary(settings, words, fresh.Count, answer, kept, away, gists, drafts, waiting, backlog);
+        var summary = Summary(settings, words, fresh.Count, answer, kept, away, gists, dated, drafts, waiting, backlog);
         await context.DeliverAsync(summary, null, cancellationToken).ConfigureAwait(false);
-        return $"{fresh.Count} new: {away.Values.Sum()} sorted away, {answer.Count + kept.Count} kept, {drafts} reply drafts proposed"
+        return $"{fresh.Count} new: {away.Values.Sum()} sorted away, {answer.Count + kept.Count} kept, {drafts} reply drafts proposed{(dated.Count > 0 ? $", {dated.Count} in the agenda" : string.Empty)}"
             + (backlog is not { Looked: > 0 } ? "." : $"; {backlog.Looked} older looked at, {backlog.Archived} archived.");
     }
 
@@ -159,6 +196,11 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
                     ?? throw new InvalidOperationException("The proposal does not say which message to label.");
                 await mailbox.LabelAsync(account, label.MessageId, label.Label, label.Archive, cancellationToken).ConfigureAwait(false);
                 return label.Archive ? $"Labelled {label.Label} and archived." : $"Labelled {label.Label}.";
+            case AgendaAction:
+                var item = JsonSerializer.Deserialize<AgendaItem>(proposal.Payload, JsonSerializerOptions.Web)
+                    ?? throw new InvalidOperationException("The proposal has nothing for the agenda.");
+                var link = await agenda.AddAsync(account, item, context.Clock.LocalTimeZone, cancellationToken).ConfigureAwait(false);
+                return $"Added to {(item.IsEvent ? "the calendar" : "the tasks")}: {link}";
             case ReplyAction:
                 var reply = JsonSerializer.Deserialize<MailReply>(proposal.Payload, JsonSerializerOptions.Web)
                     ?? throw new InvalidOperationException("The proposal has no reply.");
@@ -219,30 +261,43 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         return messages;
     }
 
-    /// <summary>Each message with the label the decider is sure of, or none: then it stays in the inbox as it is.</summary>
-    private async Task<List<(MailMessage Message, MailSettings.Label? Label)>> SortAsync(
-        RoutineContext context, MailSettings settings, List<MailMessage> fresh, CancellationToken cancellationToken)
+    /// <summary>
+    /// Each message with the label the decider is sure of, or none: then it stays in the inbox as it
+    /// is; and, for new mail when the agenda is on, whether it gives a date to act on.
+    /// </summary>
+    private async Task<List<Sorted>> SortAsync(
+        RoutineContext context, MailSettings settings, List<MailMessage> messages, HashSet<string> isOld, CancellationToken cancellationToken)
     {
-        if (!decider.Available || settings.Labels.Count == 0)
+        var agendaOn = settings.Agenda.Tasks || settings.Agenda.Calendar;
+        if (!decider.Available || (settings.Labels.Count == 0 && !agendaOn))
         {
-            context.Write(settings.Labels.Count == 0 ? "No labels in the settings: the mail stays as it is." : "No decider: the mail stays as it is.");
-            return [.. fresh.Select(m => (m, (MailSettings.Label?)null))];
+            context.Write(decider.Available ? "No labels in the settings: the mail stays as it is." : "No decider: the mail stays as it is, and no dates go to the agenda.");
+            return [.. messages.Select(m => new Sorted(m, null, false))];
         }
 
         var options = settings.Labels.Select((l, i) => new DecisionOption($"label{i + 1}", $"{l.Name}: {l.About}"))
             .Append(new DecisionOption("none", "None of these, or not sure."))
             .ToList();
-        var questions = new Dictionary<string, DecisionQuestion>
-        {
-            ["label"] = new("choice", "Which of these labels fits this email best?", options),
-        };
-
-        var sorted = new List<(MailMessage, MailSettings.Label?)>();
+        var sorted = new List<Sorted>();
         var failed = false;
-        foreach (var message in fresh)
+        foreach (var message in messages)
         {
+            var questions = new Dictionary<string, DecisionQuestion>();
+            if (settings.Labels.Count > 0)
+            {
+                questions["label"] = new("choice", "Which of these labels fits this email best?", options);
+            }
+
+            if (agendaOn && !isOld.Contains(message.Id))
+            {
+                questions["dated"] = new(
+                    "boolean",
+                    "Does this email give the reader a date to act on or to attend: a payment or deadline due, an appointment, a booking, a meeting, a trip, an event? Advertising and newsletters do not count.");
+            }
+
             MailSettings.Label? label = null;
-            if (!failed)
+            var dated = false;
+            if (!failed && questions.Count > 0)
             {
                 try
                 {
@@ -253,6 +308,8 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
                     {
                         label = settings.Labels[n - 1];
                     }
+
+                    dated = answers.TryGetValue("dated", out var date) && !date.Abstained && date.Answer == "true" && date.Confidence >= 0.5;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
@@ -261,12 +318,81 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
                 }
             }
 
-            sorted.Add((message, label));
+            sorted.Add(new Sorted(message, label, dated));
         }
 
-        context.Write($"Sorted {sorted.Count(s => s.Item2 is not null)} of {fresh.Count} messages.");
+        context.Write($"Sorted {sorted.Count(s => s.Label is not null)} of {messages.Count} messages; {sorted.Count(s => s.Dated)} give a date.");
         return sorted;
     }
+
+    /// <summary>
+    /// What the local model finds for the agenda in a message: only dates it states, from today on,
+    /// within about a year; events become tasks when the calendar is off, and the other way round.
+    /// </summary>
+    private async Task<List<AgendaItem>> DatesAsync(RoutineContext context, MailSettings settings, MailMessage message, CancellationToken cancellationToken)
+    {
+        var zone = context.Clock.LocalTimeZone;
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(context.Now, zone).DateTime);
+        var arrived = TimeZoneInfo.ConvertTime(message.Received, zone);
+        try
+        {
+            var answer = await chat.AskAsync(
+                new LocalAsk(
+                    settings.Model, Assistant(settings),
+                    $"""
+                    Dates for the reader's agenda. Today is {today.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)}; the email arrived on {arrived.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)}.
+                    From: {message.From}
+                    Subject: {message.Subject}
+
+                    {Short(message.Text.Length > 0 ? message.Text : message.Snippet, Reading * 2)}
+
+                    List what the reader should put in their agenda: a "task" for something to do by a date (pay, send, renew, sign up), an "event" for something happening at a set time that the reader attends (an appointment, a meeting, a flight, a booking). For each: a short title in {settings.Language} saying what to do or what it is; the date as YYYY-MM-DD; the time as HH:MM on a 24 hour clock, or "" when none is given; for events, how many minutes it lasts (60 when not said); the place, or "". Only dates the email states clearly, never guessed: an empty list when nothing is certain.
+                    """,
+                    DatesSchema, MaxTokens: 800),
+                cancellationToken).ConfigureAwait(false);
+            var notes = $"{message.From}: {message.Subject}\nhttps://mail.google.com/mail/?authuser={Uri.EscapeDataString(settings.Account)}#all/{message.ThreadId}";
+            var items = new List<AgendaItem>();
+            foreach (var found in JsonSerializer.Deserialize<DatesAnswer>(answer, JsonSerializerOptions.Web)?.Items ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(found.Title)
+                    || !DateOnly.TryParseExact(found.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                    || date < today || date > today.AddDays(400))
+                {
+                    continue;
+                }
+
+                TimeOnly? time = TimeOnly.TryParseExact(found.Time ?? string.Empty, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t) ? t : null;
+                var isEvent = string.Equals(found.Kind, "event", StringComparison.OrdinalIgnoreCase);
+                isEvent = isEvent ? settings.Agenda.Calendar || !settings.Agenda.Tasks : !settings.Agenda.Tasks;
+                var title = Short(found.Title.Trim(), 120);
+                if (!isEvent && time is { } at)
+                {
+                    title = $"{title} ({at.ToString("HH:mm", CultureInfo.InvariantCulture)})";
+                }
+
+                items.Add(new AgendaItem(isEvent, title, date, isEvent ? time : null, Math.Clamp(found.Minutes ?? 60, 15, 24 * 60), Short((found.Place ?? string.Empty).Trim(), 200), notes));
+            }
+
+            return items;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"No dates read from {message.Subject} ({ex.Message}).");
+            return [];
+        }
+    }
+
+    /// <summary>The same date and the same words, whatever the mail: "2026-11-12:pay-the-electricity-bill".</summary>
+    public static string AgendaKey(AgendaItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var words = string.Join('-', item.Title.ToLowerInvariant().Split(Separators, StringSplitOptions.RemoveEmptyEntries));
+        return $"{item.Date:yyyy-MM-dd}:{(words.Length <= 60 ? words : words[..60])}";
+    }
+
+    /// <summary>"Thu 12 Nov", with the time when it has one.</summary>
+    private static string When(AgendaItem item, CultureInfo culture) =>
+        item.Date.ToString("ddd d MMM", culture) + (item.Time is { } time ? $" {time.ToString("HH:mm", CultureInfo.InvariantCulture)}" : string.Empty);
 
     private static string Describe(MailMessage message) =>
         $"From: {message.From}\nSubject: {message.Subject}\n{(message.Bulk ? "Sent to a mailing list.\n" : string.Empty)}\n{Short(message.Text.Length > 0 ? message.Text : message.Snippet, Reading)}";
@@ -336,7 +462,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
 
     private static string Summary(
         MailSettings settings, MailWords words, int count, List<MailMessage> answer, List<MailMessage> kept, Dictionary<string, int> away,
-        Dictionary<string, string> gists, int drafts, int waiting, Backlog? backlog)
+        Dictionary<string, string> gists, List<AgendaItem> dated, int drafts, int waiting, Backlog? backlog)
     {
         var text = new StringBuilder().Append(CultureInfo.InvariantCulture, $"{settings.Title}: {words.New(count)}");
         void List(string heading, List<MailMessage> messages)
@@ -364,6 +490,15 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
 
         List(words.ToAnswer, answer);
         List(words.Kept, kept);
+        if (dated.Count > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\n\n{words.Agenda} ({dated.Count})");
+            foreach (var item in dated.OrderBy(i => i.Date).ThenBy(i => i.Time))
+            {
+                text.Append(CultureInfo.InvariantCulture, $"\n• {item.Title} — {When(item, words.Culture)} ({(item.IsEvent ? words.Calendar : words.Tasks)})");
+            }
+        }
+
         if (away.Count > 0)
         {
             text.Append(CultureInfo.InvariantCulture, $"\n\n{words.SortedAway}: {string.Join(", ", away.OrderByDescending(a => a.Value).Select(a => $"{a.Key} {a.Value}"))}");
@@ -414,6 +549,21 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         {"type":"object","properties":{"reply":{"type":"string"}},"required":["reply"]}
         """;
 
+    private sealed record Sorted(MailMessage Message, MailSettings.Label? Label, bool Dated);
+
+    private sealed record DatesAnswer(List<FoundDate>? Items);
+
+    private sealed record FoundDate(string? Kind, string? Title, string? Date, string? Time, int? Minutes, string? Place);
+
+    private static readonly char[] Separators = [.. Enumerable.Range(0, 128).Select(i => (char)i).Where(c => !char.IsLetterOrDigit(c))];
+
+    private const string DatesSchema = """
+        {"type":"object","properties":{"items":{"type":"array","items":{"type":"object",
+          "properties":{"kind":{"type":"string","enum":["task","event"]},"title":{"type":"string"},"date":{"type":"string"},
+            "time":{"type":"string"},"minutes":{"type":"integer"},"place":{"type":"string"}},
+          "required":["kind","title","date","time","minutes","place"]}}},"required":["items"]}
+        """;
+
     private sealed record Collected(List<string> Ids, int Rest, bool More);
 
     /// <param name="Rest">Older messages still to look at, as far as counted; <paramref name="More"/> when counting stopped early.</param>
@@ -431,8 +581,13 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
 /// <summary>A mail routine's settings, read from its JSON.</summary>
 public sealed record MailSettings(
     string Title, string Account, string Language, string Model, string Query, int Most, string LabelPrefix, string Me, IReadOnlyList<MailSettings.Label> Labels,
-    string? Backlog = "in:inbox")
+    string? Backlog = "in:inbox", MailSettings.AgendaChoice? AgendaSetting = null)
 {
+    /// <summary>Where dates go: tasks, calendar events, both, or neither.</summary>
+    public sealed record AgendaChoice(bool Tasks, bool Calendar);
+
+    public AgendaChoice Agenda => AgendaSetting ?? new AgendaChoice(true, true);
+
     /// <param name="Archive">Mail with this label leaves the inbox.</param>
     /// <param name="Reply">Mail with this label waits for an answer: a reply draft is proposed.</param>
     public sealed record Label(string Name, string About, bool Archive, bool Reply);
@@ -468,14 +623,19 @@ public sealed record MailSettings(
             Text("me", "Someone who likes short, kind emails."), labels,
             settings.TryGetProperty("backlog", out var b) && (b.ValueKind == JsonValueKind.False || (b.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(b.GetString())))
                 ? null
-                : Text("backlog", "in:inbox"));
+                : Text("backlog", "in:inbox"),
+            settings.TryGetProperty("agenda", out var g)
+                ? g.ValueKind == JsonValueKind.Object
+                    ? new AgendaChoice(!g.TryGetProperty("tasks", out var t) || t.ValueKind != JsonValueKind.False, !g.TryGetProperty("calendar", out var c) || c.ValueKind != JsonValueKind.False)
+                    : new AgendaChoice(g.ValueKind != JsonValueKind.False, g.ValueKind != JsonValueKind.False)
+                : null);
     }
 }
 
 /// <summary>The summary's few fixed words, in the person's language.</summary>
 internal sealed record MailWords(
     Func<int, string> New, string ToAnswer, string Kept, string SortedAway, Func<int, string> Drafts, Func<int, string> Waiting, Func<int, string> More,
-    Func<int, int, int, bool, string> Older)
+    Func<int, int, int, bool, string> Older, string Agenda, string Tasks, string Calendar, CultureInfo Culture)
 {
     public static MailWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
@@ -485,11 +645,15 @@ internal sealed record MailWords(
         "Restano nella posta in arrivo",
         "Smistate e archiviate",
         n => n == 1 ? "1 bozza di risposta aspetta il tuo sì in Openspace: non la invio mai io." : $"{n} bozze di risposta aspettano il tuo sì in Openspace: non le invio mai io.",
-        n => n == 1 ? "1 etichetta aspetta il tuo sì in Openspace." : $"{n} etichette aspettano il tuo sì in Openspace.",
+        n => n == 1 ? "1 modifica aspetta il tuo sì in Openspace." : $"{n} modifiche aspettano il tuo sì in Openspace.",
         n => $"e altre {n}",
         (looked, archived, rest, more) =>
             (looked > 0 ? $"Posta più vecchia: {looked} guardate, {archived} smistate e archiviate. " : string.Empty)
-            + (rest == 0 && !more ? "Non ne restano altre da guardare." : $"Ne restano {(more ? "più di " : "circa ")}{rest} da guardare."));
+            + (rest == 0 && !more ? "Non ne restano altre da guardare." : $"Ne restano {(more ? "più di " : "circa ")}{rest} da guardare."),
+        "Messe in agenda",
+        "Tasks",
+        "Calendar",
+        CultureInfo.GetCultureInfo("it-IT"));
 
     private static readonly MailWords English = new(
         n => n switch { 0 => "no new email", 1 => "1 new email", _ => $"{n} new emails" },
@@ -497,9 +661,13 @@ internal sealed record MailWords(
         "Staying in the inbox",
         "Sorted and archived",
         n => n == 1 ? "1 reply draft waits for your yes in Openspace: I never send it." : $"{n} reply drafts wait for your yes in Openspace: I never send them.",
-        n => n == 1 ? "1 label waits for your yes in Openspace." : $"{n} labels wait for your yes in Openspace.",
+        n => n == 1 ? "1 change waits for your yes in Openspace." : $"{n} changes wait for your yes in Openspace.",
         n => $"and {n} more",
         (looked, archived, rest, more) =>
             (looked > 0 ? $"Older mail: {looked} looked at, {archived} sorted and archived. " : string.Empty)
-            + (rest == 0 && !more ? "None left to look at." : $"{(more ? "More than" : "About")} {rest} still to look at."));
+            + (rest == 0 && !more ? "None left to look at." : $"{(more ? "More than" : "About")} {rest} still to look at."),
+        "Added to your agenda",
+        "Tasks",
+        "Calendar",
+        CultureInfo.GetCultureInfo("en-GB"));
 }

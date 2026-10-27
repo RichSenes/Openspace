@@ -14,8 +14,9 @@ public sealed class MailSortingTests
     private readonly FakeMailbox _mailbox = new();
     private readonly FakeDecider _decider = new();
     private readonly FakeChat _chat = new();
+    private readonly FakeAgenda _agenda = new();
 
-    private MailSorting Kind() => new(_mailbox, _decider, _chat);
+    private MailSorting Kind() => new(_mailbox, _decider, _chat, _agenda);
 
     private Routine Create(bool askFirst = false, string account = "someone@example.com", string language = "English", string extra = "")
     {
@@ -139,7 +140,7 @@ public sealed class MailSortingTests
         Assert.All(labels, p => Assert.Equal(ProposalStatus.Pending, p.Status));
         var text = Assert.Single(_h.Outbox.Sent).Text;
         Assert.Contains("Staying in the inbox (3)", text, StringComparison.Ordinal);
-        Assert.Contains("3 labels wait for your yes", text, StringComparison.Ordinal);
+        Assert.Contains("3 changes wait for your yes", text, StringComparison.Ordinal);
 
         await Proposals().ApproveAsync(labels.Single(p => p.Title == "Receipts: Your receipt").Id, default);
         Assert.Equal([("m3", "Openspace/Receipts", true)], _mailbox.Labelled);
@@ -169,7 +170,7 @@ public sealed class MailSortingTests
         var run = await RunAsync(routine);
 
         Assert.Empty(_mailbox.Labelled);
-        Assert.Contains("No decider: the mail stays as it is.", run.Log, StringComparison.Ordinal);
+        Assert.Contains("No decider: the mail stays as it is, and no dates go to the agenda.", run.Log, StringComparison.Ordinal);
         Assert.Contains("Staying in the inbox (4)", Assert.Single(_h.Outbox.Sent).Text, StringComparison.Ordinal);
     }
 
@@ -230,6 +231,99 @@ public sealed class MailSortingTests
         Assert.Empty(_mailbox.Labelled);
         Assert.DoesNotContain(_mailbox.Queries, q => q == "in:inbox");
     }
+
+    [Fact]
+    public async Task Dates_in_new_mail_go_to_the_agenda_on_their_own_tasks_and_events_apart()
+    {
+        var routine = Create();
+        _mailbox.Messages.Add(Mail("d1", "Clinic <desk@clinic.example>", "Dentist appointment confirmed"));
+        _mailbox.Messages.Add(Mail("d2", "Power Co <bills@power.example>", "Your electricity bill", bulk: true));
+        _mailbox.Messages.Add(Mail("m4", "Bob Example <bob@example.com>", "Photos from the trip"));
+
+        var run = await RunAsync(routine);
+
+        Assert.EndsWith(", 2 in the agenda.", run.Summary, StringComparison.Ordinal);
+        Assert.Equal(2, _agenda.Added.Count);
+        var visit = _agenda.Added.Single(a => a.IsEvent);
+        Assert.Equal(("Dentist", new DateOnly(2015, 6, 30), new TimeOnly(10, 30), 45, "Clinic, 2nd floor"), (visit.Title, visit.Date, visit.Time, visit.Minutes, visit.Place));
+        Assert.Contains("#all/thread-d1", visit.Notes, StringComparison.Ordinal);
+        var bill = _agenda.Added.Single(a => !a.IsEvent);
+        Assert.Equal(("Pay the electricity bill", new DateOnly(2015, 7, 10), (TimeOnly?)null), (bill.Title, bill.Date, bill.Time));
+        Assert.DoesNotContain(_agenda.Added, a => a.Title == "Last year's party");
+        Assert.Equal(2, _chat.DatePrompts);
+
+        var text = Assert.Single(_h.Outbox.Sent).Text;
+        Assert.Contains("Added to your agenda (2)\n• Dentist — Tue 30 Jun 10:30 (Calendar)\n• Pay the electricity bill — Fri 10 Jul (Tasks)", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_reminder_of_the_same_date_is_not_added_twice()
+    {
+        var routine = Create();
+        _mailbox.Messages.Add(Mail("d2", "Power Co <bills@power.example>", "Your electricity bill", bulk: true));
+        await RunAsync(routine);
+
+        _mailbox.Messages.Add(Mail("d3", "Power Co <bills@power.example>", "Reminder: your electricity bill", bulk: true));
+        _h.Clock.Advance(TimeSpan.FromHours(6));
+        var run = await RunAsync(routine);
+
+        Assert.Single(_agenda.Added);
+        Assert.DoesNotContain("agenda", run.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_the_calendar_off_an_appointment_becomes_a_task_with_its_time()
+    {
+        var routine = Create(extra: "\"agenda\":{\"calendar\":false},");
+        _mailbox.Messages.Add(Mail("d1", "Clinic <desk@clinic.example>", "Dentist appointment confirmed"));
+
+        await RunAsync(routine);
+
+        var item = Assert.Single(_agenda.Added);
+        Assert.False(item.IsEvent);
+        Assert.Equal("Dentist (10:30)", item.Title);
+    }
+
+    [Fact]
+    public async Task With_the_agenda_off_or_for_older_mail_no_dates_are_looked_for()
+    {
+        var off = Create(extra: "\"agenda\":false,");
+        _mailbox.Messages.Add(Mail("d1", "Clinic <desk@clinic.example>", "Dentist appointment confirmed", old: true));
+        _mailbox.Messages.Add(Mail("d2", "Power Co <bills@power.example>", "Your electricity bill", bulk: true));
+
+        await RunAsync(off);
+
+        Assert.Empty(_agenda.Added);
+        Assert.Equal(0, _chat.DatePrompts);
+        Assert.DoesNotContain(_decider.Asked, q => q.Contains("dated"));
+
+        var on = Create(extra: "\"backlog\":\"in:inbox\",");
+        await RunAsync(on);
+        Assert.Equal(["Pay the electricity bill"], _agenda.Added.Select(a => a.Title));
+    }
+
+    [Fact]
+    public async Task Asked_first_a_date_waits_for_a_yes_before_it_reaches_the_agenda()
+    {
+        var routine = Create(askFirst: true);
+        _mailbox.Messages.Add(Mail("d1", "Clinic <desk@clinic.example>", "Dentist appointment confirmed"));
+
+        await RunAsync(routine);
+        Assert.Empty(_agenda.Added);
+        var proposal = Assert.Single(_h.Routines.Proposals, p => p.Action == MailSorting.AgendaAction);
+        Assert.Equal("Calendar: Dentist", proposal.Title);
+
+        await Proposals().ApproveAsync(proposal.Id, default);
+
+        Assert.Equal("Dentist", Assert.Single(_agenda.Added).Title);
+        Assert.StartsWith("Added to the calendar: https://calendar.example/", proposal.Outcome, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_same_date_and_words_make_the_same_agenda_key() =>
+        Assert.Equal(
+            MailSorting.AgendaKey(new AgendaItem(false, "Pay the electricity bill!", new DateOnly(2015, 7, 10), null, 60, "", "a")),
+            MailSorting.AgendaKey(new AgendaItem(true, "pay the  electricity bill", new DateOnly(2015, 7, 10), new TimeOnly(9, 0), 30, "x", "b")));
 
     [Fact]
     public async Task A_routine_without_an_account_says_what_to_do()
@@ -299,9 +393,12 @@ public sealed class MailSortingTests
     {
         public bool Available { get; set; } = true;
 
+        public List<IReadOnlyCollection<string>> Asked { get; } = [];
+
         public Task<IReadOnlyDictionary<string, Decision>> DecideAsync(string state, IReadOnlyDictionary<string, DecisionQuestion> questions, CancellationToken cancellationToken)
         {
             bool Has(string word) => state.Contains(word, StringComparison.OrdinalIgnoreCase);
+            Asked.Add([.. questions.Keys]);
             var options = questions["label"].Options!;
             Assert.Equal("none", options[^1].Id);
             var answer = Has("Unsure") ? new Decision("label2", 0.4, false)
@@ -309,13 +406,21 @@ public sealed class MailSortingTests
                 : Has("trains") ? new Decision("label2", 0.8, false)
                 : Has("receipt") ? new Decision("label3", 0.95, false)
                 : new Decision("none", 0.7, false);
-            return Task.FromResult<IReadOnlyDictionary<string, Decision>>(new Dictionary<string, Decision> { ["label"] = answer });
+            var answers = new Dictionary<string, Decision> { ["label"] = answer };
+            if (questions.ContainsKey("dated"))
+            {
+                answers["dated"] = new(Has("appointment") || Has("bill") ? "true" : "false", 0.9, false);
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<string, Decision>>(answers);
         }
     }
 
     private sealed class FakeChat : ILocalChat
     {
         public bool Fail { get; set; }
+
+        public int DatePrompts { get; private set; }
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
         {
@@ -330,7 +435,27 @@ public sealed class MailSortingTests
                 return Task.FromResult(JsonSerializer.Serialize(new { gists = subjects.Select((s, i) => new { n = i + 1, text = $"About: {s}" }) }));
             }
 
+            if (ask.User.StartsWith("Dates for the reader's agenda", StringComparison.Ordinal))
+            {
+                DatePrompts++;
+                Assert.Contains("Today is Wednesday 24 June 2015", ask.User, StringComparison.Ordinal);
+                return Task.FromResult(ask.User.Contains("Dentist", StringComparison.Ordinal)
+                    ? """{"items":[{"kind":"event","title":"Dentist","date":"2015-06-30","time":"10:30","minutes":45,"place":"Clinic, 2nd floor"},{"kind":"event","title":"Last year's party","date":"2014-12-31","time":"","minutes":60,"place":""}]}"""
+                    : """{"items":[{"kind":"task","title":"Pay the electricity bill","date":"2015-07-10","time":"","minutes":60,"place":""},{"kind":"task","title":"Nonsense","date":"soon","time":"","minutes":60,"place":""}]}""");
+            }
+
             return Task.FromResult("""{"reply":"Eight is perfect."}""");
+        }
+    }
+
+    private sealed class FakeAgenda : IAgenda
+    {
+        public List<AgendaItem> Added { get; } = [];
+
+        public Task<string> AddAsync(string account, AgendaItem item, TimeZoneInfo zone, CancellationToken cancellationToken)
+        {
+            Added.Add(item);
+            return Task.FromResult($"https://{(item.IsEvent ? "calendar" : "tasks")}.example/{Added.Count}");
         }
     }
 }

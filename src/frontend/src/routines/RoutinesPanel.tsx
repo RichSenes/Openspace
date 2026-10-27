@@ -23,7 +23,7 @@ import { useRoutineProgress } from '../realtime/routineProgress'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
-import { readText, withText } from './settings'
+import { readAgenda, readText, withAgenda, withText } from './settings'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
 
@@ -405,6 +405,7 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
       </p>
       {kind === 'morning-paper' && <KanjiChoiceField settings={settings} onChange={setSettings} />}
       {kind === 'mail' && <AccountField settings={settings} onChange={setSettings} />}
+      {kind === 'mail' && <AgendaField settings={settings} onChange={setSettings} />}
       <details className="routine-advanced">
         <summary>Advanced settings (JSON)</summary>
         <textarea className="input" rows={8} value={settings} onChange={(e) => setSettings(e.target.value)} spellCheck={false} />
@@ -428,7 +429,7 @@ function KanjiChoiceField({ settings, onChange }: { settings: string; onChange: 
   const choice = readKanji(settings)
   const broken = Boolean(settingsProblem(settings))
   return (
-    <fieldset className="field routine-kanji" disabled={broken}>
+    <fieldset className="field routine-group" disabled={broken}>
       <legend>Kanji of the day</legend>
       <label className="check">
         <input type="checkbox" checked={choice.enabled} onChange={(e) => onChange(withKanji(settings, { ...choice, enabled: e.target.checked }))} />
@@ -471,5 +472,23 @@ function AccountField({ settings, onChange }: { settings: string; onChange: (set
       </select>
       {google.data && accounts.length === 0 && <span className="hint">No account connected yet: connect one in Settings, under Google accounts.</span>}
     </label>
+  )
+}
+
+/** Where a mail routine puts the dates it finds in new mail. */
+function AgendaField({ settings, onChange }: { settings: string; onChange: (settings: string) => void }) {
+  const agenda = readAgenda(settings)
+  return (
+    <fieldset className="field routine-group" disabled={Boolean(settingsProblem(settings))}>
+      <legend>Dates found in new mail</legend>
+      <label className="check">
+        <input type="checkbox" checked={agenda.tasks} onChange={(e) => onChange(withAgenda(settings, { ...agenda, tasks: e.target.checked }))} />
+        Things to do by a date (a bill, a renewal) become Google Tasks
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={agenda.calendar} onChange={(e) => onChange(withAgenda(settings, { ...agenda, calendar: e.target.checked }))} />
+        Appointments and bookings become events in your calendar, with no guests
+      </label>
+    </fieldset>
   )
 }

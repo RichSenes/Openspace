@@ -18,3 +18,16 @@ export function withText(settings: string, key: string, value: string): string {
   const parsed = settings.trim() ? objectOf(settings) : {}
   return parsed ? JSON.stringify({ ...parsed, [key]: value }, null, 2) : settings
 }
+
+/** Where a mail routine puts the dates it finds: "agenda": { "tasks": true, "calendar": true }; both when unsaid, neither when false. */
+export function readAgenda(settings: string): { tasks: boolean; calendar: boolean } {
+  const agenda = objectOf(settings)?.agenda
+  if (agenda === false) return { tasks: false, calendar: false }
+  const choice = typeof agenda === 'object' && agenda !== null ? (agenda as { tasks?: unknown; calendar?: unknown }) : {}
+  return { tasks: choice.tasks !== false, calendar: choice.calendar !== false }
+}
+
+export function withAgenda(settings: string, agenda: { tasks: boolean; calendar: boolean }): string {
+  const parsed = settings.trim() ? objectOf(settings) : {}
+  return parsed ? JSON.stringify({ ...parsed, agenda }, null, 2) : settings
+}

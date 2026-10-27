@@ -10,6 +10,7 @@ import { useBuildingHub } from './realtime/useBuildingHub'
 import { ReportsPanel } from './reports/ReportsPanel'
 import { SettingsPanel } from './settings/SettingsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
+import { RoutinesPanel } from './routines/RoutinesPanel'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
 
@@ -58,6 +59,8 @@ export default function App() {
             <Board key={`${office.id}-${focusTask ?? ''}`} office={office} initialTaskId={focusTask} />
           ) : view === 'rooms' ? (
             <RoomsPanel key={office.id} office={office} />
+          ) : view === 'routines' ? (
+            <RoutinesPanel key={office.id} office={office} />
           ) : view === 'reports' ? (
             <ReportsPanel key={office.id} office={office} />
           ) : (

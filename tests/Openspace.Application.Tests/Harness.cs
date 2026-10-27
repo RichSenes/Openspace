@@ -55,6 +55,14 @@ internal sealed class Harness
 
     public LoopGuard Loops { get; } = new();
 
+    public InMemoryRoutines Routines { get; } = new();
+
+    public Routines.RoutineRequests RoutineRequests { get; } = new();
+
+    public RecordingOutbox Outbox { get; } = new();
+
+    public FakeOffersKind OffersKind { get; } = new();
+
     public FakeGpuProbe GpuProbe { get; } = new();
 
     public FakeModelServer ModelServer { get; } = new();
@@ -98,6 +106,16 @@ internal sealed class Harness
     public TaskRunner Runner(int seats = 1) => new(
         new QueueDispatcher(Tasks, Offices, Limits, Gpu, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, Clock, NullLogger<TaskRunner>.Instance);
+
+    public Routines.RoutineRunner RoutineRunner() =>
+        new(Routines, [OffersKind], RoutineRequests, Outbox, UnitOfWork, Clock, NullLogger<Routines.RoutineRunner>.Instance);
+
+    public Routines.RoutineCommands RoutineCommands() => new(Offices, Routines, [OffersKind], RoutineRequests, UnitOfWork, Clock);
+
+    public Routines.RoutineQueries RoutineQueries() => new(Routines, [OffersKind]);
+
+    public Routines.ProposalCommands ProposalCommands() =>
+        new(Routines, [OffersKind], Outbox, UnitOfWork, Clock, NullLogger<Routines.ProposalCommands>.Instance);
 
     public GpuShift Shift() => new(
         Gpu, GpuProbe, ModelServer, Tasks, Offices, Runtime, Activity, UnitOfWork, new LiveOptions<LocalModelOptions>(() => LocalModels), Clock);

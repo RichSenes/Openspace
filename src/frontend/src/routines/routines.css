@@ -1,0 +1,187 @@
+.routines {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px 20px 32px;
+}
+
+.routines-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.routines-head h1 {
+  font-size: 20px;
+}
+
+.proposals {
+  display: grid;
+  gap: 12px;
+}
+
+.proposals h2 {
+  font-size: 16px;
+}
+
+.proposal {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.proposal header {
+  display: grid;
+  gap: 2px;
+}
+
+.proposal h3 {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.routine-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.routine {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.routine-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.routine-head h2 {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.routine-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.routine-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.routine-facts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.routine-facts div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.routine-facts dt {
+  color: var(--mute);
+}
+
+.routine-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The icon and the words tell the state; the colour only adds to them. */
+.run-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.run-succeeded svg {
+  color: var(--st-running);
+}
+
+.run-failed svg {
+  color: var(--danger);
+}
+
+.run-running svg {
+  color: var(--mute);
+}
+
+.run-summary {
+  color: var(--mute);
+}
+
+.run-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-list summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.run-log {
+  max-height: 260px;
+  margin: 6px 0 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--bg);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.routine-form {
+  display: grid;
+  gap: 12px;
+  min-width: min(520px, 80vw);
+}
+
+.routine-days {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.routine-days legend {
+  margin-bottom: 6px;
+  color: var(--mute);
+}
+
+.day-toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+
+.routine-advanced textarea {
+  width: 100%;
+  margin-top: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}

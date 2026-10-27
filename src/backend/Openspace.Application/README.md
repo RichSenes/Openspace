@@ -24,6 +24,7 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `OfficeQueries` | List offices, get one with its rooms and desks |
 | `WorkTaskCommands` | Assign, propose, approve (optionally choosing the desk), accept, send back, retry, discard, add a note |
 | `WorkTaskQueries` | List tasks by office and status, oldest first; get one with its notes |
+| `RoutineRunner`, `RoutineCommands`, `RoutineQueries`, `ProposalCommands` | Routines: run due ones one at a time (by hand first), create and change them, list them with their runs; a yes or a no to what they propose. Kinds implement `IRoutineKind` and work through a `RoutineContext` (log, memory of what was met, proposals, delivery) |
 | `LoopGuard` | Notices agents going in circles (the same failure again and again, a conversation filling up) and gives them a fresh start, then stops them for review |
 | `QueueDispatcher` | Hands free seats to queued tasks (see below); a task on a local model waits until `GpuArbiter` admits it |
 | `GpuArbiter` + `GpuShift` | Who has the graphics card: programs listed first, or claiming it, before local models; loads the model desks wait for, unloads it when idle, sends local tasks back to the queue when a program needs the card |

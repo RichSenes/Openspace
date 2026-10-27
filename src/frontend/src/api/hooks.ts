@@ -5,6 +5,11 @@ import type {
   AgentEngine,
   EnginesView,
   GpuView,
+  ProposalView,
+  RoutineKindView,
+  RoutineRunView,
+  RoutineView,
+  ScheduleView,
   AuditEntryView,
   BranchList,
   SoundsView,
@@ -37,6 +42,7 @@ export const keys = {
   epics: ['epics'] as const,
   officeEpics: (officeId: string) => ['epics', officeId] as const,
   reports: ['reports'] as const,
+  routines: ['routines'] as const,
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
@@ -537,4 +543,73 @@ export function useCheckClaudeUsage() {
 /** Tokens spent desk by desk; refreshed with the tasks. */
 export function useDeskUsage() {
   return useQuery({ queryKey: keys.deskUsage, queryFn: () => request<DeskUsageView[]>('GET', '/api/usage/desks') })
+}
+
+export function useRoutineKinds() {
+  return useQuery({ queryKey: [...keys.routines, 'kinds'], queryFn: () => request<RoutineKindView[]>('GET', '/api/routine-kinds') })
+}
+
+export function useRoutines(officeId: string) {
+  return useQuery({
+    queryKey: [...keys.routines, officeId],
+    queryFn: () => request<RoutineView[]>('GET', `/api/offices/${officeId}/routines`),
+    // Next and last runs move with time even when nothing is said over the hub.
+    refetchInterval: 60_000,
+  })
+}
+
+export function useRoutineRuns(routineId: string | undefined) {
+  return useQuery({
+    queryKey: [...keys.routines, 'runs', routineId],
+    queryFn: () => request<RoutineRunView[]>('GET', `/api/routines/${routineId}/runs`),
+    enabled: Boolean(routineId),
+  })
+}
+
+export function useProposals(officeId: string) {
+  return useQuery({
+    queryKey: [...keys.routines, 'proposals', officeId],
+    queryFn: () => request<ProposalView[]>('GET', `/api/offices/${officeId}/proposals?status=Pending`),
+  })
+}
+
+export interface RoutineInput {
+  name: string
+  kind: string
+  schedule: ScheduleView
+  settings: string
+}
+
+export function useCreateRoutine(officeId: string) {
+  return useWrite((input: RoutineInput) => request<Created>('POST', `/api/offices/${officeId}/routines`, input), keys.routines)
+}
+
+export function useUpdateRoutine() {
+  return useWrite(
+    (input: { id: string; name?: string; schedule?: ScheduleView; settings?: string }) =>
+      request<void>('PUT', `/api/routines/${input.id}`, { name: input.name, schedule: input.schedule, settings: input.settings }),
+    keys.routines,
+  )
+}
+
+export function useTurnOnRoutine() {
+  return useWrite(
+    (input: { id: string; enabled: boolean }) => request<void>('PUT', `/api/routines/${input.id}/enabled`, { enabled: input.enabled }),
+    keys.routines,
+  )
+}
+
+export function useDeleteRoutine() {
+  return useWrite((id: string) => request<void>('DELETE', `/api/routines/${id}`), keys.routines)
+}
+
+export function useRunRoutine() {
+  return useWrite((id: string) => request<void>('POST', `/api/routines/${id}/run`), keys.routines)
+}
+
+export function useDecideProposal() {
+  return useWrite(
+    (input: { id: string; approve: boolean }) => request<void>('POST', `/api/proposals/${input.id}/${input.approve ? 'approve' : 'reject'}`),
+    keys.routines,
+  )
 }

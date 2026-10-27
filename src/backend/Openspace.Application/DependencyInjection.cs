@@ -5,6 +5,7 @@ using Openspace.Application.Offices;
 using Openspace.Application.Queue;
 using Openspace.Application.Reports;
 using Openspace.Application.Roles;
+using Openspace.Application.Routines;
 using Openspace.Application.Work;
 
 namespace Openspace.Application;
@@ -38,6 +39,12 @@ public static class DependencyInjection
         services.AddScoped<GpuShift>();
         services.AddScoped<Review.TaskReviewer>();
         services.AddScoped<Checks.MergeChecks>();
+        services.AddSingleton<RoutineRequests>();
+        services.AddSingleton<IRoutineOutbox, NoOutbox>();
+        services.AddScoped<RoutineRunner>();
+        services.AddScoped<RoutineCommands>();
+        services.AddScoped<RoutineQueries>();
+        services.AddScoped<ProposalCommands>();
         return services;
     }
 }

@@ -4,12 +4,13 @@ import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
 import './layout.css'
 
-export type View = 'building' | 'board' | 'rooms' | 'reports' | 'agents' | 'settings'
+export type View = 'building' | 'board' | 'rooms' | 'routines' | 'reports' | 'agents' | 'settings'
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'building', label: 'Building' },
   { id: 'board', label: 'Board' },
   { id: 'rooms', label: 'Rooms' },
+  { id: 'routines', label: 'Routines' },
   { id: 'reports', label: 'Reports' },
   { id: 'agents', label: 'Agents' },
   { id: 'settings', label: 'Settings' },

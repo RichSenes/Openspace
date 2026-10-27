@@ -30,4 +30,12 @@ internal static class RepositoryExtensions
         this IWorkTaskRepository tasks, WorkTaskId id, CancellationToken cancellationToken) =>
         await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false)
         ?? throw new NotFoundException("Task", id.Value);
+
+    public static async Task<Domain.Routines.Routine> GetAsync(
+        this IRoutineRepository repository, Domain.Routines.RoutineId id, CancellationToken cancellationToken) =>
+        await repository.FindAsync(id, cancellationToken).ConfigureAwait(false) ?? throw new NotFoundException("Routine", id.Value);
+
+    public static async Task<Domain.Routines.Proposal> GetProposalAsync(
+        this IRoutineRepository repository, Domain.Routines.ProposalId id, CancellationToken cancellationToken) =>
+        await repository.FindProposalAsync(id, cancellationToken).ConfigureAwait(false) ?? throw new NotFoundException("Proposal", id.Value);
 }

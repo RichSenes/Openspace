@@ -269,6 +269,21 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Routines_of_a_kind_openspace_does_not_know_are_refused()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var created = await _http.PostAsJsonAsync($"/api/offices/{officeId}/routines",
+            new { name = "Mystery", kind = "astrology", schedule = new { days = Array.Empty<string>(), at = "07:00", everyWeeks = 1 } });
+        var routines = await GetAsync<JsonElement>($"/api/offices/{officeId}/routines");
+        var proposals = await GetAsync<JsonElement>($"/api/offices/{officeId}/proposals?status=Pending");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, created.StatusCode);
+        Assert.Equal((0, 0), (routines.GetArrayLength(), proposals.GetArrayLength()));
+        Assert.Equal(HttpStatusCode.OK, (await _http.GetAsync("/api/routine-kinds")).StatusCode);
+    }
+
+    [Fact]
     public async Task Only_a_running_task_can_be_stopped_for_review()
     {
         var (officeId, _, deskId) = await FurnishAsync();

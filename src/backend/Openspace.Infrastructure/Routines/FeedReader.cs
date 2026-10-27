@@ -27,6 +27,7 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
         var root = XDocument.Load(reader).Root ?? throw new InvalidDataException($"{source}: the feed is empty.");
         XNamespace atom = "http://www.w3.org/2005/Atom";
         XNamespace content = "http://purl.org/rss/1.0/modules/content/";
+        XNamespace media = "http://search.yahoo.com/mrss/";
 
         if (root.Name == atom + "feed")
         {
@@ -38,7 +39,8 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
                     e.Elements(atom + "link").FirstOrDefault(l => (string?)l.Attribute("rel") is null or "alternate")?.Attribute("href")?.Value,
                     (string?)e.Element(atom + "published") ?? (string?)e.Element(atom + "updated"),
                     (string?)e.Element(atom + "summary") ?? (string?)e.Element(atom + "content"),
-                    feed)).OfType<FeedItem>(),
+                    feed,
+                    Picture(e, media, (string?)e.Element(atom + "content")))).OfType<FeedItem>(),
             ];
         }
 
@@ -50,11 +52,23 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
                 (string?)i.Element("link") ?? (string?)i.Element("guid"),
                 (string?)i.Element("pubDate") ?? (string?)i.Element(XName.Get("date", "http://purl.org/dc/elements/1.1/")),
                 (string?)i.Element("description") ?? (string?)i.Element(content + "encoded"),
-                feed)).OfType<FeedItem>(),
+                feed,
+                Picture(i, media, (string?)i.Element(content + "encoded") ?? (string?)i.Element("description")))).OfType<FeedItem>(),
         ];
     }
 
-    private static FeedItem? Item(string source, string? title, string? link, string? date, string? summary, Uri feed)
+    /// <summary>The item's picture: Media RSS, an image enclosure, or the first image of its HTML.</summary>
+    private static string? Picture(XElement item, XNamespace media, string? html) =>
+        item.Descendants(media + "content")
+            .Where(m => (string?)m.Attribute("medium") == "image" || ((string?)m.Attribute("type"))?.StartsWith("image/", StringComparison.Ordinal) == true
+                || ((string?)m.Attribute("url"))?.Contains(".jp", StringComparison.OrdinalIgnoreCase) == true)
+            .Select(m => (string?)m.Attribute("url")).FirstOrDefault()
+        ?? item.Descendants(media + "thumbnail").Select(m => (string?)m.Attribute("url")).FirstOrDefault()
+        ?? item.Elements("enclosure").Where(e => ((string?)e.Attribute("type"))?.StartsWith("image/", StringComparison.Ordinal) == true)
+            .Select(e => (string?)e.Attribute("url")).FirstOrDefault()
+        ?? (html is null ? null : FirstImage().Match(html) is { Success: true } m ? WebUtility.HtmlDecode(m.Groups[1].Value) : null);
+
+    private static FeedItem? Item(string source, string? title, string? link, string? date, string? summary, Uri feed, string? picture)
     {
         var clean = Text(title);
         if (string.IsNullOrWhiteSpace(clean) || !Uri.TryCreate(feed, link?.Trim(), out var uri) || uri.Scheme is not ("http" or "https"))
@@ -63,7 +77,8 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
         }
 
         var text = Text(summary);
-        return new FeedItem(source, clean, uri, Date(date), text.Length <= MaxSummary ? text : string.Concat(text.AsSpan(0, MaxSummary), "…"));
+        var image = Uri.TryCreate(uri, picture?.Trim(), out var found) && found.Scheme is "http" or "https" ? found : null;
+        return new FeedItem(source, clean, uri, Date(date), text.Length <= MaxSummary ? text : string.Concat(text.AsSpan(0, MaxSummary), "…"), image);
     }
 
     /// <summary>Plain text out of a feed's HTML: tags dropped, entities decoded, spaces collapsed.</summary>
@@ -84,6 +99,9 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
             ? parsed
             : null;
     }
+
+    [GeneratedRegex(@"<img[^>]+src=[""']([^""']+)[""']", RegexOptions.IgnoreCase)]
+    private static partial Regex FirstImage();
 
     [GeneratedRegex("<[^>]*>")]
     private static partial Regex Tags();

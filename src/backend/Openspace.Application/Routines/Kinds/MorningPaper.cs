@@ -7,18 +7,22 @@ using Openspace.Domain.Routines;
 namespace Openspace.Application.Routines.Kinds;
 
 /// <summary>
-/// A personal paper, every morning: news from the outlets the person chose, sorted into
-/// sections, filtered by the decider for what interests them, written up by a local model
-/// in their language, laid out as a paper, printed to PDF, numbered, kept and delivered.
-/// Nothing already printed comes back the next day.
+/// A personal paper, every morning. News of the last hours from the outlets the person
+/// chose, never printed before, judged one by one by the decider (is it news, does it
+/// matter, would the reader care, is it good news) and weighed by how many outlets carry
+/// it. The day's most important story opens the front page with a large picture, next to
+/// the good news of the day; each section follows with its best stories, written up by a
+/// local model from the items alone and citing every outlet that told them. Laid out as a
+/// paper, printed to PDF, numbered, kept and delivered.
 /// </summary>
-public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer) : IRoutineKind
+public sealed partial class MorningPaper(
+    ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer, IWebImages images) : IRoutineKind
 {
     public string Key => "morning-paper";
 
     public string Name => "Morning paper";
 
-    public string Description => "News from the outlets you choose, filtered and written up by a local model, as a numbered PDF paper.";
+    public string Description => "News from the outlets you choose, judged and written up by local models, as a numbered PDF paper with a front page.";
 
     public string DefaultSettings => """
         {
@@ -33,7 +37,7 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
             "Keep facts apart from opinions, and never add facts that are not in the items.",
             "Plain words, short sentences, no jargon. A light joke now and then, never about tragedies."
           ],
-          "hoursBack": 30,
+          "hoursBack": 24,
           "perSection": 4,
           "sections": [
             { "name": "World", "about": "What happened in the world.", "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ] }
@@ -45,7 +49,7 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
     private const int PerFeed = 15;
 
     /// <summary>Items the decider weighs per section, at most: it takes a few seconds each.</summary>
-    private const int Candidates = 12;
+    private const int Candidates = 20;
 
     public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
     {
@@ -54,42 +58,88 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
         var culture = CultureOf(settings.Language);
         var since = context.Now - TimeSpan.FromHours(settings.HoursBack);
 
-        var sections = new List<PaperSection>();
+        var pool = new List<Candidate>();
         foreach (var section in settings.Sections)
         {
-            var fresh = await GatherAsync(context, section, since, cancellationToken).ConfigureAwait(false);
-            var chosen = await ChooseAsync(context, settings, section, fresh, cancellationToken).ConfigureAwait(false);
-            if (chosen.Count == 0)
-            {
-                context.Write($"{section.Name}: nothing new.");
-                continue;
-            }
-
-            var articles = await WriteAsync(context, settings, section, chosen, cancellationToken).ConfigureAwait(false);
-            if (articles.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var item in chosen)
-            {
-                await context.MarkAsync(item.Link.ToString(), SeenState.Shown, cancellationToken).ConfigureAwait(false);
-            }
-
-            sections.Add(new PaperSection(section.Name, articles, chosen));
+            var fresh = await GatherAsync(context, section, since, pool, cancellationToken).ConfigureAwait(false);
+            pool.AddRange(fresh.OrderByDescending(i => i.Published).Take(Candidates).Select(i => new Candidate(i, section)));
         }
 
-        if (sections.Count == 0)
+        if (pool.Count == 0)
         {
             return "Nothing new to print today.";
         }
 
-        var opening = await OpeningAsync(context, settings, sections, cancellationToken).ConfigureAwait(false);
+        Relate(pool);
+        await JudgeAsync(context, settings, pool, cancellationToken).ConfigureAwait(false);
+
+        var news = pool.Where(c => c.Judgement.News >= 0.5).ToList();
+        var lead = news.OrderByDescending(c => c.Score).FirstOrDefault()
+            ?? pool.OrderByDescending(c => c.Related.Count).ThenByDescending(c => c.Item.Published).First();
+        var used = new HashSet<Candidate>(lead.Related.Append(lead));
+        var good = news.Where(c => !used.Contains(c) && c.Judgement.Hopeful >= 0.6)
+            .OrderByDescending(c => c.Judgement.Hopeful * c.Judgement.News).FirstOrDefault();
+        if (good is not null)
+        {
+            used.UnionWith(good.Related.Append(good));
+        }
+
+        var front = await WriteLeadAsync(context, settings, lead, cancellationToken).ConfigureAwait(false);
+        var goodNews = good is null ? null : await WriteGoodNewsAsync(context, settings, good, cancellationToken).ConfigureAwait(false);
+
+        var sections = new List<PaperSection>();
+        foreach (var section in settings.Sections)
+        {
+            var chosen = new List<Candidate>();
+            foreach (var candidate in pool
+                         .Where(c => c.Section == section && !used.Contains(c) && c.Judgement.News >= 0.5 && c.Judgement.Interest >= 0.35)
+                         .OrderByDescending(c => c.Score))
+            {
+                if (chosen.Count == settings.PerSection)
+                {
+                    break;
+                }
+
+                if (used.Contains(candidate))
+                {
+                    continue;
+                }
+
+                chosen.Add(candidate);
+                used.UnionWith(candidate.Related.Append(candidate));
+            }
+
+            if (chosen.Count == 0)
+            {
+                context.Write($"{section.Name}: nothing worth printing.");
+                continue;
+            }
+
+            var items = Items(chosen);
+            var articles = await WriteSectionAsync(context, settings, section, items, cancellationToken).ConfigureAwait(false);
+            if (articles.Count > 0)
+            {
+                var picture = await PictureAsync(items.Take(chosen[0].Related.Count + 1), cancellationToken).ConfigureAwait(false);
+                sections.Add(new PaperSection(section.Name, articles, items, picture));
+            }
+        }
+
+        if (front is null && sections.Count == 0)
+        {
+            throw new InvalidOperationException("The local model could not write any article: see the log.");
+        }
+
+        foreach (var candidate in used)
+        {
+            await context.MarkAsync(candidate.Item.Link.ToString(), SeenState.Shown, cancellationToken).ConfigureAwait(false);
+        }
+
+        var opening = await OpeningAsync(context, settings, front, sections, cancellationToken).ConfigureAwait(false);
         var folder = Expand(settings.Folder);
         Directory.CreateDirectory(folder);
         var number = NextNumber(folder);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(context.Now, context.Clock.LocalTimeZone).DateTime);
-        var html = PaperPage.Render(settings, culture, number, today, opening, sections);
+        var html = PaperPage.Render(settings, culture, number, today, opening, front, goodNews, sections);
 
         var name = $"{Slug(settings.Title)}-N{number:000}-{today:yyyy-MM-dd}";
         await File.WriteAllTextAsync(Path.Combine(folder, name + ".html"), html, cancellationToken).ConfigureAwait(false);
@@ -97,14 +147,15 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
         await File.WriteAllBytesAsync(pdf, await printer.PrintAsync(html, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
         context.Write($"Printed {Path.GetFileName(pdf)}");
 
-        var count = sections.Sum(s => s.Articles.Count);
-        var caption = $"{settings.Title} · N. {number} · {today.ToString("dddd d MMMM yyyy", culture)}\n{opening.Title}";
+        var count = sections.Sum(s => s.Articles.Count) + (front is null ? 0 : 1) + (goodNews is null ? 0 : 1);
+        var caption = $"{settings.Title} · N. {number} · {today.ToString("dddd d MMMM yyyy", culture)}\n{front?.Article.Headline ?? opening.Title}";
         await context.DeliverAsync(caption, pdf, cancellationToken).ConfigureAwait(false);
         return $"N. {number}: {count} articles in {sections.Count} sections.";
     }
 
     /// <summary>The section's news since <paramref name="since"/> that the paper never printed.</summary>
-    private async Task<List<FeedItem>> GatherAsync(RoutineContext context, PaperSettings.Section section, DateTimeOffset since, CancellationToken cancellationToken)
+    private async Task<List<FeedItem>> GatherAsync(
+        RoutineContext context, PaperSettings.Section section, DateTimeOffset since, List<Candidate> pool, CancellationToken cancellationToken)
     {
         var fresh = new List<FeedItem>();
         foreach (var feed in section.Feeds)
@@ -123,8 +174,8 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
             var recent = items.Where(i => i.Published is null || i.Published >= since).OrderByDescending(i => i.Published).Take(PerFeed).ToList();
             foreach (var item in recent)
             {
-                if (await context.MeetAsync(item.Link.ToString(), RoutineContext.Fingerprint(item.Title), item.Title, cancellationToken).ConfigureAwait(false)
-                    && !fresh.Exists(f => f.Link == item.Link))
+                if (!fresh.Exists(f => f.Link == item.Link) && !pool.Exists(c => c.Item.Link == item.Link)
+                    && await context.MeetAsync(item.Link.ToString(), RoutineContext.Fingerprint(item.Title), item.Title, cancellationToken).ConfigureAwait(false))
                 {
                     fresh.Add(item);
                 }
@@ -135,81 +186,165 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
         return fresh;
     }
 
-    /// <summary>
-    /// The items the reader would care about most, as the decider judges them; the newest
-    /// ones when there is no decider or it fails.
-    /// </summary>
-    private async Task<List<FeedItem>> ChooseAsync(
-        RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> fresh, CancellationToken cancellationToken)
+    /// <summary>Links each item to the others telling the same story, by the words their titles share.</summary>
+    private static void Relate(List<Candidate> pool)
     {
-        var candidates = fresh.OrderByDescending(i => i.Published).Take(Candidates).ToList();
-        if (candidates.Count <= settings.PerSection || !decider.Available)
+        var words = pool.ToDictionary(c => c, c => Words(c.Item.Title));
+        foreach (var candidate in pool)
         {
-            return [.. candidates.Take(settings.PerSection)];
+            candidate.Related.AddRange(pool.Where(other => other != candidate && Similar(words[candidate], words[other])));
         }
-
-        var question = new Dictionary<string, DecisionQuestion>
-        {
-            ["interesting"] = new("boolean", $"Would this reader want to read this news in the section \"{section.Name}\" ({section.About})? The reader: {settings.Reader}"),
-        };
-        var scored = new List<(FeedItem Item, double Score)>();
-        try
-        {
-            foreach (var item in candidates)
-            {
-                var answer = (await decider.DecideAsync($"{item.Source}: {item.Title}\n\n{item.Summary}", question, cancellationToken).ConfigureAwait(false))["interesting"];
-                var yes = answer.Abstained ? 0.5 : answer.Answer == "true" ? answer.Confidence : 1 - answer.Confidence;
-                scored.Add((item, yes));
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            context.Write($"{section.Name}: the decider failed ({ex.Message}); taking the newest items.");
-            return [.. candidates.Take(settings.PerSection)];
-        }
-
-        return [.. scored.Where(s => s.Score >= 0.4).OrderByDescending(s => s.Score).Take(settings.PerSection).Select(s => s.Item)];
     }
 
+    private static HashSet<string> Words(string title) =>
+        [.. WordParts().Split(title.ToLowerInvariant()).Where(w => w.Length >= 4)];
+
+    /// <summary>Two titles on the same story share at least two longer words and a third of them.</summary>
+    public static bool SameStory(string first, string second) => Similar(Words(first), Words(second));
+
+    private static bool Similar(HashSet<string> a, HashSet<string> b)
+    {
+        var shared = a.Count(b.Contains);
+        return shared >= 2 && shared / (double)(a.Count + b.Count - shared) >= 0.3;
+    }
+
+    /// <summary>
+    /// Asks the decider about each item: is it news, does it matter today, would the reader
+    /// care, is it good news. Without a decider every item counts as plain news.
+    /// </summary>
+    private async Task JudgeAsync(RoutineContext context, PaperSettings settings, List<Candidate> pool, CancellationToken cancellationToken)
+    {
+        if (!decider.Available)
+        {
+            context.Write("No decider: the newest news goes first.");
+            return;
+        }
+
+        var questions = new Dictionary<string, DecisionQuestion>
+        {
+            ["news"] = new("boolean", "Is this a news report about something new that happened in the last day or two? Opinions, interviews, analyses, reviews, events announced long ahead and plain statements of how things are do not count."),
+            ["importance"] = new("choice", "How important is this news today, for the people of the country or of the world it concerns?",
+                [new("high", "Many people talk about it or are touched by it today."), new("medium", "It matters to some people."), new("low", "A curiosity or a niche fact.")]),
+            ["interest"] = new("boolean", $"Would this reader want to read it? The reader: {settings.Reader}"),
+            ["hopeful"] = new("boolean", "Is this good news: something positive, a solution, a step forward, a reason for hope?"),
+        };
+
+        var judged = 0;
+        foreach (var candidate in pool)
+        {
+            try
+            {
+                var answers = await decider.DecideAsync(
+                    $"{candidate.Item.Source}, section {candidate.Section.Name}: {candidate.Item.Title}\n\n{candidate.Item.Summary}", questions, cancellationToken).ConfigureAwait(false);
+                candidate.Judgement = new Judgement(Yes(answers, "news"), Importance(answers), Yes(answers, "interest"), Yes(answers, "hopeful"));
+                judged++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                context.Write($"The decider failed ({ex.Message}): the rest counts as plain news.");
+                break;
+            }
+        }
+
+        context.Write($"Judged {judged} of {pool.Count} items.");
+    }
+
+    private static double Yes(IReadOnlyDictionary<string, Decision> answers, string key) =>
+        !answers.TryGetValue(key, out var answer) || answer.Abstained ? 0.5
+        : answer.Answer == "true" ? answer.Confidence : 1 - answer.Confidence;
+
+    private static double Importance(IReadOnlyDictionary<string, Decision> answers) =>
+        !answers.TryGetValue("importance", out var answer) || answer.Abstained ? 0.5
+        : (answer.Answer switch { "high" => 1.0, "medium" => 0.6, _ => 0.2 } * answer.Confidence) + (0.5 * (1 - answer.Confidence));
+
+    /// <summary>The chosen items, each followed by the other outlets' items on the same story.</summary>
+    private static List<FeedItem> Items(IEnumerable<Candidate> chosen) =>
+        [.. chosen.SelectMany(c => c.Related.Prepend(c)).Select(c => c.Item).DistinctBy(i => i.Link)];
+
+    private async Task<PaperLead?> WriteLeadAsync(RoutineContext context, PaperSettings settings, Candidate lead, CancellationToken cancellationToken)
+    {
+        var items = Items([lead]);
+        var article = (await WriteAsync(
+            context, settings, items, "the front page",
+            "Write the day's opening story from all these items: a headline, then six to eight sentences that say what happened, why it matters and what comes next.",
+            1, cancellationToken).ConfigureAwait(false)).FirstOrDefault();
+        if (article is null)
+        {
+            return null;
+        }
+
+        return new PaperLead(lead.Section.Name, article, items, await PictureAsync(items, cancellationToken).ConfigureAwait(false));
+    }
+
+    private async Task<PaperLead?> WriteGoodNewsAsync(RoutineContext context, PaperSettings settings, Candidate good, CancellationToken cancellationToken)
+    {
+        var items = Items([good]);
+        var article = (await WriteAsync(
+            context, settings, items, "the good news of the day",
+            "Write the good news of the day from these items: a headline and three warm sentences.",
+            1, cancellationToken).ConfigureAwait(false)).FirstOrDefault();
+        return article is null ? null : new PaperLead(good.Section.Name, article, items, null);
+    }
+
+    private Task<List<PaperArticle>> WriteSectionAsync(
+        RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> items, CancellationToken cancellationToken) =>
+        WriteAsync(
+            context, settings, items, $"the section {section.Name} ({section.About})",
+            "Write one short article per story (items about the same fact make one article), each with a headline and two to four sentences.",
+            settings.PerSection, cancellationToken);
+
     private async Task<List<PaperArticle>> WriteAsync(
-        RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> items, CancellationToken cancellationToken)
+        RoutineContext context, PaperSettings settings, List<FeedItem> items, string where, string task, int most, CancellationToken cancellationToken)
     {
         var list = string.Join("\n\n", items.Select((item, i) => $"[{i + 1}] {item.Source}: {item.Title}\n{item.Summary}"));
         var user = $"""
-            Section: {section.Name} ({section.About})
-
-            The news, numbered:
+            For {where}. The news, numbered:
             {list}
 
-            Write one short article per piece of news worth it (merge pieces about the same fact), each with a headline,
-            two to four sentences, and the numbers of the news it comes from in "sources" (never in the text).
+            {task} Give the numbers of the items each article comes from in "sources", all of them, never in the text.
             """;
         try
         {
-            var answer = await chat.AskAsync(
-                new LocalAsk(settings.Model, Editor(settings), user, ArticlesSchema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
-            var articles = JsonSerializer.Deserialize<ArticlesAnswer>(answer, JsonSerializerOptions.Web)?.Articles ?? [];
-            var valid = articles
+            var answer = await chat.AskAsync(new LocalAsk(settings.Model, Editor(settings), user, ArticlesSchema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
+            var articles = (JsonSerializer.Deserialize<ArticlesAnswer>(answer, JsonSerializerOptions.Web)?.Articles ?? [])
                 .Where(a => !string.IsNullOrWhiteSpace(a.Headline) && !string.IsNullOrWhiteSpace(a.Text))
                 .Select(a => a with
                 {
                     Text = Markers().Replace(a.Text, string.Empty).Trim(),
                     Sources = [.. (a.Sources ?? []).Where(n => n >= 1 && n <= items.Count).Distinct()],
                 })
+                .Take(most)
                 .ToList();
-            context.Write($"{section.Name}: {valid.Count} articles written.");
-            return valid;
+            context.Write($"{Capitalised(where)}: {articles.Count} articles written.");
+            return articles;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            context.Write($"{section.Name}: could not be written ({ex.Message}).");
+            context.Write($"{Capitalised(where)}: could not be written ({ex.Message}).");
             return [];
         }
     }
 
-    private async Task<PaperOpening> OpeningAsync(RoutineContext context, PaperSettings settings, List<PaperSection> sections, CancellationToken cancellationToken)
+    /// <summary>The first picture of these items: the feed's own, or the one their page declares.</summary>
+    private async Task<PaperPicture?> PictureAsync(IEnumerable<FeedItem> items, CancellationToken cancellationToken)
     {
-        var headlines = string.Join("\n", sections.SelectMany(s => s.Articles.Select(a => $"- {s.Name}: {a.Headline}")));
+        foreach (var item in items.Take(3))
+        {
+            var address = item.Image ?? await images.PictureOfAsync(item.Link, cancellationToken).ConfigureAwait(false);
+            if (address is not null && await images.DownloadAsync(address, cancellationToken).ConfigureAwait(false) is { } picture)
+            {
+                return new PaperPicture(picture, item.Source);
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<PaperOpening> OpeningAsync(
+        RoutineContext context, PaperSettings settings, PaperLead? front, List<PaperSection> sections, CancellationToken cancellationToken)
+    {
+        var headlines = string.Join("\n", (front is null ? [] : new[] { $"- Front page: {front.Article.Headline}" })
+            .Concat(sections.SelectMany(s => s.Articles.Select(a => $"- {s.Name}: {a.Headline}"))));
         try
         {
             var answer = await chat.AskAsync(
@@ -218,8 +353,7 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
                     $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and four or five warm sentences that set the day, with a light touch.",
                     OpeningSchema, MaxTokens: 800),
                 cancellationToken).ConfigureAwait(false);
-            var opening = JsonSerializer.Deserialize<PaperOpening>(answer, JsonSerializerOptions.Web);
-            if (opening is { Title.Length: > 0, Text.Length: > 0 })
+            if (JsonSerializer.Deserialize<PaperOpening>(answer, JsonSerializerOptions.Web) is { Title.Length: > 0, Text.Length: > 0 } opening)
             {
                 return opening;
             }
@@ -272,6 +406,8 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
         _ => CultureInfo.GetCultureInfo("en-GB"),
     };
 
+    private static string Capitalised(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
     private static string Slug(string title) => SlugParts().Replace(title.Trim(), "-").Trim('-') is { Length: > 0 } slug ? slug : "Paper";
 
     /// <summary>Source markers a model may leave in the text anyway: "[2]", " [1, 3]".</summary>
@@ -284,15 +420,46 @@ public sealed partial class MorningPaper(ILocalChat chat, IDecider decider, IFee
     [GeneratedRegex(@"[^\p{L}\p{N}]+")]
     private static partial Regex SlugParts();
 
+    [GeneratedRegex(@"[^\p{L}\p{N}]+")]
+    private static partial Regex WordParts();
+
     private sealed record ArticlesAnswer(List<PaperArticle>? Articles);
+
+    /// <summary>What the decider said about an item, each from 0 to 1.</summary>
+    private sealed record Judgement(double News, double Importance, double Interest, double Hopeful)
+    {
+        public static readonly Judgement Unknown = new(0.6, 0.5, 0.5, 0);
+    }
+
+    private sealed class Candidate(FeedItem item, PaperSettings.Section section)
+    {
+        public FeedItem Item { get; } = item;
+
+        public PaperSettings.Section Section { get; } = section;
+
+        /// <summary>Items of other outlets on the same story.</summary>
+        public List<Candidate> Related { get; } = [];
+
+        public Judgement Judgement { get; set; } = Judgement.Unknown;
+
+        /// <summary>How much it deserves a place: importance first, then the reader's interest, then how many outlets carry it.</summary>
+        public double Score => (Judgement.Importance * 0.45) + (Judgement.Interest * 0.35) + (Math.Min(Related.Count, 3) / 3.0 * 0.2);
+    }
 }
 
-/// <param name="Sources">Numbers of the section's items it comes from, from 1.</param>
+/// <param name="Sources">Numbers of the items it comes from, from 1.</param>
 public sealed record PaperArticle(string Headline, string Text, IReadOnlyList<int>? Sources);
 
 public sealed record PaperOpening(string Title, string Text);
 
-public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Articles, IReadOnlyList<FeedItem> Items);
+/// <param name="Credit">The outlet the picture comes from.</param>
+public sealed record PaperPicture(WebImage Image, string Credit);
+
+/// <summary>A story with a place of its own: the front page's opening, or the good news of the day.</summary>
+public sealed record PaperLead(string Section, PaperArticle Article, IReadOnlyList<FeedItem> Items, PaperPicture? Picture);
+
+/// <param name="Picture">A picture for the section's first story, when one was found.</param>
+public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Articles, IReadOnlyList<FeedItem> Items, PaperPicture? Picture = null);
 
 /// <summary>What a morning paper routine is told in its settings.</summary>
 public sealed record PaperSettings(
@@ -320,7 +487,7 @@ public sealed record PaperSettings(
             Folder = string.IsNullOrWhiteSpace(read.Folder) ? "~/Documents/Morning paper" : read.Folder.Trim(),
             Reader = read.Reader?.Trim() ?? string.Empty,
             Rules = read.Rules ?? [],
-            HoursBack = read.HoursBack is > 0 and <= 24 * 7 ? read.HoursBack : 30,
+            HoursBack = read.HoursBack is > 0 and <= 24 * 7 ? read.HoursBack : 24,
             PerSection = read.PerSection is > 0 and <= 10 ? read.PerSection : 4,
             Sections = [.. read.Sections.Where(s => s.Feeds is { Count: > 0 })],
         };

@@ -606,6 +606,10 @@ export function useAskFirst() {
   )
 }
 
+export function useStopRoutine() {
+  return useWrite((id: string) => request<void>('POST', `/api/routines/${id}/stop`), keys.routines)
+}
+
 export function useDeleteRoutine() {
   return useWrite((id: string) => request<void>('DELETE', `/api/routines/${id}`), keys.routines)
 }

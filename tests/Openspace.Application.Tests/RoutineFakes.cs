@@ -89,6 +89,9 @@ internal sealed class FakeOffersKind : IRoutineKind
 
     public Exception? Fail { get; set; }
 
+    /// <summary>Makes a run wait until it is stopped.</summary>
+    public bool Hang { get; set; }
+
     public Exception? FailCarry { get; set; }
 
     public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
@@ -96,6 +99,11 @@ internal sealed class FakeOffersKind : IRoutineKind
         if (Fail is not null)
         {
             throw Fail;
+        }
+
+        if (Hang)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
         }
 
         var shown = 0;

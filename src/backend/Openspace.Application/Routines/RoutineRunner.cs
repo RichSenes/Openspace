@@ -5,14 +5,57 @@ using Openspace.Domain.Routines;
 
 namespace Openspace.Application.Routines;
 
-/// <summary>Routines a person asked to run now, waiting for the runner's next round.</summary>
+/// <summary>
+/// Routines a person asked to run now, waiting for the runner's next round; and the run
+/// going on, which a person may stop.
+/// </summary>
 public sealed class RoutineRequests
 {
     private readonly ConcurrentQueue<RoutineId> _waiting = new();
+    private readonly Lock _gate = new();
+    private (RoutineId Id, CancellationTokenSource Stop)? _running;
 
     public void Ask(RoutineId id) => _waiting.Enqueue(id);
 
     public bool TryTake(out RoutineId id) => _waiting.TryDequeue(out id);
+
+    /// <summary>A run of this routine starts: it stops when <see cref="Stop"/> is asked or the app stops.</summary>
+    internal CancellationTokenSource Starting(RoutineId id, CancellationToken stopping)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+        lock (_gate)
+        {
+            _running = (id, source);
+        }
+
+        return source;
+    }
+
+    internal void Ended(RoutineId id)
+    {
+        lock (_gate)
+        {
+            if (_running?.Id == id)
+            {
+                _running = null;
+            }
+        }
+    }
+
+    /// <summary>Stops the routine's run if it is the one going on. True when it was.</summary>
+    public bool Stop(RoutineId id)
+    {
+        lock (_gate)
+        {
+            if (_running is not { } running || running.Id != id)
+            {
+                return false;
+            }
+
+            running.Stop.Cancel();
+            return true;
+        }
+    }
 }
 
 /// <summary>
@@ -85,15 +128,24 @@ public sealed partial class RoutineRunner(
 
         var context = new RoutineContext(routine, run, routines, outbox, clock, kind, progress);
         progress.Report(routine, "Starting");
+        using var stop = requests.Starting(routine.Id, cancellationToken);
         try
         {
-            var summary = await kind.RunAsync(context, cancellationToken).ConfigureAwait(false);
+            var summary = await kind.RunAsync(context, stop.Token).ConfigureAwait(false);
             run.Succeed(string.IsNullOrWhiteSpace(summary) ? "Done." : summary, clock.GetUtcNow());
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            run.Fail("Stopped by a person.", clock.GetUtcNow());
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogRunFailed(logger, ex, routine.Name);
             run.Fail(ex.Message, clock.GetUtcNow());
+        }
+        finally
+        {
+            requests.Ended(routine.Id);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

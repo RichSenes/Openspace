@@ -70,9 +70,18 @@ public sealed class RoutineCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Deletes the routine with its runs, proposals and what it remembers.</summary>
+    /// <summary>Stops the routine's run going on, if any: the run ends as stopped, the routine keeps its schedule.</summary>
+    /// <returns>False when nothing of it was running.</returns>
+    public async Task<bool> StopAsync(RoutineId id, CancellationToken cancellationToken)
+    {
+        var routine = await routines.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        return requests.Stop(routine.Id);
+    }
+
+    /// <summary>Deletes the routine with its runs, proposals and what it remembers; a run going on is stopped first.</summary>
     public async Task DeleteAsync(RoutineId id, CancellationToken cancellationToken)
     {
+        requests.Stop(id);
         routines.Remove(await routines.GetAsync(id, cancellationToken).ConfigureAwait(false));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }

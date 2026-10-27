@@ -63,6 +63,11 @@ internal static class RoutineEndpoints
             return Results.Accepted();
         });
 
+        routines.MapPost("/stop", async (Guid routineId, RoutineCommands commands, CancellationToken ct) =>
+            await commands.StopAsync(new RoutineId(routineId), ct)
+                ? Results.NoContent()
+                : Results.Problem("This routine is not running.", statusCode: StatusCodes.Status409Conflict));
+
         routines.MapGet("/runs", (Guid routineId, RoutineQueries queries, CancellationToken ct) => queries.RunsAsync(new RoutineId(routineId), ct));
 
         var proposals = app.MapGroup("/api/proposals/{proposalId:guid}").WithTags("Routines");

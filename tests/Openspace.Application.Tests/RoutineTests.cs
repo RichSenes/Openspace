@@ -229,4 +229,25 @@ public class RoutineTests
         Assert.Contains(_h.Progress.Lines, l => l.Line == "Proposed: Backend engineer");
         Assert.Equal(string.Empty, _h.Progress.Lines[^1].Line);
     }
+
+    [Fact]
+    public async Task A_person_can_stop_a_run_and_the_routine_keeps_its_schedule()
+    {
+        var routine = await OffersAsync();
+        _h.OffersKind.Hang = true;
+        await _h.RoutineCommands().RunNowAsync(routine.Id, default);
+
+        var running = RunDueAsync();
+        while (_h.Routines.Runs.Count == 0)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(await _h.RoutineCommands().StopAsync(routine.Id, default));
+        await running;
+
+        Assert.Equal((RoutineRunStatus.Failed, "Stopped by a person."), (_h.Routines.Runs[0].Status, _h.Routines.Runs[0].Summary));
+        Assert.NotNull(routine.NextRunAt);
+        Assert.False(await _h.RoutineCommands().StopAsync(routine.Id, default));
+    }
 }

@@ -193,6 +193,33 @@ what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
 
+## Routines
+
+A routine is a recurring job of an office that is not a task for a desk. Its kind
+(one Openspace knows, listed by `GET /api/routine-kinds`) says what it does; its
+settings, a JSON object, say how; its schedule says when: a time on the person's
+clock, some days of the week (every day when none), every week or every few weeks.
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| GET | `/api/offices/{id}/routines` | Routines with their next run and the latest one |
+| POST | `/api/offices/{id}/routines` | `{ name, kind, schedule: { days, at, everyWeeks }, settings? }` |
+| PUT | `/api/routines/{id}` | Change name, schedule or settings (what is left out stays) |
+| PUT | `/api/routines/{id}/enabled` | Turn it on or off |
+| POST | `/api/routines/{id}/run` | Run it now, whatever its schedule |
+| GET | `/api/routines/{id}/runs` | The latest 20 runs, with their log |
+| DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory |
+| GET | `/api/offices/{id}/proposals?status=Pending` | What routines propose |
+| POST | `/api/proposals/{id}/approve` or `/reject` | Yes carries it out; no is remembered |
+
+Routines run one at a time in the background. A run missed while the computer was
+off happens once when it is back on, and the next one is counted from then. A run
+that fails says why and the routine keeps its schedule; runs cut short by a restart
+are marked failed. Routines remember what they met (an offer, a news item) by a
+key and a fingerprint of what matters in it: it is shown once, comes back only if
+it changed in substance, and never once the person turned it down. Anything that
+acts on the person's things is a proposal, and only a yes lets the routine act.
+
 ## Agents going in circles
 
 Smaller models, local ones above all, can get stuck: the same edit failing the same

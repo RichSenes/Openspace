@@ -130,6 +130,185 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Routines.Proposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("DecidedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RoutineId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoutineId");
+
+                    b.HasIndex("RunId");
+
+                    b.HasIndex("OfficeId", "Status");
+
+                    b.ToTable("Proposals", (string)null);
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.Routine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastRunAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextRunAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Schedule")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextRunAt");
+
+                    b.HasIndex("OfficeId");
+
+                    b.ToTable("Routines", (string)null);
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.RoutineRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ByHand")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("FinishedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Log")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RoutineId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("StartedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfficeId");
+
+                    b.HasIndex("RoutineId", "StartedAt");
+
+                    b.ToTable("RoutineRuns", (string)null);
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.SeenItem", b =>
+                {
+                    b.Property<Guid>("RoutineId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ChangedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("FirstSeenAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LastSeenAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("RoutineId", "Key");
+
+                    b.ToTable("SeenItems", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -625,6 +804,54 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Permissions")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.Proposal", b =>
+                {
+                    b.HasOne("Openspace.Domain.Routines.Routine", null)
+                        .WithMany()
+                        .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Openspace.Domain.Routines.RoutineRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.Routine", b =>
+                {
+                    b.HasOne("Openspace.Domain.Offices.Office", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.RoutineRun", b =>
+                {
+                    b.HasOne("Openspace.Domain.Offices.Office", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Openspace.Domain.Routines.Routine", null)
+                        .WithMany()
+                        .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Routines.SeenItem", b =>
+                {
+                    b.HasOne("Openspace.Domain.Routines.Routine", null)
+                        .WithMany()
+                        .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

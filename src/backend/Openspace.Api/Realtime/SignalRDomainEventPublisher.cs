@@ -56,6 +56,18 @@ internal sealed class SignalRDomainEventPublisher(IHubContext<BuildingHub> hub, 
             await hub.Clients.All.SendAsync("EpicsChanged", cancellationToken).ConfigureAwait(false);
         }
 
+        // Routines, their runs and their proposals: the Routines view of that office reloads.
+        foreach (var office in events.Select(e => e switch
+                 {
+                     Domain.Routines.RoutineChanged x => x.OfficeId,
+                     Domain.Routines.RoutineRunChanged x => x.OfficeId,
+                     Domain.Routines.ProposalChanged x => (OfficeId?)x.OfficeId,
+                     _ => null,
+                 }).OfType<OfficeId>().Distinct())
+        {
+            await hub.Clients.All.SendAsync("RoutinesChanged", office.Value, cancellationToken).ConfigureAwait(false);
+        }
+
         if (events.Any(e => e is RoleDefined or RoleChanged))
         {
             await hub.Clients.All.SendAsync("RolesChanged", cancellationToken).ConfigureAwait(false);

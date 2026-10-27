@@ -21,4 +21,13 @@ internal static class IdConverters
         : ValueConverter<Domain.Reports.ReportId, Guid>(id => id.Value, value => new Domain.Reports.ReportId(value));
 
     internal sealed class WorkTaskIdConverter() : ValueConverter<WorkTaskId, Guid>(id => id.Value, value => new WorkTaskId(value));
+
+    internal sealed class RoutineIdConverter()
+        : ValueConverter<Domain.Routines.RoutineId, Guid>(id => id.Value, value => new Domain.Routines.RoutineId(value));
+
+    internal sealed class RoutineRunIdConverter()
+        : ValueConverter<Domain.Routines.RoutineRunId, Guid>(id => id.Value, value => new Domain.Routines.RoutineRunId(value));
+
+    internal sealed class ProposalIdConverter()
+        : ValueConverter<Domain.Routines.ProposalId, Guid>(id => id.Value, value => new Domain.Routines.ProposalId(value));
 }

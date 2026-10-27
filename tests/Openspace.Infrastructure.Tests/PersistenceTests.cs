@@ -40,6 +40,46 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_routine_with_its_run_proposal_and_memory_survives_a_round_trip()
+    {
+        var (officeId, _, _) = await FurnishECorpAsync();
+        var now = new DateTimeOffset(2026, 10, 27, 5, 0, 0, TimeSpan.Zero);
+        var (routineId, runId) = await InScope(async sp =>
+        {
+            var routines = sp.GetRequiredService<Application.Abstractions.IRoutineRepository>();
+            var office = await sp.GetRequiredService<Application.Abstractions.IOfficeRepository>().FindAsync(officeId, default);
+            var schedule = Domain.Routines.RoutineSchedule.Weekly([DayOfWeek.Monday, DayOfWeek.Thursday], new TimeOnly(9, 15), 2, new DateOnly(2026, 11, 2));
+            var routine = Domain.Routines.Routine.Create(office!, "Maintenance", "maintenance", schedule, "{\"disk\":\"/srv\"}", now, TimeZoneInfo.Utc);
+            var run = Domain.Routines.RoutineRun.Start(routine, true, now, TimeZoneInfo.Utc);
+            run.Write("Checked the disk", now);
+            run.Succeed("All fine.", now);
+            routines.Add(routine);
+            routines.AddRun(run);
+            routines.AddProposal(Domain.Routines.Proposal.Make(run, "update", "Update OpenCode", "A new version is out.", "{\"to\":\"1.20\"}", now));
+            routines.AddSeen(Domain.Routines.SeenItem.Meet(routine.Id, "opencode-1.20", "fp", "OpenCode 1.20", Domain.Routines.SeenState.Shown, now));
+            await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+            return (routine.Id, run.Id);
+        });
+
+        await InScope(async sp =>
+        {
+            var routines = sp.GetRequiredService<Application.Abstractions.IRoutineRepository>();
+            var routine = await routines.FindAsync(routineId, default);
+            var run = await routines.FindRunAsync(runId, default);
+            var proposal = Assert.Single(await routines.ListProposalsAsync(officeId, Domain.Routines.ProposalStatus.Pending, default));
+            var seen = await routines.FindSeenAsync(routineId, "opencode-1.20", default);
+
+            Assert.Equal([DayOfWeek.Monday, DayOfWeek.Thursday], routine!.Schedule.Days);
+            Assert.Equal((new TimeOnly(9, 15), 2, new DateOnly(2026, 11, 2)), (routine.Schedule.At, routine.Schedule.EveryWeeks, routine.Schedule.Since));
+            Assert.Equal((now, "{\"disk\":\"/srv\"}"), (routine.LastRunAt!.Value, routine.Settings));
+            Assert.Contains("Checked the disk", run!.Log, StringComparison.Ordinal);
+            Assert.Equal(("Update OpenCode", "{\"to\":\"1.20\"}"), (proposal.Title, proposal.Payload));
+            Assert.Equal(Domain.Routines.SeenState.Shown, seen!.State);
+            Assert.Single(await routines.ListDueAsync(routine.NextRunAt!.Value, default));
+        });
+    }
+
+    [Fact]
     public async Task Office_with_rooms_and_desks_survives_a_round_trip()
     {
         var (officeId, _, _) = await FurnishECorpAsync();

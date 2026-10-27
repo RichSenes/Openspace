@@ -123,7 +123,12 @@ Later, in rough order of appearance:
   (or claiming the card through the API) always get it, and local tasks go back
   to the queue for them.
 - **Routines.** Simple recurring jobs (sorting email, a morning paper) on the
-  local models, on a schedule, outside the office and its repositories.
+  local models, on a schedule, outside the office and its repositories. The
+  engine is done (schedules, runs and their logs, memory of what was met,
+  proposals waiting for a yes); next come local models and the GPU for routines,
+  news and mail sources, Telegram, and the kinds themselves: morning paper, mail,
+  follow-ups, deadlines, weekly recap, newsletters, maintenance, job offers and
+  the CV.
 
 - ~~**Notification sounds.**~~ Done: a sound when an agent needs you, when work reaches
   review, when a task fails, and other moments worth hearing. Customisable per

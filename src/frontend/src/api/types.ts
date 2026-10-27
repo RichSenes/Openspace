@@ -404,3 +404,68 @@ export interface SoundsView {
   /** Sound files of yours, kept on this machine. */
   files: string[]
 }
+
+export type Weekday = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'
+
+/** When a routine runs: a time of day, on some days (every day when none), every week or every few. */
+export interface ScheduleView {
+  days: Weekday[]
+  /** "HH:mm" on the person's clock. */
+  at: string
+  everyWeeks: number
+  /** The week counting starts from, for schedules every few weeks. */
+  since?: string | null
+}
+
+export type RoutineRunStatus = 'Running' | 'Succeeded' | 'Failed'
+
+export interface RoutineRunView {
+  id: string
+  routineId: string
+  status: RoutineRunStatus
+  byHand: boolean
+  startedAt: string
+  finishedAt: string | null
+  summary: string | null
+  log: string
+}
+
+/** A recurring job of an office: the morning paper, the job offers of the day… */
+export interface RoutineView {
+  id: string
+  officeId: string
+  name: string
+  kind: string
+  kindName: string
+  schedule: ScheduleView
+  /** The kind's own settings, as JSON. */
+  settings: string
+  enabled: boolean
+  lastRunAt: string | null
+  nextRunAt: string | null
+  lastRun: RoutineRunView | null
+}
+
+export type ProposalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Done' | 'Failed'
+
+/** Something a routine wants to do with the person's things: it waits for a yes. */
+export interface ProposalView {
+  id: string
+  routineId: string
+  routineName: string
+  action: string
+  title: string
+  /** Markdown. */
+  body: string
+  status: ProposalStatus
+  createdAt: string
+  decidedAt: string | null
+  outcome: string | null
+}
+
+export interface RoutineKindView {
+  key: string
+  name: string
+  description: string
+  defaultSettings: string
+}

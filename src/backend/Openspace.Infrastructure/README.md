@@ -10,6 +10,7 @@ Adapters that connect the application to the outside world.
 | Agent signals | `OpenCode/OpenCodeEventListener` + `OpenCodeEventTranslator`: global event stream to progress, permission, finished, failed (done) |
 | Workspaces | `Git/GitWorkspaceManager`: one git worktree per task (done) |
 | Queue | `Hosting/QueueRunnerService`: recovers at startup, fills seats every few seconds (done) |
+| Routines | `Persistence/RoutineRepository` + `Configurations/RoutineConfiguration` (schedule stored as JSON), `Hosting/RoutineRunnerService` runs them every few seconds, off with the queue in tests (done) |
 | Graphics card | `LocalModels/LocalModelServer` starts and stops the local model server, `LocalModels/GpuProbe` reads the card's memory and the running programs, `Hosting/GpuShiftService` runs `GpuShift` every few seconds and writes the OpenCode provider (done) |
 | Persistence | SQLite via EF Core (done) |
 | Agent tools | `OpenCodeRuntime.ConnectToolsAsync`: registers the API's MCP server in OpenCode per worktree (done; the server itself lives in the API) |

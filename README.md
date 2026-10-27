@@ -102,6 +102,11 @@ Each project has its own README with detailed specifications.
     conversation that keeps filling up) is stopped and starts over in a fresh
     conversation on the work done so far; if it keeps looping its work goes to
     review as it is. Stop and review does the same by hand, without losing work.
+20. Offices have routines: recurring jobs that run on their own schedule (a time
+    of day, some days of the week, every few weeks), log what they do, remember
+    what they already met so nothing comes back twice, and propose: nothing
+    touches your things until you approve. The first kinds (morning paper, mail,
+    job offers) are on their way.
 
 ## Ground rules
 

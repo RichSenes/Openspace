@@ -75,6 +75,7 @@ app.MapEpicEndpoints();
 app.MapReportEndpoints();
 app.MapEngineEndpoints();
 app.MapGpuEndpoints();
+app.MapRoutineEndpoints();
 app.MapSettingsEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);

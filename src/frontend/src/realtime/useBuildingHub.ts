@@ -27,6 +27,7 @@ export function useBuildingHub(): LinkState {
       void client.invalidateQueries({ queryKey: keys.deskUsage })
     })
     hub.on('ReportsChanged', () => void client.invalidateQueries({ queryKey: keys.reports }))
+    hub.on('RoutinesChanged', () => void client.invalidateQueries({ queryKey: keys.routines }))
     hub.on('EpicsChanged', () => void client.invalidateQueries({ queryKey: keys.epics }))
     hub.on('RolesChanged', () => void client.invalidateQueries({ queryKey: keys.roles }))
     hub.on('TaskLogChanged', (taskId: string) => void client.invalidateQueries({ queryKey: keys.log(taskId) }))

@@ -26,6 +26,14 @@ public sealed class OpenspaceDbContext(
 
     public DbSet<Domain.Reports.Report> Reports => Set<Domain.Reports.Report>();
 
+    public DbSet<Domain.Routines.Routine> Routines => Set<Domain.Routines.Routine>();
+
+    public DbSet<Domain.Routines.RoutineRun> RoutineRuns => Set<Domain.Routines.RoutineRun>();
+
+    public DbSet<Domain.Routines.Proposal> Proposals => Set<Domain.Routines.Proposal>();
+
+    public DbSet<Domain.Routines.SeenItem> SeenItems => Set<Domain.Routines.SeenItem>();
+
     /// <summary>Saves, then publishes the events raised by the saved aggregates.</summary>
     async Task IUnitOfWork.SaveChangesAsync(CancellationToken cancellationToken)
     {
@@ -60,6 +68,9 @@ public sealed class OpenspaceDbContext(
         configurationBuilder.Properties<RoleId>().HaveConversion<IdConverters.RoleIdConverter>();
         configurationBuilder.Properties<EpicId>().HaveConversion<IdConverters.EpicIdConverter>();
         configurationBuilder.Properties<Domain.Reports.ReportId>().HaveConversion<IdConverters.ReportIdConverter>();
+        configurationBuilder.Properties<Domain.Routines.RoutineId>().HaveConversion<IdConverters.RoutineIdConverter>();
+        configurationBuilder.Properties<Domain.Routines.RoutineRunId>().HaveConversion<IdConverters.RoutineRunIdConverter>();
+        configurationBuilder.Properties<Domain.Routines.ProposalId>().HaveConversion<IdConverters.ProposalIdConverter>();
 
         // SQLite cannot order or compare DateTimeOffset natively: store it as a sortable 64-bit number.
         configurationBuilder.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();

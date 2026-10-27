@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IEpicRepository, EpicRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<IRoutineRepository, RoutineRepository>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
         services.TryAddSingleton<IActivityPublisher, NullActivityPublisher>();
         services.AddSingleton<IWorkspaceManager, GitWorkspaceManager>();
@@ -61,6 +62,11 @@ public static class DependencyInjection
             ? ActivatorUtilities.CreateInstance<QueueRunnerService>(sp)
             : new IdleService());
         services.AddHostedService<ReviewRunnerService>();
+
+        // Routines run in the background like the queue, and like it are off in tests.
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<IOptions<QueueOptions>>().Value.Enabled
+            ? ActivatorUtilities.CreateInstance<RoutineRunnerService>(sp)
+            : new IdleService());
 
         // The graphics card: local models load when desks need them and give way to the programs listed first.
         services.AddHttpClient(LocalModelServer.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(5));

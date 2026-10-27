@@ -106,4 +106,13 @@ public class LocalModelsTests
 
         Assert.Null(server.Running);
     }
+
+    [Fact]
+    public void A_server_s_last_lines_say_why_it_stopped_in_plain_words()
+    {
+        Assert.Equal("not enough graphics memory", LocalModelServer.Why("0.07 E ggml: allocating 320 MiB on device 0: cudaMalloc failed: out of memory\n0.07 I cleaning up"));
+        Assert.Equal("its port is taken by another program", LocalModelServer.Why("couldn't bind HTTP server socket: Address already in use"));
+        Assert.Equal("0.01 E srv load_model: failed to load model", LocalModelServer.Why("0.00 I loading\n0.01 E srv load_model: failed to load model\n0.02 I bye"));
+        Assert.Null(LocalModelServer.Why("0.00 I all good"));
+    }
 }

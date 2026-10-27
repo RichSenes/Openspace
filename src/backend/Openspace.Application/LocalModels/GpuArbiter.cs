@@ -64,6 +64,18 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
 
     internal DateTimeOffset? RetryAt { get; set; }
 
+    /// <summary>Why the model last failed to load, for the message shown until the next try.</summary>
+    internal string? LastFailure { get; set; }
+
+    /// <summary>A person asks to try loading again now instead of waiting.</summary>
+    public void RetryNow()
+    {
+        lock (_gate)
+        {
+            RetryAt = null;
+        }
+    }
+
     /// <summary>Whether the model runs on this machine, through Openspace's provider.</summary>
     public bool IsLocal(string? model) =>
         Enabled && model is not null && model.StartsWith(options.CurrentValue.Provider + "/", StringComparison.Ordinal);

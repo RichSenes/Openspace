@@ -22,6 +22,12 @@ describe('gpuBadge', () => {
     expect(badge?.title).toBe('Local desks wait until the graphics card is free again.')
   })
 
+  it('says in the bar when a model did not load for lack of graphics memory', () => {
+    expect(gpuBadge(view({ state: 'Failed', modelName: 'Gemma', detail: 'The model server stopped while loading (not enough graphics memory): trying again at 17:04.' }))?.text).toBe(
+      'Gemma: not enough graphics memory',
+    )
+  })
+
   it('says when a model did not load', () => {
     expect(gpuBadge(view({ state: 'Failed', modelName: 'Gemma', detail: 'The model did not answer: trying again at 10:05.' }))).toMatchObject({ text: 'Gemma did not load', tone: 'trouble' })
   })

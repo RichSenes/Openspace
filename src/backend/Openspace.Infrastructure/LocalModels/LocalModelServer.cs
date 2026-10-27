@@ -21,6 +21,7 @@ internal sealed partial class LocalModelServer(
     private readonly Queue<string> _output = new();
     private Process? _process;
     private string? _model;
+    private string? _lastFailure;
 
     public string? Running
     {
@@ -29,6 +30,17 @@ internal sealed partial class LocalModelServer(
             lock (_gate)
             {
                 return _process is { HasExited: false } ? _model : null;
+            }
+        }
+    }
+
+    public string? LastFailure
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastFailure;
             }
         }
     }
@@ -51,6 +63,7 @@ internal sealed partial class LocalModelServer(
         lock (_gate)
         {
             Kill();
+            _lastFailure = null;
             var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {model.Command}.");
             process.StandardInput.Close();
 
@@ -155,7 +168,29 @@ internal sealed partial class LocalModelServer(
             tail = string.Join('\n', _output);
         }
 
+        lock (_gate)
+        {
+            _lastFailure = Why(tail);
+        }
+
         LogExited(logger, model, process.ExitCode, tail);
+    }
+
+    /// <summary>The reason in a server's last lines, said simply when it is a known one.</summary>
+    internal static string? Why(string tail)
+    {
+        if (tail.Contains("out of memory", StringComparison.OrdinalIgnoreCase))
+        {
+            return "not enough graphics memory";
+        }
+
+        if (tail.Contains("address already in use", StringComparison.OrdinalIgnoreCase))
+        {
+            return "its port is taken by another program";
+        }
+
+        var error = tail.Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Contains(" E ", StringComparison.Ordinal) || l.Contains("error", StringComparison.OrdinalIgnoreCase));
+        return error is null ? null : error.Length <= 160 ? error : string.Concat(error.AsSpan(0, 160), "…");
     }
 
     private void Kill()

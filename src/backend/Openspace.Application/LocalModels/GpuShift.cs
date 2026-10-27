@@ -159,7 +159,7 @@ public sealed class GpuShift(
 
         if (now < arbiter.RetryAt)
         {
-            Report(GpuState.Failed, wanted, false, $"{NameOf(wanted)} did not load: trying again at {arbiter.RetryAt.Value.ToLocalTime():HH:mm}.");
+            Report(GpuState.Failed, wanted, false, $"{arbiter.LastFailure ?? $"{NameOf(wanted)} did not load"}: trying again at {arbiter.RetryAt.Value.ToLocalTime():HH:mm}.");
             return;
         }
 
@@ -190,8 +190,15 @@ public sealed class GpuShift(
 
     private async Task FailAsync(string id, string reason, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        // The server's own words say why, when it stopped by itself: no memory left, say.
+        if (server.LastFailure is { Length: > 0 } why)
+        {
+            reason = $"{reason} ({why})";
+        }
+
         await StopAsync(cancellationToken).ConfigureAwait(false);
         arbiter.RetryAt = now + options.CurrentValue.RetryAfter;
+        arbiter.LastFailure = reason;
         Report(GpuState.Failed, id, false, $"{reason}: trying again at {arbiter.RetryAt.Value.ToLocalTime():HH:mm}.");
     }
 

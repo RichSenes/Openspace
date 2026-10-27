@@ -209,6 +209,25 @@ public class GpuArbiterTests
     }
 
     [Fact]
+    public async Task A_failed_load_says_why_and_can_be_tried_again_at_once()
+    {
+        await LocalTaskAsync();
+        await _h.Shift().TickAsync(default);
+        _h.ModelServer.Running = null;
+        _h.ModelServer.LastFailure = "not enough graphics memory";
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal(GpuState.Failed, _h.Gpu.View().State);
+        Assert.Contains("not enough graphics memory", _h.Gpu.View().Detail, StringComparison.Ordinal);
+
+        _h.Gpu.RetryNow();
+        await _h.Runner().RunQueueAsync(default);
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal(["gemma", "gemma"], _h.ModelServer.Started);
+    }
+
+    [Fact]
     public async Task A_server_somebody_else_started_is_left_alone()
     {
         _h.ModelServer.Answering = true;

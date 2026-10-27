@@ -25,6 +25,8 @@ public sealed class GoogleTests : IDisposable
             TokenUri = new Uri("https://auth.example/token"),
             RevokeUri = new Uri("https://auth.example/revoke"),
             GmailUri = new Uri("https://mail.example/"),
+            TasksUri = new Uri("https://tasks.example/"),
+            CalendarUri = new Uri("https://calendar.example/"),
         };
         File.WriteAllText(Path.Combine(_folder, GoogleAccounts.ClientFile), """{"installed":{"client_id":"made-up-client.apps.example","client_secret":"made-up-secret"}}""");
     }
@@ -240,6 +242,43 @@ public sealed class GoogleTests : IDisposable
         Assert.DoesNotContain("\r\nBcc:", mail, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_task_goes_to_the_default_list_due_that_day_with_its_place_in_the_notes()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var agenda = new GoogleAgenda(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options));
+
+        var link = await agenda.AddAsync(email, new AgendaItem(false, "Pay the electricity bill", new DateOnly(2026, 3, 10), null, 60, "Online", "From the bill"), TimeZoneInfo.Utc, default);
+
+        Assert.Equal("https://tasks.example/task-1", link);
+        var call = Assert.Single(_google.Calls, c => c.Path == "/tasks/v1/lists/@default/tasks");
+        Assert.Equal("""{"title":"Pay the electricity bill","notes":"Online\nFrom the bill","due":"2026-03-10T00:00:00.000Z"}""", call.Body);
+        Assert.Equal("Bearer made-up-access", call.Authorization);
+    }
+
+    [Fact]
+    public async Task An_event_goes_to_the_main_calendar_on_the_person_s_clock_without_guests_or_emails()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var agenda = new GoogleAgenda(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options));
+        var rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
+
+        var link = await agenda.AddAsync(email, new AgendaItem(true, "Dentist", new DateOnly(2026, 3, 12), new TimeOnly(10, 30), 45, "Clinic", "From the clinic"), rome, default);
+        await agenda.AddAsync(email, new AgendaItem(true, "Town fair", new DateOnly(2026, 3, 14), null, 60, "", "From the town"), rome, default);
+
+        Assert.Equal("https://calendar.example/event-1", link);
+        var calls = _google.Calls.Where(c => c.Path == "/calendar/v3/calendars/primary/events").ToList();
+        Assert.All(calls, c => Assert.Equal("?sendUpdates=none", c.Query));
+        Assert.All(calls, c => Assert.DoesNotContain("attendees", c.Body, StringComparison.Ordinal));
+        using var timed = JsonDocument.Parse(calls[0].Body);
+        Assert.Equal("2026-03-12T10:30:00", timed.RootElement.GetProperty("start").GetProperty("dateTime").GetString());
+        Assert.Equal("2026-03-12T11:15:00", timed.RootElement.GetProperty("end").GetProperty("dateTime").GetString());
+        Assert.Equal("Europe/Rome", timed.RootElement.GetProperty("start").GetProperty("timeZone").GetString());
+        using var allDay = JsonDocument.Parse(calls[1].Body);
+        Assert.Equal("2026-03-14", allDay.RootElement.GetProperty("start").GetProperty("date").GetString());
+        Assert.Equal("2026-03-15", allDay.RootElement.GetProperty("end").GetProperty("date").GetString());
+    }
+
     private static string Base64Url(string text) => GoogleAccounts.Base64Url(Encoding.UTF8.GetBytes(text));
 
     /// <summary>Google's sign-in and Gmail, made up: answers by path, records every call.</summary>
@@ -270,6 +309,8 @@ public sealed class GoogleTests : IDisposable
                 ("/gmail/v1/users/me/labels", "GET") => Json("""{"labels":[{"id":"INBOX","name":"INBOX"},{"id":"Label_1","name":"Existing"}]}"""),
                 ("/gmail/v1/users/me/labels", "POST") => Json("""{"id":"Label_new","name":"Openspace/Newsletters"}"""),
                 ("/gmail/v1/users/me/drafts", _) => Json("""{"id":"draft-1"}"""),
+                ("/tasks/v1/lists/@default/tasks", "POST") => Json("""{"id":"task-1","webViewLink":"https://tasks.example/task-1"}"""),
+                ("/calendar/v3/calendars/primary/events", "POST") => Json("""{"id":"event-1","htmlLink":"https://calendar.example/event-1"}"""),
                 _ when uri.AbsolutePath.EndsWith("/modify", StringComparison.Ordinal) => Json("{}"),
                 _ => Json("""{"error":{"message":"Not found"}}""", HttpStatusCode.NotFound),
             };

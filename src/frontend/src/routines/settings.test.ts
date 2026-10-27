@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readText, withText } from './settings'
+import { readAgenda, readText, withAgenda, withText } from './settings'
 
 describe('routine text settings', () => {
   it('reads a text setting, empty when missing or not text', () => {
@@ -11,5 +11,17 @@ describe('routine text settings', () => {
   it('changes one setting and keeps the others, leaving broken JSON alone', () => {
     expect(JSON.parse(withText('{"labels":[1],"account":""}', 'account', 'someone@example.com'))).toEqual({ labels: [1], account: 'someone@example.com' })
     expect(withText('{"account":', 'account', 'x')).toBe('{"account":')
+  })
+})
+
+describe('mail agenda settings', () => {
+  it('puts dates in both places unless told otherwise', () => {
+    expect(readAgenda('{}')).toEqual({ tasks: true, calendar: true })
+    expect(readAgenda('{"agenda":{"calendar":false}}')).toEqual({ tasks: true, calendar: false })
+    expect(readAgenda('{"agenda":false}')).toEqual({ tasks: false, calendar: false })
+  })
+
+  it('writes both choices and keeps the rest', () => {
+    expect(JSON.parse(withAgenda('{"account":"a"}', { tasks: false, calendar: true }))).toEqual({ account: 'a', agenda: { tasks: false, calendar: true } })
   })
 })

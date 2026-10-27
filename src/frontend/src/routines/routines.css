@@ -338,14 +338,14 @@
   font-size: 12px;
 }
 
-.routine-kanji {
+.routine-group {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.routine-kanji legend {
+.routine-group legend {
   margin-bottom: 6px;
   padding: 0;
   color: var(--mute);

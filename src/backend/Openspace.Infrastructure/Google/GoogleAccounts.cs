@@ -31,6 +31,10 @@ public sealed class GoogleOptions
     public Uri RevokeUri { get; set; } = new("https://oauth2.googleapis.com/revoke");
 
     public Uri GmailUri { get; set; } = new("https://gmail.googleapis.com/");
+
+    public Uri TasksUri { get; set; } = new("https://tasks.googleapis.com/");
+
+    public Uri CalendarUri { get; set; } = new("https://www.googleapis.com/");
 }
 
 /// <summary>

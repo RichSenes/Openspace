@@ -1,5 +1,6 @@
 .shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   height: 100%;
 }
@@ -23,9 +24,13 @@
   display: flex;
   gap: 4px;
   height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tab {
+  flex: none;
   height: 100%;
   padding: 0 12px;
   border: 0;
@@ -76,7 +81,7 @@
 
 .body {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -187,7 +192,7 @@
   }
 
   .body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
   }
 

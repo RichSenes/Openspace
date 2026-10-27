@@ -13,6 +13,7 @@ namespace Openspace.Infrastructure.Hosting;
 /// </summary>
 internal sealed partial class GpuShiftService(
     IServiceScopeFactory scopes,
+    DeciderClient decider,
     IOptionsMonitor<LocalModelOptions> options,
     ILogger<GpuShiftService> logger) : BackgroundService
 {
@@ -36,6 +37,7 @@ internal sealed partial class GpuShiftService(
         do
         {
             await InScopeAsync((shift, ct) => shift.TickAsync(ct), stoppingToken).ConfigureAwait(false);
+            await decider.StopIfIdleAsync(stoppingToken).ConfigureAwait(false);
         }
         while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
     }
@@ -44,6 +46,7 @@ internal sealed partial class GpuShiftService(
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
         await InScopeAsync((shift, ct) => shift.StopAsync(ct), cancellationToken).ConfigureAwait(false);
+        await decider.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task InScopeAsync(Func<GpuShift, CancellationToken, Task> work, CancellationToken cancellationToken)

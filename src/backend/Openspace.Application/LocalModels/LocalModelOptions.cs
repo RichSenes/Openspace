@@ -42,6 +42,12 @@ public sealed class LocalModelOptions
     /// <summary>A claim not renewed for this long lapses, in case its program died without releasing it.</summary>
     public TimeSpan ClaimLease { get; set; } = TimeSpan.FromMinutes(10);
 
+    /// <summary>How long a routine waits for the graphics card (an image generator may have it) before giving up.</summary>
+    public TimeSpan RoutineWait { get; set; } = TimeSpan.FromHours(3);
+
+    /// <summary>The small model on the processor that answers typed questions for routines.</summary>
+    public DeciderOptions Decider { get; set; } = new();
+
     public LocalModel? Find(string id) => Models.Find(m => string.Equals(m.Id, id, StringComparison.Ordinal));
 }
 
@@ -69,4 +75,23 @@ public sealed class GpuHolder
     public string Name { get; set; } = "";
 
     public string Match { get; set; } = "";
+}
+
+/// <summary>
+/// A model on the processor (Rizzo-Flow, say) that answers typed questions: yes or no, one of
+/// a list, a score. It needs no graphics card, so it runs next to anything; Openspace starts it
+/// when a routine asks and stops it when nobody does.
+/// </summary>
+public sealed class DeciderOptions
+{
+    /// <summary>What starts it; empty means routines have no decider.</summary>
+    public string Command { get; set; } = "";
+
+    public List<string> Arguments { get; set; } = [];
+
+    public Uri Url { get; set; } = new("http://127.0.0.1:8017");
+
+    public TimeSpan IdleUnload { get; set; } = TimeSpan.FromMinutes(10);
+
+    public TimeSpan StartTimeout { get; set; } = TimeSpan.FromMinutes(3);
 }

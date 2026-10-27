@@ -245,4 +245,95 @@ public class GpuArbiterTests
 
         Assert.Equal((GpuState.Off, (string?)null), (_h.Gpu.View().State, _h.ModelServer.Running));
     }
+
+    private sealed class FakeModelApi : ILocalModelApi
+    {
+        public List<LocalAsk> Asked { get; } = [];
+
+        public Task<string> CompleteAsync(LocalAsk ask, CancellationToken cancellationToken)
+        {
+            Asked.Add(ask);
+            return Task.FromResult("Buongiorno.");
+        }
+    }
+
+    private async Task ServingAsync()
+    {
+        _h.Gpu.TryLease("local/gemma")?.Dispose();
+        await _h.Shift().TickAsync(default);
+        _h.ModelServer.Answering = true;
+        await _h.Shift().TickAsync(default);
+    }
+
+    [Fact]
+    public async Task A_routine_leases_the_loaded_model_and_holds_off_tasks_meanwhile()
+    {
+        Assert.Null(_h.Gpu.TryLease("local/gemma"));
+        await ServingAsync();
+
+        using (var lease = _h.Gpu.TryLease("local/gemma"))
+        {
+            Assert.NotNull(lease);
+            Assert.Null(_h.Gpu.TryLease("local/gemma"));
+            var task = await LocalTaskAsync();
+            Assert.Equal(WorkTaskStatus.Queued, task.Status);
+
+            // A long ask keeps the model loaded past the idle time.
+            _h.Clock.Advance(TimeSpan.FromMinutes(15));
+            await _h.Shift().TickAsync(default);
+            Assert.Equal(GpuState.Serving, _h.Gpu.View().State);
+        }
+
+        Assert.NotNull(_h.Gpu.TryLease("local/gemma"));
+    }
+
+    [Fact]
+    public async Task A_routine_asking_gives_way_to_a_holder_after_the_grace()
+    {
+        await ServingAsync();
+        using var lease = _h.Gpu.TryLease("local/gemma");
+
+        _h.GpuProbe.Programs.Add("image-studio");
+        await _h.Shift().TickAsync(default);
+        Assert.Equal(GpuState.Yielding, _h.Gpu.View().State);
+
+        _h.Clock.Advance(TimeSpan.FromMinutes(3));
+        await _h.Shift().TickAsync(default);
+        Assert.Equal((GpuState.Lent, (string?)null), (_h.Gpu.View().State, _h.ModelServer.Running));
+    }
+
+    [Fact]
+    public async Task Local_chat_waits_for_the_model_then_asks_it()
+    {
+        var api = new FakeModelApi();
+        var chat = new LocalChat(_h.Gpu, api, new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
+
+        var answer = chat.AskAsync(new LocalAsk("local/gemma", "You write a paper.", "Say good morning."), default);
+        Assert.False(answer.IsCompleted);
+        await _h.Shift().TickAsync(default);
+        _h.ModelServer.Answering = true;
+        await _h.Shift().TickAsync(default);
+        _h.Clock.Advance(LocalChat.Poll);
+
+        Assert.Equal("Buongiorno.", await answer);
+        Assert.Equal("Say good morning.", Assert.Single(api.Asked).User);
+        Assert.Equal(["gemma"], _h.ModelServer.Started);
+    }
+
+    [Fact]
+    public async Task Local_chat_gives_up_when_the_card_stays_taken_and_says_who_has_it()
+    {
+        _h.LocalModels.RoutineWait = TimeSpan.FromSeconds(5);
+        _h.GpuProbe.Programs.Add("image-studio");
+        await _h.Shift().TickAsync(default);
+        var chat = new LocalChat(_h.Gpu, new FakeModelApi(), new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
+
+        var answer = chat.AskAsync(new LocalAsk("local/gemma", "s", "u"), default);
+        _h.Clock.Advance(LocalChat.Poll);
+        _h.Clock.Advance(LocalChat.Poll);
+
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => answer);
+        Assert.Contains("the card is with Image studio", error.Message, StringComparison.Ordinal);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => chat.AskAsync(new LocalAsk("nvidia/big", "s", "u"), default));
+    }
 }

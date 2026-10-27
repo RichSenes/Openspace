@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddSingleton<LoopGuard>();
         services.AddSingleton<GpuArbiter>();
         services.AddScoped<GpuShift>();
+        services.AddSingleton<ILocalChat, LocalChat>();
         services.AddScoped<Review.TaskReviewer>();
         services.AddScoped<Checks.MergeChecks>();
         services.AddSingleton<RoutineRequests>();

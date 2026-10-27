@@ -49,6 +49,7 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
     private readonly Dictionary<string, (DateTimeOffset First, DateTimeOffset Last)> _wanted = new(StringComparer.Ordinal);
     private GpuView _view = new(GpuState.Off, null, null, [], null);
     private bool _busy;
+    private int _leases;
 
     public bool Enabled => options.CurrentValue.Enabled;
 
@@ -78,7 +79,7 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
         lock (_gate)
         {
             _wanted[id] = (_wanted.TryGetValue(id, out var seen) ? seen.First : now, now);
-            if (_busy || _view.State != GpuState.Serving || _view.Model != model)
+            if (_busy || _leases > 0 || _view.State != GpuState.Serving || _view.Model != model)
             {
                 return false;
             }
@@ -88,6 +89,62 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
             _busy = true;
             _wanted.Remove(id);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// A routine asks to use the loaded model now. Null while the model is not loaded or a
+    /// task or another routine uses it; the request is remembered either way, so the model
+    /// gets loaded. Dispose the lease when done.
+    /// </summary>
+    public IDisposable? TryLease(string model)
+    {
+        var id = model[(model.IndexOf('/', StringComparison.Ordinal) + 1)..];
+        var now = clock.GetUtcNow();
+        lock (_gate)
+        {
+            _wanted[id] = (_wanted.TryGetValue(id, out var seen) ? seen.First : now, now);
+            if (_busy || _leases > 0 || _view.State != GpuState.Serving || _view.Model != model)
+            {
+                return null;
+            }
+
+            _leases++;
+            _wanted.Remove(id);
+            return new Lease(this);
+        }
+    }
+
+    /// <summary>Routines using the model right now.</summary>
+    internal int Leases
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _leases;
+            }
+        }
+    }
+
+    private void EndLease()
+    {
+        lock (_gate)
+        {
+            _leases = Math.Max(0, _leases - 1);
+        }
+    }
+
+    private sealed class Lease(GpuArbiter arbiter) : IDisposable
+    {
+        private int _done;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _done, 1) == 0)
+            {
+                arbiter.EndLease();
+            }
         }
     }
 

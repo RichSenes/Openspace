@@ -229,6 +229,11 @@ What a routine makes goes to the person's Telegram group: its settings name a bo
 in a repository). Long text is split on line breaks; files go as documents. A
 routine without a channel delivers nothing; tests point the folder somewhere empty.
 
+Routines read news through RSS and Atom feeds (no DTDs or external entities: a
+feed that tries to read local files is refused) and print their pages to PDF with
+a headless Firefox through geckodriver (`Pdf:Geckodriver`, the snap's
+`firefox.geckodriver` when present): A4, backgrounds included.
+
 ## Agents going in circles
 
 Smaller models, local ones above all, can get stuck: the same edit failing the same
@@ -348,6 +353,14 @@ Every few seconds the API looks at the card, and only at the memory in use
   Pick a `Match` only that program has: any command line that contains it counts.
 - A model that does not answer within `StartTimeout` is stopped and tried again
   after `RetryAfter`; its server's last lines go to the API log.
+
+Routines use the local models too: they lease the loaded model through the same
+arbiter, so they wait while a program has the card (at most `RoutineWait`, 3 hours),
+keep the model loaded while they ask, and give way after the same grace as tasks.
+Next to it, an optional decider runs on the processor (`LocalModels:Decider`, a
+command such as Rizzo-Flow's server and its `Url`): it answers typed questions (yes or
+no, one of a list) for sorting and filtering, starts on the first question and stops
+after `IdleUnload` without any.
 
 `GET /api/gpu` (also in `GET /api/engines` as `gpu`) says who has the card:
 `Off`, `Free`, `Loading`, `Serving`, `WaitingForMemory`, `Yielding`, `Lent` or

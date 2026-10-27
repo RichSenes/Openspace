@@ -1,13 +1,15 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Openspace.Application.LocalModels;
 
 namespace Openspace.Infrastructure.LocalModels;
 
-/// <summary>Starts the model server as a child process, and stops it with everything it started.</summary>
+/// <summary>
+/// Starts a model server as a child process, and stops it with everything it started: the
+/// one on the graphics card, or the decider on the processor, each at its own address.
+/// </summary>
 internal sealed partial class LocalModelServer(
-    IHttpClientFactory httpClients, IOptionsMonitor<LocalModelOptions> options, ILogger<LocalModelServer> logger)
+    IHttpClientFactory httpClients, Func<Uri> serverUrl, ILogger<LocalModelServer> logger)
     : ILocalModelServer, IDisposable
 {
     public const string HttpClientName = "local-model";
@@ -100,7 +102,7 @@ internal sealed partial class LocalModelServer(
         try
         {
             using var http = httpClients.CreateClient(HttpClientName);
-            using var response = await http.GetAsync(new Uri(options.CurrentValue.ServerUrl, "/health"), cancellationToken).ConfigureAwait(false);
+            using var response = await http.GetAsync(new Uri(serverUrl(), "/health"), cancellationToken).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)

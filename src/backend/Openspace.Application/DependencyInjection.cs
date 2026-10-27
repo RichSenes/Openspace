@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.Agents;
+using Openspace.Application.LocalModels;
 using Openspace.Application.Offices;
 using Openspace.Application.Queue;
 using Openspace.Application.Reports;
@@ -32,6 +33,8 @@ public static class DependencyInjection
         services.AddSingleton<Review.PendingReviews>();
         services.AddSingleton<PermissionRequests>();
         services.AddSingleton<EngineLimits>();
+        services.AddSingleton<GpuArbiter>();
+        services.AddScoped<GpuShift>();
         services.AddScoped<Review.TaskReviewer>();
         services.AddScoped<Checks.MergeChecks>();
         return services;

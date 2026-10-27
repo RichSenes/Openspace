@@ -93,6 +93,11 @@ Each project has its own README with detailed specifications.
     account is over its limits, its tasks go on with the first reserve that
     still has room, and go back to the desk once its account resets. Meant for
     public code: an office kept on this machine has none.
+18. Desks can run on models of this machine (a llama.cpp server, say), which
+    Openspace loads on the graphics card when a desk needs one and unloads when
+    nobody uses it. Programs that come first (an image generator, a trainer) get
+    the card as soon as they run or claim it: local tasks finish or go back to
+    the queue, and resume once the card is free again.
 
 ## Ground rules
 

@@ -388,6 +388,48 @@ internal sealed class InMemoryReports : IReportRepository
 }
 
 /// <summary>Options that read their value when asked, as a monitor of live settings does.</summary>
+internal sealed class FakeGpuProbe : LocalModels.IGpuProbe
+{
+    public LocalModels.GpuMemory? Memory { get; set; } = new(500, 12288);
+
+    /// <summary>The command lines of the programs running now.</summary>
+    public List<string> Programs { get; } = [];
+
+    public Task<LocalModels.GpuMemory?> MemoryAsync(CancellationToken cancellationToken) => Task.FromResult(Memory);
+
+    public IReadOnlyList<string> RunningHolders(IReadOnlyList<LocalModels.GpuHolder> holders) =>
+        [.. holders.Where(h => Programs.Exists(p => p.Contains(h.Match, StringComparison.OrdinalIgnoreCase))).Select(h => h.Name)];
+}
+
+internal sealed class FakeModelServer : LocalModels.ILocalModelServer
+{
+    public string? Running { get; set; }
+
+    /// <summary>Whether the started model answers yet; something else may answer too.</summary>
+    public bool Answering { get; set; }
+
+    public List<string> Started { get; } = [];
+
+    public int Stops { get; private set; }
+
+    public Task StartAsync(LocalModels.LocalModel model, CancellationToken cancellationToken)
+    {
+        Started.Add(model.Id);
+        Running = model.Id;
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        Running = null;
+        Answering = false;
+        Stops++;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> IsAnsweringAsync(CancellationToken cancellationToken) => Task.FromResult(Answering);
+}
+
 internal sealed class LiveOptions<T>(Func<T> read) : Microsoft.Extensions.Options.IOptionsMonitor<T>
 {
     public T CurrentValue => read();

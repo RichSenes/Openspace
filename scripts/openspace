@@ -22,6 +22,9 @@ WEB_PORT="${OPENSPACE_WEB_PORT:-5173}"
 OPENCODE_PORT="${OPENSPACE_OPENCODE_PORT:-4096}"
 STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
 SERVICES=(opencode api web)
+# The API writes the OpenCode provider of the local models here; OpenCode merges it with
+# the person's own configuration (restart opencode after the first time).
+OPENCODE_LOCAL="${LocalModels__OpenCodeConfigPath:-$STATE/opencode-local.json}"
 
 # Tools installed for the user only: .NET in ~/.dotnet, Node and OpenCode through nvm.
 export PATH="$HOME/.dotnet:$HOME/.local/bin:$PATH"
@@ -83,13 +86,18 @@ start_one() {
   case "$name" in
     opencode)
       command -v opencode >/dev/null 2>&1 || fail "opencode is not installed (npm install -g opencode-ai)"
-      launch opencode "$HOME" opencode serve --port "$OPENCODE_PORT"
+      if [ -f "$OPENCODE_LOCAL" ]; then
+        launch opencode "$HOME" env OPENCODE_CONFIG="$OPENCODE_LOCAL" opencode serve --port "$OPENCODE_PORT"
+      else
+        launch opencode "$HOME" opencode serve --port "$OPENCODE_PORT"
+      fi
       ;;
     api)
       say "api: building…"
       (cd "$API_DIR" && dotnet build -v q -nologo >"$STATE/logs/api-build.log" 2>&1) || fail "the API does not build: see $STATE/logs/api-build.log"
       launch api "$API_DIR" env ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}" \
         ASPNETCORE_URLS="http://localhost:$API_PORT" OpenCode__BaseUrl="http://127.0.0.1:$OPENCODE_PORT" \
+        LocalModels__OpenCodeConfigPath="$OPENCODE_LOCAL" \
         dotnet run --no-build --no-launch-profile
       ;;
     web)

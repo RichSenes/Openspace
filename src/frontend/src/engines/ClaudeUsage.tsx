@@ -1,5 +1,6 @@
-import { RefreshCw, TriangleAlert } from 'lucide-react'
-import { useCheckClaudeUsage, useEngines } from '../api/hooks'
+import { Cpu, Hand, LoaderCircle, MemoryStick, RefreshCw, TriangleAlert } from 'lucide-react'
+import { useCheckClaudeUsage, useEngines, useGpu } from '../api/hooks'
+import { gpuBadge } from './gpu'
 import type { ClaudeUsage, UsageWindow } from '../api/types'
 import './engines.css'
 
@@ -87,6 +88,21 @@ export function LimitPauses({ onOpen }: { onOpen: () => void }) {
     <button type="button" className="claude-meter claude-meter-limited" onClick={onOpen} title="Desks on these models wait in the queue">
       <TriangleAlert size={14} aria-hidden />
       <span>{pauses.map((p) => `${p.label}: paused until ${new Date(p.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`).join(' · ')}</span>
+    </button>
+  )
+}
+
+const GPU_ICON = { Loading: LoaderCircle, Serving: Cpu, WaitingForMemory: MemoryStick, Yielding: Hand, Lent: Hand, Failed: TriangleAlert }
+
+/** Who has the graphics card, while local models have something to say about it. */
+export function GpuStatus({ onOpen }: { onOpen: () => void }) {
+  const badge = gpuBadge(useGpu().data)
+  if (!badge) return null
+  const Icon = GPU_ICON[badge.state as keyof typeof GPU_ICON] ?? Cpu
+  return (
+    <button type="button" className={`claude-meter gpu-${badge.tone}`} onClick={onOpen} title={badge.title}>
+      <Icon size={14} aria-hidden />
+      <span>{badge.text}</span>
     </button>
   )
 }

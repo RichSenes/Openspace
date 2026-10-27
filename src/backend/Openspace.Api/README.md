@@ -251,6 +251,55 @@ back, the task returns to it the next time it is queued. Free tiers may keep wha
 they are sent, so an office kept on this machine (`localOnly`) cannot have
 reserves, and one with reserves cannot be kept local until they are removed.
 
+### Local models and the graphics card
+
+With `LocalModels:Enabled`, desks can name models served on this machine as
+`local/<id>` (the provider name is `LocalModels:Provider`). Each model says what
+starts its server, a command that stays in the foreground and answers an
+OpenAI-compatible API at `LocalModels:ServerUrl`, and how much graphics memory it
+needs. Keep real paths in `appsettings.Local.json`, which git ignores:
+
+```json
+"LocalModels": {
+  "Enabled": true,
+  "ApiKeyFile": "/opt/models/.apikey",
+  "Models": [
+    { "Id": "gemma", "Name": "Gemma", "Command": "/opt/models/start-gemma.sh", "MemoryMiB": 11000, "Context": 32768 }
+  ],
+  "Holders": [
+    { "Name": "Image studio", "Match": "image-studio" }
+  ]
+}
+```
+
+At startup the API writes the matching OpenCode provider to
+`LocalModels:OpenCodeConfigPath` (the key is read from `ApiKeyFile` by OpenCode,
+never copied); `scripts/openspace` points it to the state folder and hands it to
+`opencode serve`, so restart OpenCode once after the first time.
+
+Every few seconds the API looks at the card, and only at the memory in use
+(`nvidia-smi`) and at the running programs' command lines (Linux):
+
+- A queued task on a local model waits until that model answers; the model is
+  started when the card has the memory it needs and nothing else answers at the
+  server's address. One local task runs at a time.
+- A model nobody used for `IdleUnload` (10 minutes) is stopped. A desk waiting
+  for another model gets it once the loaded one is idle.
+- A holder is a program that comes first: one whose command line contains its
+  `Match`, or one that claims the card with `POST /api/gpu/claim`
+  (`{ "holder": "Image studio" }`, renewed within `ClaimLease`, 10 minutes, and
+  released with `DELETE /api/gpu/claim/{holder}`). Local tasks then have
+  `YieldGrace` (3 minutes) to end; after that they go back to the queue with a
+  note and resume in their own session later, and the model is stopped.
+  Pick a `Match` only that program has: any command line that contains it counts.
+- A model that does not answer within `StartTimeout` is stopped and tried again
+  after `RetryAfter`; its server's last lines go to the API log.
+
+`GET /api/gpu` (also in `GET /api/engines` as `gpu`) says who has the card:
+`Off`, `Free`, `Loading`, `Serving`, `WaitingForMemory`, `Yielding`, `Lent` or
+`Failed`, with the model, the holders and a sentence. The top bar shows it. When
+Openspace stops, it stops the model it started.
+
 ## Claude Code
 
 Claude Code agents run as `claude -p` in the task's working copy, with `--restricted`:

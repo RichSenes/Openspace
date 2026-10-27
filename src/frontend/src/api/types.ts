@@ -60,6 +60,19 @@ export interface EnginesView {
   pauses?: LimitPause[] | null
 }
 
+export type GpuState = 'Off' | 'Free' | 'Loading' | 'Serving' | 'WaitingForMemory' | 'Yielding' | 'Lent' | 'Failed'
+
+/** Who has the graphics card, for desks on models of this machine. */
+export interface GpuView {
+  state: GpuState
+  /** The local model loaded, loading or waited for, as "local/<id>". */
+  model: string | null
+  modelName: string | null
+  /** The programs the card is lent to, or being freed for. */
+  holders: string[]
+  detail: string | null
+}
+
 /** An account over its usage limits: its desks keep their tasks queued until it resumes. */
 export interface LimitPause {
   /** "claude-code", or "opencode:<provider>" for an OpenCode provider. */

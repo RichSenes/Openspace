@@ -65,6 +65,18 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Programs_claim_and_release_the_graphics_card()
+    {
+        var claimed = await _http.PostAsJsonAsync("/api/gpu/claim", new { holder = "Image studio" });
+        var nameless = await _http.PostAsJsonAsync("/api/gpu/claim", new { holder = " " });
+        var released = await _http.DeleteAsync("/api/gpu/claim/Image%20studio");
+        var gpu = await GetAsync<JsonElement>("/api/gpu");
+
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.BadRequest, HttpStatusCode.OK), (claimed.StatusCode, nameless.StatusCode, released.StatusCode));
+        Assert.Equal("Off", gpu.GetProperty("state").GetString());
+    }
+
+    [Fact]
     public async Task An_office_can_be_furnished_and_read_back()
     {
         var (officeId, roomId, deskId) = await FurnishAsync();

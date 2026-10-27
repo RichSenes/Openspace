@@ -343,51 +343,6 @@ public sealed class MailSortingTests
     [InlineData("Shop <orders@shop.example>", "Shop")]
     public void The_sender_is_named_as_people_say_it(string from, string name) => Assert.Equal(name, MailSorting.Sender(from));
 
-    private sealed class FakeMailbox : IMailbox
-    {
-        public List<MailMessage> Messages { get; } = [];
-
-        public List<(string Id, string Label, bool Archive)> Labelled { get; } = [];
-
-        public List<MailReply> Drafts { get; } = [];
-
-        public List<string> Accounts { get; } = [];
-
-        public List<string> Queries { get; } = [];
-
-        /// <summary>Two ids a page, so the routine has to turn pages. Archived mail leaves the inbox; "newer_than" leaves out the old.</summary>
-        public Task<MailPage> FindAsync(string account, string query, string? page, CancellationToken cancellationToken)
-        {
-            Accounts.Add(account);
-            Queries.Add(query);
-            var matching = Messages
-                .Where(m => !Labelled.Any(l => l.Id == m.Id && l.Archive))
-                .Where(m => !query.Contains("newer_than", StringComparison.Ordinal) || m.Received >= Harness.Start.AddDays(-2))
-                .Select(m => m.Id)
-                .ToList();
-            var from = page is null ? 0 : int.Parse(page, System.Globalization.CultureInfo.InvariantCulture);
-            var next = from + 2 < matching.Count ? (from + 2).ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
-            return Task.FromResult(new MailPage([.. matching.Skip(from).Take(2)], next));
-        }
-
-        public Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken) =>
-            Task.FromResult(Messages.Single(m => m.Id == messageId));
-
-        public Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken)
-        {
-            Accounts.Add(account);
-            Labelled.Add((messageId, label, archive));
-            return Task.CompletedTask;
-        }
-
-        public Task<string> DraftReplyAsync(string account, MailReply reply, CancellationToken cancellationToken)
-        {
-            Accounts.Add(account);
-            Drafts.Add(reply);
-            return Task.FromResult($"draft-{Drafts.Count}");
-        }
-    }
-
     /// <summary>Sorts by words in the subject; "Unsure" makes it unsure.</summary>
     private sealed class FakeDecider : IDecider
     {

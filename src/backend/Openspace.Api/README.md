@@ -277,6 +277,14 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   with `sendUpdates=none`. `agenda` (`{ "tasks": true, "calendar": true }`, or
   `false`) says where they go; with one off, the other takes everything. The same
   date with the same words is added once, whatever mail repeats it.
+- **Newsletter digest** (`newsletters`): the newsletters of `account` matching
+  `query` (by default those the mail routine labelled, `label:openspace-newsletters
+  newer_than:14d`; Gmail writes a label's slash as a dash), newest first, `most` per
+  issue, each summed up once. The local model writes a headline and a few sentences
+  for each in `language`, leaving out advertising (a newsletter that is only
+  advertising is left out of the page), and gives it a topic; topics group the
+  summaries, the busiest first, each linking back to its mail. Printed to PDF like
+  the paper, numbered in `folder`, and delivered through `channel`.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

@@ -511,10 +511,10 @@ public sealed partial class MorningPaper(
             .DefaultIfEmpty(0)
             .Max() + 1;
 
-    private static string Expand(string folder) =>
+    internal static string Expand(string folder) =>
         folder.StartsWith('~') ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), folder.TrimStart('~', '/')) : folder;
 
-    private static CultureInfo CultureOf(string language) => language.Trim().ToUpperInvariant() switch
+    internal static CultureInfo CultureOf(string language) => language.Trim().ToUpperInvariant() switch
     {
         "ITALIAN" or "ITALIANO" => CultureInfo.GetCultureInfo("it-IT"),
         "JAPANESE" => CultureInfo.GetCultureInfo("ja-JP"),
@@ -526,7 +526,7 @@ public sealed partial class MorningPaper(
 
     private static string Capitalised(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
-    private static string Slug(string title) => SlugParts().Replace(title.Trim(), "-").Trim('-') is { Length: > 0 } slug ? slug : "Paper";
+    internal static string Slug(string title) => SlugParts().Replace(title.Trim(), "-").Trim('-') is { Length: > 0 } slug ? slug : "Paper";
 
     /// <summary>Source markers a model may leave in the text anyway: "[2]", " [1, 3]".</summary>
     [GeneratedRegex(@"\s*\[\d+(?:\s*,\s*\d+)*\]")]

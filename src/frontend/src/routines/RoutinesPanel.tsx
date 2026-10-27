@@ -404,7 +404,7 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
         {days.length === 0 && '. Pick days to run only on those.'}
       </p>
       {kind === 'morning-paper' && <KanjiChoiceField settings={settings} onChange={setSettings} />}
-      {kind === 'mail' && <AccountField settings={settings} onChange={setSettings} />}
+      {(kind === 'mail' || kind === 'newsletters') && <AccountField settings={settings} onChange={setSettings} />}
       {kind === 'mail' && <AgendaField settings={settings} onChange={setSettings} />}
       <details className="routine-advanced">
         <summary>Advanced settings (JSON)</summary>
@@ -452,7 +452,7 @@ function KanjiChoiceField({ settings, onChange }: { settings: string; onChange: 
   )
 }
 
-/** The Google account a mail routine works on, chosen among the connected ones. */
+/** The Google account a routine reads mail from, chosen among the connected ones. */
 function AccountField({ settings, onChange }: { settings: string; onChange: (settings: string) => void }) {
   const google = useGoogle()
   const account = readText(settings, 'account')

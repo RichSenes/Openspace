@@ -5,6 +5,7 @@ import {
   useCreateRoutine,
   useDecideProposal,
   useDeleteRoutine,
+  useGoogle,
   useKanjiCourse,
   useKnownKanji,
   useProposals,
@@ -22,6 +23,7 @@ import { useRoutineProgress } from '../realtime/routineProgress'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
+import { readText, withText } from './settings'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
 
@@ -402,6 +404,7 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
         {days.length === 0 && '. Pick days to run only on those.'}
       </p>
       {kind === 'morning-paper' && <KanjiChoiceField settings={settings} onChange={setSettings} />}
+      {kind === 'mail' && <AccountField settings={settings} onChange={setSettings} />}
       <details className="routine-advanced">
         <summary>Advanced settings (JSON)</summary>
         <textarea className="input" rows={8} value={settings} onChange={(e) => setSettings(e.target.value)} spellCheck={false} />
@@ -445,5 +448,28 @@ function KanjiChoiceField({ settings, onChange }: { settings: string; onChange: 
       )}
       {broken && <p className="hint">Fix the advanced settings first.</p>}
     </fieldset>
+  )
+}
+
+/** The Google account a mail routine works on, chosen among the connected ones. */
+function AccountField({ settings, onChange }: { settings: string; onChange: (settings: string) => void }) {
+  const google = useGoogle()
+  const account = readText(settings, 'account')
+  const accounts = google.data?.accounts ?? []
+  const missing = account !== '' && !accounts.some((a) => a.email === account)
+  return (
+    <label className="field">
+      <span>Google account</span>
+      <select className="input" value={account} disabled={Boolean(settingsProblem(settings))} onChange={(e) => onChange(withText(settings, 'account', e.target.value))}>
+        <option value="">Choose an account</option>
+        {accounts.map((a) => (
+          <option key={a.email} value={a.email}>
+            {a.email}
+          </option>
+        ))}
+        {missing && <option value={account}>{account} (not connected)</option>}
+      </select>
+      {google.data && accounts.length === 0 && <span className="hint">No account connected yet: connect one in Settings, under Google accounts.</span>}
+    </label>
   )
 }

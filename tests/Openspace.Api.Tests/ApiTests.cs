@@ -301,6 +301,23 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Google_says_where_its_client_goes_and_answers_a_refusal_with_a_page()
+    {
+        var status = await GetAsync<JsonElement>("/api/google");
+        var connect = await _http.PostAsync("/api/google/connect", null);
+        var refused = await _http.GetAsync("/api/google/callback?error=access_denied&state=made-up");
+
+        Assert.False(status.GetProperty("clientReady").GetBoolean());
+        Assert.Contains("openspace-no-google-", status.GetProperty("folder").GetString(), StringComparison.Ordinal);
+        Assert.Equal(0, status.GetProperty("accounts").GetArrayLength());
+        Assert.Equal(HttpStatusCode.Conflict, connect.StatusCode);
+        Assert.Contains("google-client.json", await connect.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal("text/html", refused.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("You said no to Google", await refused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Contains((await GetAsync<JsonElement>("/api/routine-kinds")).EnumerateArray(), k => k.GetProperty("key").GetString() == "mail");
+    }
+
+    [Fact]
     public async Task Only_a_running_task_can_be_stopped_for_review()
     {
         var (officeId, _, deskId) = await FurnishAsync();

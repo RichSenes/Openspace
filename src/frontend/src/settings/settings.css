@@ -126,3 +126,23 @@
 .sound-upload {
   justify-self: start;
 }
+
+.google-accounts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.google-accounts li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  overflow-wrap: anywhere;
+}

@@ -215,6 +215,10 @@ clock, some days of the week (every day when none), every week or every few week
 | DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory, stopping a run first |
 | GET | `/api/offices/{id}/proposals?status=Pending` | What routines propose |
 | POST | `/api/proposals/{id}/approve` or `/reject` | Yes carries it out; no is remembered |
+| GET | `/api/google` | Whether the OAuth client is in place, and the connected accounts |
+| POST | `/api/google/connect` | `{ url }`: Google's page to say yes on; it comes back to the callback |
+| GET | `/api/google/callback` | Where Google sends the browser back: keeps the account's key, answers with a small page |
+| DELETE | `/api/google/accounts/{email}` | Gives the account's key back to Google and forgets it |
 
 Routines run one at a time in the background. A run missed while the computer was
 off happens once when it is back on, and the next one is counted from then. A run
@@ -251,6 +255,24 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   `scripts/openspace kanji-data` downloads KANJIDIC2 and JMdict (EDRDG, CC BY-SA
   4.0), KanjiVG (CC BY-SA 3.0) and Tatoeba's sentences (CC BY 2.0 FR), about 60 MB;
   the page credits them.
+- **Mail** (`mail`): the new mail of `account` matching `query` (`in:inbox
+  newer_than:2d`), never met before. The decider puts each message under one of
+  `labels` (`name`, `about`) when it is sure of it, as `labelPrefix/name` in the
+  mailbox; labels with `archive` take the message out of the inbox. Labelling and
+  archiving can be undone, so they happen on their own unless the routine asks
+  first. For mail under a label with `reply`, not sent to a list, the local model
+  drafts an answer in the mail's own language, knowing who the person is (`me`):
+  it becomes a draft in the mailbox only after a yes, and the person sends it. No
+  routine can send mail. A summary of what stays in the inbox, in `language`,
+  goes through `channel`. Mail is read by local models only.
+
+Google accounts are connected in Settings with the person's own OAuth client: a
+desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,
+its JSON saved as `google-client.json` in `Google:Folder` (`~/.config/openspace`).
+The browser goes to Google and comes back to `/api/google/callback` on this computer
+(PKCE; only loopback addresses are accepted). Each account's lasting key is kept in
+`google/<address>.json` in the same folder, readable by the person only; short-lived
+tokens stay in memory. Tests point the folder somewhere empty and Google to a fake.
 
 Routines read news through RSS and Atom feeds (no DTDs or external entities: a
 feed that tries to read local files is refused) and print their pages to PDF with

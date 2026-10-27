@@ -3,6 +3,7 @@ import { useEngines, useSaveSettings, useSettings, useBackUp, useBackups } from 
 import type { Autonomy, SettingsView } from '../api/types'
 import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
+import { GoogleCard } from './GoogleCard'
 import { SoundsCard } from './SoundsCard'
 import './settings.css'
 
@@ -38,6 +39,7 @@ export function SettingsPanel() {
       </section>
       <SoundsCard />
       <Backups />
+      <GoogleCard />
       <Accounts />
     </section>
   )

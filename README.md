@@ -140,6 +140,11 @@ scripts/openspace stop
 scripts/openspace kanji-data     # once, for the paper's kanji of the day: its dictionaries
 ```
 
+Routines that work on mail (and later the calendar and tasks) need a Google
+account: put your own OAuth client (a desktop app of your Google Cloud project) in
+`~/.config/openspace/google-client.json`, then connect the account in Settings,
+under Google accounts. Keys stay on your computer; no routine can send mail.
+
 Logs and process ids live in `~/.local/state/openspace`. Ports change with
 `OPENSPACE_API_PORT`, `OPENSPACE_WEB_PORT` and `OPENSPACE_OPENCODE_PORT`.
 

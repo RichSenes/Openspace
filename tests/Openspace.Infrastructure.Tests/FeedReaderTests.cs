@@ -92,4 +92,20 @@ public class FeedReaderTests
             WebImages.Declared("""<meta content="https://cdn.example/a.png" name="twitter:image">""", page)?.ToString());
         Assert.Null(WebImages.Declared("""<meta property="og:image" content="javascript:alert(1)">""", page));
     }
+
+    [Fact]
+    public void A_picture_s_size_is_read_from_its_own_header()
+    {
+        byte[] png = [0x89, (byte)'P', (byte)'N', (byte)'G', 13, 10, 26, 10, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R', 0, 0, 2, 188, 0, 0, 7, 71];
+        byte[] gif = [(byte)'G', (byte)'I', (byte)'F', (byte)'8', (byte)'9', (byte)'a', 0x20, 0x03, 0x58, 0x02];
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0, 4, 0, 0, 0xFF, 0xC0, 0, 17, 8, 0x02, 0xA3, 0x04, 0xB0, 3, 0, 0, 0, 0, 0, 0];
+
+        Assert.Equal((700, 1863), WebImages.Size(png));
+        Assert.Equal((800, 600), WebImages.Size(gif));
+        Assert.Equal((1200, 675), WebImages.Size(jpeg));
+        Assert.Equal((0, 0), WebImages.Size([1, 2, 3]));
+        Assert.False(new Application.Routines.WebImage(png, "image/png", 700, 1863).FitsAFrame);
+        Assert.False(new Application.Routines.WebImage(jpeg, "image/jpeg", 320, 180).FitsAFrame);
+        Assert.True(new Application.Routines.WebImage(jpeg, "image/jpeg", 1200, 675).FitsAFrame);
+    }
 }

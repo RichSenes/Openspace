@@ -208,8 +208,9 @@ clock, some days of the week (every day when none), every week or every few week
 | PUT | `/api/routines/{id}/enabled` | Turn it on or off |
 | PUT | `/api/routines/{id}/ask-first` | `{ askFirst }`: every proposal waits for a yes |
 | POST | `/api/routines/{id}/run` | Run it now, whatever its schedule |
+| POST | `/api/routines/{id}/stop` | Stop its run going on (409 when none); it keeps its schedule |
 | GET | `/api/routines/{id}/runs` | The latest 20 runs, with their log |
-| DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory |
+| DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory, stopping a run first |
 | GET | `/api/offices/{id}/proposals?status=Pending` | What routines propose |
 | POST | `/api/proposals/{id}/approve` or `/reject` | Yes carries it out; no is remembered |
 

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { CircleCheck, CircleX, LoaderCircle, Play, Plus, Trash2 } from 'lucide-react'
+import { CircleCheck, CircleX, LoaderCircle, Play, Plus, Square, Trash2 } from 'lucide-react'
 import {
   useAskFirst,
   useCreateRoutine,
@@ -10,11 +10,13 @@ import {
   useRoutineRuns,
   useRoutines,
   useRunRoutine,
+  useStopRoutine,
   useTurnOnRoutine,
   useUpdateRoutine,
 } from '../api/hooks'
 import type { OfficeView, RoutineRunStatus, RoutineView, ScheduleView, Weekday } from '../api/types'
 import { Markdown } from '../reports/Markdown'
+import { useRoutineProgress } from '../realtime/routineProgress'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK } from './schedule'
@@ -111,6 +113,8 @@ function Proposals({ officeId }: { officeId: string }) {
 
 function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: RoutineView; open: boolean; onToggleRuns: () => void; onEdit: () => void }) {
   const run = useRunRoutine()
+  const stop = useStopRoutine()
+  const running = useRoutineProgress().has(routine.id) || routine.lastRun?.status === 'Running'
   const turnOn = useTurnOnRoutine()
   const askFirst = useAskFirst()
   const remove = useDeleteRoutine()
@@ -170,9 +174,15 @@ function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: Routine
         </div>
       </dl>
       <div className="row">
-        <button type="button" className="btn" disabled={run.isPending} onClick={() => run.mutate(routine.id, { onSuccess: () => toast('It runs in a moment') })}>
-          <Play size={16} /> Run now
-        </button>
+        {running ? (
+          <button type="button" className="btn" disabled={stop.isPending} onClick={() => stop.mutate(routine.id, { onSuccess: () => toast('Stopped: the routine keeps its schedule') })}>
+            <Square size={16} /> Stop
+          </button>
+        ) : (
+          <button type="button" className="btn" disabled={run.isPending} onClick={() => run.mutate(routine.id, { onSuccess: () => toast('It runs in a moment') })}>
+            <Play size={16} /> Run now
+          </button>
+        )}
         <button type="button" className="btn" onClick={onEdit}>
           Change
         </button>
@@ -182,7 +192,7 @@ function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: Routine
         {deleting ? (
           <>
             <button type="button" className="btn btn-danger" onClick={() => remove.mutate(routine.id, { onSuccess: () => toast('Routine deleted') })}>
-              <Trash2 size={16} /> Delete it, with its runs
+              <Trash2 size={16} /> Delete it, with its runs and memory
             </button>
             <button type="button" className="btn btn-quiet" onClick={() => setDeleting(false)}>
               Keep it

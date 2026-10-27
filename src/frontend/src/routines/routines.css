@@ -1,5 +1,6 @@
 .routines {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 16px;
   padding: 16px 20px 32px;
@@ -48,8 +49,9 @@
 
 .routine-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  max-width: 760px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -58,8 +60,8 @@
 .routine {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 16px;
+  padding: 16px 20px;
   border-radius: var(--radius);
   background: var(--panel);
   min-width: 0;
@@ -73,33 +75,81 @@
 }
 
 .routine-head h2 {
-  font-size: 16px;
+  font-size: 17px;
   overflow-wrap: anywhere;
 }
 
-.routine-switch {
+/* The word says the state; the knob's side and the fill only repeat it. */
+.switch {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
   cursor: pointer;
+  font-weight: 600;
 }
 
-.routine-switch input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
+.switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border: 1px solid var(--mute);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mute);
+  transition: transform 0.15s ease;
+}
+
+.switch[aria-checked='true'] .switch-track {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.switch[aria-checked='true'] .switch-knob {
+  background: var(--on-accent);
+  transform: translateX(16px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .routine-facts {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
 }
 
 .routine-facts div {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .routine {
+    padding: 14px;
+  }
+
+  .kanji-glyph {
+    width: 56px;
+    height: 56px;
+    font-size: 34px;
+  }
 }
 
 .routine-facts dt {
@@ -107,8 +157,97 @@
 }
 
 .routine-facts dd {
+  display: grid;
+  gap: 2px;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.kanji-course {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.kanji-course h3 {
+  font-size: 14px;
+}
+
+.kanji-course p {
+  margin: 0;
+}
+
+.kanji-next {
+  display: flex;
+  align-items: start;
+  gap: 16px;
+}
+
+.kanji-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: 44px;
+  line-height: 1;
+}
+
+.kanji-text {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.routine-acting {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.routine-acting legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--mute);
+}
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice .btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.choice .btn[aria-pressed='false'] {
+  color: var(--mute);
+}
+
+.routine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.routine-actions-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
 }
 
 /* The icon and the words tell the state; the colour only adds to them. */
@@ -134,6 +273,10 @@
   color: var(--mute);
 }
 
+.run-list .run-summary {
+  flex-basis: 100%;
+}
+
 .run-list {
   display: grid;
   gap: 4px;
@@ -143,8 +286,16 @@
 }
 
 .run-list summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 6px 0;
   cursor: pointer;
   overflow-wrap: anywhere;
+}
+
+.run-list li + li {
+  border-top: 1px solid var(--line);
 }
 
 .run-log {
@@ -161,10 +312,11 @@
 .routine-form {
   display: grid;
   gap: 12px;
-  min-width: min(520px, 80vw);
+  min-width: 0;
 }
 
 .routine-days {
+  min-width: 0;
   border: 0;
   margin: 0;
   padding: 0;
@@ -186,14 +338,30 @@
   font-size: 12px;
 }
 
-.kanji-next {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
+.routine-kanji {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.kanji-glyph {
-  font-size: 1.5rem;
-  line-height: 1;
+.routine-kanji legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.check {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
 }

@@ -55,3 +55,18 @@ export function settingsProblem(text: string): string | undefined {
     return 'These settings are not valid JSON.'
   }
 }
+
+const time = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
+const dayNumber = (d: Date) => Math.round(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86_400_000)
+
+/** A moment as people say it: "today at 15:30", "tomorrow at 06:00", "Mon 2 Nov at 06:00". */
+export function whenNear(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso)
+  const days = dayNumber(d) - dayNumber(now)
+  if (days === 0) return `today at ${time(d)}`
+  if (days === 1) return `tomorrow at ${time(d)}`
+  if (days === -1) return `yesterday at ${time(d)}`
+  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' }).replaceAll(',', '')
+  return `${date} at ${time(d)}`
+}

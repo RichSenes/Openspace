@@ -55,10 +55,10 @@ internal sealed class RecordingOutbox : IRoutineOutbox
 {
     public List<(string Routine, string Text, string? File)> Sent { get; } = [];
 
-    public Task SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken)
+    public Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken)
     {
         Sent.Add((routine.Name, text, filePath));
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }
 

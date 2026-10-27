@@ -44,10 +44,11 @@ public interface IRoutineKind
 public interface IRoutineOutbox
 {
     /// <param name="filePath">A file to attach, such as the paper's PDF.</param>
-    Task SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken);
+    /// <returns>False when the routine names no channel, so nothing was sent.</returns>
+    Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken);
 }
 
 internal sealed class NoOutbox : IRoutineOutbox
 {
-    public Task SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken) => Task.FromResult(false);
 }

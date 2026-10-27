@@ -23,12 +23,16 @@ internal sealed class DeciderClient(
 
     public bool Available => !string.IsNullOrWhiteSpace(options.CurrentValue.Decider.Command);
 
+    internal string? Running => _server.Running;
+
     public async Task<IReadOnlyDictionary<string, Decision>> DecideAsync(
         string state, IReadOnlyDictionary<string, DecisionQuestion> questions, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(questions);
-        await EnsureRunningAsync(cancellationToken).ConfigureAwait(false);
+
+        // In use from now: the idle check must not stop it while it starts.
         _lastUsed = clock.GetUtcNow();
+        await EnsureRunningAsync(cancellationToken).ConfigureAwait(false);
 
         var body = new JsonObject { ["state"] = state, ["questions"] = new JsonObject() };
         foreach (var (key, question) in questions)
@@ -119,7 +123,8 @@ internal sealed class DeciderClient(
                     throw new InvalidOperationException("The decider did not start: see the API log for its last lines.");
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(1), clock, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromSeconds(1), clock, cancellationToken).ConfigureAwait(false);
+                _lastUsed = clock.GetUtcNow();
             }
         }
         finally

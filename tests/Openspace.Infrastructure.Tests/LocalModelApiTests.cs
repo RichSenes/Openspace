@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.LocalModels;
 using Openspace.Infrastructure.LocalModels;
 
@@ -56,6 +57,28 @@ public sealed class LocalModelApiTests : IDisposable
         Assert.Equal(new Decision("japan", 0.7, false), decisions["section"]);
         Assert.Equal("false", decisions["relevant"].Answer);
         Assert.True(decisions["mood"].Abstained);
+    }
+
+    [Fact]
+    public async Task The_decider_is_not_stopped_as_idle_while_it_starts()
+    {
+        using var provider = new ServiceCollection().AddHttpClient().BuildServiceProvider();
+        var options = new LocalModelOptions
+        {
+            Decider = new DeciderOptions { Command = "/bin/sh", Arguments = ["-c", "sleep 30"], Url = new Uri("http://127.0.0.1:9"), StartTimeout = TimeSpan.FromSeconds(3) },
+        };
+        using var decider = new DeciderClient(
+            provider.GetRequiredService<IHttpClientFactory>(),
+            new LiveOptions<LocalModelOptions>(options), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalModelServer>.Instance);
+
+        var asking = decider.DecideAsync("A text.", new Dictionary<string, DecisionQuestion> { ["ok"] = new("boolean", "Is it fine?") }, default);
+        await Task.Delay(500);
+        await decider.StopIfIdleAsync(default);
+
+        Assert.Equal("decider", decider.Running);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => asking);
+        Assert.Contains("did not start", error.Message, StringComparison.Ordinal);
+        Assert.Null(decider.Running);
     }
 
     private sealed class Recorder : HttpMessageHandler

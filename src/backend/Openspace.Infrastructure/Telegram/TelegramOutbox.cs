@@ -29,12 +29,12 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
 
     private const int MaxCaption = 1000;
 
-    public async Task SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken)
+    public async Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(routine);
         if (ChannelOf(routine.Settings) is not { } channel)
         {
-            return;
+            return false;
         }
 
         var (token, chat, topic) = Read(channel);
@@ -53,7 +53,7 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
             content.Headers.ContentType = new MediaTypeHeaderValue(filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "application/octet-stream");
             form.Add(content, "document", Path.GetFileName(filePath));
             await PostAsync(token, "sendDocument", form, cancellationToken).ConfigureAwait(false);
-            return;
+            return true;
         }
 
         foreach (var chunk in Chunks(text))
@@ -67,6 +67,8 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
             using var form = new FormUrlEncodedContent(fields);
             await PostAsync(token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
         }
+
+        return true;
     }
 
     internal static string? ChannelOf(string settings)

@@ -73,7 +73,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const bubbles = useMemo(() => {
     const all = new Map(desksBubbles)
     for (const r of routines.data ?? []) {
-      const said = routineBubble(r, progress.get(r.id), proposals.data?.filter((p) => p.routineId === r.id).length ?? 0)
+      const said = routineBubble(r, progress.get(r.id)?.line, proposals.data?.filter((p) => p.routineId === r.id).length ?? 0)
       if (said) all.set(r.id, said)
     }
     return all

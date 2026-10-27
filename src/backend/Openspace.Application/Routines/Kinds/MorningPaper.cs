@@ -243,6 +243,7 @@ public sealed partial class MorningPaper(
         var judged = 0;
         foreach (var candidate in pool)
         {
+            context.Progress($"Judging {judged + 1} of {pool.Count} news items");
             try
             {
                 var answers = await decider.DecideAsync(
@@ -316,7 +317,7 @@ public sealed partial class MorningPaper(
             """;
         try
         {
-            var answer = await chat.AskAsync(new LocalAsk(settings.Model, Editor(settings), user, ArticlesSchema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
+            var answer = await chat.AskAsync(context, new LocalAsk(settings.Model, Editor(settings), user, ArticlesSchema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
             var articles = (JsonSerializer.Deserialize<ArticlesAnswer>(answer, JsonSerializerOptions.Web)?.Articles ?? [])
                 .Where(a => !string.IsNullOrWhiteSpace(a.Headline) && !string.IsNullOrWhiteSpace(a.Text))
                 .Select(a => a with
@@ -358,7 +359,7 @@ public sealed partial class MorningPaper(
             .Concat(sections.SelectMany(s => s.Articles.Select(a => $"- {s.Name}: {a.Headline}"))));
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Editor(settings),
                     $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and three or four warm sentences that set the day, with a light touch.",
@@ -449,7 +450,7 @@ public sealed partial class MorningPaper(
             """;
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model,
                     $"You help someone learn Japanese. Write in {settings.Language}, and only in {settings.Language}. Never add readings, meanings or facts that are not given.",

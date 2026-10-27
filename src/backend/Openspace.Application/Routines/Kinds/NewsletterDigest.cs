@@ -59,8 +59,9 @@ public sealed class NewsletterDigest(IMailbox mailbox, ILocalChat chat, IPdfPrin
 
         var summaries = new List<(MailMessage Letter, LetterSummary Summary)>();
         var skipped = 0;
-        foreach (var letter in letters)
+        foreach (var (letter, i) in letters.Select((l, i) => (l, i)))
         {
+            context.Progress($"Summing up {i + 1} of {letters.Count} newsletters");
             switch (await SumUpAsync(context, settings, letter, cancellationToken).ConfigureAwait(false))
             {
                 case { Worth: false }:
@@ -130,8 +131,9 @@ public sealed class NewsletterDigest(IMailbox mailbox, ILocalChat chat, IPdfPrin
         while (page is not null && pages < MostPages && ids.Count < settings.Most);
 
         var letters = new List<MailMessage>();
-        foreach (var id in ids)
+        foreach (var (id, i) in ids.Select((id, i) => (id, i)))
         {
+            context.Progress($"Reading {i + 1} of {ids.Count} newsletters");
             var letter = await mailbox.ReadAsync(settings.Account, id, cancellationToken).ConfigureAwait(false);
             if (await context.MeetAsync(KeyPrefix + letter.Id, letter.Id, $"{MailSorting.Sender(letter.From)}: {letter.Subject}", cancellationToken).ConfigureAwait(false))
             {
@@ -147,7 +149,7 @@ public sealed class NewsletterDigest(IMailbox mailbox, ILocalChat chat, IPdfPrin
         var text = letter.Text.Length > 0 ? letter.Text : letter.Snippet;
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Editor(settings),
                     $"""
@@ -182,7 +184,7 @@ public sealed class NewsletterDigest(IMailbox mailbox, ILocalChat chat, IPdfPrin
         var headlines = string.Join("\n", topics.SelectMany(t => t.Entries.Select(e => $"- {t.Name}: {e.Headline}")));
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Editor(settings),
                     $"This issue's newsletters:\n{headlines}\n\nWrite a short opening note: a title of its own and two or three sentences on what stands out, with a light touch.",

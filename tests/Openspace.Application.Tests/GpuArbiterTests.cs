@@ -340,6 +340,33 @@ public class GpuArbiterTests
     }
 
     [Fact]
+    public async Task While_it_waits_for_the_card_local_chat_says_who_has_it_once_a_minute_then_that_it_is_free()
+    {
+        _h.GpuProbe.Programs.Add("image-studio");
+        await _h.Shift().TickAsync(default);
+        var said = new List<string>();
+        var chat = new LocalChat(_h.Gpu, new FakeModelApi(), new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
+
+        var answer = chat.AskAsync(new LocalAsk("local/gemma", "s", "u", Waiting: said.Add), default);
+        for (var i = 0; i < 25; i++)
+        {
+            _h.Clock.Advance(LocalChat.Poll);
+            await Task.Yield();
+        }
+
+        Assert.Equal(["Waiting for the graphics card: Image studio is using it", "Waiting for the graphics card: Image studio is using it"], said);
+
+        _h.GpuProbe.Programs.Clear();
+        await _h.Shift().TickAsync(default);
+        _h.ModelServer.Answering = true;
+        await _h.Shift().TickAsync(default);
+        _h.Clock.Advance(LocalChat.Poll);
+
+        Assert.Equal("Buongiorno.", await answer);
+        Assert.Equal("The graphics card is free: the local model is writing", said[^1]);
+    }
+
+    [Fact]
     public async Task Local_chat_gives_up_when_the_card_stays_taken_and_says_who_has_it()
     {
         _h.LocalModels.RoutineWait = TimeSpan.FromSeconds(5);

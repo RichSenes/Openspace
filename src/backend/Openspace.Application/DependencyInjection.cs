@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Openspace.Application.Agents;
 using Openspace.Application.LocalModels;
 using Openspace.Application.Offices;
@@ -40,7 +41,7 @@ public static class DependencyInjection
         services.AddScoped<Review.TaskReviewer>();
         services.AddScoped<Checks.MergeChecks>();
         services.AddSingleton<RoutineRequests>();
-        services.AddSingleton<IRoutineOutbox, NoOutbox>();
+        services.TryAddSingleton<IRoutineOutbox, NoOutbox>();
         services.AddScoped<RoutineRunner>();
         services.AddScoped<RoutineCommands>();
         services.AddScoped<RoutineQueries>();

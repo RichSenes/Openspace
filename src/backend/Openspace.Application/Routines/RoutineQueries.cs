@@ -20,7 +20,7 @@ public sealed class RoutineQueries(IRoutineRepository routines, IEnumerable<IRou
             views.Add(new RoutineView(
                 routine.Id.Value, routine.OfficeId.Value, routine.Name, routine.Kind,
                 kinds.FirstOrDefault(k => k.Key == routine.Kind)?.Name ?? routine.Kind,
-                ScheduleView.Of(routine.Schedule), routine.Settings, routine.Enabled, routine.LastRunAt, routine.NextRunAt,
+                ScheduleView.Of(routine.Schedule), routine.Settings, routine.Enabled, routine.AskFirst, routine.LastRunAt, routine.NextRunAt,
                 last is null ? null : RoutineRunView.Of(last) with { Log = string.Empty }));
         }
 

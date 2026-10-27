@@ -441,6 +441,8 @@ export interface RoutineView {
   /** The kind's own settings, as JSON. */
   settings: string
   enabled: boolean
+  /** Every proposal waits for a yes; otherwise what can be undone is done on its own. */
+  askFirst: boolean
   lastRunAt: string | null
   nextRunAt: string | null
   lastRun: RoutineRunView | null

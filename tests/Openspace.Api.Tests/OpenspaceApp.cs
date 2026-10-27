@@ -55,6 +55,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
             // Never the graphics card of the machine running the tests: no model server is started.
             ["LocalModels:Enabled"] = "false",
+
+            // Never the person's Telegram: routines in tests find no bots to write with.
+            ["Telegram:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-telegram-{Guid.NewGuid():N}"),
             ["Operator:Name"] = "elliot",
             ["Queue:Enabled"] = "false",
         };

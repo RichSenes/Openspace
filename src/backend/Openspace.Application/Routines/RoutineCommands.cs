@@ -59,6 +59,13 @@ public sealed class RoutineCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task AskFirstAsync(RoutineId id, bool askFirst, CancellationToken cancellationToken)
+    {
+        var routine = await routines.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        routine.AskBeforeActing(askFirst, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Deletes the routine with its runs, proposals and what it remembers.</summary>
     public async Task DeleteAsync(RoutineId id, CancellationToken cancellationToken)
     {

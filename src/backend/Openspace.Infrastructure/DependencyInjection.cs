@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Application.LocalModels;
+using Openspace.Application.Routines;
 using Openspace.Application.Queue;
 using Openspace.Infrastructure.ClaudeCode;
 using Openspace.Infrastructure.Git;
@@ -73,6 +74,13 @@ public static class DependencyInjection
         services.AddSingleton<IGpuProbe, GpuProbe>();
         services.AddSingleton<ILocalModelServer, LocalModelServer>();
         services.AddHostedService<GpuShiftService>();
+
+        // What routines make reaches the person's own Telegram group.
+        services.AddHttpClient<IRoutineOutbox, Telegram.TelegramOutbox>(http =>
+        {
+            http.BaseAddress = new Uri("https://api.telegram.org/");
+            http.Timeout = TimeSpan.FromMinutes(2);
+        });
         return services;
     }
 

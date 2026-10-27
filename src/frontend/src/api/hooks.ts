@@ -599,6 +599,13 @@ export function useTurnOnRoutine() {
   )
 }
 
+export function useAskFirst() {
+  return useWrite(
+    (input: { id: string; askFirst: boolean }) => request<void>('PUT', `/api/routines/${input.id}/ask-first`, { askFirst: input.askFirst }),
+    keys.routines,
+  )
+}
+
 export function useDeleteRoutine() {
   return useWrite((id: string) => request<void>('DELETE', `/api/routines/${id}`), keys.routines)
 }

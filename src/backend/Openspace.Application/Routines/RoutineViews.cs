@@ -33,7 +33,7 @@ public sealed record RoutineRunView(
 /// <param name="KindName">The kind's name for people; the key itself when Openspace no longer knows it.</param>
 /// <param name="LastRun">The latest run, without its log.</param>
 public sealed record RoutineView(
-    Guid Id, Guid OfficeId, string Name, string Kind, string KindName, ScheduleView Schedule, string Settings, bool Enabled,
+    Guid Id, Guid OfficeId, string Name, string Kind, string KindName, ScheduleView Schedule, string Settings, bool Enabled, bool AskFirst,
     DateTimeOffset? LastRunAt, DateTimeOffset? NextRunAt, RoutineRunView? LastRun);
 
 public sealed record ProposalView(

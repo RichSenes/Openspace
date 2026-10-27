@@ -363,7 +363,7 @@ public static partial class PaperPage
     }
 
     /// <summary>Warm paper, near-black ink: muted text stays above 7:1 on the paper colour.</summary>
-    private const string Style = """
+    internal const string Style = """
         @page { size: A4; margin: 0; }
         :root { --paper: #f6f1e7; --ink: #1f1b16; --muted: #4a4339; --rule: #1f1b16; --box: #ece4d4; }
         * { box-sizing: border-box; }

@@ -397,6 +397,11 @@ export function useGpu() {
   })
 }
 
+/** After the model failed to load: try again now instead of waiting. */
+export function useRetryGpu() {
+  return useWrite(() => request<void>('POST', '/api/gpu/retry'), keys.gpu)
+}
+
 /** Changes what runs a desk's agent: engine, agent and model. */
 export function useChangeDeskAgent(officeId: string) {
   return useWrite(

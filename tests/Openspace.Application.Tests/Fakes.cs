@@ -412,6 +412,8 @@ internal sealed class FakeModelServer : LocalModels.ILocalModelServer
 
     public int Stops { get; private set; }
 
+    public string? LastFailure { get; set; }
+
     public Task StartAsync(LocalModels.LocalModel model, CancellationToken cancellationToken)
     {
         Started.Add(model.Id);

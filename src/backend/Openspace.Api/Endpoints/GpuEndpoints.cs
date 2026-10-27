@@ -20,6 +20,13 @@ internal static class GpuEndpoints
                 ? Results.Problem("Say which program wants the graphics card.", statusCode: StatusCodes.Status400BadRequest)
                 : Results.Ok(gpu.Claim(request.Holder)));
 
+        // After a failed load: try again at the next look instead of waiting a few minutes.
+        group.MapPost("/retry", (GpuArbiter gpu) =>
+        {
+            gpu.RetryNow();
+            return Results.NoContent();
+        });
+
         group.MapDelete("/claim/{holder}", (string holder, GpuArbiter gpu) => gpu.Release(holder));
     }
 }

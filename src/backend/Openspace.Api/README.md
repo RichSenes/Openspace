@@ -362,8 +362,11 @@ Every few seconds the API looks at the card, and only at the memory in use
   `YieldGrace` (3 minutes) to end; after that they go back to the queue with a
   note and resume in their own session later, and the model is stopped.
   Pick a `Match` only that program has: any command line that contains it counts.
-- A model that does not answer within `StartTimeout` is stopped and tried again
-  after `RetryAfter`; its server's last lines go to the API log.
+- A model that does not answer within `StartTimeout`, or whose server stops while
+  loading, is stopped and tried again after `RetryAfter`; the state says why in
+  plain words when the server's last lines tell (not enough graphics memory, port
+  taken), the lines themselves go to the API log, and `POST /api/gpu/retry` (Try
+  again in the top bar) tries again at once.
 
 Routines use the local models too: they lease the loaded model through the same
 arbiter, so they wait while a program has the card (at most `RoutineWait`, 3 hours),

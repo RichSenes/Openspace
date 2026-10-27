@@ -28,6 +28,9 @@ public interface ILocalModelServer
 
     Task StopAsync(CancellationToken cancellationToken);
 
+    /// <summary>Why the last server Openspace started stopped by itself, in a few words; null when it did not.</summary>
+    string? LastFailure { get; }
+
     /// <summary>Whether a server answers at the address, started by Openspace or not.</summary>
     Task<bool> IsAnsweringAsync(CancellationToken cancellationToken);
 }

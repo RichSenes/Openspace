@@ -28,6 +28,6 @@ export function gpuBadge(view: GpuView | undefined): GpuBadge | undefined {
     case 'Lent':
       return badge(`Graphics card lent to ${holders}`, 'waiting')
     case 'Failed':
-      return badge(`${model} did not load`, 'trouble')
+      return badge(view.detail?.includes('graphics memory') ? `${model}: not enough graphics memory` : `${model} did not load`, 'trouble')
   }
 }

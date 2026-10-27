@@ -13,10 +13,11 @@ namespace Openspace.Application.Routines.Kinds;
 /// it. The day's most important story opens the front page with a large picture, next to
 /// the good news of the day; each section follows with its best stories, written up by a
 /// local model from the items alone and citing every outlet that told them. Laid out as a
-/// paper, printed to PDF, numbered, kept and delivered.
+/// paper, printed to PDF, numbered, kept and delivered. When asked, it closes with a kanji
+/// of the day: one never explained, with its readings, strokes, words and sentences.
 /// </summary>
 public sealed partial class MorningPaper(
-    ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer, IWebImages images) : IRoutineKind
+    ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer, IWebImages images, IKanjiBook kanjiBook) : IRoutineKind
 {
     public string Key => "morning-paper";
 
@@ -40,6 +41,7 @@ public sealed partial class MorningPaper(
           "hoursBack": 24,
           "perSection": 4,
           "goodNews": ["World"],
+          "kanji": { "enabled": false, "fromGrade": 1 },
           "sections": [
             { "name": "World", "about": "What happened in the world.", "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ] }
           ]
@@ -135,12 +137,20 @@ public sealed partial class MorningPaper(
             await context.MarkAsync(candidate.Item.Link.ToString(), SeenState.Shown, cancellationToken).ConfigureAwait(false);
         }
 
+        var kanji = await KanjiOfTheDayAsync(context, settings, cancellationToken).ConfigureAwait(false);
+        if (kanji is not null)
+        {
+            var key = KanjiCourse.KeyOf(kanji.Entry.Literal);
+            await context.MeetAsync(key, kanji.Entry.Literal, kanji.Entry.Literal, cancellationToken).ConfigureAwait(false);
+            await context.MarkAsync(key, SeenState.Shown, cancellationToken).ConfigureAwait(false);
+        }
+
         var opening = await OpeningAsync(context, settings, front, sections, cancellationToken).ConfigureAwait(false);
         var folder = Expand(settings.Folder);
         Directory.CreateDirectory(folder);
         var number = NextNumber(folder);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(context.Now, context.Clock.LocalTimeZone).DateTime);
-        var html = PaperPage.Render(settings, culture, number, today, opening, front, goodNews, sections);
+        var html = PaperPage.Render(settings, culture, number, today, opening, front, goodNews, sections, kanji);
 
         var name = $"{Slug(settings.Title)}-N{number:000}-{today:yyyy-MM-dd}";
         await File.WriteAllTextAsync(Path.Combine(folder, name + ".html"), html, cancellationToken).ConfigureAwait(false);
@@ -151,7 +161,7 @@ public sealed partial class MorningPaper(
         var count = sections.Sum(s => s.Articles.Count) + (front is null ? 0 : 1) + (goodNews is null ? 0 : 1);
         var caption = $"{settings.Title} · N. {number} · {today.ToString("dddd d MMMM yyyy", culture)}\n{front?.Article.Headline ?? opening.Title}";
         await context.DeliverAsync(caption, pdf, cancellationToken).ConfigureAwait(false);
-        return $"N. {number}: {count} articles in {sections.Count} sections.";
+        return $"N. {number}: {count} articles in {sections.Count} sections{(kanji is null ? string.Empty : $", kanji {kanji.Entry.Literal}")}.";
     }
 
     /// <summary>The section's news since <paramref name="since"/> that the paper never printed.</summary>
@@ -367,6 +377,113 @@ public sealed partial class MorningPaper(
         return new PaperOpening(settings.Title, string.Empty);
     }
 
+    /// <summary>
+    /// The next kanji of the course, looked up in the dictionaries and explained in the
+    /// paper's language by the local model: its meaning, a memory trick, what its words mean,
+    /// the sentences translated where people did not translate them already.
+    /// </summary>
+    private async Task<PaperKanji?> KanjiOfTheDayAsync(RoutineContext context, PaperSettings settings, CancellationToken cancellationToken)
+    {
+        var wanted = KanjiSettings.Read(context.Settings);
+        if (!wanted.Enabled)
+        {
+            return null;
+        }
+
+        if (!kanjiBook.Available)
+        {
+            context.Write($"Kanji of the day: its dictionaries are not in {kanjiBook.Folder} (scripts/openspace kanji-data downloads them).");
+            return null;
+        }
+
+        try
+        {
+            var next = KanjiCourse.Next(
+                await kanjiBook.CurriculumAsync(cancellationToken).ConfigureAwait(false),
+                await context.DealtWithAsync(KanjiCourse.KeyPrefix, cancellationToken).ConfigureAwait(false),
+                wanted.FromGrade);
+            if (next is null)
+            {
+                context.Write("Kanji of the day: every kanji of the course is explained.");
+                return null;
+            }
+
+            if (await kanjiBook.LookUpAsync(next.Literal, cancellationToken).ConfigureAwait(false) is not { } entry)
+            {
+                context.Write($"Kanji of the day: {next.Literal} is not in the dictionary.");
+                return null;
+            }
+
+            var kanji = await ExplainAsync(context, settings, entry, cancellationToken).ConfigureAwait(false);
+            context.Write($"Kanji of the day: {entry.Literal}.");
+            return kanji;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"Kanji of the day: could not be prepared ({ex.Message}).");
+            return null;
+        }
+    }
+
+    private async Task<PaperKanji> ExplainAsync(RoutineContext context, PaperSettings settings, KanjiEntry entry, CancellationToken cancellationToken)
+    {
+        var language = CultureOf(settings.Language).TwoLetterISOLanguageName;
+        var people = entry.Sentences.Select(s => language switch { "it" => s.Italian, "en" => s.English, _ => null }).ToList();
+        var fallback = new PaperKanji(
+            entry, string.Join(", ", entry.Meanings), string.Empty,
+            [.. entry.Words.Select(w => string.Join(", ", w.Meanings.Take(2)))],
+            [.. entry.Sentences.Select((s, i) => people[i] ?? s.English ?? s.Italian ?? string.Empty)]);
+
+        var words = string.Join("\n", entry.Words.Select((w, i) => $"[{i + 1}] {w.Written} ({w.Reading}): {string.Join("; ", w.Meanings)}"));
+        var sentences = string.Join("\n", entry.Sentences.Select((s, i) => $"[{i + 1}] {s.Text}{(s.English is null ? string.Empty : $" English: {s.English}")}"));
+        var user = $"""
+            The kanji of the day: {entry.Literal}, {entry.StrokeCount} strokes. Its meanings in English: {string.Join(", ", entry.Meanings)}.
+            Readings: on {string.Join(", ", entry.On)}; kun {string.Join(", ", entry.Kun)}.
+            {(entry.Parts.Count > 0 ? $"Built from: {string.Join(", ", entry.Parts)}." : "It is not built from other kanji.")}
+            Words, numbered:
+            {words}
+            Sentences, numbered:
+            {sentences}
+
+            Write in {settings.Language}: "meaning", the kanji's meanings in a few words; "words", what each word means, in order, in a few words each; "sentences", each sentence translated from the Japanese, in order (the English is there to help); "hint", one sentence that helps remember the kanji from its shape or its parts, told as a memory trick and never as its history.
+            """;
+        try
+        {
+            var answer = await chat.AskAsync(
+                new LocalAsk(
+                    settings.Model,
+                    $"You help someone learn Japanese. Write in {settings.Language}, and only in {settings.Language}. Never add readings, meanings or facts that are not given.",
+                    user, KanjiSchema, MaxTokens: 1200),
+                cancellationToken).ConfigureAwait(false);
+            var notes = JsonSerializer.Deserialize<KanjiAnswer>(answer, JsonSerializerOptions.Web);
+            if (notes is null || string.IsNullOrWhiteSpace(notes.Meaning))
+            {
+                return fallback;
+            }
+
+            return fallback with
+            {
+                Meaning = notes.Meaning.Trim(),
+                Hint = notes.Hint?.Trim() ?? string.Empty,
+                WordMeanings = [.. fallback.WordMeanings.Select((m, i) => notes.Words?.ElementAtOrDefault(i) is { Length: > 0 } said ? said.Trim() : m)],
+                Translations = [.. fallback.Translations.Select((t, i) => people[i] ?? (notes.Sentences?.ElementAtOrDefault(i) is { Length: > 0 } said ? said.Trim() : t))],
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"Kanji of the day: the local model could not explain it ({ex.Message}), the dictionary's English stays.");
+            return fallback;
+        }
+    }
+
+    private const string KanjiSchema = """
+        {"type":"object","properties":{"meaning":{"type":"string"},"hint":{"type":"string"},
+          "words":{"type":"array","items":{"type":"string"}},"sentences":{"type":"array","items":{"type":"string"}}},
+          "required":["meaning","hint","words","sentences"]}
+        """;
+
+    private sealed record KanjiAnswer(string? Meaning, string? Hint, List<string>? Words, List<string>? Sentences);
+
     private static string Editor(PaperSettings settings) => $"""
         You are the editor of "{settings.Title}", a personal paper. Write in {settings.Language}, and only in {settings.Language}.
         Who reads it: {settings.Reader}
@@ -458,6 +575,10 @@ public sealed record PaperPicture(WebImage Image, string Credit);
 
 /// <summary>A story with a place of its own: the front page's opening, or the good news of the day.</summary>
 public sealed record PaperLead(string Section, PaperArticle Article, IReadOnlyList<FeedItem> Items, PaperPicture? Picture);
+
+/// <summary>The kanji of the day with what the local model wrote about it, in the paper's language.</summary>
+/// <param name="WordMeanings">One per word of the entry, in order; <paramref name="Translations"/>, one per sentence.</param>
+public sealed record PaperKanji(KanjiEntry Entry, string Meaning, string Hint, IReadOnlyList<string> WordMeanings, IReadOnlyList<string> Translations);
 
 /// <param name="Picture">A picture for the section's first story, when one was found.</param>
 public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Articles, IReadOnlyList<FeedItem> Items, PaperPicture? Picture = null);

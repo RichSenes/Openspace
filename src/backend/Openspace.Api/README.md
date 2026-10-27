@@ -210,6 +210,8 @@ clock, some days of the week (every day when none), every week or every few week
 | POST | `/api/routines/{id}/run` | Run it now, whatever its schedule |
 | POST | `/api/routines/{id}/stop` | Stop its run going on (409 when none); it keeps its schedule |
 | GET | `/api/routines/{id}/runs` | The latest 20 runs, with their log |
+| GET | `/api/routines/{id}/kanji` | A paper's kanji of the day: the next one, how many explained and known |
+| POST | `/api/routines/{id}/kanji/known` | `{ kanji }`: the person knows it, the paper never explains it |
 | DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory, stopping a run first |
 | GET | `/api/offices/{id}/proposals?status=Pending` | What routines propose |
 | POST | `/api/proposals/{id}/approve` or `/reject` | Yes carries it out; no is remembered |
@@ -239,6 +241,16 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   with a short note. The page is printed to PDF, numbered from the highest number
   kept in `folder`, saved with its HTML, and delivered through `channel`. A feed
   that fails is logged and skipped.
+- **Kanji of the day**, in the paper when its settings say `"kanji": { "enabled":
+  true, "fromGrade": 1 }`: one kanji a day of the common use list, by school year
+  and the most common first, never one explained before or one the person knows.
+  The paper closes with its readings, its strokes drawn one by one, common words and
+  short sentences with their reading over the kanji; the local model translates what
+  is not already translated by people and adds a memory trick. The dictionaries stay
+  on the computer, in `Kanji:Folder` (`~/.local/share/openspace/kanji`):
+  `scripts/openspace kanji-data` downloads KANJIDIC2 and JMdict (EDRDG, CC BY-SA
+  4.0), KanjiVG (CC BY-SA 3.0) and Tatoeba's sentences (CC BY 2.0 FR), about 60 MB;
+  the page credits them.
 
 Routines read news through RSS and Atom feeds (no DTDs or external entities: a
 feed that tries to read local files is refused) and print their pages to PDF with

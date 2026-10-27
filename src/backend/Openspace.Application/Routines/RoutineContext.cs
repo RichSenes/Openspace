@@ -88,6 +88,16 @@ public sealed class RoutineContext(
         }
     }
 
+    /// <summary>The keys starting with <paramref name="prefix"/> of what was shown, dismissed or taken up: all but the skipped.</summary>
+    public async Task<IReadOnlySet<string>> DealtWithAsync(string prefix, CancellationToken cancellationToken)
+    {
+        var saved = await routines.ListSeenAsync(Routine.Id, prefix, cancellationToken).ConfigureAwait(false);
+        return saved.Concat(_met.Values.Where(s => s.Key.StartsWith(prefix, StringComparison.Ordinal)))
+            .Where(s => s.State != SeenState.Skipped)
+            .Select(s => s.Key)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
     private async Task<SeenItem?> SeenAsync(string key, CancellationToken cancellationToken) =>
         _met.TryGetValue(key.Trim(), out var met) ? met : await routines.FindSeenAsync(Routine.Id, key.Trim(), cancellationToken).ConfigureAwait(false);
 

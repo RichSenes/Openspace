@@ -98,6 +98,9 @@ public static class DependencyInjection
         services.AddHttpClient(Routines.FirefoxPdfPrinter.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(3));
         services.AddSingleton<IPdfPrinter, Routines.FirefoxPdfPrinter>();
 
+        // The kanji of the day reads open dictionaries kept on this computer.
+        services.AddSingleton<IKanjiBook, Routines.KanjiBook>();
+
         // What routines make reaches the person's own Telegram group.
         services.AddHttpClient<IRoutineOutbox, Telegram.TelegramOutbox>(http =>
         {

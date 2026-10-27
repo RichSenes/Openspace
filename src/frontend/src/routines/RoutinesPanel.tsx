@@ -5,6 +5,8 @@ import {
   useCreateRoutine,
   useDecideProposal,
   useDeleteRoutine,
+  useKanjiCourse,
+  useKnownKanji,
   useProposals,
   useRoutineKinds,
   useRoutineRuns,
@@ -19,6 +21,7 @@ import { Markdown } from '../reports/Markdown'
 import { useRoutineProgress } from '../realtime/routineProgress'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
+import { asksForKanji, gradeLabel } from './kanji'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK } from './schedule'
 import './routines.css'
 
@@ -172,6 +175,7 @@ function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: Routine
             )}
           </dd>
         </div>
+        {asksForKanji(routine.kind, routine.settings) && <KanjiFact routineId={routine.id} />}
       </dl>
       <div className="row">
         {running ? (
@@ -206,6 +210,58 @@ function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: Routine
       </div>
       {open && <Runs routineId={routine.id} />}
     </li>
+  )
+}
+
+/** The kanji the paper explains next, with a way to skip the ones the person already knows. */
+function KanjiFact({ routineId }: { routineId: string }) {
+  const course = useKanjiCourse(routineId, true)
+  const known = useKnownKanji()
+  const toast = useToast()
+  const data = course.data
+  return (
+    <div>
+      <dt>Kanji of the day</dt>
+      <dd>
+        {!data ? (
+          course.error ? <span className="error">{course.error.message}</span> : 'Reading the dictionaries…'
+        ) : !data.available ? (
+          <>
+            Its dictionaries are not in <code>{data.folder}</code>: <code>scripts/openspace kanji-data</code> downloads them.
+          </>
+        ) : (
+          <span className="kanji-next">
+            {data.next ? (
+              <>
+                Next{' '}
+                <span lang="ja" className="kanji-glyph">
+                  {data.next.literal}
+                </span>{' '}
+                {data.next.meanings.slice(0, 3).join(', ')} · {gradeLabel(data.next.grade)}
+              </>
+            ) : (
+              'Every kanji is explained'
+            )}
+            <span className="run-summary">
+              {' '}
+              · {data.explained} explained, {data.known} known
+            </span>
+            {data.next && (
+              <button
+                type="button"
+                className="btn btn-quiet"
+                disabled={known.isPending}
+                onClick={() =>
+                  known.mutate({ id: routineId, kanji: data.next!.literal }, { onSuccess: () => toast(`${data.next!.literal} skipped: you know it`) })
+                }
+              >
+                I know it
+              </button>
+            )}
+          </span>
+        )}
+      </dd>
+    </div>
   )
 }
 

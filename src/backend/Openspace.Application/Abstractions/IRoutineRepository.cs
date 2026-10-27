@@ -38,5 +38,8 @@ public interface IRoutineRepository
 
     Task<SeenItem?> FindSeenAsync(RoutineId routineId, string key, CancellationToken cancellationToken);
 
+    /// <summary>What a routine has met whose key starts with <paramref name="prefix"/>.</summary>
+    Task<IReadOnlyList<SeenItem>> ListSeenAsync(RoutineId routineId, string prefix, CancellationToken cancellationToken);
+
     void AddSeen(SeenItem item);
 }

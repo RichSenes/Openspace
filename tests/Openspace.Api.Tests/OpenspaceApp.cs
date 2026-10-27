@@ -58,6 +58,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
             // Never the person's Telegram: routines in tests find no bots to write with.
             ["Telegram:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-telegram-{Guid.NewGuid():N}"),
+
+            // Never the person's dictionaries: the kanji of the day finds none.
+            ["Kanji:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-kanji-{Guid.NewGuid():N}"),
             ["Operator:Name"] = "elliot",
             ["Queue:Enabled"] = "false",
         };

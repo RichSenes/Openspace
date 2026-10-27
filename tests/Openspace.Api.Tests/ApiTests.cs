@@ -284,6 +284,23 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task A_paper_s_kanji_course_says_where_its_dictionaries_go_and_takes_one_kanji_at_a_time()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+        var routine = await PostAsync<Created>($"/api/offices/{officeId}/routines",
+            new { name = "Paper", kind = "morning-paper", schedule = new { days = Array.Empty<string>(), at = "06:00", everyWeeks = 1 } });
+
+        var course = await GetAsync<JsonElement>($"/api/routines/{routine.Id}/kanji");
+        var known = await _http.PostAsJsonAsync($"/api/routines/{routine.Id}/kanji/known", new { kanji = "日" });
+        var many = await _http.PostAsJsonAsync($"/api/routines/{routine.Id}/kanji/known", new { kanji = "日月明" });
+
+        Assert.False(course.GetProperty("available").GetBoolean());
+        Assert.Contains("openspace-no-kanji-", course.GetProperty("folder").GetString(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NoContent, known.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, many.StatusCode);
+    }
+
+    [Fact]
     public async Task Only_a_running_task_can_be_stopped_for_review()
     {
         var (officeId, _, deskId) = await FurnishAsync();

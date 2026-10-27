@@ -57,6 +57,7 @@ public sealed class PersistenceTests : IAsyncLifetime
             routines.AddRun(run);
             routines.AddProposal(Domain.Routines.Proposal.Make(run, "update", "Update OpenCode", "A new version is out.", "{\"to\":\"1.20\"}", now));
             routines.AddSeen(Domain.Routines.SeenItem.Meet(routine.Id, "opencode-1.20", "fp", "OpenCode 1.20", Domain.Routines.SeenState.Shown, now));
+            routines.AddSeen(Domain.Routines.SeenItem.Meet(routine.Id, "kanji:日", "日", "日", Domain.Routines.SeenState.Dismissed, now));
             await sp.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
             return (routine.Id, run.Id);
         });
@@ -75,6 +76,7 @@ public sealed class PersistenceTests : IAsyncLifetime
             Assert.Contains("Checked the disk", run!.Log, StringComparison.Ordinal);
             Assert.Equal(("Update OpenCode", "{\"to\":\"1.20\"}"), (proposal.Title, proposal.Payload));
             Assert.Equal(Domain.Routines.SeenState.Shown, seen!.State);
+            Assert.Equal(["kanji:日"], (await routines.ListSeenAsync(routineId, "kanji:", default)).Select(s => s.Key));
             Assert.Single(await routines.ListDueAsync(routine.NextRunAt!.Value, default));
         });
     }

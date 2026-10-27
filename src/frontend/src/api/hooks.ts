@@ -5,6 +5,7 @@ import type {
   AgentEngine,
   EnginesView,
   GpuView,
+  KanjiCourseView,
   ProposalView,
   RoutineKindView,
   RoutineRunView,
@@ -600,6 +601,22 @@ export function useUpdateRoutine() {
 export function useTurnOnRoutine() {
   return useWrite(
     (input: { id: string; enabled: boolean }) => request<void>('PUT', `/api/routines/${input.id}/enabled`, { enabled: input.enabled }),
+    keys.routines,
+  )
+}
+
+export function useKanjiCourse(routineId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.routines, 'kanji', routineId],
+    queryFn: () => request<KanjiCourseView>('GET', `/api/routines/${routineId}/kanji`),
+    enabled,
+  })
+}
+
+/** The person already knows this kanji: the paper never explains it. */
+export function useKnownKanji() {
+  return useWrite(
+    (input: { id: string; kanji: string }) => request<void>('POST', `/api/routines/${input.id}/kanji/known`, { kanji: input.kanji }),
     keys.routines,
   )
 }

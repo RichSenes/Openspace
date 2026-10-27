@@ -39,6 +39,7 @@ builder.Services.Configure<Openspace.Infrastructure.Persistence.BackupOptions>(b
 builder.Services.Configure<Openspace.Application.Checks.CheckOptions>(builder.Configuration.GetSection(Openspace.Application.Checks.CheckOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Telegram.TelegramOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Telegram.TelegramOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Routines.PdfOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.PdfOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Routines.KanjiOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.KanjiOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));

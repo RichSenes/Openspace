@@ -467,6 +467,16 @@ export interface ProposalView {
   outcome: string | null
 }
 
+/** The kanji of the day of a paper: the next one, and how far the course went. */
+export interface KanjiCourseView {
+  /** Whether the dictionaries are on this computer; when not, `folder` says where they go. */
+  available: boolean
+  folder: string
+  next: { literal: string; grade: number; meanings: string[] } | null
+  explained: number
+  known: number
+}
+
 export interface RoutineKindView {
   key: string
   name: string

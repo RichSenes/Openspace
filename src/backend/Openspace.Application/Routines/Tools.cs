@@ -18,9 +18,16 @@ public interface IPdfPrinter
 }
 
 /// <param name="MediaType">"image/jpeg", "image/png", "image/webp" or "image/gif".</param>
-public sealed record WebImage(byte[] Bytes, string MediaType)
+/// <param name="Width">In pixels, as the file says; 0 when it could not be read.</param>
+public sealed record WebImage(byte[] Bytes, string MediaType, int Width = 0, int Height = 0)
 {
     public string DataUri => $"data:{MediaType};base64,{Convert.ToBase64String(Bytes)}";
+
+    /// <summary>
+    /// Whether it reads as a photo in a wide frame: wide enough not to blur, and landscape.
+    /// Previews of documents (tall pages of text), logos and thumbnails are not.
+    /// </summary>
+    public bool FitsAFrame => Width >= 480 && Height > 0 && Width / (double)Height is >= 1.15 and <= 2.6;
 }
 
 /// <summary>Pictures for routines' pages: an article's own main picture, downloaded to embed.</summary>

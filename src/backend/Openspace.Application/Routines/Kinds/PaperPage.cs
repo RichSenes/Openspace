@@ -33,7 +33,7 @@ public static class PaperPage
             </head>
             <body>
             <section class="front">
-            <p class="issue"><span>N. {number}</span><span>{E(Capitalised(day.ToString("dddd d MMMM yyyy", culture), culture))}</span></p>
+            <p class="issue"><span>N. {number}</span><span class="colophon">{E(words.Colophon)}</span><span>{E(Capitalised(day.ToString("dddd d MMMM yyyy", culture), culture))}</span></p>
             <header class="masthead">
               <h1>{E(settings.Title)}</h1>
 
@@ -124,7 +124,7 @@ public static class PaperPage
             html.Append("  </div>\n</section>\n");
         }
 
-        html.Append(CultureInfo.InvariantCulture, $"<footer class=\"colophon\">{E(settings.Title)}{(settings.Subtitle.Length > 0 ? $" · <span lang=\"ja\">{E(settings.Subtitle)}</span>" : "")} · N. {number}. {E(words.Colophon)}</footer>\n</body>\n</html>\n");
+        html.Append("</body>\n</html>\n");
         return html.ToString();
     }
 
@@ -171,10 +171,11 @@ public static class PaperPage
         :root { --paper: #f6f1e7; --ink: #1f1b16; --muted: #4a4339; --rule: #1f1b16; --box: #ece4d4; }
         * { box-sizing: border-box; }
         html { background: var(--paper); }
-        body { margin: 0; padding: 12mm 15mm; color: var(--ink); background: var(--paper);
+        body { margin: 0; padding: 12mm 15mm 14mm; color: var(--ink); background: var(--paper);
+               box-decoration-break: clone; -webkit-box-decoration-break: clone;
                font-family: "Noto Serif", "Noto Serif CJK JP", Georgia, serif; font-size: 10.5pt; line-height: 1.45; }
         .front { margin-bottom: 6px; }
-        .issue { display: flex; justify-content: space-between; margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
+        .issue { display: flex; justify-content: space-between; align-items: baseline; gap: 6mm; margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
                  font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.08em; }
         .masthead { text-align: center; border-bottom: 3px double var(--rule); padding-bottom: 4px; margin-bottom: 10px; }
         .masthead h1 { margin: 0; font-size: 46pt; letter-spacing: 0.04em; font-weight: 800; line-height: 1.05; }
@@ -183,12 +184,12 @@ public static class PaperPage
         .lead h2 { margin: 0 0 8px; font-size: 24pt; line-height: 1.12; }
         figure { margin: 0 0 8px; }
         figure img { display: block; width: 100%; object-fit: cover; border: 0.5px solid #b9ad99; }
-        .lead figure img { height: 72mm; }
+        .lead figure img { height: 58mm; }
         figcaption { margin-top: 2px; font-size: 7.5pt; color: var(--muted); text-align: right; }
         .lead-text { margin: 0; column-count: 2; column-gap: 8mm; text-align: justify; hyphens: auto; font-size: 11pt; }
-        .front-row { display: flex; gap: 8mm; margin-top: 12px; padding-top: 10px; border-top: 1.5px solid var(--rule); }
-        .front-row > section { flex: 1; }
-        .opening { font-style: italic; }
+        .front-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-top: 12px; padding-top: 10px;
+                     border-top: 1.5px solid var(--rule); }
+        .opening { font-style: italic; font-size: 10pt; }
         .opening h3, .good h3 { margin: 0 0 4px; font-size: 13pt; font-style: normal; }
         .opening p, .good p { margin: 0; }
         .good { padding: 8px 10px; background: var(--box); border: 1px solid #b9ad99; }
@@ -211,6 +212,6 @@ public static class PaperPage
         article p { margin: 0; text-align: justify; hyphens: auto; }
         p.sources { margin-top: 3px; font-size: 8.5pt; color: var(--muted); text-align: left; }
         .sources a { color: var(--muted); }
-        .colophon { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--rule); font-size: 8pt; color: var(--muted); text-align: center; }
+        .issue .colophon { font-size: 7pt; text-transform: none; letter-spacing: 0; color: var(--muted); text-align: center; }
         """;
 }

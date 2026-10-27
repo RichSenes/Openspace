@@ -267,7 +267,7 @@ public sealed partial class MorningPaper(
         var items = Items([lead]);
         var article = (await WriteAsync(
             context, settings, items, "the front page",
-            "Write the day's opening story from all these items: a headline, then six to eight sentences that say what happened, why it matters and what comes next.",
+            "Write the day's opening story from all these items: a headline, then five or six sentences that say what happened, why it matters and what comes next.",
             1, cancellationToken).ConfigureAwait(false)).FirstOrDefault();
         if (article is null)
         {
@@ -332,7 +332,7 @@ public sealed partial class MorningPaper(
         foreach (var item in items.Take(3))
         {
             var address = item.Image ?? await images.PictureOfAsync(item.Link, cancellationToken).ConfigureAwait(false);
-            if (address is not null && await images.DownloadAsync(address, cancellationToken).ConfigureAwait(false) is { } picture)
+            if (address is not null && await images.DownloadAsync(address, cancellationToken).ConfigureAwait(false) is { FitsAFrame: true } picture)
             {
                 return new PaperPicture(picture, item.Source);
             }
@@ -351,7 +351,7 @@ public sealed partial class MorningPaper(
             var answer = await chat.AskAsync(
                 new LocalAsk(
                     settings.Model, Editor(settings),
-                    $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and four or five warm sentences that set the day, with a light touch.",
+                    $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and three or four warm sentences that set the day, with a light touch.",
                     OpeningSchema, MaxTokens: 800),
                 cancellationToken).ConfigureAwait(false);
             if (JsonSerializer.Deserialize<PaperOpening>(answer, JsonSerializerOptions.Web) is { Title.Length: > 0, Text.Length: > 0 } opening)

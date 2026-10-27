@@ -93,6 +93,20 @@ public sealed class MorningPaperTests : IDisposable
     }
 
     [Fact]
+    public async Task A_picture_that_is_not_a_landscape_photo_is_left_out()
+    {
+        var routine = Create();
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city", image: new Uri("https://img.example/tall-report-preview.png"))];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var lead = html[html.IndexOf("class=\"lead\"", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
+        Assert.DoesNotContain("<figure>", lead, StringComparison.Ordinal);
+        Assert.Contains("About Big strike stops the city", lead, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task One_story_told_by_two_outlets_is_one_article_citing_both()
     {
         var routine = Create();
@@ -322,7 +336,10 @@ public sealed class MorningPaperTests : IDisposable
     {
         public Task<Uri?> PictureOfAsync(Uri page, CancellationToken cancellationToken) => Task.FromResult<Uri?>(null);
 
+        /// <summary>Photos are 1200x675; "tall" ones are previews of documents, 700x1863.</summary>
         public Task<WebImage?> DownloadAsync(Uri picture, CancellationToken cancellationToken) =>
-            Task.FromResult<WebImage?>(new WebImage([0xFF, 0xD8, 0xFF], "image/jpeg"));
+            Task.FromResult<WebImage?>(picture.ToString().Contains("tall", StringComparison.Ordinal)
+                ? new WebImage([0x89, 0x50], "image/png", 700, 1863)
+                : new WebImage([0xFF, 0xD8, 0xFF], "image/jpeg", 1200, 675));
     }
 }

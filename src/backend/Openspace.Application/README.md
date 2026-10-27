@@ -24,6 +24,7 @@ Use cases of Openspace: what a person (or an agent) can ask the building to do.
 | `OfficeQueries` | List offices, get one with its rooms and desks |
 | `WorkTaskCommands` | Assign, propose, approve (optionally choosing the desk), accept, send back, retry, discard, add a note |
 | `WorkTaskQueries` | List tasks by office and status, oldest first; get one with its notes |
+| `LoopGuard` | Notices agents going in circles (the same failure again and again, a conversation filling up) and gives them a fresh start, then stops them for review |
 | `QueueDispatcher` | Hands free seats to queued tasks (see below); a task on a local model waits until `GpuArbiter` admits it |
 | `GpuArbiter` + `GpuShift` | Who has the graphics card: programs listed first, or claiming it, before local models; loads the model desks wait for, unloads it when idle, sends local tasks back to the queue when a program needs the card |
 | `Supervisor` | Splits a request into proposed tasks for the office's desks. Desk names are the only allowed values in the schema; since OpenCode does not enforce schemas strictly, tasks that still lack a valid desk get a short follow-up question (one desk per task). With a single desk everything goes to it; a task left without one says what was suggested (the model reads the repository, read-only, and answers with JSON matching a schema); approves all proposals of an epic at once |

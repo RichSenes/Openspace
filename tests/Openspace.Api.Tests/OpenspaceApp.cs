@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.Abstractions;
 
@@ -39,23 +40,36 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         KeepAlive();
-        builder.UseSetting("ConnectionStrings:Openspace", _connectionString);
-        builder.UseSetting("Settings:Path", SettingsPath);
-        builder.UseSetting("Sounds:Folder", SoundsFolder);
+        var settings = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Openspace"] = _connectionString,
+            ["Settings:Path"] = SettingsPath,
+            ["Sounds:Folder"] = SoundsFolder,
 
-        // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
-        builder.UseSetting("OpenCode:BaseUrl", "http://127.0.0.1:9");
-        // Never the Claude Code of the machine running the tests: it would use a real account.
-        builder.UseSetting("ClaudeCode:Enabled", "false");
-        // Never the graphics card of the machine running the tests: no model server is started.
-        builder.UseSetting("LocalModels:Enabled", "false");
+            // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
+            ["OpenCode:BaseUrl"] = "http://127.0.0.1:9",
+            ["OpenCode:ListenToEvents"] = "false",
+
+            // Never the Claude Code of the machine running the tests: it would use a real account.
+            ["ClaudeCode:Enabled"] = "false",
+
+            // Never the graphics card of the machine running the tests: no model server is started.
+            ["LocalModels:Enabled"] = "false",
+            ["Operator:Name"] = "elliot",
+            ["Queue:Enabled"] = "false",
+        };
+        foreach (var (key, value) in settings)
+        {
+            builder.UseSetting(key, value);
+        }
+
+        // Added last, so the person's appsettings.Local.json, read by the API itself, never wins over them.
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings));
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));
         }
-        builder.UseSetting("Operator:Name", "elliot");
-        builder.UseSetting("Queue:Enabled", "false");
-        builder.UseSetting("OpenCode:ListenToEvents", "false");
+
         builder.UseEnvironment("Testing");
     }
 

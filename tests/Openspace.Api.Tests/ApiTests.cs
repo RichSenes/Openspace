@@ -269,6 +269,18 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Only_a_running_task_can_be_stopped_for_review()
+    {
+        var (officeId, _, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Add a logout button" });
+
+        var stop = await _http.PostAsync($"/api/tasks/{task.Id}/stop", null);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, stop.StatusCode);
+        Assert.Equal("Queued", (await GetAsync<WorkTask>($"/api/tasks/{task.Id}")).Status);
+    }
+
+    [Fact]
     public async Task A_task_without_desk_is_proposed_and_approved_later()
     {
         var (officeId, _, deskId) = await FurnishAsync();

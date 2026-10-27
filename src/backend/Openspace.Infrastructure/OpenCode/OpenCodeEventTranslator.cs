@@ -30,6 +30,7 @@ internal static class OpenCodeEventTranslator
                 ? new AgentSignal.PermissionReplied(replied, request, Text(props, "reply") is not "reject")
                 : null,
             "session.idle" => new AgentSignal.Finished(Text(props, "sessionID")!),
+            "session.compacted" => Text(props, "sessionID") is { } compacted ? new AgentSignal.Compacted(compacted) : null,
             "session.error" => FromError(props),
             "session.status" => FromStatus(props),
             _ => null,

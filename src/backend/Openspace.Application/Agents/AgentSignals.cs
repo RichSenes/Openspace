@@ -21,6 +21,7 @@ public sealed partial class AgentSignals(
     PermissionRequests permissions,
     IOptionsMonitor<AgentOptions> agentOptions,
     EngineLimits limits,
+    LoopGuard loops,
     TimeProvider clock)
 {
     /// <param name="step">The agent's current todo item, if this update is about its plan.</param>
@@ -117,6 +118,75 @@ public sealed partial class AgentSignals(
         await LogAsync(
             AuditEntry.Record(task.Id, clock.GetUtcNow(), kind, summary, relative, succeeded, callId),
             cancellationToken).ConfigureAwait(false);
+
+        if (succeeded)
+        {
+            if (kind == AuditKind.Change)
+            {
+                loops.Changed(sessionId);
+            }
+
+            return;
+        }
+
+        var times = loops.Failed(sessionId, $"{summary}\n{relative}");
+        if (times >= LoopGuard.RepeatedFailures)
+        {
+            var error = relative?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault();
+            await StartOverAsync(
+                task,
+                $"it tried the same thing {times} times and it failed the same way each time ({summary}{(error is null ? "" : $": {ActionPhrases.Shorten(error, 200)}")})",
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The engine summarised the conversation to make room: too often, and the agent lost its thread.</summary>
+    public async Task CompactedAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is null)
+        {
+            return;
+        }
+
+        var times = loops.Compacted(sessionId);
+        if (times >= LoopGuard.Compactions)
+        {
+            await StartOverAsync(task, $"its conversation filled up {times} times and it lost the thread", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The agent is going in circles: it is stopped and starts again in a fresh conversation,
+    /// in the same working copy, told what went wrong. After a couple of fresh starts its work
+    /// goes to review as it is instead: nothing done so far is lost.
+    /// </summary>
+    private async Task StartOverAsync(WorkTask task, string why, CancellationToken cancellationToken)
+    {
+        var now = clock.GetUtcNow();
+        var run = task.Run!;
+        if (loops.TryRestart(task, run.SessionId, why))
+        {
+            task.AddNote(
+                NoteAuthor.System,
+                $"Openspace stopped the agent because {why}. It starts again in a fresh conversation, in the same working copy, with the work done so far.",
+                now);
+            task.Requeue(now);
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            task.Interrupt(
+                $"Openspace stopped the agent because {why}, after {LoopGuard.FreshStarts} fresh starts already. Its work so far is kept: look at it, then accept it or send it back with directions.",
+                now);
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await ShowAsync(task, ActivityKind.Stopped, null, "Stopped: going in circles", null, cancellationToken).ConfigureAwait(false);
+            reviews.Enqueue(task.Id);
+        }
+
+        // Not running any more: whatever the old conversation still reports is ignored.
+        await runtime.AbortAsync(run.SessionId, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

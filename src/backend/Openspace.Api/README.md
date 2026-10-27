@@ -31,6 +31,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/tasks/{id}/send-back` | Back to the queue for another round: `{ text?, withReview? }`; with `withReview` the reviewer's note on this round goes along, after the text or alone |
 | PUT | `/api/tasks/{id}/checks/{number}` | Tick a check a person tried by hand, or untick it: `{ done }`; in review or done |
 | POST | `/api/tasks/{id}/retry` | Requeue a failed task |
+| POST | `/api/tasks/{id}/stop` | Stop a running agent and put its work so far in review, as it is |
 | POST | `/api/tasks/{id}/discard` | Drop an open task |
 | POST | `/api/tasks/{id}/notes` | Add a note as the operator: `{ text }` |
 | GET | `/api/tasks/{id}/diff` | What the agent changed, as a unified diff (plain text) |
@@ -191,6 +192,23 @@ A task's first round of work is 1; each send back starts the next. Agents list
 what a person must try by hand with `add_manual_check`, the reviewer adds what
 is missing, and ticks are cleared when the work goes back. Tokens are counted
 per round, as OpenCode reports each answer and Claude Code each run.
+
+## Agents going in circles
+
+Smaller models, local ones above all, can get stuck: the same edit failing the same
+way again and again, or a conversation that fills the model's context, is summarised
+by OpenCode and loses its thread. Openspace watches for both:
+
+- the same tool call failing the same way 4 times with no change landing in between;
+- the conversation summarised 3 times in the same session (`session.compacted`).
+
+The agent is then stopped and the task goes back to the queue with a note; it starts
+again in a fresh conversation, in the same working copy, with a brief that says what
+went wrong and asks it to look at `git diff` before doing anything again. A task gets
+two fresh starts per round; looping a third time, it goes to review as it is, missing
+steps included, so a person (or the reviewer) can accept it or send it back with
+directions. Nothing done is ever thrown away. A person can do the same at any time
+with Stop and review (`POST /api/tasks/{id}/stop`).
 
 ## Sounds
 

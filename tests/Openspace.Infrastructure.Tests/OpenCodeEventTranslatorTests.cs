@@ -35,6 +35,12 @@ public class OpenCodeEventTranslatorTests
     }
 
     [Fact]
+    public void A_summarised_conversation_is_reported()
+    {
+        Assert.Equal(new AgentSignal.Compacted("ses_1"), Translate("""{"type":"session.compacted","properties":{"sessionID":"ses_1"}}"""));
+    }
+
+    [Fact]
     public void A_todo_list_with_nothing_in_progress_says_nothing()
     {
         Assert.Null(Translate("""{"type":"todo.updated","properties":{"sessionID":"ses_1","todos":[{"content":"Done","status":"completed"}]}}"""));

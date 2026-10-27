@@ -91,4 +91,25 @@ public class ProcedureTests
         Assert.Equal((true, true, false), (first, second, third));
         Assert.Equal(0, task.ProcedureReminders);
     }
+
+    [Fact]
+    public void An_interrupted_task_goes_to_review_as_it_is_with_steps_still_missing()
+    {
+        var task = RunningWithProcedure();
+
+        task.Interrupt("Stopped by a person: the work so far is kept.", Now);
+
+        Assert.Equal(WorkTaskStatus.Review, task.Status);
+        Assert.Equal(2, task.MissingSteps.Count);
+        Assert.Equal("Stopped by a person: the work so far is kept.", task.Notes[^1].Text);
+    }
+
+    [Fact]
+    public void Only_a_running_task_can_be_interrupted()
+    {
+        var (office, desk) = ECorpWithDesk();
+        var task = WorkTask.Assign(office, desk.Id, "Patch the header", null, "elliot", Now);
+
+        Assert.Throws<DomainException>(() => task.Interrupt("Stopped.", Now));
+    }
 }

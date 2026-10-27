@@ -25,7 +25,7 @@ export function groupByColumn(tasks: WorkTaskView[]): Map<TaskStatus, WorkTaskVi
   return groups
 }
 
-export type TaskAction = 'approve' | 'accept' | 'send-back' | 'retry' | 'discard'
+export type TaskAction = 'approve' | 'accept' | 'send-back' | 'retry' | 'stop' | 'discard'
 
 /** What a person can do with a task in a given status, mirroring the domain rules. */
 export function actionsFor(status: TaskStatus): TaskAction[] {
@@ -33,8 +33,9 @@ export function actionsFor(status: TaskStatus): TaskAction[] {
     case 'Proposed':
       return ['approve', 'discard']
     case 'Queued':
-    case 'Running':
       return ['discard']
+    case 'Running':
+      return ['stop', 'discard']
     case 'Review':
       return ['accept', 'send-back', 'discard']
     case 'Failed':

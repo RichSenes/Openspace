@@ -56,7 +56,7 @@ public static class Briefing
         return text
             .AppendLine()
             .AppendLine("How to report:")
-            .AppendLine("- Keep a todo list and update it before each step. Write each item as a short sentence a person understands, saying what you change and why, e.g. \"Adding the logout button to the header\". The team sees your current item live.")
+            .AppendLine("- Keep a todo list and update it before each step. Write each item as a short sentence a person understands, saying what you change and why, e.g. \"Adding the logout button to the header\": no code, conditions or file paths in it. The team sees your current item live.")
             .AppendLine("- Do not commit: Openspace commits your work once it is accepted.")
             .AppendLine("- If the openspace tools are available: use add_task_note to leave the team decisions, findings or open questions worth keeping, and get_task to re-read this brief with the latest notes.")
             .AppendLine("- If you cannot go on until the person does or decides something (closing an app, say), call wait_for_person saying exactly what they must do: you wait there until they answer. Never loop or sleep waiting for it yourself.")
@@ -74,6 +74,17 @@ public static class Briefing
             .AppendLine(ForNewTask(office, room, desk, task, before))
             .AppendLine()
             .AppendLine("Another agent already worked on this task in this working copy. Look at git status and git diff to see where it stands, then go on from there: the notes from the team above say what is still wrong.")
+            .ToString();
+
+    /// <summary>What an agent reads when it starts over after going in circles.</summary>
+    /// <param name="why">What went wrong, as in "it tried the same thing 4 times…".</param>
+    public static string ForFreshStart(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before, string why) =>
+        new StringBuilder()
+            .AppendLine(ForNewTask(office, room, desk, task, before))
+            .AppendLine()
+            .AppendLine(CultureInfo.InvariantCulture, $"You already worked on this task in this working copy, in a conversation Openspace stopped because {why}.")
+            .AppendLine("Start from what is there: look at git status and git diff to see what you already did, and do not redo it. A change that is already in a file is done: move on to what is left, or finish with your summary.")
+            .Append("Do not try again what failed the same way more than once: find another way, or leave a note saying what blocks you.")
             .ToString();
 
     /// <summary>What an agent is asked when its accepted work no longer merges cleanly.</summary>

@@ -53,6 +53,8 @@ internal sealed class Harness
 
     public GpuArbiter Gpu { get; }
 
+    public LoopGuard Loops { get; } = new();
+
     public FakeGpuProbe GpuProbe { get; } = new();
 
     public FakeModelServer ModelServer { get; } = new();
@@ -95,14 +97,14 @@ internal sealed class Harness
 
     public TaskRunner Runner(int seats = 1) => new(
         new QueueDispatcher(Tasks, Offices, Limits, Gpu, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
-        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Clock, NullLogger<TaskRunner>.Instance);
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, Clock, NullLogger<TaskRunner>.Instance);
 
     public GpuShift Shift() => new(
         Gpu, GpuProbe, ModelServer, Tasks, Offices, Runtime, Activity, UnitOfWork, new LiveOptions<LocalModelOptions>(() => LocalModels), Clock);
 
     public AgentSignals Signals() => new(
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions,
-        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Clock);
+        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, Clock);
 
     public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);
 

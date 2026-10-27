@@ -304,6 +304,23 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         MoveTo(WorkTaskStatus.Review, now);
     }
 
+    /// <summary>
+    /// The agent is stopped before it finished, by a person or because it went in circles:
+    /// its work so far goes to review as it is, missing steps included, to be accepted or
+    /// sent back with directions.
+    /// </summary>
+    public void Interrupt(string reason, DateTimeOffset now)
+    {
+        if (Status != WorkTaskStatus.Running)
+        {
+            throw InvalidTransition(WorkTaskStatus.Review);
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        AddNote(NoteAuthor.System, reason, now);
+        MoveTo(WorkTaskStatus.Review, now);
+    }
+
     public void Fail(string reason, DateTimeOffset now)
     {
         if (Status != WorkTaskStatus.Running)

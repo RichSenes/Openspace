@@ -127,8 +127,10 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         var backlog = older is null ? null : new Backlog(old.Count, old.Count(m => archived.Contains(m.Id)), older.Rest, older.More);
 
         var dated = new List<AgendaItem>();
-        foreach (var message in sorted.Where(s => s.Dated).Select(s => s.Message))
+        var withDates = sorted.Where(s => s.Dated).Select(s => s.Message).ToList();
+        foreach (var (message, i) in withDates.Select((m, i) => (m, i)))
         {
+            context.Progress($"Reading the dates of {i + 1} of {withDates.Count} messages");
             foreach (var item in await DatesAsync(context, settings, message, cancellationToken).ConfigureAwait(false))
             {
                 var key = AgendaPrefix + AgendaKey(item);
@@ -157,8 +159,9 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         var gists = await GistsAsync(context, settings, [.. answer.Concat(kept).Take(MostInSummary)], cancellationToken).ConfigureAwait(false);
 
         var drafts = 0;
-        foreach (var message in answer)
+        foreach (var (message, i) in answer.Select((m, i) => (m, i)))
         {
+            context.Progress($"Drafting reply {i + 1} of {answer.Count}");
             if (await DraftAsync(context, settings, message, cancellationToken).ConfigureAwait(false) is not { } reply)
             {
                 continue;
@@ -246,11 +249,12 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
     }
 
     /// <summary>The messages behind these ids that deserve a look, read in full.</summary>
-    private async Task<List<MailMessage>> MeetAsync(RoutineContext context, MailSettings settings, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    private async Task<List<MailMessage>> MeetAsync(RoutineContext context, MailSettings settings, List<string> ids, CancellationToken cancellationToken)
     {
         var messages = new List<MailMessage>();
-        foreach (var id in ids)
+        foreach (var (id, i) in ids.Select((id, i) => (id, i)))
         {
+            context.Progress($"Reading {i + 1} of {ids.Count} messages");
             var message = await mailbox.ReadAsync(settings.Account, id, cancellationToken).ConfigureAwait(false);
             if (await context.MeetAsync(KeyPrefix + message.Id, message.Id, $"{Sender(message.From)}: {message.Subject}", cancellationToken).ConfigureAwait(false))
             {
@@ -280,8 +284,9 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             .ToList();
         var sorted = new List<Sorted>();
         var failed = false;
-        foreach (var message in messages)
+        foreach (var (message, i) in messages.Select((m, i) => (m, i)))
         {
+            context.Progress($"Sorting {i + 1} of {messages.Count} messages");
             var questions = new Dictionary<string, DecisionQuestion>();
             if (settings.Labels.Count > 0)
             {
@@ -336,7 +341,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         var arrived = TimeZoneInfo.ConvertTime(message.Received, zone);
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Assistant(settings),
                     $"""
@@ -405,10 +410,11 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             return [];
         }
 
+        context.Progress($"Summing up the {messages.Count} messages that stay");
         var list = string.Join("\n\n", messages.Select((m, i) => $"[{i + 1}] From {m.From}, subject {m.Subject}\n{Short(m.Text.Length > 0 ? m.Text : m.Snippet, 600)}"));
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Assistant(settings),
                     $"These emails stay in the inbox:\n{list}\n\nFor each, write one short sentence in {settings.Language}: what it is about and what, if anything, the reader has to do. Give its number in \"n\".",
@@ -430,7 +436,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
     {
         try
         {
-            var answer = await chat.AskAsync(
+            var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Assistant(settings),
                     $"""

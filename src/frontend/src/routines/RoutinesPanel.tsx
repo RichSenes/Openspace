@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { ChevronDown, ChevronUp, CircleCheck, CircleX, LoaderCircle, Pencil, Play, Plus, SkipForward, Square, Trash2 } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, Pencil, Play, Plus, SkipForward, Square, Trash2 } from 'lucide-react'
 import {
   useAskFirst,
   useCreateRoutine,
@@ -23,6 +23,7 @@ import { useRoutineProgress } from '../realtime/routineProgress'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
+import { runNews } from './progress'
 import { readAgenda, readText, withAgenda, withText } from './settings'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
@@ -116,7 +117,8 @@ function Proposals({ officeId }: { officeId: string }) {
 function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => void }) {
   const run = useRunRoutine()
   const stop = useStopRoutine()
-  const running = useRoutineProgress().has(routine.id) || routine.lastRun?.status === 'Running'
+  const news = useRoutineProgress().get(routine.id)
+  const running = news !== undefined || routine.lastRun?.status === 'Running'
   const turnOn = useTurnOnRoutine()
   const askFirst = useAskFirst()
   const remove = useDeleteRoutine()
@@ -157,9 +159,11 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
           <dd>{!routine.enabled ? 'None: it is off' : routine.nextRunAt ? whenNear(routine.nextRunAt) : '—'}</dd>
         </div>
         <div>
-          <dt>Last run</dt>
+          <dt>{running ? 'Now' : 'Last run'}</dt>
           <dd>
-            {last && Icon ? (
+            {running ? (
+              <RunningNow line={news?.line} heardAt={news?.at} startedAt={last?.status === 'Running' ? last.startedAt : undefined} />
+            ) : last && Icon ? (
               <>
                 <span className={`run-state run-${last.status.toLowerCase()}`}>
                   <Icon size={14} aria-hidden /> {RUN_LABEL[last.status]}
@@ -230,6 +234,35 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
       {history && <Runs routineId={routine.id} />}
     </li>
   )
+}
+
+/** What a running routine is doing, since when, and whether it went quiet for too long. */
+function RunningNow({ line, heardAt, startedAt }: { line: string | undefined; heardAt: number | undefined; startedAt: string | undefined }) {
+  const now = useNow(5000)
+  const { since, quiet } = runNews(startedAt, heardAt, now)
+  return (
+    <>
+      <span className="run-state run-running">
+        <LoaderCircle size={14} aria-hidden /> {line ?? 'Running'}
+      </span>
+      <span className="run-summary">{since}</span>
+      {quiet && (
+        <span className="run-quiet" role="status">
+          <CircleAlert size={14} aria-hidden /> {quiet}
+        </span>
+      )}
+    </>
+  )
+}
+
+/** The time, again every few milliseconds, so what is said about it stays true. */
+function useNow(every: number): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), every)
+    return () => window.clearInterval(timer)
+  }, [every])
+  return now
 }
 
 /** The kanji the paper explains next, with a way to skip the ones the person already knows. */

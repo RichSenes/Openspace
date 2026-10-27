@@ -269,6 +269,35 @@
   color: var(--mute);
 }
 
+/* The wheel turns while the run is alive; the words say the rest. */
+.routine-facts .run-running svg {
+  animation: run-spin 1.6s linear infinite;
+}
+
+@keyframes run-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routine-facts .run-running svg {
+    animation: none;
+  }
+}
+
+.run-quiet {
+  display: inline-flex;
+  align-items: start;
+  gap: 4px;
+  color: var(--accent);
+}
+
+.run-quiet svg {
+  flex: none;
+  margin-top: 3px;
+}
+
 .run-summary {
   color: var(--mute);
 }

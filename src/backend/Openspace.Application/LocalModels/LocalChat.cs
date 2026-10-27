@@ -4,7 +4,9 @@ namespace Openspace.Application.LocalModels;
 
 /// <param name="Model">A local model as desks name it: <c>local/gemma</c>.</param>
 /// <param name="JsonSchema">When given, the answer is JSON matching it.</param>
-public sealed record LocalAsk(string Model, string System, string User, string? JsonSchema = null, int MaxTokens = 2048, double Temperature = 0.3);
+/// <param name="Waiting">Told, about once a minute, while the model waits for the graphics card, and once when it gets it.</param>
+public sealed record LocalAsk(
+    string Model, string System, string User, string? JsonSchema = null, int MaxTokens = 2048, double Temperature = 0.3, Action<string>? Waiting = null);
 
 /// <summary>The model server's own API: one request, one answer.</summary>
 public interface ILocalModelApi
@@ -36,9 +38,17 @@ public sealed class LocalChat(GpuArbiter gpu, ILocalModelApi api, IOptionsMonito
         }
 
         var giveUp = clock.GetUtcNow() + options.CurrentValue.RoutineWait;
+        var told = DateTimeOffset.MinValue;
         IDisposable? lease;
         while ((lease = gpu.TryLease(ask.Model)) is null)
         {
+            if (ask.Waiting is not null && clock.GetUtcNow() - told >= TimeSpan.FromMinutes(1))
+            {
+                var holders = gpu.View().Holders;
+                ask.Waiting($"Waiting for the graphics card{(holders.Count > 0 ? $": {string.Join(", ", holders)} is using it" : string.Empty)}");
+                told = clock.GetUtcNow();
+            }
+
             if (clock.GetUtcNow() >= giveUp)
             {
                 var view = gpu.View();
@@ -47,6 +57,11 @@ public sealed class LocalChat(GpuArbiter gpu, ILocalModelApi api, IOptionsMonito
             }
 
             await Task.Delay(Poll, clock, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (told != DateTimeOffset.MinValue)
+        {
+            ask.Waiting?.Invoke("The graphics card is free: the local model is writing");
         }
 
         using (lease)
@@ -76,4 +91,16 @@ public interface IDecider
 
     Task<IReadOnlyDictionary<string, Decision>> DecideAsync(
         string state, IReadOnlyDictionary<string, DecisionQuestion> questions, CancellationToken cancellationToken);
+}
+
+public static class LocalChatExtensions
+{
+    /// <summary>Asks on behalf of a routine run: while the model waits for the graphics card, the run says so.</summary>
+    public static Task<string> AskAsync(this ILocalChat chat, Routines.RoutineContext context, LocalAsk ask, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(chat);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(ask);
+        return chat.AskAsync(ask with { Waiting = context.Progress }, cancellationToken);
+    }
 }

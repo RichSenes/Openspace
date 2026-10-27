@@ -31,6 +31,12 @@ public sealed class RoutineContext(
     }
 
     /// <summary>
+    /// Where a long step is, for whoever watches, without filling the log: "Sorting 12 of 40".
+    /// Long steps say it at every item, so a run that stops talking is a run that is stuck.
+    /// </summary>
+    public void Progress(string line) => progress?.Report(Routine, line);
+
+    /// <summary>
     /// Something the routine wants to do with the person's things. What can be undone is done
     /// at once, unless the routine asks first; anything else waits for a yes.
     /// </summary>

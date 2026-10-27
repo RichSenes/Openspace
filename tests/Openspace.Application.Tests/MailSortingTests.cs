@@ -86,6 +86,14 @@ public sealed class MailSortingTests
         Assert.Contains("Staying in the inbox (1)\n• Bob Example — Photos from the trip", text, StringComparison.Ordinal);
         Assert.Contains("Sorted and archived: Newsletters 1, Receipts 1", text, StringComparison.Ordinal);
         Assert.Contains("1 reply draft waits for your yes", text, StringComparison.Ordinal);
+
+        // Long steps say where they are at every message, without filling the log.
+        var lines = _h.Progress.Lines.Select(l => l.Line).ToList();
+        Assert.Contains("Reading 4 of 4 messages", lines);
+        Assert.Contains("Sorting 1 of 4 messages", lines);
+        Assert.Contains("Sorting 4 of 4 messages", lines);
+        Assert.Contains("Drafting reply 1 of 1", lines);
+        Assert.DoesNotContain("Sorting 1 of 4", run.Log, StringComparison.Ordinal);
     }
 
     [Fact]

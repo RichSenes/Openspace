@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<Checks.MergeChecks>();
         services.AddSingleton<RoutineRequests>();
         services.TryAddSingleton<IRoutineOutbox, NoOutbox>();
+        services.TryAddSingleton<IRoutineProgress, NoProgress>();
         services.AddScoped<RoutineRunner>();
         services.AddScoped<RoutineCommands>();
         services.AddScoped<RoutineQueries>();

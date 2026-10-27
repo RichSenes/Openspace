@@ -13,6 +13,9 @@ public sealed class RoutineCommands(
     IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
+    /// <summary>The name the routines room gets in every office.</summary>
+    public const string RoomName = "Routine";
+
     public async Task<RoutineId> CreateAsync(
         OfficeId officeId, string name, string kind, ScheduleView schedule, string? settings, CancellationToken cancellationToken)
     {
@@ -24,6 +27,7 @@ public sealed class RoutineCommands(
             office, name, known.Key, schedule.ToSchedule(), string.IsNullOrWhiteSpace(settings) ? known.DefaultSettings : settings,
             clock.GetUtcNow(), clock.LocalTimeZone);
         routines.Add(routine);
+        office.RoutinesRoom(RoomName, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return routine.Id;
     }

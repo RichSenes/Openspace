@@ -52,3 +52,16 @@ internal sealed class NoOutbox : IRoutineOutbox
 {
     public Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken) => Task.FromResult(false);
 }
+
+/// <summary>What a running routine is doing, line by line, for whoever watches: the building's bubbles.</summary>
+public interface IRoutineProgress
+{
+    void Report(Routine routine, string line);
+}
+
+internal sealed class NoProgress : IRoutineProgress
+{
+    public void Report(Routine routine, string line)
+    {
+    }
+}

@@ -21,6 +21,9 @@ internal sealed class InMemoryRoutines : IRoutineRepository
     public Task<IReadOnlyList<Routine>> ListAsync(OfficeId officeId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Routine>>([.. Items.Where(r => r.OfficeId == officeId).OrderBy(r => r.Name)]);
 
+    public Task<IReadOnlyList<OfficeId>> OfficesWithRoutinesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<OfficeId>>([.. Items.Select(r => r.OfficeId).Distinct()]);
+
     public Task<IReadOnlyList<Routine>> ListDueAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Routine>>([.. Items.Where(r => r.IsDue(now)).OrderBy(r => r.NextRunAt)]);
 
@@ -49,6 +52,13 @@ internal sealed class InMemoryRoutines : IRoutineRepository
         Task.FromResult(Seen.Find(s => s.RoutineId == routineId && s.Key == key));
 
     public void AddSeen(SeenItem item) => Seen.Add(item);
+}
+
+internal sealed class RecordingProgress : IRoutineProgress
+{
+    public List<(string Routine, string Line)> Lines { get; } = [];
+
+    public void Report(Routine routine, string line) => Lines.Add((routine.Name, line));
 }
 
 internal sealed class RecordingOutbox : IRoutineOutbox

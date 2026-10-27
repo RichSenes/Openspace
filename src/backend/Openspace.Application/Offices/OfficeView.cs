@@ -58,7 +58,8 @@ public sealed record RoomView(
     int? Left,
     int? Top,
     string? Mood,
-    string? Check)
+    string? Check,
+    RoomKind Kind = RoomKind.Work)
 {
     public static RoomView From(Room room) =>
         new(
@@ -75,7 +76,8 @@ public sealed record RoomView(
             room.Left,
             room.Top,
             room.Mood,
-            room.Check);
+            room.Check,
+            room.Kind);
 }
 
 /// <param name="Spot">Where the desk stands in its room; null when it is placed automatically.</param>

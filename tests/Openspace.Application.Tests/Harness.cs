@@ -61,6 +61,8 @@ internal sealed class Harness
 
     public RecordingOutbox Outbox { get; } = new();
 
+    public RecordingProgress Progress { get; } = new();
+
     public FakeOffersKind OffersKind { get; } = new();
 
     public FakeGpuProbe GpuProbe { get; } = new();
@@ -108,7 +110,7 @@ internal sealed class Harness
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, Clock, NullLogger<TaskRunner>.Instance);
 
     public Routines.RoutineRunner RoutineRunner() =>
-        new(Routines, [OffersKind], RoutineRequests, Outbox, UnitOfWork, Clock, NullLogger<Routines.RoutineRunner>.Instance);
+        new(Routines, Offices, Progress, [OffersKind], RoutineRequests, Outbox, UnitOfWork, Clock, NullLogger<Routines.RoutineRunner>.Instance);
 
     public Routines.RoutineCommands RoutineCommands() => new(Offices, Routines, [OffersKind], RoutineRequests, UnitOfWork, Clock);
 

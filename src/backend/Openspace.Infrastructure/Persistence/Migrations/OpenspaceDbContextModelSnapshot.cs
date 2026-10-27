@@ -533,6 +533,13 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                             b1.Property<int?>("Depth")
                                 .HasColumnType("INTEGER");
 
+                            b1.Property<string>("Kind")
+                                .IsRequired()
+                                .ValueGeneratedOnAdd()
+                                .HasMaxLength(20)
+                                .HasColumnType("TEXT")
+                                .HasDefaultValue("Work");
+
                             b1.Property<int?>("Left")
                                 .HasColumnType("INTEGER");
 

@@ -42,7 +42,7 @@ public sealed class MorningPaperTests : IDisposable
     private async Task<RoutineRun> RunAsync(Routine routine)
     {
         _h.RoutineRequests.Ask(routine.Id);
-        await new RoutineRunner(_h.Routines, [Paper()], _h.RoutineRequests, _h.Outbox, _h.UnitOfWork, _h.Clock, NullLogger<RoutineRunner>.Instance)
+        await new RoutineRunner(_h.Routines, _h.Offices, _h.Progress, [Paper()], _h.RoutineRequests, _h.Outbox, _h.UnitOfWork, _h.Clock, NullLogger<RoutineRunner>.Instance)
             .RunWaitingAsync(default);
         return _h.Routines.Runs.OrderBy(r => r.StartedAt).Last();
     }

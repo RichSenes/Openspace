@@ -136,6 +136,8 @@ export interface RoomView {
   mood?: string | null
   /** The command run on a branch after the room's work is merged into it, e.g. dotnet test. */
   check?: string | null
+  /** "Routines" for the room where the office's routines sit: it has no desks of its own. */
+  kind?: 'Work' | 'Routines'
 }
 
 export interface ProcedureStepView {

@@ -2,6 +2,15 @@ using Openspace.Domain.Common;
 
 namespace Openspace.Domain.Offices;
 
+public enum RoomKind
+{
+    /// <summary>Desks whose agents take tasks.</summary>
+    Work,
+
+    /// <summary>The office's routines, each at a place of its own: no desks.</summary>
+    Routines,
+}
+
 /// <summary>An area of competence inside an office, with its own desks and context.</summary>
 public sealed class Room
 {
@@ -10,15 +19,18 @@ public sealed class Room
     private List<FurniturePiece> _furniture = [];
     private List<int> _windows = [];
 
-    internal Room(RoomId id, string name)
+    internal Room(RoomId id, string name, RoomKind kind = RoomKind.Work)
     {
         Id = id;
         Name = name;
+        Kind = kind;
     }
 
     public RoomId Id { get; }
 
     public string Name { get; }
+
+    public RoomKind Kind { get; private set; }
 
     /// <summary>Conventions, paths, do and don't: injected into every agent working here.</summary>
     public string Context { get; private set; } = string.Empty;
@@ -119,6 +131,11 @@ public sealed class Room
 
     internal Desk AddDesk(string name, AgentProfile agent)
     {
+        if (Kind == RoomKind.Routines)
+        {
+            throw new DomainException($"'{Name}' holds the office's routines: desks go in the other rooms.");
+        }
+
         var deskName = UniqueDeskName(name, null);
         var desk = new Desk(DeskId.New(), deskName, agent);
         _desks.Add(desk);

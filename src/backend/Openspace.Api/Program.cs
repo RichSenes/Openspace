@@ -27,6 +27,7 @@ builder.Services.AddSingleton<Openspace.Api.Sounds.SoundStore>();
 
 builder.Services.AddSingleton<IDomainEventPublisher, SignalRDomainEventPublisher>();
 builder.Services.AddSingleton<IActivityPublisher, SignalRActivityPublisher>();
+builder.Services.AddSingleton<Openspace.Application.Routines.IRoutineProgress, SignalRRoutineProgress>();
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration.GetConnectionString("Openspace")

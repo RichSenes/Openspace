@@ -67,6 +67,7 @@ export default function App() {
             <BuildingView
               office={office}
               onOpenRooms={() => setView('rooms')}
+              onOpenRoutines={() => setView('routines')}
               onOpenTask={(taskId) => {
                 setFocusTask(taskId)
                 setView('board')

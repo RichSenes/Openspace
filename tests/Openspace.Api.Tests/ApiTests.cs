@@ -74,6 +74,9 @@ public sealed class ApiTests : IDisposable
 
         Assert.Equal((HttpStatusCode.OK, HttpStatusCode.BadRequest, HttpStatusCode.OK), (claimed.StatusCode, nameless.StatusCode, released.StatusCode));
         Assert.Equal("Off", gpu.GetProperty("state").GetString());
+        Assert.False(gpu.GetProperty("routineTurn").GetBoolean());
+        Assert.Equal(0, gpu.GetProperty("routinesWaiting").GetArrayLength());
+        Assert.True((await claimed.Content.ReadFromJsonAsync<JsonElement>()).TryGetProperty("routineTurn", out _));
     }
 
     [Fact]

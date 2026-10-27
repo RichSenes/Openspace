@@ -12,6 +12,9 @@ public sealed class RoutineContext(
     /// <summary>Met during this run: not in the database until the run is saved.</summary>
     private readonly Dictionary<string, SeenItem> _met = new(StringComparer.Ordinal);
 
+    /// <summary>What to let go of when the run ends: its turn on the graphics card.</summary>
+    private readonly List<Action> _atEnd = [];
+
     public Routine Routine { get; } = routine;
 
     public RoutineRun Run { get; } = run;
@@ -35,6 +38,28 @@ public sealed class RoutineContext(
     /// Long steps say it at every item, so a run that stops talking is a run that is stuck.
     /// </summary>
     public void Progress(string line) => progress?.Report(Routine, line);
+
+    /// <summary>This run's turn on the graphics card, for the local models it asks.</summary>
+    public LocalModels.RoutineTurn Turn => new(Run.Id.Value.ToString(), Routine.Name, action =>
+    {
+        lock (_atEnd)
+        {
+            _atEnd.Add(action);
+        }
+    });
+
+    /// <summary>The run is over, whatever happened: what it held is let go.</summary>
+    public void Ended()
+    {
+        List<Action> actions;
+        lock (_atEnd)
+        {
+            actions = [.. _atEnd];
+            _atEnd.Clear();
+        }
+
+        actions.ForEach(a => a());
+    }
 
     /// <summary>
     /// Something the routine wants to do with the person's things. What can be undone is done

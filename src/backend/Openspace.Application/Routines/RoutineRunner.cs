@@ -146,6 +146,7 @@ public sealed partial class RoutineRunner(
         finally
         {
             requests.Ended(routine.Id);
+            context.Ended();
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

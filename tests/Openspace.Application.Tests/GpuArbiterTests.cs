@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Openspace.Application.LocalModels;
+using Openspace.Application.Routines;
+using Openspace.Domain.Routines;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
@@ -364,6 +367,103 @@ public class GpuArbiterTests
 
         Assert.Equal("Buongiorno.", await answer);
         Assert.Equal("The graphics card is free: the local model is writing", said[^1]);
+    }
+
+    [Fact]
+    public void A_routine_s_turn_is_shown_to_claiming_programs_which_keep_the_card_until_they_let_it_go()
+    {
+        _h.Gpu.Claim("Atelier");
+
+        Assert.True(_h.Gpu.OpenTurn("run-1", "Hikyaku"));
+        Assert.False(_h.Gpu.OpenTurn("run-1", "Hikyaku"));
+        _h.Gpu.OpenTurn("run-2", "Riku Shinbun");
+
+        var renewed = _h.Gpu.Claim("Atelier");
+        Assert.True(renewed.RoutineTurn);
+        Assert.Equal(["Hikyaku", "Riku Shinbun"], renewed.RoutinesWaiting);
+        Assert.Equal(["Atelier"], _h.Gpu.Claims());
+
+        _h.Gpu.CloseTurn("run-1");
+        _h.Gpu.CloseTurn("run-2");
+        Assert.False(_h.Gpu.View().RoutineTurn);
+        Assert.Empty(_h.Gpu.View().RoutinesWaiting!);
+    }
+
+    [Fact]
+    public async Task A_routine_run_holds_its_turn_from_its_first_question_to_its_end_even_when_it_fails()
+    {
+        await ServingAsync();
+        var chat = new LocalChat(_h.Gpu, new FakeModelApi(), new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
+        var kind = new AskingKind(chat, _h.Gpu);
+        var routine = Routine.Create(_h.Office, "Hikyaku", kind.Key, RoutineSchedule.Daily(new TimeOnly(7, 0)), "{}", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        _h.Routines.Add(routine);
+        var runner = new RoutineRunner(_h.Routines, _h.Offices, _h.Progress, [kind], _h.RoutineRequests, _h.Outbox, _h.UnitOfWork, _h.Clock, NullLogger<RoutineRunner>.Instance);
+
+        _h.RoutineRequests.Ask(routine.Id);
+        await runner.RunWaitingAsync(default);
+        Assert.Equal([false, true, true], kind.TurnSeen);
+        Assert.Equal(["Hikyaku"], kind.WaitingSeen);
+        Assert.False(_h.Gpu.View().RoutineTurn);
+
+        kind.Fail = true;
+        _h.RoutineRequests.Ask(routine.Id);
+        await runner.RunWaitingAsync(default);
+        Assert.Equal(RoutineRunStatus.Failed, _h.Routines.Runs[^1].Status);
+        Assert.False(_h.Gpu.View().RoutineTurn);
+    }
+
+    [Fact]
+    public async Task While_its_turn_waits_for_a_claiming_program_the_run_says_it_waits_for_its_current_job()
+    {
+        _h.Gpu.Claim("Atelier");
+        await _h.Shift().TickAsync(default);
+        var said = new List<string>();
+        var ended = new List<Action>();
+        var chat = new LocalChat(_h.Gpu, new FakeModelApi(), new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
+
+        var answer = chat.AskAsync(new LocalAsk("local/gemma", "s", "u", Waiting: said.Add, Turn: new RoutineTurn("run-9", "Hikyaku", ended.Add)), default);
+        Assert.True(_h.Gpu.View().RoutineTurn);
+        Assert.Equal(["Waiting for Atelier to finish its current job"], said);
+
+        _h.Gpu.Release("Atelier");
+        await _h.Shift().TickAsync(default);
+        _h.ModelServer.Answering = true;
+        await _h.Shift().TickAsync(default);
+        _h.Clock.Advance(LocalChat.Poll);
+        Assert.Equal("Buongiorno.", await answer);
+
+        Assert.True(_h.Gpu.View().RoutineTurn);
+        Assert.Single(ended)();
+        Assert.False(_h.Gpu.View().RoutineTurn);
+    }
+
+    /// <summary>Asks the local model twice in one run, looking at the turn before, between and after.</summary>
+    private sealed class AskingKind(ILocalChat chat, GpuArbiter gpu) : IRoutineKind
+    {
+        public string Key => "asking";
+
+        public string Name => "Asking";
+
+        public string Description => "Asks a local model twice.";
+
+        public List<bool> TurnSeen { get; } = [];
+
+        public List<string> WaitingSeen { get; } = [];
+
+        public bool Fail { get; set; }
+
+        public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
+        {
+            TurnSeen.Clear();
+            WaitingSeen.Clear();
+            TurnSeen.Add(gpu.View().RoutineTurn);
+            await chat.AskAsync(context, new LocalAsk("local/gemma", "s", "first"), cancellationToken);
+            TurnSeen.Add(gpu.View().RoutineTurn);
+            WaitingSeen.AddRange(gpu.View().RoutinesWaiting!);
+            await chat.AskAsync(context, new LocalAsk("local/gemma", "s", "second"), cancellationToken);
+            TurnSeen.Add(gpu.View().RoutineTurn);
+            return Fail ? throw new InvalidOperationException("Made-up failure.") : "Asked twice.";
+        }
     }
 
     [Fact]

@@ -425,6 +425,16 @@ Every few seconds the API looks at the card, and only at the memory in use
 Routines use the local models too: they lease the loaded model through the same
 arbiter, so they wait while a program has the card (at most `RoutineWait`, 3 hours),
 keep the model loaded while they ask, and give way after the same grace as tasks.
+So that a program with a long queue never starves them, routines get a **turn**: it
+starts when a run first asks a local model and lasts until the run ends.
+`GET /api/gpu` and the answer to every claim say `"routineTurn": true` and name the
+routines in `"routinesWaiting"`. A program that claims the card should then, between
+two of its jobs (never in the middle of one), release its claim, check again every
+few seconds, and once `routineTurn` is false claim again and wait for the state to
+be `Lent` before starting the next job (the model is unloaded first). Claims keep
+holding the card during a turn: giving way is the program's choice, and programs
+that do not know about turns work as before. Meanwhile the routine says
+"Waiting for Atelier to finish its current job".
 Next to it, an optional decider runs on the processor (`LocalModels:Decider`, a
 command such as Rizzo-Flow's server and its `Url`): it answers typed questions (yes or
 no, one of a list) for sorting and filtering, starts on the first question and stops

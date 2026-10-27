@@ -31,7 +31,15 @@ public enum GpuState
 /// <param name="Model">The local model loaded, loading or waited for, as <c>provider/id</c>.</param>
 /// <param name="Holders">The programs the card is lent to, or being freed for.</param>
 /// <param name="Detail">A sentence for people, when there is more to say than the state.</param>
-public sealed record GpuView(GpuState State, string? Model, string? ModelName, IReadOnlyList<string> Holders, string? Detail);
+/// <param name="RoutineTurn">
+/// Routines are using a local model, or waiting for one: a program that claims the card should
+/// let it go between two of its jobs (never in the middle of one), and claim it again once the
+/// turn is over. Claims keep holding the card during a turn: giving way is the program's choice.
+/// </param>
+/// <param name="RoutinesWaiting">The routines whose turn it is, by name.</param>
+public sealed record GpuView(
+    GpuState State, string? Model, string? ModelName, IReadOnlyList<string> Holders, string? Detail, bool RoutineTurn = false,
+    IReadOnlyList<string>? RoutinesWaiting = null);
 
 /// <summary>
 /// Who has the graphics card. Programs listed as holders, and those that claim it through
@@ -47,6 +55,7 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
     private readonly Lock _gate = new();
     private readonly Dictionary<string, DateTimeOffset> _claims = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (DateTimeOffset First, DateTimeOffset Last)> _wanted = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _turns = new(StringComparer.Ordinal);
     private GpuView _view = new(GpuState.Off, null, null, [], null);
     private bool _busy;
     private int _leases;
@@ -167,7 +176,7 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
         lock (_gate)
         {
             _claims[holder.Trim()] = clock.GetUtcNow() + options.CurrentValue.ClaimLease;
-            return _view;
+            return Shown();
         }
     }
 
@@ -176,7 +185,7 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
         lock (_gate)
         {
             _claims.Remove(holder.Trim());
-            return _view;
+            return Shown();
         }
     }
 
@@ -191,6 +200,37 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
             }
 
             return [.. _claims.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+        }
+    }
+
+    /// <summary>
+    /// A routine run asks a local model: its turn starts, and lasts until the run ends, so all
+    /// its questions are answered in one go. True when the turn is new.
+    /// </summary>
+    /// <param name="key">The run, so one run opens one turn.</param>
+    public bool OpenTurn(string key, string routine)
+    {
+        lock (_gate)
+        {
+            return _turns.TryAdd(key, routine);
+        }
+    }
+
+    public void CloseTurn(string key)
+    {
+        lock (_gate)
+        {
+            _turns.Remove(key);
+        }
+    }
+
+    /// <summary>The programs holding the card by a claim, which can give way between jobs.</summary>
+    public IReadOnlyList<string> Claimants()
+    {
+        lock (_gate)
+        {
+            var now = clock.GetUtcNow();
+            return [.. _claims.Where(c => c.Value > now).Select(c => c.Key).Order(StringComparer.OrdinalIgnoreCase)];
         }
     }
 
@@ -230,7 +270,11 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
     {
         lock (_gate)
         {
-            return Enabled ? _view : new GpuView(GpuState.Off, null, null, [], null);
+            return Enabled ? Shown() : new GpuView(GpuState.Off, null, null, [], null, false, []);
         }
     }
+
+    /// <summary>The view with the routines' turn. Called holding the gate.</summary>
+    private GpuView Shown() =>
+        _view with { RoutineTurn = _turns.Count > 0, RoutinesWaiting = [.. _turns.Values.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] };
 }

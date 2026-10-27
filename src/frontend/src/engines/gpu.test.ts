@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GpuView } from '../api/types'
 import { gpuBadge } from './gpu'
 
-const view = (over: Partial<GpuView>): GpuView => ({ state: 'Free', model: null, modelName: null, holders: [], detail: null, ...over })
+const view = (over: Partial<GpuView>): GpuView => ({ state: 'Free', model: null, modelName: null, holders: [], detail: null, routineTurn: false, routinesWaiting: [], ...over })
 
 describe('gpuBadge', () => {
   it('stays quiet while local models are off or the card is free', () => {

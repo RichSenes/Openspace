@@ -71,6 +71,9 @@ export interface GpuView {
   /** The programs the card is lent to, or being freed for. */
   holders: string[]
   detail: string | null
+  /** Routines are using a local model or waiting for one: programs that claim the card let it go between their jobs. */
+  routineTurn: boolean
+  routinesWaiting: string[] | null
 }
 
 /** An account over its usage limits: its desks keep their tasks queued until it resumes. */

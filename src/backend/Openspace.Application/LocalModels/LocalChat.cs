@@ -5,8 +5,16 @@ namespace Openspace.Application.LocalModels;
 /// <param name="Model">A local model as desks name it: <c>local/gemma</c>.</param>
 /// <param name="JsonSchema">When given, the answer is JSON matching it.</param>
 /// <param name="Waiting">Told, about once a minute, while the model waits for the graphics card, and once when it gets it.</param>
+/// <param name="Turn">The routine run asking: its turn on the card starts with this question and lasts until the run ends.</param>
 public sealed record LocalAsk(
-    string Model, string System, string User, string? JsonSchema = null, int MaxTokens = 2048, double Temperature = 0.3, Action<string>? Waiting = null);
+    string Model, string System, string User, string? JsonSchema = null, int MaxTokens = 2048, double Temperature = 0.3, Action<string>? Waiting = null,
+    RoutineTurn? Turn = null);
+
+/// <summary>A routine run's claim to a turn on the graphics card.</summary>
+/// <param name="Key">The run, so that one run opens one turn.</param>
+/// <param name="Name">The routine, as programs giving way show it.</param>
+/// <param name="WhenEnded">Takes what to do when the run ends, whatever happened in it.</param>
+public sealed record RoutineTurn(string Key, string Name, Action<Action> WhenEnded);
 
 /// <summary>The model server's own API: one request, one answer.</summary>
 public interface ILocalModelApi
@@ -37,6 +45,11 @@ public sealed class LocalChat(GpuArbiter gpu, ILocalModelApi api, IOptionsMonito
             throw new InvalidOperationException($"{ask.Model} is not a local model, or local models are turned off.");
         }
 
+        if (ask.Turn is { } turn && gpu.OpenTurn(turn.Key, turn.Name))
+        {
+            turn.WhenEnded(() => gpu.CloseTurn(turn.Key));
+        }
+
         var giveUp = clock.GetUtcNow() + options.CurrentValue.RoutineWait;
         var told = DateTimeOffset.MinValue;
         IDisposable? lease;
@@ -45,7 +58,10 @@ public sealed class LocalChat(GpuArbiter gpu, ILocalModelApi api, IOptionsMonito
             if (ask.Waiting is not null && clock.GetUtcNow() - told >= TimeSpan.FromMinutes(1))
             {
                 var holders = gpu.View().Holders;
-                ask.Waiting($"Waiting for the graphics card{(holders.Count > 0 ? $": {string.Join(", ", holders)} is using it" : string.Empty)}");
+                var yielding = gpu.Claimants();
+                ask.Waiting(ask.Turn is not null && yielding.Count > 0
+                    ? $"Waiting for {string.Join(", ", yielding)} to finish its current job"
+                    : $"Waiting for the graphics card{(holders.Count > 0 ? $": {string.Join(", ", holders)} is using it" : string.Empty)}");
                 told = clock.GetUtcNow();
             }
 
@@ -101,6 +117,6 @@ public static class LocalChatExtensions
         ArgumentNullException.ThrowIfNull(chat);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(ask);
-        return chat.AskAsync(ask with { Waiting = context.Progress }, cancellationToken);
+        return chat.AskAsync(ask with { Waiting = context.Progress, Turn = context.Turn }, cancellationToken);
     }
 }

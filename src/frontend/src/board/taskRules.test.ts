@@ -41,6 +41,12 @@ describe('groupByColumn', () => {
 })
 
 describe('actionsFor', () => {
+  it('stops a running agent without losing its work, only while it runs', () => {
+    expect(actionsFor('Running')).toEqual(['stop', 'discard'])
+    expect(actionsFor('Queued')).not.toContain('stop')
+    expect(actionsFor('Review')).not.toContain('stop')
+  })
+
   it('lets you approve only proposed tasks', () => {
     expect(actionsFor('Proposed')).toContain('approve')
     expect(actionsFor('Queued')).not.toContain('approve')
@@ -48,6 +54,7 @@ describe('actionsFor', () => {
 
   it('offers review actions only in review', () => {
     expect(actionsFor('Review')).toEqual(['accept', 'send-back', 'discard'])
+
   })
 
   it('offers nothing on closed tasks', () => {

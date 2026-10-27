@@ -113,7 +113,7 @@ export function useCreateTask() {
   )
 }
 
-export type TaskCommand = 'accept' | 'retry' | 'discard'
+export type TaskCommand = 'accept' | 'retry' | 'stop' | 'discard'
 
 export function useTaskCommand() {
   return useWrite(

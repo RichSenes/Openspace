@@ -111,6 +111,9 @@ internal static class TaskEndpoints
         tasks.MapPost("/{taskId:guid}/retry", (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.RetryAsync(new WorkTaskId(taskId), ct)));
 
+        tasks.MapPost("/{taskId:guid}/stop", (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
+            NoContent(commands.StopAsync(new WorkTaskId(taskId), ct)));
+
         tasks.MapPost("/{taskId:guid}/discard", (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.DiscardAsync(new WorkTaskId(taskId), ct)));
 

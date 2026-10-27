@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddSingleton<Review.PendingReviews>();
         services.AddSingleton<PermissionRequests>();
         services.AddSingleton<EngineLimits>();
+        services.AddSingleton<LoopGuard>();
         services.AddSingleton<GpuArbiter>();
         services.AddScoped<GpuShift>();
         services.AddScoped<Review.TaskReviewer>();

@@ -73,7 +73,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
   const checks = checksDone(task)
   const canTick = task.status === 'Review' || task.status === 'Done'
 
-  const run = (name: 'accept' | 'retry' | 'discard', done: string) =>
+  const run = (name: 'accept' | 'retry' | 'stop' | 'discard', done: string) =>
     command.mutate({ taskId: task.id, command: name }, { onSuccess: () => toast(done) })
 
   const submitFeedback = (e: FormEvent) => {
@@ -434,6 +434,16 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
             {actions.includes('retry') && (
               <button type="button" className="btn btn-primary" onClick={() => run('retry', 'Back in the queue')}>
                 Try again
+              </button>
+            )}
+            {actions.includes('stop') && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => run('stop', 'Stopped: the work so far is in review')}
+                title="Stops the agent and keeps its work: accept it, or send it back with directions"
+              >
+                Stop and review
               </button>
             )}
             {actions.includes('discard') && (

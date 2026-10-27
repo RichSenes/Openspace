@@ -98,6 +98,10 @@ Each project has its own README with detailed specifications.
     nobody uses it. Programs that come first (an image generator, a trainer) get
     the card as soon as they run or claim it: local tasks finish or go back to
     the queue, and resume once the card is free again.
+19. An agent going in circles (the same failure again and again, or a
+    conversation that keeps filling up) is stopped and starts over in a fresh
+    conversation on the work done so far; if it keeps looping its work goes to
+    review as it is. Stop and review does the same by hand, without losing work.
 
 ## Ground rules
 

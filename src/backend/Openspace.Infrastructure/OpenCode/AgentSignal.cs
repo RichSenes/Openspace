@@ -21,6 +21,9 @@ internal abstract record AgentSignal(string SessionId)
 
     public sealed record Failed(string SessionId, string Reason) : AgentSignal(SessionId);
 
+    /// <summary>The engine summarised the conversation to make room in the model's context.</summary>
+    public sealed record Compacted(string SessionId) : AgentSignal(SessionId);
+
     /// <summary>The agent's account is over its usage limits; they reset at <paramref name="Until"/> when known.</summary>
     /// <param name="Scope">The account, as <see cref="EngineLimits"/> names it.</param>
     public sealed record OutOfLimits(string SessionId, string Scope, DateTimeOffset? Until, string Reason) : AgentSignal(SessionId);

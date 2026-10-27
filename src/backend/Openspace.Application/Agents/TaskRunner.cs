@@ -17,6 +17,7 @@ public sealed partial class TaskRunner(
     IWorkspaceManager workspaces,
     ActivityBoard activity,
     AgentSignals signals,
+    LoopGuard loops,
     TimeProvider clock,
     ILogger<TaskRunner> logger)
 {
@@ -66,6 +67,7 @@ public sealed partial class TaskRunner(
 
             var setup = await setups.ForTaskAsync(desk, task, cancellationToken, office.PrivatePaths).ConfigureAwait(false);
             string message;
+            var freshStart = task.Run is null ? null : loops.TakeFreshStart(task.Id);
             if (task.Run is null)
             {
                 var workspace = await workspaces
@@ -81,16 +83,19 @@ public sealed partial class TaskRunner(
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 message = Briefing.ForNewTask(office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false));
             }
-            else if (runtime.EngineOf(task.Run.SessionId) != setup.Engine)
+            else if (freshStart is not null || runtime.EngineOf(task.Run.SessionId) != setup.Engine)
             {
-                // The desk changed engine since: its new agent cannot pick up the old
-                // session, so it opens its own in the same working copy and reads it all.
+                // The agent went in circles, or the desk changed engine since: either way the
+                // old session is left behind and a new one opens in the same working copy.
                 var sessionId = await runtime
                     .CreateSessionAsync(task.Run.WorkspacePath, task.Title, setup, cancellationToken)
                     .ConfigureAwait(false);
                 task.AttachRun(AgentRun.Create(sessionId, task.Run.WorkspacePath, task.Run.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                message = Briefing.ForTakeOver(office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false));
+                var before = await BeforeAsync(task, cancellationToken).ConfigureAwait(false);
+                message = freshStart is not null
+                    ? Briefing.ForFreshStart(office, room, desk, task, before, freshStart)
+                    : Briefing.ForTakeOver(office, room, desk, task, before);
             }
             else
             {

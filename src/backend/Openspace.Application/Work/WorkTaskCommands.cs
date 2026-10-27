@@ -340,6 +340,23 @@ public sealed class WorkTaskCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Stops the agent and puts its work so far in review as it is, to be accepted or sent
+    /// back with directions: unlike discarding, nothing done is lost.
+    /// </summary>
+    public async Task StopAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        task.Interrupt("Stopped by a person while working. The work so far is kept: accept it, or send it back with directions.", now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await activity.ClearTaskAsync(task.Id.Value, now, cancellationToken).ConfigureAwait(false);
+        if (task.Run is { } run)
+        {
+            await runtime.AbortAsync(run.SessionId, run.WorkspacePath, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Drops the task, stopping its agent and throwing its working copy away.</summary>
     public async Task DiscardAsync(WorkTaskId taskId, CancellationToken cancellationToken)
     {

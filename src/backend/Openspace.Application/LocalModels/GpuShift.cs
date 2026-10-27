@@ -40,9 +40,11 @@ public sealed class GpuShift(
             .ToList();
         var running = server.Running;
 
+        // Routines asking the model count as work on it, like tasks.
+        var working = local.Count > 0 || arbiter.Leases > 0;
         if (holders.Count > 0)
         {
-            await GiveWayAsync(holders, local, running, now, cancellationToken).ConfigureAwait(false);
+            await GiveWayAsync(holders, local, working, running, now, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -69,12 +71,12 @@ public sealed class GpuShift(
         }
 
         arbiter.LoadingSince = null;
-        if (local.Count > 0 || wanted == running)
+        if (working || wanted == running)
         {
             arbiter.LastUsed = now;
         }
 
-        if (local.Count == 0 && wanted is not null && wanted != running)
+        if (!working && wanted is not null && wanted != running)
         {
             // Another desk waits for a different model: make room for it.
             await StopAsync(cancellationToken).ConfigureAwait(false);
@@ -82,7 +84,7 @@ public sealed class GpuShift(
             return;
         }
 
-        if (local.Count == 0 && now - arbiter.LastUsed >= settings.IdleUnload)
+        if (!working && now - arbiter.LastUsed >= settings.IdleUnload)
         {
             await StopAsync(cancellationToken).ConfigureAwait(false);
             Report(GpuState.Free, null, false, $"Unloaded {NameOf(running)}: unused for {settings.IdleUnload.TotalMinutes:0} minutes.");
@@ -104,14 +106,14 @@ public sealed class GpuShift(
     }
 
     private async Task GiveWayAsync(
-        List<string> holders, List<WorkTask> local, string? running, DateTimeOffset now, CancellationToken cancellationToken)
+        List<string> holders, List<WorkTask> local, bool working, string? running, DateTimeOffset now, CancellationToken cancellationToken)
     {
         arbiter.YieldingSince ??= now;
         var grace = options.CurrentValue.YieldGrace;
-        if (local.Count > 0 && now - arbiter.YieldingSince < grace)
+        if (working && running is not null && now - arbiter.YieldingSince < grace)
         {
             var left = arbiter.YieldingSince.Value + grace;
-            Report(GpuState.Yielding, running, true, $"Local tasks may finish until {left.ToLocalTime():HH:mm}, then they go back to the queue.", holders);
+            Report(GpuState.Yielding, running, local.Count > 0, $"Local work may finish until {left.ToLocalTime():HH:mm}, then tasks go back to the queue.", holders);
             return;
         }
 

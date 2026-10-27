@@ -37,6 +37,7 @@ builder.Services.Configure<Openspace.Infrastructure.Git.GitHubOptions>(builder.C
 builder.Services.Configure<Openspace.Infrastructure.Persistence.BackupOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Persistence.BackupOptions.SectionName));
 builder.Services.Configure<Openspace.Application.Checks.CheckOptions>(builder.Configuration.GetSection(Openspace.Application.Checks.CheckOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Telegram.TelegramOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Telegram.TelegramOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Routines.PdfOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.PdfOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));

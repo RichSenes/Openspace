@@ -80,7 +80,7 @@ public class LocalModelsTests
     {
         using var services = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         using var server = new LocalModelServer(
-            services.GetRequiredService<IHttpClientFactory>(), new LiveOptions<LocalModelOptions>(Options()), NullLogger<LocalModelServer>.Instance);
+            services.GetRequiredService<IHttpClientFactory>(), () => Options().ServerUrl, NullLogger<LocalModelServer>.Instance);
         var model = new LocalModel { Id = "sleepy", Command = "/bin/sh", Arguments = ["-c", "sleep 60"] };
 
         await server.StartAsync(model, default);
@@ -96,7 +96,7 @@ public class LocalModelsTests
     {
         using var services = new ServiceCollection().AddHttpClient().BuildServiceProvider();
         using var server = new LocalModelServer(
-            services.GetRequiredService<IHttpClientFactory>(), new LiveOptions<LocalModelOptions>(Options()), NullLogger<LocalModelServer>.Instance);
+            services.GetRequiredService<IHttpClientFactory>(), () => Options().ServerUrl, NullLogger<LocalModelServer>.Instance);
 
         await server.StartAsync(new LocalModel { Id = "broken", Command = "/bin/sh", Arguments = ["-c", "echo 'syntax error' >&2; exit 2"] }, default);
         for (var i = 0; i < 50 && server.Running is not null; i++)

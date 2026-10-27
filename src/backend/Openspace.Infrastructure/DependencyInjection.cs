@@ -72,8 +72,26 @@ public static class DependencyInjection
         // The graphics card: local models load when desks need them and give way to the programs listed first.
         services.AddHttpClient(LocalModelServer.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(5));
         services.AddSingleton<IGpuProbe, GpuProbe>();
-        services.AddSingleton<ILocalModelServer, LocalModelServer>();
+        services.AddSingleton<ILocalModelServer>(sp => new LocalModelServer(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            () => sp.GetRequiredService<IOptionsMonitor<LocalModelOptions>>().CurrentValue.ServerUrl,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LocalModelServer>>()));
+
+        // Routines ask the local models through the arbiter, and the decider on the processor directly.
+        services.AddHttpClient<ILocalModelApi, LlamaServerApi>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(15));
+        services.AddHttpClient(DeciderClient.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(10));
+        services.AddSingleton<DeciderClient>();
+        services.AddSingleton<IDecider>(sp => sp.GetRequiredService<DeciderClient>());
         services.AddHostedService<GpuShiftService>();
+
+        // Routines read news feeds and print their pages to PDF with a headless Firefox.
+        services.AddHttpClient<IFeedReader, Routines.FeedReader>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(30);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
+        });
+        services.AddHttpClient(Routines.FirefoxPdfPrinter.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(3));
+        services.AddSingleton<IPdfPrinter, Routines.FirefoxPdfPrinter>();
 
         // What routines make reaches the person's own Telegram group.
         services.AddHttpClient<IRoutineOutbox, Telegram.TelegramOutbox>(http =>

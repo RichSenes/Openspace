@@ -39,6 +39,7 @@ public sealed partial class MorningPaper(
           ],
           "hoursBack": 24,
           "perSection": 4,
+          "goodNews": ["World"],
           "sections": [
             { "name": "World", "about": "What happened in the world.", "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ] }
           ]
@@ -48,8 +49,8 @@ public sealed partial class MorningPaper(
     /// <summary>Items read per feed at most: some feeds carry their whole history.</summary>
     private const int PerFeed = 15;
 
-    /// <summary>Items the decider weighs per section, at most: it takes a few seconds each.</summary>
-    private const int Candidates = 20;
+    /// <summary>Items the decider weighs per section, at most: it takes over ten seconds each on a processor.</summary>
+    private const int Candidates = 12;
 
     public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
     {
@@ -77,7 +78,7 @@ public sealed partial class MorningPaper(
         var lead = news.OrderByDescending(c => c.Score).FirstOrDefault()
             ?? pool.OrderByDescending(c => c.Related.Count).ThenByDescending(c => c.Item.Published).First();
         var used = new HashSet<Candidate>(lead.Related.Append(lead));
-        var good = news.Where(c => !used.Contains(c) && c.Judgement.Hopeful >= 0.6)
+        var good = news.Where(c => !used.Contains(c) && c.Judgement.Hopeful >= 0.6 && settings.GoodNewsFrom(c.Section))
             .OrderByDescending(c => c.Judgement.Hopeful * c.Judgement.News).FirstOrDefault();
         if (good is not null)
         {
@@ -464,8 +465,13 @@ public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Artic
 /// <summary>What a morning paper routine is told in its settings.</summary>
 public sealed record PaperSettings(
     string Title, string Subtitle, string Language, string Model, string Folder, string Reader,
-    IReadOnlyList<string> Rules, int HoursBack, int PerSection, IReadOnlyList<PaperSettings.Section> Sections)
+    IReadOnlyList<string> Rules, int HoursBack, int PerSection, IReadOnlyList<PaperSettings.Section> Sections,
+    IReadOnlyList<string>? GoodNews = null)
 {
+    /// <summary>Whether the good news of the day may come from this section: from any, unless some are named.</summary>
+    public bool GoodNewsFrom(Section section) =>
+        GoodNews is not { Count: > 0 } names || names.Contains(section.Name, StringComparer.OrdinalIgnoreCase);
+
     public sealed record Feed(string Name, string Url);
 
     public sealed record Section(string Name, string About, IReadOnlyList<Feed> Feeds);

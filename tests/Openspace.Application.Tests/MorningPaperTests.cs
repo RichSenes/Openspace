@@ -27,11 +27,11 @@ public sealed class MorningPaperTests : IDisposable
 
     private MorningPaper Paper() => new(_chat, _decider, _feeds, _printer, _images);
 
-    private Routine Create(int perSection = 2, string? sections = null)
+    private Routine Create(int perSection = 2, string? sections = null, string goodNews = "[]")
     {
         var settings = $$"""
             {"title":"Daily Bugle","subtitle":"デイリー","language":"English","folder":{{JsonSerializer.Serialize(_folder)}},
-             "reader":"Likes cats and trains.","rules":["Be kind."],"perSection":{{perSection}},
+             "reader":"Likes cats and trains.","rules":["Be kind."],"perSection":{{perSection}},"goodNews":{{goodNews}},
              "sections":{{sections ?? """[{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"},{"name":"Courier","url":"https://courier.example/feed"}]}]"""}}}
             """;
         var routine = Routine.Create(_h.Office, "Paper", "morning-paper", RoutineSchedule.Daily(new TimeOnly(6, 30)), settings, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
@@ -121,6 +121,37 @@ public sealed class MorningPaperTests : IDisposable
         var box = html[html.IndexOf("class=\"good\"", StringComparison.Ordinal)..];
         Assert.Contains("The good news", box, StringComparison.Ordinal);
         Assert.Contains("About Old bridge reopens after repairs", box, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Good_news_comes_only_from_the_sections_named_for_it()
+    {
+        var routine = Create(
+            sections: """
+                [{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+                 {"name":"Tech","about":"Gadgets.","feeds":[{"name":"Courier","url":"https://courier.example/feed"}]}]
+                """,
+            goodNews: """["City"]""");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city")];
+        _feeds.Items["https://courier.example/feed"] = [Item("Courier", "Phone maker reopens its shop")];
+
+        await RunAsync(routine);
+
+        Assert.DoesNotContain("class=\"good\"", Html(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_section_heading_travels_with_its_first_story()
+    {
+        var routine = Create(perSection: 3);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Cat cafe opens"), Item("Gazette", "Tram line opens")];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var opener = html[html.IndexOf("<div class=\"opener\"><h2>City</h2>", StringComparison.Ordinal)..];
+        Assert.Matches("^<div class=\"opener\"><h2>City</h2>\\s*<article class=\"first\"><h3>About", opener);
+        Assert.Contains("<p class=\"kicker\">Front page</p>", html, StringComparison.Ordinal);
     }
 
     [Fact]

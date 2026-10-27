@@ -48,7 +48,7 @@ public static class PaperPage
         if (front is not null)
         {
             html.Append("<article class=\"lead\">\n");
-            html.Append(CultureInfo.InvariantCulture, $"  <p class=\"kicker\">{E(front.Section)}</p>\n  <h2>{E(front.Article.Headline)}</h2>\n");
+            html.Append(CultureInfo.InvariantCulture, $"  <p class=\"kicker\">{E(words.Lead)}</p>\n  <h2>{E(front.Article.Headline)}</h2>\n");
             if (front.Picture is { } picture)
             {
                 html.Append(CultureInfo.InvariantCulture, $"  <figure><img src=\"{picture.Image.DataUri}\" alt=\"\"><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>\n");
@@ -89,7 +89,8 @@ public static class PaperPage
 
         foreach (var section in sections)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section\">\n  <h2>{E(section.Name)}</h2>\n");
+            // The heading travels with the first story, so it never ends a page alone.
+            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
             for (var i = 0; i < section.Articles.Count; i++)
             {
                 var article = section.Articles[i];
@@ -102,13 +103,17 @@ public static class PaperPage
                             <div><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>
                         """);
                     AppendSources(html, article, section.Items);
-                    html.Append("</div>\n  </article>\n  <div class=\"columns\">\n");
+                    html.Append("</div>\n  </article></div>\n  <div class=\"columns\">\n");
                     continue;
                 }
 
                 if (i == 0)
                 {
-                    html.Append("  <div class=\"columns\">\n");
+                    // Without a picture the first story is a plain one, kept with the heading.
+                    html.Append(CultureInfo.InvariantCulture, $"<article class=\"first\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
+                    AppendSources(html, article, section.Items);
+                    html.Append("</article></div>\n  <div class=\"columns\">\n");
+                    continue;
                 }
 
                 html.Append(CultureInfo.InvariantCulture, $"    <article><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
@@ -147,16 +152,16 @@ public static class PaperPage
         text.Length == 0 ? text : string.Concat(char.ToUpper(text[0], culture).ToString(), text.AsSpan(1));
 
     /// <summary>The few words the page writes itself, in the paper's language.</summary>
-    private sealed record Words(string GoodNews, string InThisIssue, string Photo, string Colophon)
+    private sealed record Words(string Lead, string GoodNews, string InThisIssue, string Photo, string Colophon)
     {
         public static Words For(CultureInfo culture) => culture.TwoLetterISOLanguageName switch
         {
-            "it" => new("La buona notizia", "In questo numero", "Foto", "Scritto da un modello locale a partire dalle fonti citate: i fatti sono loro."),
-            "es" => new("La buena noticia", "En este número", "Foto", "Escrito por un modelo local a partir de las fuentes citadas: los hechos son suyos."),
-            "fr" => new("La bonne nouvelle", "Dans ce numéro", "Photo", "Écrit par un modèle local à partir des sources citées : les faits sont les leurs."),
-            "de" => new("Die gute Nachricht", "In dieser Ausgabe", "Foto", "Von einem lokalen Modell aus den verlinkten Quellen geschrieben: die Fakten stammen von ihnen."),
-            "ja" => new("今日のいいニュース", "今号の内容", "写真", "ローカルモデルが出典をもとに書きました。事実は出典によります。"),
-            _ => new("The good news", "In this issue", "Photo", "Written by a local model from the linked sources: the facts are theirs."),
+            "it" => new("In apertura", "La buona notizia", "In questo numero", "Foto", "Scritto da un modello locale a partire dalle fonti citate: i fatti sono loro."),
+            "es" => new("Portada", "La buena noticia", "En este número", "Foto", "Escrito por un modelo local a partir de las fuentes citadas: los hechos son suyos."),
+            "fr" => new("À la une", "La bonne nouvelle", "Dans ce numéro", "Photo", "Écrit par un modèle local à partir des sources citées : les faits sont les leurs."),
+            "de" => new("Aufmacher", "Die gute Nachricht", "In dieser Ausgabe", "Foto", "Von einem lokalen Modell aus den verlinkten Quellen geschrieben: die Fakten stammen von ihnen."),
+            "ja" => new("トップ記事", "今日のいいニュース", "今号の内容", "写真", "ローカルモデルが出典をもとに書きました。事実は出典によります。"),
+            _ => new("Front page", "The good news", "In this issue", "Photo", "Written by a local model from the linked sources: the facts are theirs."),
         };
     }
 
@@ -168,7 +173,7 @@ public static class PaperPage
         html { background: var(--paper); }
         body { margin: 0; padding: 12mm 15mm; color: var(--ink); background: var(--paper);
                font-family: "Noto Serif", "Noto Serif CJK JP", Georgia, serif; font-size: 10.5pt; line-height: 1.45; }
-        .front { break-after: page; }
+        .front { margin-bottom: 6px; }
         .issue { display: flex; justify-content: space-between; margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
                  font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.08em; }
         .masthead { text-align: center; border-bottom: 3px double var(--rule); padding-bottom: 4px; margin-bottom: 10px; }
@@ -178,7 +183,7 @@ public static class PaperPage
         .lead h2 { margin: 0 0 8px; font-size: 24pt; line-height: 1.12; }
         figure { margin: 0 0 8px; }
         figure img { display: block; width: 100%; object-fit: cover; border: 0.5px solid #b9ad99; }
-        .lead figure img { height: 92mm; }
+        .lead figure img { height: 72mm; }
         figcaption { margin-top: 2px; font-size: 7.5pt; color: var(--muted); text-align: right; }
         .lead-text { margin: 0; column-count: 2; column-gap: 8mm; text-align: justify; hyphens: auto; font-size: 11pt; }
         .front-row { display: flex; gap: 8mm; margin-top: 12px; padding-top: 10px; border-top: 1.5px solid var(--rule); }
@@ -193,7 +198,8 @@ public static class PaperPage
         .index li { margin: 0 0 3px; }
         .index strong { text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; }
         .section { margin-top: 12px; }
-        .section > h2 { break-after: avoid; margin: 0 0 8px; padding-bottom: 2px; border-bottom: 1.5px solid var(--rule); font-size: 13pt;
+        .opener { break-inside: avoid; }
+        .section h2 { break-after: avoid; margin: 0 0 8px; padding-bottom: 2px; border-bottom: 1.5px solid var(--rule); font-size: 13pt;
                         text-transform: uppercase; letter-spacing: 0.12em; }
         .top { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-bottom: 10px; }
         .top figure img { height: 58mm; }

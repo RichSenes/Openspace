@@ -19,27 +19,24 @@ internal sealed partial class GmailMailbox(HttpClient http, IGoogleAccounts acco
     /// <summary>Of each body, what routines read at most.</summary>
     private const int MostText = 8000;
 
+    /// <summary>Ids per page: the most Gmail gives without a second call is 500, a hundred keeps answers small.</summary>
+    private const int PageSize = 100;
+
     private static readonly string[] Inbox = ["INBOX"];
 
     private readonly Dictionary<string, Dictionary<string, string>> _labels = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task<IReadOnlyList<MailMessage>> ListAsync(string account, string query, int most, CancellationToken cancellationToken)
+    public async Task<MailPage> FindAsync(string account, string query, string? page, CancellationToken cancellationToken)
     {
-        var list = await GetAsync(account, $"messages?q={Uri.EscapeDataString(query)}&maxResults={most}", cancellationToken).ConfigureAwait(false);
-        var messages = new List<MailMessage>();
-        if (!list.TryGetProperty("messages", out var found))
-        {
-            return messages;
-        }
-
-        foreach (var item in found.EnumerateArray())
-        {
-            var message = await GetAsync(account, $"messages/{Uri.EscapeDataString(item.GetProperty("id").GetString()!)}?format=full", cancellationToken).ConfigureAwait(false);
-            messages.Add(Read(message));
-        }
-
-        return messages;
+        var list = await GetAsync(
+            account, $"messages?q={Uri.EscapeDataString(query)}&maxResults={PageSize}{(page is null ? string.Empty : $"&pageToken={Uri.EscapeDataString(page)}")}",
+            cancellationToken).ConfigureAwait(false);
+        var ids = list.TryGetProperty("messages", out var found) ? found.EnumerateArray().Select(m => m.GetProperty("id").GetString()!).ToList() : [];
+        return new MailPage(ids, list.TryGetProperty("nextPageToken", out var next) ? next.GetString() : null);
     }
+
+    public async Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken) =>
+        Read(await GetAsync(account, $"messages/{Uri.EscapeDataString(messageId)}?format=full", cancellationToken).ConfigureAwait(false));
 
     public async Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken)
     {

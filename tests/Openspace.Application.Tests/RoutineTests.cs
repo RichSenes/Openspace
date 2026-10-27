@@ -161,4 +161,36 @@ public class RoutineTests
         Assert.Equal(("Offers of the day", "06:30", "1 new offers", ""), (view.KindName, view.Schedule.At, view.LastRun!.Summary, view.LastRun.Log));
         Assert.Equal(("Offers in Japan", "Backend engineer"), (Assert.Single(waiting).RoutineName, waiting[0].Title));
     }
+
+    [Fact]
+    public async Task What_can_be_undone_is_done_on_its_own_and_logged()
+    {
+        var routine = await OffersAsync();
+        _h.OffersKind.Undoable = true;
+        _h.OffersKind.Offers.Add(("https://jobs.example/1", "Backend engineer", "C#, Tokyo"));
+
+        await _h.RoutineCommands().RunNowAsync(routine.Id, default);
+        await RunDueAsync();
+
+        var proposal = Assert.Single(_h.Routines.Proposals);
+        Assert.Equal((ProposalStatus.Done, "Tailored CV saved."), (proposal.Status, proposal.Outcome));
+        Assert.Contains("Done on its own: Backend engineer", _h.Routines.Runs[0].Log, StringComparison.Ordinal);
+        Assert.Empty(await _h.RoutineQueries().ProposalsAsync(_h.Office.Id, ProposalStatus.Pending, default));
+    }
+
+    [Fact]
+    public async Task A_routine_that_asks_first_waits_for_a_yes_even_for_what_can_be_undone()
+    {
+        var routine = await OffersAsync();
+        _h.OffersKind.Undoable = true;
+        _h.OffersKind.Offers.Add(("https://jobs.example/1", "Backend engineer", "C#, Tokyo"));
+        await _h.RoutineCommands().AskFirstAsync(routine.Id, true, default);
+
+        await _h.RoutineCommands().RunNowAsync(routine.Id, default);
+        await RunDueAsync();
+
+        Assert.Equal(ProposalStatus.Pending, Assert.Single(_h.Routines.Proposals).Status);
+        Assert.Empty(_h.OffersKind.CarriedOut);
+        Assert.True(Assert.Single(await _h.RoutineQueries().ListAsync(_h.Office.Id, default)).AskFirst);
+    }
 }

@@ -24,6 +24,7 @@ internal sealed class RoutineConfiguration :
         builder.Property(r => r.Schedule).HasConversion(ScheduleConverter.Instance).IsRequired();
         builder.Property(r => r.Settings).IsRequired();
         builder.Property(r => r.Enabled);
+        builder.Property(r => r.AskFirst);
         builder.Property(r => r.CreatedAt);
         builder.Property(r => r.LastRunAt);
         builder.Property(r => r.NextRunAt);

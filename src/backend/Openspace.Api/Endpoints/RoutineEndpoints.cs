@@ -12,6 +12,8 @@ internal static class RoutineEndpoints
 
     public sealed record EnabledRequest(bool Enabled);
 
+    public sealed record AskFirstRequest(bool AskFirst);
+
     public static void MapRoutineEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/routine-kinds", (RoutineQueries queries) => queries.Kinds()).WithTags("Routines");
@@ -40,6 +42,12 @@ internal static class RoutineEndpoints
         routines.MapPut("/enabled", async (Guid routineId, EnabledRequest request, RoutineCommands commands, CancellationToken ct) =>
         {
             await commands.TurnOnAsync(new RoutineId(routineId), request.Enabled, ct);
+            return Results.NoContent();
+        });
+
+        routines.MapPut("/ask-first", async (Guid routineId, AskFirstRequest request, RoutineCommands commands, CancellationToken ct) =>
+        {
+            await commands.AskFirstAsync(new RoutineId(routineId), request.AskFirst, ct);
             return Results.NoContent();
         });
 

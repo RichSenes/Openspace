@@ -43,6 +43,12 @@ public sealed class Routine : AggregateRoot<RoutineId>
 
     public bool Enabled { get; private set; } = true;
 
+    /// <summary>
+    /// Every proposal waits for a yes. Off (the default), what can be undone (a label, a
+    /// reminder, a saved file) is done on its own and logged; only what cannot waits.
+    /// </summary>
+    public bool AskFirst { get; private set; }
+
     public DateTimeOffset CreatedAt { get; }
 
     public DateTimeOffset? LastRunAt { get; private set; }
@@ -86,6 +92,12 @@ public sealed class Routine : AggregateRoot<RoutineId>
     {
         Enabled = enabled;
         NextRunAt = enabled ? Schedule.NextAfter(now, zone) : null;
+        Raise(new RoutineChanged(Id, OfficeId, now));
+    }
+
+    public void AskBeforeActing(bool askFirst, DateTimeOffset now)
+    {
+        AskFirst = askFirst;
         Raise(new RoutineChanged(Id, OfficeId, now));
     }
 

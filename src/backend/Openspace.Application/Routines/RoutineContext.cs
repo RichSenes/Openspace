@@ -6,7 +6,7 @@ namespace Openspace.Application.Routines;
 
 /// <summary>What a routine's kind works with during one run.</summary>
 public sealed class RoutineContext(
-    Routine routine, RoutineRun run, IRoutineRepository routines, IRoutineOutbox outbox, TimeProvider clock)
+    Routine routine, RoutineRun run, IRoutineRepository routines, IRoutineOutbox outbox, TimeProvider clock, IRoutineKind? kind = null)
 {
     /// <summary>Met during this run: not in the database until the run is saved.</summary>
     private readonly Dictionary<string, SeenItem> _met = new(StringComparer.Ordinal);
@@ -25,13 +25,34 @@ public sealed class RoutineContext(
     /// <summary>A line in the run's log, for people looking at what it did.</summary>
     public void Write(string line) => Run.Write(line, Now);
 
-    /// <summary>Asks the person to approve something; nothing happens until they do.</summary>
-    public Proposal Propose(string action, string title, string body, object? payload = null)
+    /// <summary>
+    /// Something the routine wants to do with the person's things. What can be undone is done
+    /// at once, unless the routine asks first; anything else waits for a yes.
+    /// </summary>
+    public async Task<Proposal> ProposeAsync(string action, string title, string body, object? payload, CancellationToken cancellationToken)
     {
         var proposal = Proposal.Make(
             Run, action, title, body, payload is null ? null : payload as string ?? JsonSerializer.Serialize(payload, JsonSerializerOptions.Web), Now);
         routines.AddProposal(proposal);
-        Write($"Proposed: {title}");
+        if (Routine.AskFirst || kind is null || !kind.CanUndo(action))
+        {
+            Write($"Proposed: {title}");
+            return proposal;
+        }
+
+        proposal.Approve(Now);
+        try
+        {
+            var outcome = await kind.CarryOutAsync(proposal, this, cancellationToken).ConfigureAwait(false);
+            proposal.Carried(string.IsNullOrWhiteSpace(outcome) ? "Done." : outcome, Now);
+            Write($"Done on its own: {title}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            proposal.CouldNotCarry(ex.Message, Now);
+            Write($"Could not do {title}: {ex.Message}");
+        }
+
         return proposal;
     }
 

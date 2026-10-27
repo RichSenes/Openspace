@@ -206,6 +206,7 @@ clock, some days of the week (every day when none), every week or every few week
 | POST | `/api/offices/{id}/routines` | `{ name, kind, schedule: { days, at, everyWeeks }, settings? }` |
 | PUT | `/api/routines/{id}` | Change name, schedule or settings (what is left out stays) |
 | PUT | `/api/routines/{id}/enabled` | Turn it on or off |
+| PUT | `/api/routines/{id}/ask-first` | `{ askFirst }`: every proposal waits for a yes |
 | POST | `/api/routines/{id}/run` | Run it now, whatever its schedule |
 | GET | `/api/routines/{id}/runs` | The latest 20 runs, with their log |
 | DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory |
@@ -218,7 +219,15 @@ that fails says why and the routine keeps its schedule; runs cut short by a rest
 are marked failed. Routines remember what they met (an offer, a news item) by a
 key and a fingerprint of what matters in it: it is shown once, comes back only if
 it changed in substance, and never once the person turned it down. Anything that
-acts on the person's things is a proposal, and only a yes lets the routine act.
+acts on the person's things is a proposal. What can be undone (a label, a reminder,
+a file saved in its own folder) is carried out at once and logged, unless the
+routine asks first; deleting, replying or applying always waits for a yes.
+
+What a routine makes goes to the person's Telegram group: its settings name a bot
+(`"channel": "KAWARABAN"`), whose token is in `telegram.env` and whose topic is in
+`telegram.json`, both in `Telegram:Folder` (`~/.config/openspace` by default, never
+in a repository). Long text is split on line breaks; files go as documents. A
+routine without a channel delivers nothing; tests point the folder somewhere empty.
 
 ## Agents going in circles
 

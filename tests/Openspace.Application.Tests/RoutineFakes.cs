@@ -96,7 +96,7 @@ internal sealed class FakeOffersKind : IRoutineKind
                 continue;
             }
 
-            context.Propose("tailor-cv", title, detail, new { url });
+            await context.ProposeAsync("tailor-cv", title, detail, new { url }, cancellationToken);
             await context.MarkAsync(url, SeenState.Shown, cancellationToken);
             shown++;
         }
@@ -104,6 +104,11 @@ internal sealed class FakeOffersKind : IRoutineKind
         await context.DeliverAsync($"{shown} new offers", null, cancellationToken);
         return $"{shown} new offers";
     }
+
+    /// <summary>Saving a tailored CV in its own folder can be undone; set it to try that path.</summary>
+    public bool Undoable { get; set; }
+
+    public bool CanUndo(string action) => Undoable && action == "tailor-cv";
 
     public Task<string> CarryOutAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken)
     {

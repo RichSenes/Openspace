@@ -53,7 +53,8 @@ public sealed partial class ProposalCommands(
         var routine = await routines.GetAsync(proposal.RoutineId, cancellationToken).ConfigureAwait(false);
         var run = await routines.FindRunAsync(proposal.RunId, cancellationToken).ConfigureAwait(false)
             ?? throw new NotFoundException("Routine run", proposal.RunId.Value);
-        return (proposal, kinds.FirstOrDefault(k => k.Key == routine.Kind), new RoutineContext(routine, run, routines, outbox, clock));
+        var kind = kinds.FirstOrDefault(k => k.Key == routine.Kind);
+        return (proposal, kind, new RoutineContext(routine, run, routines, outbox, clock, kind));
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not carry out the proposal {Title}")]

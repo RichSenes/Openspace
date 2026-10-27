@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CircleCheck, CircleX, LoaderCircle, Play, Plus, Trash2 } from 'lucide-react'
 import {
+  useAskFirst,
   useCreateRoutine,
   useDecideProposal,
   useDeleteRoutine,
@@ -37,7 +38,7 @@ export function RoutinesPanel({ office }: { office: OfficeView }) {
       <header className="routines-head">
         <div>
           <h1>Routines of {office.name}</h1>
-          <p className="hint">Jobs that run on their own at set times. They propose; nothing touches your things until you say yes.</p>
+          <p className="hint">Jobs that run on their own at set times. What can be undone they do by themselves and log; deleting, replying or applying always waits for your yes.</p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setCreating(true)} disabled={!kinds.data?.length}>
           <Plus size={16} /> New routine
@@ -111,6 +112,7 @@ function Proposals({ officeId }: { officeId: string }) {
 function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: RoutineView; open: boolean; onToggleRuns: () => void; onEdit: () => void }) {
   const run = useRunRoutine()
   const turnOn = useTurnOnRoutine()
+  const askFirst = useAskFirst()
   const remove = useDeleteRoutine()
   const toast = useToast()
   const [deleting, setDeleting] = useState(false)
@@ -139,6 +141,19 @@ function RoutineCard({ routine, open, onToggleRuns, onEdit }: { routine: Routine
         <div>
           <dt>Next run</dt>
           <dd>{routine.enabled ? when(routine.nextRunAt) : 'Turned off'}</dd>
+        </div>
+        <div>
+          <dt>Acting</dt>
+          <dd>
+            <label className="routine-switch">
+              <input
+                type="checkbox"
+                checked={routine.askFirst}
+                onChange={(e) => askFirst.mutate({ id: routine.id, askFirst: e.target.checked })}
+              />
+              <span>{routine.askFirst ? 'Asks you before doing anything' : 'Does what can be undone on its own; asks for the rest'}</span>
+            </label>
+          </dd>
         </div>
         <div>
           <dt>Last run</dt>

@@ -24,6 +24,13 @@ public interface IRoutineKind
     /// <returns>A line for people: what came out of this run.</returns>
     Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether doing it can be undone (a label, a reminder, a file saved in its own folder):
+    /// then a routine that does not ask first does it on its own. Sending, deleting or
+    /// applying never are.
+    /// </summary>
+    bool CanUndo(string action) => false;
+
     /// <summary>A proposal of this kind was approved: carry it out.</summary>
     /// <returns>What was done, for people.</returns>
     Task<string> CarryOutAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken) =>

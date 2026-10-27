@@ -73,7 +73,7 @@ public sealed partial class RoutineRunner(
             return;
         }
 
-        var context = new RoutineContext(routine, run, routines, outbox, clock);
+        var context = new RoutineContext(routine, run, routines, outbox, clock, kind);
         try
         {
             var summary = await kind.RunAsync(context, cancellationToken).ConfigureAwait(false);

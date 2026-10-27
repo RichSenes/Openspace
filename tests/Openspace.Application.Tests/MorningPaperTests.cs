@@ -16,6 +16,7 @@ public sealed class MorningPaperTests : IDisposable
     private readonly FakeChat _chat = new();
     private readonly FakePrinter _printer = new();
     private readonly FakeImages _images = new();
+    private readonly FakeKanjiBook _kanji = new();
 
     public void Dispose()
     {
@@ -25,12 +26,12 @@ public sealed class MorningPaperTests : IDisposable
         }
     }
 
-    private MorningPaper Paper() => new(_chat, _decider, _feeds, _printer, _images);
+    private MorningPaper Paper() => new(_chat, _decider, _feeds, _printer, _images, _kanji);
 
-    private Routine Create(int perSection = 2, string? sections = null, string goodNews = "[]")
+    private Routine Create(int perSection = 2, string? sections = null, string goodNews = "[]", string kanji = "{}", string language = "English")
     {
         var settings = $$"""
-            {"title":"Daily Bugle","subtitle":"デイリー","language":"English","folder":{{JsonSerializer.Serialize(_folder)}},
+            {"title":"Daily Bugle","subtitle":"デイリー","language":"{{language}}","folder":{{JsonSerializer.Serialize(_folder)}},"kanji":{{kanji}},
              "reader":"Likes cats and trains.","rules":["Be kind."],"perSection":{{perSection}},"goodNews":{{goodNews}},
              "sections":{{sections ?? """[{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"},{"name":"Courier","url":"https://courier.example/feed"}]}]"""}}}
             """;
@@ -249,6 +250,110 @@ public sealed class MorningPaperTests : IDisposable
     }
 
     [Fact]
+    public async Task The_kanji_of_the_day_closes_the_paper_with_its_strokes_words_and_sentences()
+    {
+        var routine = Create(kanji: """{"enabled":true}""");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        var run = await RunAsync(routine);
+
+        Assert.EndsWith(", kanji 日.", run.Summary, StringComparison.Ordinal);
+        var html = Html();
+        var box = html[html.IndexOf("<section class=\"kanji\">", StringComparison.Ordinal)..];
+        Assert.Contains("<div class=\"glyph\" lang=\"ja\">日</div>", box, StringComparison.Ordinal);
+        Assert.Contains("day, sun", box, StringComparison.Ordinal);
+        Assert.Contains("A window with the sun in it.", box, StringComparison.Ordinal);
+        Assert.Equal(2, box.Split("<svg ").Length - 1);
+        Assert.Contains("<ruby>毎<b>日</b><rt>まいにち</rt></ruby></span> each day", box, StringComparison.Ordinal);
+        Assert.Contains("<ruby>毎<rt>まい</rt><b>日</b><rt>にち</rt></ruby>", box, StringComparison.Ordinal);
+        Assert.Contains("I walk every day.", box, StringComparison.Ordinal);
+        Assert.DoesNotContain("I walk each day.", box, StringComparison.Ordinal);
+        Assert.Contains("Tatoeba", box, StringComparison.Ordinal);
+        Assert.Contains("<strong>Kanji of the day</strong> <span lang=\"ja\">日</span>", html, StringComparison.Ordinal);
+        Assert.Contains("毎日歩きます。", _chat.Prompts.Single(p => p.StartsWith("The kanji of the day", StringComparison.Ordinal)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task People_s_own_translation_wins_over_the_model_s()
+    {
+        var routine = Create(kanji: """{"enabled":true}""", language: "Italian");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        Assert.Contains("Mi piace la domenica.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model's Sunday.", html, StringComparison.Ordinal);
+        Assert.Contains("Il kanji del giorno", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Each_issue_explains_a_kanji_never_explained_and_strokes_that_are_not_path_data_are_left_out()
+    {
+        var routine = Create(kanji: """{"enabled":true}""");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+        await RunAsync(routine);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Bridge reopens")];
+        var second = await RunAsync(routine);
+
+        Assert.EndsWith(", kanji 月.", second.Summary, StringComparison.Ordinal);
+        var html = File.ReadAllText(Directory.GetFiles(_folder, "*N002*.html").Single());
+        Assert.Contains("<div class=\"glyph\" lang=\"ja\">月</div>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<svg", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_its_dictionaries_the_paper_says_where_they_go_and_prints_anyway()
+    {
+        var routine = Create(kanji: """{"enabled":true}""");
+        _kanji.Available = false;
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal(RoutineRunStatus.Succeeded, run.Status);
+        Assert.Contains("Kanji of the day: its dictionaries are not in /kanji-data", run.Log, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"kanji\"", Html(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_model_that_cannot_explain_leaves_the_dictionary_s_english()
+    {
+        var routine = Create(kanji: """{"enabled":true}""");
+        _chat.Kanji = "not json";
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        var run = await RunAsync(routine);
+
+        var box = Html()[Html().IndexOf("<section class=\"kanji\">", StringComparison.Ordinal)..];
+        Assert.Contains("<p class=\"meaning\">day, sun</p>", box, StringComparison.Ordinal);
+        Assert.Contains("I walk every day.", box, StringComparison.Ordinal);
+        Assert.Contains("the dictionary's English stays", run.Log, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task No_kanji_unless_the_settings_ask_for_it()
+    {
+        var routine = Create();
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        await RunAsync(routine);
+
+        Assert.DoesNotContain("class=\"kanji\"", Html(), StringComparison.Ordinal);
+        Assert.DoesNotContain(_chat.Prompts, p => p.StartsWith("The kanji of the day", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Furigana_gives_each_kanji_its_reading_or_one_over_the_word_and_escapes_the_rest()
+    {
+        Assert.Equal("<ruby>場<rt>ば</rt>所<rt>しょ</rt></ruby>に<b>行</b>&lt;", PaperPage.Furigana("[場所|ば|しょ]に行<", "行"));
+        Assert.Equal("<ruby>今<b>日</b><rt>きょう</rt></ruby>は", PaperPage.Furigana("[今日|きょう]は", "日"));
+    }
+
+    [Fact]
     public void The_next_number_follows_the_highest_kept()
     {
         Directory.CreateDirectory(_folder);
@@ -305,12 +410,20 @@ public sealed class MorningPaperTests : IDisposable
 
         public string? Headline { get; set; }
 
+        /// <summary>What it answers about the kanji of the day, when not the usual.</summary>
+        public string? Kanji { get; set; }
+
         /// <summary>One article from all the section's news.</summary>
         public bool MergeAll { get; set; }
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
         {
             Prompts.Add(ask.User);
+            if (ask.User.StartsWith("The kanji of the day", StringComparison.Ordinal))
+            {
+                return Task.FromResult(Kanji ?? """{"meaning":"day, sun","hint":"A window with the sun in it.","words":["each day"],"sentences":["I walk each day.","Model's Sunday."]}""");
+            }
+
             if (ask.User.StartsWith("Today's headlines", StringComparison.Ordinal))
             {
                 return Task.FromResult("""{"title":"A calm morning","text":"Coffee first."}""");

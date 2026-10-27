@@ -48,5 +48,8 @@ internal sealed class RoutineRepository(OpenspaceDbContext db) : IRoutineReposit
     public Task<SeenItem?> FindSeenAsync(RoutineId routineId, string key, CancellationToken cancellationToken) =>
         db.SeenItems.FirstOrDefaultAsync(s => s.RoutineId == routineId && s.Key == key, cancellationToken);
 
+    public async Task<IReadOnlyList<SeenItem>> ListSeenAsync(RoutineId routineId, string prefix, CancellationToken cancellationToken) =>
+        await db.SeenItems.Where(s => s.RoutineId == routineId && s.Key.StartsWith(prefix)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public void AddSeen(SeenItem item) => db.SeenItems.Add(item);
 }

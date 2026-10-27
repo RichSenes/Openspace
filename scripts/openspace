@@ -8,6 +8,7 @@
 #   scripts/openspace status
 #   scripts/openspace logs api         follow a log
 #   scripts/openspace restore FILE     put a database backup back (stops and restarts the API)
+#   scripts/openspace kanji-data       download the dictionaries of the paper's kanji of the day
 #
 # Ports and folders can be changed with environment variables, e.g. OPENSPACE_API_PORT.
 # Anything else in the environment (ConnectionStrings__Openspace, Settings__Path...) is
@@ -173,6 +174,32 @@ restore() {
   start_one api
 }
 
+# The open dictionaries the kanji of the day reads, in the folder the API expects (Kanji__Folder):
+# KANJIDIC2 and JMdict from EDRDG, KanjiVG's strokes, and Tatoeba's Japanese sentences with
+# their readings and their Italian and English translations, kept only for those sentences.
+kanji_data() {
+  local dir="${Kanji__Folder:-$HOME/.local/share/openspace/kanji}" tatoeba=https://downloads.tatoeba.org/exports/per_language kanjivg
+  dir="${dir/#\~/$HOME}"
+  mkdir -p "$dir"
+  cd "$dir"
+  say "downloading into $dir"
+  curl -fsSL -o kanjidic2.xml.gz http://ftp.edrdg.org/pub/Nihongo/kanjidic2.xml.gz
+  curl -fsSL -o JMdict_e.gz http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz
+  kanjivg="$(curl -fsSL https://api.github.com/repos/KanjiVG/kanjivg/releases/latest | grep -o 'https://[^"]*/kanjivg-[0-9]*\.xml\.gz' | head -n 1)"
+  [ -n "$kanjivg" ] || fail "could not find KanjiVG's latest release"
+  curl -fsSL -o kanjivg.xml.gz "$kanjivg"
+  for f in jpn/jpn_transcriptions jpn/jpn-ita_links jpn/jpn-eng_links ita/ita_sentences eng/eng_sentences; do
+    curl -fsSL "$tatoeba/$f.tsv.bz2" | bunzip2 > "$(basename "$f").tsv.part"
+  done
+  mv jpn_transcriptions.tsv.part jpn_transcriptions.tsv
+  mv jpn-ita_links.tsv.part jpn-ita_links.tsv
+  mv jpn-eng_links.tsv.part jpn-eng_links.tsv
+  awk -F'\t' 'NR==FNR { keep[$2]; next } $1 in keep' jpn-ita_links.tsv ita_sentences.tsv.part > ita_sentences.tsv
+  awk -F'\t' 'NR==FNR { keep[$2]; next } $1 in keep' jpn-eng_links.tsv eng_sentences.tsv.part > eng_sentences.tsv
+  rm -f ita_sentences.tsv.part eng_sentences.tsv.part
+  say "done: $(du -sh . | cut -f1) in $dir"
+}
+
 command="${1:-}"
 [ $# -gt 0 ] && shift
 case "$command" in
@@ -185,5 +212,6 @@ case "$command" in
   status) for s in "${SERVICES[@]}"; do status_one "$s"; done ;;
   logs) tail -n 100 -f "$STATE/logs/$(pick "${1:-api}" | head -n 1).log" ;;
   restore) restore "$@" ;;
-  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  kanji-data) kanji_data ;;
+  *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

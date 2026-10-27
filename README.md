@@ -137,6 +137,7 @@ scripts/openspace status
 scripts/openspace restart api    # after an update: rebuilds and restarts the API only
 scripts/openspace logs api
 scripts/openspace stop
+scripts/openspace kanji-data     # once, for the paper's kanji of the day: its dictionaries
 ```
 
 Logs and process ids live in `~/.local/state/openspace`. Ports change with

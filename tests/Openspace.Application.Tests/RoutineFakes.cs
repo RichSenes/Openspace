@@ -51,6 +51,9 @@ internal sealed class InMemoryRoutines : IRoutineRepository
     public Task<SeenItem?> FindSeenAsync(RoutineId routineId, string key, CancellationToken cancellationToken) =>
         Task.FromResult(Seen.Find(s => s.RoutineId == routineId && s.Key == key));
 
+    public Task<IReadOnlyList<SeenItem>> ListSeenAsync(RoutineId routineId, string prefix, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SeenItem>>([.. Seen.Where(s => s.RoutineId == routineId && s.Key.StartsWith(prefix, StringComparison.Ordinal))]);
+
     public void AddSeen(SeenItem item) => Seen.Add(item);
 }
 
@@ -141,4 +144,28 @@ internal sealed class FakeOffersKind : IRoutineKind
 
     public Task RejectedAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken) =>
         context.MarkAsync(JsonDocument.Parse(proposal.Payload).RootElement.GetProperty("url").GetString()!, SeenState.Dismissed, cancellationToken);
+}
+
+/// <summary>Three kanji: 日 and 月 in the first school year, 明 in the second.</summary>
+internal sealed class FakeKanjiBook : IKanjiBook
+{
+    public bool Available { get; set; } = true;
+
+    public string Folder => "/kanji-data";
+
+    public Task<IReadOnlyList<KanjiInCourse>> CurriculumAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<KanjiInCourse>>([new("日", 1, ["day", "sun"]), new("月", 1, ["month", "moon"]), new("明", 2, ["bright"])]);
+
+    public Task<KanjiEntry?> LookUpAsync(string literal, CancellationToken cancellationToken) =>
+        Task.FromResult<KanjiEntry?>(literal switch
+        {
+            "日" => new KanjiEntry(
+                "日", 1, 2, ["day", "sun"], ["ニチ"], ["ひ"], ["M31.5,24.5c1,1,1.7,2.7,1.7,4.7", "M33.4,26c0.8,0,37-3,40-3"], [],
+                [new KanjiWord("毎日", "まいにち", ["every day"])],
+                [new KanjiSentence("毎日歩きます。", "[毎日|まい|にち][歩|ある]きます。", null, "I walk every day."),
+                 new KanjiSentence("日曜日が好き。", "[日曜日|にち|よう|び]が[好|す]き。", "Mi piace la domenica.", "I like Sundays.")]),
+            "月" => new KanjiEntry("月", 1, 1, ["month", "moon"], ["ゲツ"], ["つき"], ["M10,10L20,90\"/><script>alert(1)</script><path d=\"M0,0"], [], [], []),
+            "明" => new KanjiEntry("明", 2, 2, ["bright"], ["メイ"], ["あか(るい)"], ["M10,20L12,60", "M50,15L52,90"], ["日", "月"], [], []),
+            _ => null,
+        });
 }

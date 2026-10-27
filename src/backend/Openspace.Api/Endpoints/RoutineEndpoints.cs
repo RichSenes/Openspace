@@ -14,6 +14,8 @@ internal static class RoutineEndpoints
 
     public sealed record AskFirstRequest(bool AskFirst);
 
+    public sealed record KnownKanjiRequest(string Kanji);
+
     public static void MapRoutineEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/routine-kinds", (RoutineQueries queries) => queries.Kinds()).WithTags("Routines");
@@ -69,6 +71,15 @@ internal static class RoutineEndpoints
                 : Results.Problem("This routine is not running.", statusCode: StatusCodes.Status409Conflict));
 
         routines.MapGet("/runs", (Guid routineId, RoutineQueries queries, CancellationToken ct) => queries.RunsAsync(new RoutineId(routineId), ct));
+
+        // The kanji of the day: the next one, how many are explained, and "I know it" to skip one.
+        routines.MapGet("/kanji", (Guid routineId, KanjiCourse course, CancellationToken ct) => course.ViewAsync(new RoutineId(routineId), ct));
+
+        routines.MapPost("/kanji/known", async (Guid routineId, KnownKanjiRequest request, KanjiCourse course, CancellationToken ct) =>
+        {
+            await course.KnownAsync(new RoutineId(routineId), request.Kanji, ct);
+            return Results.NoContent();
+        });
 
         var proposals = app.MapGroup("/api/proposals/{proposalId:guid}").WithTags("Routines");
         proposals.MapPost("/approve", async (Guid proposalId, ProposalCommands commands, CancellationToken ct) =>

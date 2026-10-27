@@ -40,6 +40,7 @@ builder.Services.Configure<Openspace.Application.Checks.CheckOptions>(builder.Co
 builder.Services.Configure<Openspace.Infrastructure.Telegram.TelegramOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Telegram.TelegramOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Routines.PdfOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.PdfOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Routines.KanjiOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.KanjiOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Google.GoogleOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Google.GoogleOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
@@ -80,6 +81,7 @@ app.MapReportEndpoints();
 app.MapEngineEndpoints();
 app.MapGpuEndpoints();
 app.MapRoutineEndpoints();
+app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);

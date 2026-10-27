@@ -6,6 +6,7 @@ import type {
   EnginesView,
   GpuView,
   KanjiCourseView,
+  GoogleStatusView,
   ProposalView,
   RoutineKindView,
   RoutineRunView,
@@ -52,6 +53,7 @@ export const keys = {
   backups: ['backups'] as const,
   sounds: ['sounds'] as const,
   deskUsage: ['usage', 'desks'] as const,
+  google: ['google'] as const,
 }
 
 interface Created {
@@ -645,4 +647,22 @@ export function useDecideProposal() {
     (input: { id: string; approve: boolean }) => request<void>('POST', `/api/proposals/${input.id}/${input.approve ? 'approve' : 'reject'}`),
     keys.routines,
   )
+}
+
+/** The Google accounts; while the person is saying yes in another tab, it looks again every few seconds. */
+export function useGoogle(waiting = false) {
+  return useQuery({
+    queryKey: keys.google,
+    queryFn: () => request<GoogleStatusView>('GET', '/api/google'),
+    refetchInterval: waiting ? 3000 : false,
+  })
+}
+
+/** Where to send the person to connect an account: Google's own page, in a new tab. */
+export function useConnectGoogle() {
+  return useWrite(() => request<{ url: string }>('POST', '/api/google/connect'), keys.google)
+}
+
+export function useDisconnectGoogle() {
+  return useWrite((email: string) => request<void>('DELETE', `/api/google/accounts/${encodeURIComponent(email)}`), keys.google)
 }

@@ -483,3 +483,17 @@ export interface RoutineKindView {
   description: string
   defaultSettings: string
 }
+
+/** A Google account connected with the person's own OAuth client. */
+export interface GoogleAccountView {
+  email: string
+  connectedAt: string
+  scopes: string[]
+}
+
+/** Whether the person's OAuth client is in place, and the accounts connected with it. */
+export interface GoogleStatusView {
+  clientReady: boolean
+  folder: string
+  accounts: GoogleAccountView[]
+}

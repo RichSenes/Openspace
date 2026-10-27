@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<ProposalCommands>();
         services.AddScoped<KanjiCourse>();
         services.AddScoped<IRoutineKind, Routines.Kinds.MorningPaper>();
+        services.AddScoped<IRoutineKind, Routines.Kinds.MailSorting>();
         return services;
     }
 }

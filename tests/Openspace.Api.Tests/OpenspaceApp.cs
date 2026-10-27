@@ -61,6 +61,7 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
             // Never the person's dictionaries: the kanji of the day finds none.
             ["Kanji:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-kanji-{Guid.NewGuid():N}"),
+            ["Google:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-google-{Guid.NewGuid():N}"),
             ["Operator:Name"] = "elliot",
             ["Queue:Enabled"] = "false",
         };

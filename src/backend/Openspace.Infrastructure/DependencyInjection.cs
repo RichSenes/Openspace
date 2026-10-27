@@ -107,6 +107,13 @@ public static class DependencyInjection
             http.BaseAddress = new Uri("https://api.telegram.org/");
             http.Timeout = TimeSpan.FromMinutes(2);
         });
+
+        // Google accounts connected with the person's own OAuth client; their mail for the mail routine.
+        services.AddHttpClient(Google.GoogleHttp.Name).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(1));
+        services.AddSingleton(sp => new Google.GoogleAccounts(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(Google.GoogleHttp.Name), sp.GetRequiredService<IOptionsMonitor<Google.GoogleOptions>>(), TimeProvider.System));
+        services.AddSingleton<Application.Google.IGoogleAccounts>(sp => sp.GetRequiredService<Google.GoogleAccounts>());
+        services.AddHttpClient<IMailbox, Google.GmailMailbox>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(2));
         return services;
     }
 

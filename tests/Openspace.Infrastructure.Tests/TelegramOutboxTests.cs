@@ -67,7 +67,7 @@ public sealed class TelegramOutboxTests : IDisposable
     [Fact]
     public async Task A_routine_without_a_channel_delivers_nothing()
     {
-        await Outbox().SendAsync(Routine("{}"), "Nobody reads this.", null, default);
+        Assert.False(await Outbox().SendAsync(Routine("{}"), "Nobody reads this.", null, default));
 
         Assert.Empty(_telegram.Calls);
     }

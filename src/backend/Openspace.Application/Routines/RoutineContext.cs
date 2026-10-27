@@ -89,8 +89,14 @@ public sealed class RoutineContext(
     /// <summary>Sends what the run made to the person: the paper, a summary.</summary>
     public async Task DeliverAsync(string text, string? filePath, CancellationToken cancellationToken)
     {
-        await outbox.SendAsync(Routine, text, filePath, cancellationToken).ConfigureAwait(false);
-        Write(filePath is null ? "Delivered a message" : $"Delivered {Path.GetFileName(filePath)}");
+        if (await outbox.SendAsync(Routine, text, filePath, cancellationToken).ConfigureAwait(false))
+        {
+            Write(filePath is null ? "Delivered a message" : $"Delivered {Path.GetFileName(filePath)}");
+        }
+        else
+        {
+            Write("Not delivered: this routine names no channel.");
+        }
     }
 
     /// <summary>A short, stable digest of the parts of something that matter, to tell when it changed.</summary>

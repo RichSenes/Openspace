@@ -47,6 +47,8 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         builder.UseSetting("OpenCode:BaseUrl", "http://127.0.0.1:9");
         // Never the Claude Code of the machine running the tests: it would use a real account.
         builder.UseSetting("ClaudeCode:Enabled", "false");
+        // Never the graphics card of the machine running the tests: no model server is started.
+        builder.UseSetting("LocalModels:Enabled", "false");
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));

@@ -66,3 +66,14 @@
   border-color: var(--danger);
   color: var(--ink);
 }
+
+/* The graphics card: the icon and the words tell the state, the border only adds to them. */
+.gpu-waiting {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.gpu-trouble {
+  border-color: var(--danger);
+  color: var(--ink);
+}

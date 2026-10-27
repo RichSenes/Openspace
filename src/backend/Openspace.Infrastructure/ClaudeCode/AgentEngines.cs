@@ -6,7 +6,8 @@ namespace Openspace.Infrastructure.ClaudeCode;
 
 /// <summary>What can run agents here: asks OpenCode for its models and checks that Claude Code starts.</summary>
 internal sealed class AgentEngines(
-    OpenCodeRuntime openCode, ClaudeCodeRuntime claude, ClaudeCodeUsage usage, IOptionsMonitor<ClaudeCodeOptions> options, Application.Agents.EngineLimits limits)
+    OpenCodeRuntime openCode, ClaudeCodeRuntime claude, ClaudeCodeUsage usage, IOptionsMonitor<ClaudeCodeOptions> options, Application.Agents.EngineLimits limits,
+    Application.LocalModels.GpuArbiter gpu)
     : IAgentEngines
 {
     /// <summary>Aliases Claude Code resolves to the latest model of each family.</summary>
@@ -42,7 +43,8 @@ internal sealed class AgentEngines(
             claudeCode && options.CurrentValue.Supervise ? "ClaudeCode" : "OpenCode",
             claudeCode && options.CurrentValue.Review ? "ClaudeCode" : null,
             limits.PausedUntil(Application.Agents.EngineLimits.ClaudeCode),
-            limits.Pauses());
+            limits.Pauses(),
+            gpu.View());
     }
 
     public async Task<ClaudeUsageView?> CheckClaudeUsageAsync(CancellationToken cancellationToken)

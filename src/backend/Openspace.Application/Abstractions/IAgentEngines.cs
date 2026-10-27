@@ -16,6 +16,7 @@ public interface IAgentEngines
 /// <param name="Reviewer">The engine that reviews finished work, or null when nothing does.</param>
 /// <param name="ClaudePausedUntil">While the account is over its limits, when Claude Code desks take work again.</param>
 /// <param name="Pauses">Every account over its limits now, Claude's and OpenCode providers', with when each resumes.</param>
+/// <param name="Gpu">Who has the graphics card, for desks on models of this machine.</param>
 public sealed record EnginesView(
     bool OpenCode,
     IReadOnlyList<ModelOption> OpenCodeModels,
@@ -25,7 +26,8 @@ public sealed record EnginesView(
     string Supervisor,
     string? Reviewer,
     DateTimeOffset? ClaudePausedUntil = null,
-    IReadOnlyList<Agents.LimitPause>? Pauses = null);
+    IReadOnlyList<Agents.LimitPause>? Pauses = null,
+    LocalModels.GpuView? Gpu = null);
 
 public sealed record ModelOption(string Id, string Name);
 

@@ -1,6 +1,6 @@
 import { NeedsYou } from '../activity/NeedsYou'
 import { MuteButton } from '../sounds/MuteButton'
-import { ClaudeMeter, LimitPauses } from '../engines/ClaudeUsage'
+import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
 import './layout.css'
 
@@ -47,6 +47,7 @@ export function TopBar({ view, onView, link }: Props) {
       <div className="topbar-end">
         <NeedsYou />
         <LimitPauses onOpen={() => onView('board')} />
+        <GpuStatus onOpen={() => onView('board')} />
         <ClaudeMeter onOpen={() => onView('settings')} />
         <MuteButton />
         <span className={`link link-${link}`} title="Connection to the Openspace server">

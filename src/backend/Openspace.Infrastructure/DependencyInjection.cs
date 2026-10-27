@@ -4,10 +4,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
+using Openspace.Application.LocalModels;
 using Openspace.Application.Queue;
 using Openspace.Infrastructure.ClaudeCode;
 using Openspace.Infrastructure.Git;
 using Openspace.Infrastructure.Hosting;
+using Openspace.Infrastructure.LocalModels;
 using Openspace.Infrastructure.OpenCode;
 using Openspace.Infrastructure.Persistence;
 
@@ -59,6 +61,12 @@ public static class DependencyInjection
             ? ActivatorUtilities.CreateInstance<QueueRunnerService>(sp)
             : new IdleService());
         services.AddHostedService<ReviewRunnerService>();
+
+        // The graphics card: local models load when desks need them and give way to the programs listed first.
+        services.AddHttpClient(LocalModelServer.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(5));
+        services.AddSingleton<IGpuProbe, GpuProbe>();
+        services.AddSingleton<ILocalModelServer, LocalModelServer>();
+        services.AddHostedService<GpuShiftService>();
         return services;
     }
 

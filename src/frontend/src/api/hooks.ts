@@ -4,6 +4,7 @@ import type {
   DeskLook,
   AgentEngine,
   EnginesView,
+  GpuView,
   AuditEntryView,
   BranchList,
   SoundsView,
@@ -39,6 +40,7 @@ export const keys = {
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
+  gpu: ['gpu'] as const,
   settings: ['settings'] as const,
   backups: ['backups'] as const,
   sounds: ['sounds'] as const,
@@ -377,6 +379,15 @@ export function useEngines() {
     queryKey: keys.engines,
     queryFn: () => request<EnginesView>('GET', '/api/engines'),
     refetchInterval: 60_000,
+  })
+}
+
+/** Who has the graphics card: it changes within seconds when a program takes it. */
+export function useGpu() {
+  return useQuery({
+    queryKey: keys.gpu,
+    queryFn: () => request<GpuView>('GET', '/api/gpu'),
+    refetchInterval: 5_000,
   })
 }
 

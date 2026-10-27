@@ -37,6 +37,7 @@ builder.Services.Configure<Openspace.Infrastructure.Git.GitHubOptions>(builder.C
 builder.Services.Configure<Openspace.Infrastructure.Persistence.BackupOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Persistence.BackupOptions.SectionName));
 builder.Services.Configure<Openspace.Application.Checks.CheckOptions>(builder.Configuration.GetSection(Openspace.Application.Checks.CheckOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
+builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
 builder.Services.Configure<WorkspaceOptions>(options =>
@@ -73,6 +74,7 @@ app.MapRoleEndpoints();
 app.MapEpicEndpoints();
 app.MapReportEndpoints();
 app.MapEngineEndpoints();
+app.MapGpuEndpoints();
 app.MapSettingsEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);

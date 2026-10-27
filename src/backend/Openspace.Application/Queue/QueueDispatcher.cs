@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
+using Openspace.Application.LocalModels;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
@@ -15,6 +16,7 @@ public sealed class QueueDispatcher(
     IWorkTaskRepository tasks,
     IOfficeRepository offices,
     EngineLimits limits,
+    GpuArbiter gpu,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
     TimeProvider clock)
@@ -58,6 +60,12 @@ public sealed class QueueDispatcher(
             // unless the office has a reserve model that can go on with them meanwhile.
             if ((anyPaused || task.ReserveModel is not null)
                 && !Hand(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk, now))
+            {
+                continue;
+            }
+
+            // Desks on a model of this machine wait for it to be loaded on the graphics card.
+            if (gpu.Enabled && !Admitted(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk))
             {
                 continue;
             }
@@ -135,6 +143,17 @@ public sealed class QueueDispatcher(
         }
 
         return true;
+    }
+
+    private bool Admitted(WorkTask task, Office office, DeskId desk)
+    {
+        if (!office.HasDesk(desk))
+        {
+            return true;
+        }
+
+        var model = AgentSetups.AgentFor(office.Locate(desk).Desk, task).Model;
+        return !gpu.IsLocal(model) || gpu.Admit(model!);
     }
 
     private async Task<Office> OfficeOfAsync(WorkTask task, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)

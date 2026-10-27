@@ -118,9 +118,12 @@ Later, in rough order of appearance:
 - ~~**Reserve models.**~~ Done: an office names free cloud models that go on with
   its tasks while a desk's account is over its limits, in order, and hands them
   back when it resets; only for offices whose code may leave this machine.
-- **Local models and routines.** Small models running on this machine (through
-  Ollama or similar, wired into OpenCode) for simple recurring jobs such as sorting
-  email, on a schedule, outside the office and its repositories.
+- ~~**Local models on the graphics card.**~~ Done: desks can run on models of
+  this machine, loaded when needed and unloaded when idle; programs listed first
+  (or claiming the card through the API) always get it, and local tasks go back
+  to the queue for them.
+- **Routines.** Simple recurring jobs (sorting email, a morning paper) on the
+  local models, on a schedule, outside the office and its repositories.
 
 - ~~**Notification sounds.**~~ Done: a sound when an agent needs you, when work reaches
   review, when a task fails, and other moments worth hearing. Customisable per

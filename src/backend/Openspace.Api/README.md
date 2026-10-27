@@ -264,7 +264,12 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   drafts an answer in the mail's own language, knowing who the person is (`me`):
   it becomes a draft in the mailbox only after a yes, and the person sends it. No
   routine can send mail. A summary of what stays in the inbox, in `language`,
-  goes through `channel`. Mail is read by local models only.
+  goes through `channel`. Mail is read by local models only. Each run looks at
+  `most` messages at most: the new ones first, then, while there is room, older
+  mail matching `backlog` (`in:inbox`; `false` to leave it alone), newest first,
+  that no run looked at yet. Older mail is sorted but never answered, and the
+  summary says how much is left. Messages are listed by id a page at a time, and
+  only those never met are read.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

@@ -37,6 +37,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
           "model": "local/gemma",
           "query": "in:inbox newer_than:2d",
           "most": 40,
+          "backlog": "in:inbox",
           "labelPrefix": "Openspace",
           "me": "Who you are and how you write, so reply drafts sound like you.",
           "labels": [
@@ -55,6 +56,9 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
     /// <summary>Messages summed up in one go at most, so the summary stays short.</summary>
     private const int MostInSummary = 15;
 
+    /// <summary>Pages of ids looked through at most per search: a few thousand messages.</summary>
+    private const int MostPages = 20;
+
     /// <summary>Of each message, the start the decider and the writer read.</summary>
     private const int Reading = 1500;
 
@@ -65,24 +69,24 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         ArgumentNullException.ThrowIfNull(context);
         var settings = MailSettings.Read(context.Settings);
         var words = MailWords.For(settings.Language);
-        var messages = await mailbox.ListAsync(settings.Account, settings.Query, settings.Most, cancellationToken).ConfigureAwait(false);
+        var done = await context.DealtWithAsync(KeyPrefix, cancellationToken).ConfigureAwait(false);
+        var newer = await CollectAsync(settings.Account, settings.Query, settings.Most, done, [], countRest: false, cancellationToken).ConfigureAwait(false);
+        var older = settings.Backlog is { } search && newer.Ids.Count < settings.Most
+            ? await CollectAsync(settings.Account, search, settings.Most - newer.Ids.Count, done, newer.Ids, countRest: true, cancellationToken).ConfigureAwait(false)
+            : null;
 
-        var fresh = new List<MailMessage>();
-        foreach (var message in messages)
-        {
-            if (await context.MeetAsync(KeyPrefix + message.Id, message.Id, $"{Sender(message.From)}: {message.Subject}", cancellationToken).ConfigureAwait(false))
-            {
-                fresh.Add(message);
-            }
-        }
-
-        context.Write($"{messages.Count} messages found, {fresh.Count} new.");
-        if (fresh.Count == 0)
+        var fresh = await MeetAsync(context, settings, newer.Ids, cancellationToken).ConfigureAwait(false);
+        var old = older is null ? [] : await MeetAsync(context, settings, older.Ids, cancellationToken).ConfigureAwait(false);
+        context.Write(older is null
+            ? $"{fresh.Count} new messages."
+            : $"{fresh.Count} new messages and {old.Count} older ones; {(older.More ? "more than " : string.Empty)}{older.Rest} older ones still to look at.");
+        if (fresh.Count == 0 && old.Count == 0)
         {
             return "No new mail.";
         }
 
-        var sorted = await SortAsync(context, settings, fresh, cancellationToken).ConfigureAwait(false);
+        var sorted = await SortAsync(context, settings, [.. fresh, .. old], cancellationToken).ConfigureAwait(false);
+        var isOld = old.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
 
         var away = new Dictionary<string, int>(StringComparer.Ordinal);
         var archived = new HashSet<string>(StringComparer.Ordinal);
@@ -101,13 +105,18 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             }
             else if (proposal.Status == ProposalStatus.Done && label.Archive)
             {
-                away[label.Name] = away.GetValueOrDefault(label.Name) + 1;
                 archived.Add(message.Id);
+                if (!isOld.Contains(message.Id))
+                {
+                    away[label.Name] = away.GetValueOrDefault(label.Name) + 1;
+                }
             }
         }
 
-        var answer = sorted.Where(s => s.Label is { Reply: true } && !s.Message.Bulk).Select(s => s.Message).ToList();
-        var kept = sorted.Select(s => s.Message).Where(m => !archived.Contains(m.Id)).Except(answer).ToList();
+        // Older mail is sorted, never answered: a reply weeks late is the person's call, and the summary stays about today.
+        var answer = sorted.Where(s => s.Label is { Reply: true } && !s.Message.Bulk && !isOld.Contains(s.Message.Id)).Select(s => s.Message).ToList();
+        var kept = fresh.Where(m => !archived.Contains(m.Id)).Except(answer).ToList();
+        var backlog = older is null ? null : new Backlog(old.Count, old.Count(m => archived.Contains(m.Id)), older.Rest, older.More);
         var gists = await GistsAsync(context, settings, [.. answer.Concat(kept).Take(MostInSummary)], cancellationToken).ConfigureAwait(false);
 
         var drafts = 0;
@@ -127,14 +136,15 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             drafts++;
         }
 
-        foreach (var message in fresh)
+        foreach (var message in fresh.Concat(old))
         {
             await context.MarkAsync(KeyPrefix + message.Id, SeenState.Shown, cancellationToken).ConfigureAwait(false);
         }
 
-        var summary = Summary(settings, words, fresh.Count, answer, kept, away, gists, drafts, waiting);
+        var summary = Summary(settings, words, fresh.Count, answer, kept, away, gists, drafts, waiting, backlog);
         await context.DeliverAsync(summary, null, cancellationToken).ConfigureAwait(false);
-        return $"{fresh.Count} new: {away.Values.Sum()} sorted away, {answer.Count + kept.Count} kept, {drafts} reply drafts proposed.";
+        return $"{fresh.Count} new: {away.Values.Sum()} sorted away, {answer.Count + kept.Count} kept, {drafts} reply drafts proposed"
+            + (backlog is not { Looked: > 0 } ? "." : $"; {backlog.Looked} older looked at, {backlog.Archived} archived.");
     }
 
     public async Task<string> CarryOutAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken)
@@ -157,6 +167,56 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
             default:
                 throw new NotSupportedException($"Mail routines do not know how to {proposal.Action}.");
         }
+    }
+
+    /// <summary>
+    /// The ids matching <paramref name="query"/>, newest first, never dealt with nor already taken: up to
+    /// <paramref name="want"/>. With <paramref name="countRest"/> it goes on counting the others, up to a limit.
+    /// </summary>
+    private async Task<Collected> CollectAsync(
+        string account, string query, int want, IReadOnlySet<string> done, IReadOnlyCollection<string> taken, bool countRest, CancellationToken cancellationToken)
+    {
+        var ids = new List<string>();
+        var rest = 0;
+        string? page = null;
+        var pages = 0;
+        do
+        {
+            var found = await mailbox.FindAsync(account, query, page, cancellationToken).ConfigureAwait(false);
+            foreach (var id in found.Ids.Where(id => !done.Contains(KeyPrefix + id) && !taken.Contains(id) && !ids.Contains(id)))
+            {
+                if (ids.Count < want)
+                {
+                    ids.Add(id);
+                }
+                else
+                {
+                    rest++;
+                }
+            }
+
+            page = found.Next;
+            pages++;
+        }
+        while (page is not null && pages < MostPages && (ids.Count < want || countRest));
+
+        return new Collected(ids, rest, page is not null);
+    }
+
+    /// <summary>The messages behind these ids that deserve a look, read in full.</summary>
+    private async Task<List<MailMessage>> MeetAsync(RoutineContext context, MailSettings settings, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        var messages = new List<MailMessage>();
+        foreach (var id in ids)
+        {
+            var message = await mailbox.ReadAsync(settings.Account, id, cancellationToken).ConfigureAwait(false);
+            if (await context.MeetAsync(KeyPrefix + message.Id, message.Id, $"{Sender(message.From)}: {message.Subject}", cancellationToken).ConfigureAwait(false))
+            {
+                messages.Add(message);
+            }
+        }
+
+        return messages;
     }
 
     /// <summary>Each message with the label the decider is sure of, or none: then it stays in the inbox as it is.</summary>
@@ -276,7 +336,7 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
 
     private static string Summary(
         MailSettings settings, MailWords words, int count, List<MailMessage> answer, List<MailMessage> kept, Dictionary<string, int> away,
-        Dictionary<string, string> gists, int drafts, int waiting)
+        Dictionary<string, string> gists, int drafts, int waiting, Backlog? backlog)
     {
         var text = new StringBuilder().Append(CultureInfo.InvariantCulture, $"{settings.Title}: {words.New(count)}");
         void List(string heading, List<MailMessage> messages)
@@ -307,6 +367,11 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         if (away.Count > 0)
         {
             text.Append(CultureInfo.InvariantCulture, $"\n\n{words.SortedAway}: {string.Join(", ", away.OrderByDescending(a => a.Value).Select(a => $"{a.Key} {a.Value}"))}");
+        }
+
+        if (backlog is { Looked: > 0 } || backlog is { Rest: > 0 })
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\n\n{words.Older(backlog.Looked, backlog.Archived, backlog.Rest, backlog.More)}");
         }
 
         if (drafts > 0)
@@ -349,6 +414,11 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
         {"type":"object","properties":{"reply":{"type":"string"}},"required":["reply"]}
         """;
 
+    private sealed record Collected(List<string> Ids, int Rest, bool More);
+
+    /// <param name="Rest">Older messages still to look at, as far as counted; <paramref name="More"/> when counting stopped early.</param>
+    private sealed record Backlog(int Looked, int Archived, int Rest, bool More);
+
     private sealed record LabelPayload(string MessageId, string Label, bool Archive);
 
     private sealed record GistsAnswer(List<Gist>? Gists);
@@ -360,7 +430,8 @@ public sealed class MailSorting(IMailbox mailbox, IDecider decider, ILocalChat c
 
 /// <summary>A mail routine's settings, read from its JSON.</summary>
 public sealed record MailSettings(
-    string Title, string Account, string Language, string Model, string Query, int Most, string LabelPrefix, string Me, IReadOnlyList<MailSettings.Label> Labels)
+    string Title, string Account, string Language, string Model, string Query, int Most, string LabelPrefix, string Me, IReadOnlyList<MailSettings.Label> Labels,
+    string? Backlog = "in:inbox")
 {
     /// <param name="Archive">Mail with this label leaves the inbox.</param>
     /// <param name="Reply">Mail with this label waits for an answer: a reply draft is proposed.</param>
@@ -394,31 +465,41 @@ public sealed record MailSettings(
         return new MailSettings(
             Text("title", "Mail"), account, Text("language", "English"), Text("model", "local/gemma"), Text("query", "in:inbox newer_than:2d"), most,
             settings.TryGetProperty("labelPrefix", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString()!.Trim().Trim('/') : "Openspace",
-            Text("me", "Someone who likes short, kind emails."), labels);
+            Text("me", "Someone who likes short, kind emails."), labels,
+            settings.TryGetProperty("backlog", out var b) && (b.ValueKind == JsonValueKind.False || (b.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(b.GetString())))
+                ? null
+                : Text("backlog", "in:inbox"));
     }
 }
 
 /// <summary>The summary's few fixed words, in the person's language.</summary>
 internal sealed record MailWords(
-    Func<int, string> New, string ToAnswer, string Kept, string SortedAway, Func<int, string> Drafts, Func<int, string> Waiting, Func<int, string> More)
+    Func<int, string> New, string ToAnswer, string Kept, string SortedAway, Func<int, string> Drafts, Func<int, string> Waiting, Func<int, string> More,
+    Func<int, int, int, bool, string> Older)
 {
     public static MailWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
     private static readonly MailWords Italian = new(
-        n => n == 1 ? "1 mail nuova" : $"{n} mail nuove",
+        n => n switch { 0 => "nessuna mail nuova", 1 => "1 mail nuova", _ => $"{n} mail nuove" },
         "Da rispondere",
         "Restano nella posta in arrivo",
         "Smistate e archiviate",
         n => n == 1 ? "1 bozza di risposta aspetta il tuo sì in Openspace: non la invio mai io." : $"{n} bozze di risposta aspettano il tuo sì in Openspace: non le invio mai io.",
         n => n == 1 ? "1 etichetta aspetta il tuo sì in Openspace." : $"{n} etichette aspettano il tuo sì in Openspace.",
-        n => $"e altre {n}");
+        n => $"e altre {n}",
+        (looked, archived, rest, more) =>
+            (looked > 0 ? $"Posta più vecchia: {looked} guardate, {archived} smistate e archiviate. " : string.Empty)
+            + (rest == 0 && !more ? "Non ne restano altre da guardare." : $"Ne restano {(more ? "più di " : "circa ")}{rest} da guardare."));
 
     private static readonly MailWords English = new(
-        n => n == 1 ? "1 new email" : $"{n} new emails",
+        n => n switch { 0 => "no new email", 1 => "1 new email", _ => $"{n} new emails" },
         "To answer",
         "Staying in the inbox",
         "Sorted and archived",
         n => n == 1 ? "1 reply draft waits for your yes in Openspace: I never send it." : $"{n} reply drafts wait for your yes in Openspace: I never send them.",
         n => n == 1 ? "1 label waits for your yes in Openspace." : $"{n} labels wait for your yes in Openspace.",
-        n => $"and {n} more");
+        n => $"and {n} more",
+        (looked, archived, rest, more) =>
+            (looked > 0 ? $"Older mail: {looked} looked at, {archived} sorted and archived. " : string.Empty)
+            + (rest == 0 && !more ? "None left to look at." : $"{(more ? "More than" : "About")} {rest} still to look at."));
 }

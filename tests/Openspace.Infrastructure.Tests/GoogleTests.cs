@@ -163,7 +163,17 @@ public sealed class GoogleTests : IDisposable
         var (accounts, email) = await ConnectedAsync();
         var mailbox = new GmailMailbox(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options));
 
-        var messages = await mailbox.ListAsync(email, "in:inbox newer_than:2d", 10, default);
+        var first = await mailbox.FindAsync(email, "in:inbox newer_than:2d", null, default);
+        var second = await mailbox.FindAsync(email, "in:inbox newer_than:2d", first.Next, default);
+        var messages = new List<MailMessage>();
+        foreach (var id in first.Ids.Concat(second.Ids))
+        {
+            messages.Add(await mailbox.ReadAsync(email, id, default));
+        }
+
+        Assert.Equal(["m1"], first.Ids);
+        Assert.Equal("page-2", first.Next);
+        Assert.Null(second.Next);
 
         Assert.Equal(2, messages.Count);
         var personal = messages[0];
@@ -181,7 +191,7 @@ public sealed class GoogleTests : IDisposable
         var letter = messages[1];
         Assert.True(letter.Bulk);
         Assert.Equal("Weekly news\nThree things & more.", letter.Text);
-        Assert.Contains(_google.Calls, c => c.Path == "/gmail/v1/users/me/messages" && c.Query.Contains("q=in%3Ainbox%20newer_than%3A2d", StringComparison.Ordinal));
+        Assert.Contains(_google.Calls, c => c.Path == "/gmail/v1/users/me/messages" && c.Query.Contains("q=in%3Ainbox%20newer_than%3A2d", StringComparison.Ordinal) && c.Query.Contains("pageToken=page-2", StringComparison.Ordinal));
         Assert.All(_google.Calls.Where(c => c.Path.StartsWith("/gmail/", StringComparison.Ordinal)), c => Assert.Equal("Bearer made-up-access", c.Authorization));
     }
 
@@ -253,7 +263,8 @@ public sealed class GoogleTests : IDisposable
                 ("/token", _) => Json(Tokens(form.Contains("authorization_code", StringComparison.Ordinal))),
                 ("/revoke", _) => Json("{}"),
                 ("/gmail/v1/users/me/profile", _) => Json("""{"emailAddress":"someone@example.com"}"""),
-                ("/gmail/v1/users/me/messages", _) => Json("""{"messages":[{"id":"m1","threadId":"t1"},{"id":"m2","threadId":"t2"}]}"""),
+                ("/gmail/v1/users/me/messages", _) when uri.Query.Contains("pageToken=page-2", StringComparison.Ordinal) => Json("""{"messages":[{"id":"m2","threadId":"t2"}]}"""),
+                ("/gmail/v1/users/me/messages", _) => Json("""{"messages":[{"id":"m1","threadId":"t1"}],"nextPageToken":"page-2","resultSizeEstimate":2}"""),
                 ("/gmail/v1/users/me/messages/m1", _) => Json(Personal()),
                 ("/gmail/v1/users/me/messages/m2", _) => Json(Letter()),
                 ("/gmail/v1/users/me/labels", "GET") => Json("""{"labels":[{"id":"INBOX","name":"INBOX"},{"id":"Label_1","name":"Existing"}]}"""),

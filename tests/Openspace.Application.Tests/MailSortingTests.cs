@@ -17,10 +17,10 @@ public sealed class MailSortingTests
 
     private MailSorting Kind() => new(_mailbox, _decider, _chat);
 
-    private Routine Create(bool askFirst = false, string account = "someone@example.com", string language = "English")
+    private Routine Create(bool askFirst = false, string account = "someone@example.com", string language = "English", string extra = "")
     {
         var settings = $$"""
-            {"title":"Post","account":"{{account}}","language":"{{language}}","channel":"POSTMAN","labelPrefix":"Openspace","me":"A kind person.",
+            {{{extra}}"title":"Post","account":"{{account}}","language":"{{language}}","channel":"POSTMAN","labelPrefix":"Openspace","me":"A kind person.",
              "labels":[
                {"name":"To answer","about":"A person waits for my answer.","archive":false,"reply":true},
                {"name":"Newsletters","about":"Letters I signed up for.","archive":true},
@@ -42,8 +42,18 @@ public sealed class MailSortingTests
 
     private ProposalCommands Proposals() => new(_h.Routines, [Kind()], _h.Outbox, _h.UnitOfWork, _h.Clock, NullLogger<ProposalCommands>.Instance);
 
-    private static MailMessage Mail(string id, string from, string subject, string text = "Hello.", bool bulk = false) =>
-        new(id, $"thread-{id}", from, from, subject, $"<{id}@mail.example>", Harness.Start, text, text, Unread: true, bulk);
+    private static MailMessage Mail(string id, string from, string subject, string text = "Hello.", bool bulk = false, bool old = false) =>
+        new(id, $"thread-{id}", from, from, subject, $"<{id}@mail.example>", old ? Harness.Start.AddDays(-30) : Harness.Start, text, text, Unread: true, bulk);
+
+    /// <summary>Old mail in the inbox, newest first: three newsletters, a receipt, and a person waiting for an answer.</summary>
+    private void OldMail()
+    {
+        _mailbox.Messages.Add(Mail("o1", "News <news@letters.example>", "Old trains issue 3", bulk: true, old: true));
+        _mailbox.Messages.Add(Mail("o2", "Ada Example <ada@example.com>", "Dinner last month?", old: true));
+        _mailbox.Messages.Add(Mail("o3", "News <news@letters.example>", "Old trains issue 2", bulk: true, old: true));
+        _mailbox.Messages.Add(Mail("o4", "Shop <orders@shop.example>", "Old receipt", bulk: true, old: true));
+        _mailbox.Messages.Add(Mail("o5", "News <news@letters.example>", "Old trains issue 1", bulk: true, old: true));
+    }
 
     private void Inbox()
     {
@@ -181,6 +191,47 @@ public sealed class MailSortingTests
     }
 
     [Fact]
+    public async Task Room_left_under_the_limit_goes_to_older_mail_newest_first_a_few_each_time()
+    {
+        var routine = Create(extra: "\"most\":3,");
+        _mailbox.Messages.Add(Mail("m4", "Bob Example <bob@example.com>", "Photos from the trip"));
+        OldMail();
+
+        var first = await RunAsync(routine);
+
+        Assert.Equal("1 new: 0 sorted away, 1 kept, 0 reply drafts proposed; 2 older looked at, 1 archived.", first.Summary);
+        Assert.Equal([("o1", "Openspace/Newsletters", true), ("o2", "Openspace/To answer", false)], _mailbox.Labelled);
+        var text = _h.Outbox.Sent[^1].Text;
+        Assert.Contains("Older mail: 2 looked at, 1 sorted and archived. About 3 still to look at.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dinner last month", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_h.Routines.Proposals, p => p.Action == MailSorting.ReplyAction);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        var second = await RunAsync(routine);
+
+        Assert.Equal("0 new: 0 sorted away, 0 kept, 0 reply drafts proposed; 3 older looked at, 3 archived.", second.Summary);
+        Assert.StartsWith("Post: no new email", _h.Outbox.Sent[^1].Text, StringComparison.Ordinal);
+        Assert.Contains("None left to look at.", _h.Outbox.Sent[^1].Text, StringComparison.Ordinal);
+        Assert.Equal(["o3", "o4", "o5"], _mailbox.Labelled.Skip(2).Select(l => l.Id));
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        Assert.Equal("No new mail.", (await RunAsync(routine)).Summary);
+    }
+
+    [Fact]
+    public async Task Older_mail_is_left_alone_when_the_settings_say_so()
+    {
+        var routine = Create(extra: "\"backlog\":false,");
+        OldMail();
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal("No new mail.", run.Summary);
+        Assert.Empty(_mailbox.Labelled);
+        Assert.DoesNotContain(_mailbox.Queries, q => q == "in:inbox");
+    }
+
+    [Fact]
     public async Task A_routine_without_an_account_says_what_to_do()
     {
         var routine = Create(account: "");
@@ -208,11 +259,25 @@ public sealed class MailSortingTests
 
         public List<string> Accounts { get; } = [];
 
-        public Task<IReadOnlyList<MailMessage>> ListAsync(string account, string query, int most, CancellationToken cancellationToken)
+        public List<string> Queries { get; } = [];
+
+        /// <summary>Two ids a page, so the routine has to turn pages. Archived mail leaves the inbox; "newer_than" leaves out the old.</summary>
+        public Task<MailPage> FindAsync(string account, string query, string? page, CancellationToken cancellationToken)
         {
             Accounts.Add(account);
-            return Task.FromResult<IReadOnlyList<MailMessage>>([.. Messages.Take(most)]);
+            Queries.Add(query);
+            var matching = Messages
+                .Where(m => !Labelled.Any(l => l.Id == m.Id && l.Archive))
+                .Where(m => !query.Contains("newer_than", StringComparison.Ordinal) || m.Received >= Harness.Start.AddDays(-2))
+                .Select(m => m.Id)
+                .ToList();
+            var from = page is null ? 0 : int.Parse(page, System.Globalization.CultureInfo.InvariantCulture);
+            var next = from + 2 < matching.Count ? (from + 2).ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+            return Task.FromResult(new MailPage([.. matching.Skip(from).Take(2)], next));
         }
+
+        public Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken) =>
+            Task.FromResult(Messages.Single(m => m.Id == messageId));
 
         public Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken)
         {

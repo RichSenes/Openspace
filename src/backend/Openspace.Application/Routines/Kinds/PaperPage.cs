@@ -73,7 +73,7 @@ public static class PaperPage
             html.Append("  </div>\n</section>\n");
         }
 
-        html.Append(CultureInfo.InvariantCulture, $"<footer class=\"colophon\">{E(settings.Title)}{(settings.Subtitle.Length > 0 ? $" · <span lang=\"ja\">{E(settings.Subtitle)}</span>" : "")} · N. {number}. Written by a local model from the linked sources; facts are theirs.</footer>\n</body>\n</html>\n");
+        html.Append(CultureInfo.InvariantCulture, $"<footer class=\"colophon\">{E(settings.Title)}{(settings.Subtitle.Length > 0 ? $" · <span lang=\"ja\">{E(settings.Subtitle)}</span>" : "")} · N. {number}. {E(Colophon(culture))}</footer>\n</body>\n</html>\n");
         return html.ToString();
     }
 
@@ -85,6 +85,16 @@ public static class PaperPage
             .Select(outlet => outlet.Count() == 1
                 ? $"<a href=\"{E(outlet.First().Link.ToString())}\">{E(outlet.Key)}</a>"
                 : $"{E(outlet.Key)} ({string.Join(", ", outlet.Select((item, i) => $"<a href=\"{E(item.Link.ToString())}\">{i + 1}</a>"))})"));
+
+    private static string Colophon(CultureInfo culture) => culture.TwoLetterISOLanguageName switch
+    {
+        "it" => "Scritto da un modello locale a partire dalle fonti citate: i fatti sono loro.",
+        "es" => "Escrito por un modelo local a partir de las fuentes citadas: los hechos son suyos.",
+        "fr" => "Écrit par un modèle local à partir des sources citées : les faits sont les leurs.",
+        "de" => "Von einem lokalen Modell aus den verlinkten Quellen geschrieben: die Fakten stammen von ihnen.",
+        "ja" => "ローカルモデルが出典をもとに書きました。事実は出典によります。",
+        _ => "Written by a local model from the linked sources: the facts are theirs.",
+    };
 
     private static string E(string text) => WebUtility.HtmlEncode(text);
 

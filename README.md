@@ -105,8 +105,9 @@ Each project has its own README with detailed specifications.
 20. Offices have routines: recurring jobs that run on their own schedule (a time
     of day, some days of the week, every few weeks), log what they do, remember
     what they already met so nothing comes back twice, and propose: nothing
-    touches your things until you approve. The first kinds (morning paper, mail,
-    job offers) are on their way.
+    touches your things until you approve; what can be undone they do on their
+    own and log. They deliver to a Telegram group. The first kind is a morning
+    paper: news filtered and written up by local models, as a numbered PDF.
 
 ## Ground rules
 

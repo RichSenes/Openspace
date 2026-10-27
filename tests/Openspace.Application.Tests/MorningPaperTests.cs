@@ -65,6 +65,7 @@ public sealed class MorningPaperTests : IDisposable
         Assert.Contains("N. 1", html, StringComparison.Ordinal);
         Assert.Contains("デイリー", html, StringComparison.Ordinal);
         Assert.Contains("href=\"https://courier.example/", html, StringComparison.Ordinal);
+        Assert.Contains("Written by a local model", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Old news", _chat.Prompts[0], StringComparison.Ordinal);
         var (_, caption, file) = Assert.Single(_h.Outbox.Sent);
         Assert.Equal(pdf, file);

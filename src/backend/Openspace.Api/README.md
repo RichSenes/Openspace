@@ -229,6 +229,16 @@ What a routine makes goes to the person's Telegram group: its settings name a bo
 in a repository). Long text is split on line breaks; files go as documents. A
 routine without a channel delivers nothing; tests point the folder somewhere empty.
 
+### Kinds of routine
+
+- **Morning paper** (`morning-paper`): news of the last hours (`hoursBack`) from the
+  feeds of each section, never printed before; the decider keeps what the reader
+  (`reader`) would care about, `perSection` per section; the local model (`model`)
+  writes them up in `language` following `rules`, from the items alone, and opens
+  with a short note. The page is printed to PDF, numbered from the highest number
+  kept in `folder`, saved with its HTML, and delivered through `channel`. A feed
+  that fails is logged and skipped.
+
 Routines read news through RSS and Atom feeds (no DTDs or external entities: a
 feed that tries to read local files is refused) and print their pages to PDF with
 a headless Firefox through geckodriver (`Pdf:Geckodriver`, the snap's

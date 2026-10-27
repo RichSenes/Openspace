@@ -22,6 +22,8 @@ public sealed class RoutineRequests
 /// <remarks>Not thread-safe: call it from a single place (its background service).</remarks>
 public sealed partial class RoutineRunner(
     IRoutineRepository routines,
+    IOfficeRepository offices,
+    IRoutineProgress progress,
     IEnumerable<IRoutineKind> kinds,
     RoutineRequests requests,
     IRoutineOutbox outbox,
@@ -29,19 +31,27 @@ public sealed partial class RoutineRunner(
     TimeProvider clock,
     ILogger<RoutineRunner> logger)
 {
-    /// <summary>After a restart nothing follows the runs that were going on: they failed.</summary>
+    /// <summary>
+    /// After a restart nothing follows the runs that were going on: they failed. Offices
+    /// with routines get their routines room if they had none yet.
+    /// </summary>
     public async Task RecoverAsync(CancellationToken cancellationToken)
     {
+        foreach (var officeId in await routines.OfficesWithRoutinesAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (await offices.FindAsync(officeId, cancellationToken).ConfigureAwait(false) is { } office)
+            {
+                office.RoutinesRoom(RoutineCommands.RoomName, clock.GetUtcNow());
+            }
+        }
+
         var unfinished = await routines.ListUnfinishedRunsAsync(cancellationToken).ConfigureAwait(false);
         foreach (var run in unfinished)
         {
             run.Fail("Openspace stopped while this run was going on.", clock.GetUtcNow());
         }
 
-        if (unfinished.Count > 0)
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RunWaitingAsync(CancellationToken cancellationToken)
@@ -73,7 +83,8 @@ public sealed partial class RoutineRunner(
             return;
         }
 
-        var context = new RoutineContext(routine, run, routines, outbox, clock, kind);
+        var context = new RoutineContext(routine, run, routines, outbox, clock, kind, progress);
+        progress.Report(routine, "Starting");
         try
         {
             var summary = await kind.RunAsync(context, cancellationToken).ConfigureAwait(false);
@@ -86,6 +97,7 @@ public sealed partial class RoutineRunner(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        progress.Report(routine, string.Empty);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The routine {Routine} failed")]

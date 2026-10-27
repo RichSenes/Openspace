@@ -193,4 +193,40 @@ public class RoutineTests
         Assert.Empty(_h.OffersKind.CarriedOut);
         Assert.True(Assert.Single(await _h.RoutineQueries().ListAsync(_h.Office.Id, default)).AskFirst);
     }
+
+    [Fact]
+    public async Task The_first_routine_opens_the_office_s_routines_room_without_desks()
+    {
+        await OffersAsync();
+        await OffersAsync();
+
+        var room = Assert.Single(_h.Office.Rooms, r => r.Kind == Domain.Offices.RoomKind.Routines);
+        Assert.Equal("Routine", room.Name);
+        Assert.Throws<DomainException>(() => _h.Office.AddDesk(room.Id, "Clerk", Domain.Offices.AgentProfile.Create("build"), _h.Clock.GetUtcNow()));
+    }
+
+    [Fact]
+    public async Task Offices_that_had_routines_get_their_room_at_startup()
+    {
+        var routine = Routine.Create(_h.Office, "Paper", "fake-offers", RoutineSchedule.Daily(new TimeOnly(6, 0)), null, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        _h.Routines.Add(routine);
+
+        await _h.RoutineRunner().RecoverAsync(default);
+
+        Assert.Contains(_h.Office.Rooms, r => r.Kind == Domain.Offices.RoomKind.Routines);
+    }
+
+    [Fact]
+    public async Task A_run_tells_the_building_what_it_does_and_when_it_stops()
+    {
+        var routine = await OffersAsync();
+        _h.OffersKind.Offers.Add(("https://jobs.example/1", "Backend engineer", "C#, Tokyo"));
+
+        await _h.RoutineCommands().RunNowAsync(routine.Id, default);
+        await RunDueAsync();
+
+        Assert.Equal("Starting", _h.Progress.Lines[0].Line);
+        Assert.Contains(_h.Progress.Lines, l => l.Line == "Proposed: Backend engineer");
+        Assert.Equal(string.Empty, _h.Progress.Lines[^1].Line);
+    }
 }

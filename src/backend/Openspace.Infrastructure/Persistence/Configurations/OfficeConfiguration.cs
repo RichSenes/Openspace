@@ -43,6 +43,7 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
             room.HasKey(r => r.Id);
             room.Property(r => r.Id).ValueGeneratedNever();
             room.Property(r => r.Name).IsRequired();
+            room.Property(r => r.Kind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(RoomKind.Work).HasSentinel(RoomKind.Work);
             room.Property(r => r.Context).IsRequired();
             room.Property(r => r.Mood).HasMaxLength(40);
             room.Property(r => r.Check).HasMaxLength(Office.MaxCheckLength);

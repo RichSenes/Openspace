@@ -10,6 +10,9 @@ public interface IRoutineRepository
 
     Task<IReadOnlyList<Routine>> ListAsync(OfficeId officeId, CancellationToken cancellationToken);
 
+    /// <summary>The offices that have at least one routine.</summary>
+    Task<IReadOnlyList<OfficeId>> OfficesWithRoutinesAsync(CancellationToken cancellationToken);
+
     /// <summary>Routines turned on whose next run is at or before <paramref name="now"/>, earliest first.</summary>
     Task<IReadOnlyList<Routine>> ListDueAsync(DateTimeOffset now, CancellationToken cancellationToken);
 

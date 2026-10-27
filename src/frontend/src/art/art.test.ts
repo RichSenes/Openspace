@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BONE, CHARACTER_COLORS, CLOTH_COLORS, HAIR_COLORS, MOUTHS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from './palette'
+import { BONE, CHARACTER_COLORS, CLOTH_COLORS, DOLL_LIPS, HAIR_COLORS, MOUTHS, PORCELAIN, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from './palette'
 import { AGENT_LOOKS, poseOf, type AgentState } from './agentStates'
 import { FAN_MODULES, withFanPack, type FanModule } from './fanPack'
 import { inTheDark } from './lighting'
@@ -150,6 +150,24 @@ describe('costumes and outfits', () => {
     expect(open.some((p) => p.color === SKIN_TONES.deep[0])).toBe(false)
     expect(open.find((p) => p.color === CHARACTER_COLORS['eye.glow'])?.glow).toBe(true)
     expect(pixels('blink').some((p) => p.color === CHARACTER_COLORS['eye.glow'])).toBe(false)
+  })
+
+  it('makes a karakuri of porcelain in a red kimono whatever the look, with its key turning only while it works', () => {
+    const pose = (screen: 'on' | 'off', frame: number) => ({ emotion: 'neutral' as const, gesture: 'rest' as const, frame, screen })
+    const doll = (screen: 'on' | 'off', frame: number) => stationPixels({ ...look, costume: 'karakuri' }, pose(screen, frame), THEMES.cozy)
+    const colors = new Set(doll('on', 0).map((p) => p.color))
+    expect(colors.has(PORCELAIN[0])).toBe(true)
+    expect(colors.has(SKIN_TONES.deep[0])).toBe(false)
+    expect(colors.has(CLOTH_COLORS.red[0])).toBe(true)
+    expect(colors.has(DOLL_LIPS)).toBe(true)
+    const key = (screen: 'on' | 'off', frame: number) => JSON.stringify(doll(screen, frame).filter((p) => p.x > 26 && p.y < 26))
+    expect(key('on', 0)).not.toEqual(key('on', 2))
+    expect(key('off', 0)).toEqual(key('off', 2))
+  })
+
+  it('keeps the karakuri lips and eyes readable on porcelain', () => {
+    expect(contrast(DOLL_LIPS, PORCELAIN[0])).toBeGreaterThanOrEqual(3)
+    expect(contrast(CHARACTER_COLORS.eye, PORCELAIN[0])).toBeGreaterThanOrEqual(3)
   })
 
   it('keeps the skeleton eyes readable on bone', () => {

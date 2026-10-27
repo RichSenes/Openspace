@@ -30,6 +30,12 @@ export const CHARACTER_COLORS = {
 /** Light, mid and shadow tones of black gloves, for the hooded costume. */
 export const GLOVES = ['#3a3842', '#2a2830', '#1a191e'] as const
 
+/** Light, mid and shadow tones of a karakuri doll's porcelain face. */
+export const PORCELAIN = ['#f8f4ee', '#e7ded2', '#c8bdae'] as const
+
+/** A karakuri's red lips: dark enough on porcelain to read by lightness (above 3:1). */
+export const DOLL_LIPS = '#b3302c'
+
 /** Light, mid and shadow tones of a skeleton costume, in place of skin. */
 export const BONE = ['#f4f1e8', '#d8d3c6', '#b5ae9f'] as const
 

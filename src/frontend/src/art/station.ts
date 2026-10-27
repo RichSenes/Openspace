@@ -1,7 +1,7 @@
-import { BONE, CHARACTER_COLORS, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
+import { BONE, CHARACTER_COLORS, DOLL_LIPS, PORCELAIN, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
 import { FAN_COLORS, FAN_COSTUMES } from './fanPack'
 import type { Light } from './lighting'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, WINDUP_KEY, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
 import { pixelsOf, type Pixel, type Resolve, type SpriteDef } from './sprite'
 import type { Theme } from './themes'
@@ -55,13 +55,15 @@ export const STATION = { width: 32, height: 46, deskY: 25 } as const
 /** Colours of a character: shared names, plus the tones of this appearance. */
 export function characterColors(look: Appearance): Resolve {
   // Costumes have bones or gloves where skin would show.
-  const [skinLight, skinMid, skinShadow] = look.costume === 'skeleton' ? BONE : look.costume === 'hooded' ? GLOVES : SKIN_TONES[look.skin]
-  const [hairBase, hairShade] = HAIR_COLORS[look.hair]
-  // The skeleton always wears its blue hoodie.
-  const [clothLight, clothMid, clothDark] = CLOTH_COLORS[look.costume === 'skeleton' ? 'blue' : look.cloth]
+  const doll = look.costume === 'karakuri'
+  const [skinLight, skinMid, skinShadow] =
+    look.costume === 'skeleton' ? BONE : look.costume === 'hooded' ? GLOVES : doll ? PORCELAIN : SKIN_TONES[look.skin]
+  // The karakuri always has black hair and a red kimono; the skeleton its blue hoodie.
+  const [hairBase, hairShade] = HAIR_COLORS[doll ? 'black' : look.hair]
+  const [clothLight, clothMid, clothDark] = CLOTH_COLORS[look.costume === 'skeleton' ? 'blue' : doll ? 'red' : look.cloth]
   const colors: Record<string, string> = {
     ...CHARACTER_COLORS,
-    mouth: MOUTHS[look.skin],
+    mouth: doll ? DOLL_LIPS : MOUTHS[look.skin],
     'skin.light': skinLight,
     'skin.mid': skinMid,
     'skin.shadow': skinShadow,
@@ -106,12 +108,30 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const self = costume
     ? [costume.body, closed ? costume.closed : costume.open]
     : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
+  const doll = look.costume === 'karakuri'
+  // A karakuri's key turns while it works, and stands still while it sleeps.
+  const key = doll ? pixelsOf(WINDUP_KEY, pose.screen === 'on' ? Math.floor(pose.frame / 2) % 2 : 0, person, cx, cy) : []
   const layers = [...self, look.accessory && ACCESSORIES[look.accessory], arms]
-  const behind = layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))
-  const desk = pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY)
+  const behind = [...key, ...layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))]
+  const desk = [
+    ...pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY),
+    ...(doll ? pixelsOf(HOURGLASS, pose.screen === 'on' ? Math.floor(pose.frame / 3) % 2 : 0, themeColors(theme.colors), 26, STATION.deskY + 7) : []),
+  ]
   const front = hands ? pixelsOf(hands, pose.frame, person, cx, cy) : []
   const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme.colors), cx + 8, cy - 11) : []
   return [...behind, ...desk, ...front, ...signal]
+}
+
+/** The hourglass on a routine's desk: sand runs down while it works. */
+export const HOURGLASS: SpriteDef = {
+  name: 'hourglass',
+  width: 5,
+  height: 8,
+  legend: { o: 'outline', w: 'plinth.mid', g: 'board.light', s: 'note.yellow' },
+  frames: [
+    ['owwwo', '.oso.', '.oso.', '..o..', '.ogo.', '.oso.', 'owwwo', '.....'],
+    ['owwwo', '.ogo.', '.oso.', '..s..', '.oso.', '.oso.', 'owwwo', '.....'],
+  ],
 }
 
 /** The light a desk's screen casts while it is on, in the station's own pixels. */

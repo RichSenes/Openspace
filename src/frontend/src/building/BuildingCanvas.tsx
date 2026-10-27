@@ -11,6 +11,7 @@ import { pixelsOf, type Pixel } from '../art/sprite'
 import { STATION, themeColors } from '../art/station'
 import { themeOf, type Theme } from '../art/themes'
 import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
+import type { AgentState } from '../art/agentStates'
 import { agentStateOf, lookOf } from './agents'
 import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
@@ -55,6 +56,8 @@ interface Props {
   tasks: readonly WorkTaskView[]
   /** What each desk is doing, by desk id: shown as speech bubbles. */
   activities: ReadonlyMap<string, DeskActivity>
+  /** States decided elsewhere, by desk id: the routines' dolls. */
+  states?: ReadonlyMap<string, AgentState>
   /** Lights off: only screens, lamps and other glowing things light the rooms. */
   dark: boolean
   /** More controls beside Fit. */
@@ -96,7 +99,7 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, dark, controls, arrange, onPickDesk }: Props) {
+export function BuildingCanvas({ office, tasks, activities, states, dark, controls, arrange, onPickDesk }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
@@ -117,7 +120,7 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
       view.layout = layout
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
-      const drawn = drawBuilding(layout, { office, tasks, activities, dark }, arrange?.selection)
+      const drawn = drawBuilding(layout, { office, tasks, activities, states, dark }, arrange?.selection)
       app.stage.addChild(drawn.world)
       Object.assign(view, drawn)
       view.hall?.paint()
@@ -192,7 +195,7 @@ export function BuildingCanvas({ office, tasks, activities, dark, controls, arra
   }, [])
 
   const arranging = Boolean(arrange)
-  useEffect(() => draw.current(), [office, tasks, activities, dark, arranging, arrange?.selection])
+  useEffect(() => draw.current(), [office, tasks, activities, states, dark, arranging, arrange?.selection])
 
   return (
     <div className="building-canvas" ref={host}>
@@ -531,6 +534,7 @@ interface Scene {
   office: OfficeView
   tasks: readonly WorkTaskView[]
   activities: ReadonlyMap<string, DeskActivity>
+  states?: ReadonlyMap<string, AgentState>
   dark: boolean
 }
 
@@ -823,7 +827,7 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
 
   const views = new Map(scene.office.rooms.flatMap((r) => r.desks).map((d) => [d.id, d]))
   const looks = new Map(room.desks.map((d) => [d.id, lookOf(views.get(d.id) ?? d)]))
-  const states = new Map(room.desks.map((d) => [d.id, agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
+  const states = new Map(room.desks.map((d) => [d.id, scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
   return {
     paint: (tick) => {
       const phase = phaseOf(new Date().getHours())

@@ -61,4 +61,35 @@ public class FeedReaderTests
     {
         Assert.Empty(Parse("""<rss><channel><item><title>Script</title><link>javascript:alert(1)</link></item></channel></rss>"""));
     }
+
+    [Fact]
+    public void Pictures_come_from_media_rss_enclosures_or_the_item_s_html()
+    {
+        var items = Parse("""
+            <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel>
+              <item><title>One</title><link>https://news.example/1</link><media:content url="https://img.example/1.jpg" medium="image"/></item>
+              <item><title>Two</title><link>https://news.example/2</link><enclosure url="https://img.example/2.png" type="image/png"/></item>
+              <item><title>Three</title><link>https://news.example/3</link><description><![CDATA[<p><img src="/pics/3.webp"> text</p>]]></description></item>
+              <item><title>Four</title><link>https://news.example/4</link></item>
+            </channel></rss>
+            """);
+
+        Assert.Equal(
+            ["https://img.example/1.jpg", "https://img.example/2.png", "https://news.example/pics/3.webp", null],
+            items.Select(i => i.Image?.ToString()));
+    }
+
+    [Fact]
+    public void A_page_s_own_picture_is_its_open_graph_image()
+    {
+        var page = new Uri("https://news.example/story");
+
+        Assert.Equal(
+            "https://news.example/img/lead.jpg",
+            WebImages.Declared("""<head><meta name="x" content="y"><meta property="og:image" content="/img/lead.jpg"></head>""", page)?.ToString());
+        Assert.Equal(
+            "https://cdn.example/a.png",
+            WebImages.Declared("""<meta content="https://cdn.example/a.png" name="twitter:image">""", page)?.ToString());
+        Assert.Null(WebImages.Declared("""<meta property="og:image" content="javascript:alert(1)">""", page));
+    }
 }

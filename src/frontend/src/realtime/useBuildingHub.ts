@@ -2,6 +2,7 @@ import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/s
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { mergeActivity } from '../activity/activity'
+import { reportRoutineProgress } from './routineProgress'
 import { keys } from '../api/hooks'
 import type { DeskActivity } from '../api/types'
 import { retryDelay } from './retry'
@@ -28,6 +29,7 @@ export function useBuildingHub(): LinkState {
     })
     hub.on('ReportsChanged', () => void client.invalidateQueries({ queryKey: keys.reports }))
     hub.on('RoutinesChanged', () => void client.invalidateQueries({ queryKey: keys.routines }))
+    hub.on('RoutineProgress', (progress: { routineId: string; line: string }) => reportRoutineProgress(progress.routineId, progress.line))
     hub.on('EpicsChanged', () => void client.invalidateQueries({ queryKey: keys.epics }))
     hub.on('RolesChanged', () => void client.invalidateQueries({ queryKey: keys.roles }))
     hub.on('TaskLogChanged', (taskId: string) => void client.invalidateQueries({ queryKey: keys.log(taskId) }))

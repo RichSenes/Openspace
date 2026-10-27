@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
-import { useActivity, useOfficeTasks, useSetOfficeTheme } from '../api/hooks'
+import { useActivity, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
@@ -12,6 +12,8 @@ import { AgentCard } from './AgentCard'
 import { ArrangePanel } from './ArrangePanel'
 import { BuildingCanvas, type DeskPick, type Selection } from './BuildingCanvas'
 import { LookDialog } from './LookDialog'
+import { useRoutineProgress } from '../realtime/routineProgress'
+import { routineBubble, routineStateOf, withRoutines } from './routines'
 import './building.css'
 
 const lightsKey = (officeId: string) => `openspace.lights-off.${officeId}`
@@ -42,6 +44,8 @@ function useLightsOff(officeId: string): [boolean, (off: boolean) => void] {
 interface Props {
   office: OfficeView
   onOpenRooms: () => void
+  /** Shows the office's routines: a click on one of their dolls. */
+  onOpenRoutines: () => void
   /** Shows a task on the Board. */
   onOpenTask: (taskId: string) => void
 }
@@ -54,10 +58,26 @@ function cardPlace(pick: DeskPick, box: DOMRect | undefined): React.CSSPropertie
   return { left, top: Math.max(16, Math.min(pick.y - 40, height - 340)) }
 }
 
-export function BuildingView({ office, onOpenRooms, onOpenTask }: Props) {
+export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }: Props) {
   const tasks = useOfficeTasks(office.id)
   const activity = useActivity()
-  const bubbles = useMemo(() => activityByDesk(activity.data, office.id), [activity.data, office.id])
+  const routines = useRoutines(office.id)
+  const proposals = useProposals(office.id)
+  const progress = useRoutineProgress()
+  const desksBubbles = useMemo(() => activityByDesk(activity.data, office.id), [activity.data, office.id])
+  // The routines' dolls: their state, and their bubbles beside the desks'.
+  const routineStates = useMemo(() => {
+    const waiting = (id: string) => proposals.data?.filter((p) => p.routineId === id).length ?? 0
+    return new Map((routines.data ?? []).map((r) => [r.id, routineStateOf(r, progress.has(r.id), waiting(r.id))]))
+  }, [routines.data, proposals.data, progress])
+  const bubbles = useMemo(() => {
+    const all = new Map(desksBubbles)
+    for (const r of routines.data ?? []) {
+      const said = routineBubble(r, progress.get(r.id), proposals.data?.filter((p) => p.routineId === r.id).length ?? 0)
+      if (said) all.set(r.id, said)
+    }
+    return all
+  }, [desksBubbles, routines.data, proposals.data, progress])
   const [lightsOff, setLightsOff] = useLightsOff(office.id)
   const setTheme = useSetOfficeTheme(office.id)
   const toast = useToast()
@@ -65,7 +85,11 @@ export function BuildingView({ office, onOpenRooms, onOpenTask }: Props) {
   const [arranging, setArranging] = useState(false)
   const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const shown = useMemo(() => withDrafts(office, drafts), [office, drafts])
+  // While arranging, the routines room shows empty: its dolls place themselves.
+  const shown = useMemo(
+    () => (arranging ? withDrafts(office, drafts) : withRoutines(withDrafts(office, drafts), routines.data)),
+    [office, drafts, arranging, routines.data],
+  )
   const wrapper = useRef<HTMLDivElement>(null)
   const [picked, setPicked] = useState<{ pick: DeskPick; style: React.CSSProperties }>()
   const [giving, setGiving] = useState<string>()
@@ -95,10 +119,14 @@ export function BuildingView({ office, onOpenRooms, onOpenTask }: Props) {
   return (
     <div className={arranging ? 'building arranging' : 'building'} ref={wrapper}>
       <BuildingCanvas
-        onPickDesk={(pick) => setPicked(pick ? { pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) } : undefined)}
+        onPickDesk={(pick) => {
+          if (pick && routineStates.has(pick.deskId)) onOpenRoutines()
+          else setPicked(pick ? { pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) } : undefined)
+        }}
         office={shown}
         tasks={tasks.data ?? noTasks}
         activities={bubbles}
+        states={routineStates}
         dark={lightsOff}
         arrange={
           arranging

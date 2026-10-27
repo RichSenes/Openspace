@@ -213,6 +213,29 @@ public sealed class Office : AggregateRoot<OfficeId>
         return room;
     }
 
+    /// <summary>
+    /// The room where the office's routines sit, opened the first time it is needed; under
+    /// another name if one of the work rooms already took <paramref name="name"/>.
+    /// </summary>
+    public Room RoutinesRoom(string name, DateTimeOffset now)
+    {
+        if (_rooms.Find(r => r.Kind == RoomKind.Routines) is { } existing)
+        {
+            return existing;
+        }
+
+        var roomName = Guard.NotBlank(name, "Room name", MaxNameLength);
+        if (_rooms.Exists(r => string.Equals(r.Name, roomName, StringComparison.OrdinalIgnoreCase)))
+        {
+            roomName = $"{roomName} ⚙";
+        }
+
+        var room = new Room(RoomId.New(), roomName, RoomKind.Routines);
+        _rooms.Add(room);
+        Raise(new RoomOpened(Id, room.Id, room.Name, now));
+        return room;
+    }
+
     public void SetRoomProcedure(RoomId roomId, IEnumerable<string> steps, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(steps);

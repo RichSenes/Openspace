@@ -6,7 +6,8 @@ namespace Openspace.Application.Routines;
 
 /// <summary>What a routine's kind works with during one run.</summary>
 public sealed class RoutineContext(
-    Routine routine, RoutineRun run, IRoutineRepository routines, IRoutineOutbox outbox, TimeProvider clock, IRoutineKind? kind = null)
+    Routine routine, RoutineRun run, IRoutineRepository routines, IRoutineOutbox outbox, TimeProvider clock, IRoutineKind? kind = null,
+    IRoutineProgress? progress = null)
 {
     /// <summary>Met during this run: not in the database until the run is saved.</summary>
     private readonly Dictionary<string, SeenItem> _met = new(StringComparer.Ordinal);
@@ -23,7 +24,11 @@ public sealed class RoutineContext(
     public DateTimeOffset Now => Clock.GetUtcNow();
 
     /// <summary>A line in the run's log, for people looking at what it did.</summary>
-    public void Write(string line) => Run.Write(line, Now);
+    public void Write(string line)
+    {
+        Run.Write(line, Now);
+        progress?.Report(Routine, line);
+    }
 
     /// <summary>
     /// Something the routine wants to do with the person's things. What can be undone is done

@@ -13,6 +13,9 @@ internal sealed class RoutineRepository(OpenspaceDbContext db) : IRoutineReposit
     public async Task<IReadOnlyList<Routine>> ListAsync(OfficeId officeId, CancellationToken cancellationToken) =>
         await db.Routines.Where(r => r.OfficeId == officeId).OrderBy(r => r.Name).ToListAsync(cancellationToken).ConfigureAwait(false);
 
+    public async Task<IReadOnlyList<OfficeId>> OfficesWithRoutinesAsync(CancellationToken cancellationToken) =>
+        await db.Routines.Select(r => r.OfficeId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyList<Routine>> ListDueAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
         await db.Routines.Where(r => r.Enabled && r.NextRunAt != null && r.NextRunAt <= now).OrderBy(r => r.NextRunAt)
             .ToListAsync(cancellationToken).ConfigureAwait(false);

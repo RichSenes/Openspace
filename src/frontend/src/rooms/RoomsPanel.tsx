@@ -201,36 +201,40 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
           </ul>
         )}
 
-        <form className="desk-new" onSubmit={submitDesk}>
-          <label className="field">
-            <span>Desk name: who sits here, in words you like</span>
-            <input
-              className="input"
-              value={desk.name}
-              onChange={(e) => setDesk({ ...desk, name: e.target.value })}
-              placeholder="e.g. Theme developer"
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Role</span>
-            <select className="input" value={desk.roleId} onChange={(e) => setDesk({ ...desk, roleId: e.target.value })}>
-              <option value="">No role</option>
-              {roles.data?.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <EngineFields value={desk} onChange={(choice) => setDesk({ ...desk, ...choice })} engines={engines.data} />
-          <div className="row">
-            <button type="submit" className="btn" disabled={addDesk.isPending}>
-              <Plus size={16} /> Add desk
-            </button>
-          </div>
-          {addDesk.error && <p className="error">{addDesk.error.message}</p>}
-        </form>
+        {room.kind === 'Routines' ? (
+          <p className="hint">This room holds the office's routines, each as a karakuri at its desk. Add and change them in Routines.</p>
+        ) : (
+          <form className="desk-new" onSubmit={submitDesk}>
+            <label className="field">
+              <span>Desk name: who sits here, in words you like</span>
+              <input
+                className="input"
+                value={desk.name}
+                onChange={(e) => setDesk({ ...desk, name: e.target.value })}
+                placeholder="e.g. Theme developer"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Role</span>
+              <select className="input" value={desk.roleId} onChange={(e) => setDesk({ ...desk, roleId: e.target.value })}>
+                <option value="">No role</option>
+                {roles.data?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <EngineFields value={desk} onChange={(choice) => setDesk({ ...desk, ...choice })} engines={engines.data} />
+            <div className="row">
+              <button type="submit" className="btn" disabled={addDesk.isPending}>
+                <Plus size={16} /> Add desk
+              </button>
+            </div>
+            {addDesk.error && <p className="error">{addDesk.error.message}</p>}
+          </form>
+        )}
       </section>
     </article>
   )

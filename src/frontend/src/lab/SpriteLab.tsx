@@ -168,6 +168,7 @@ export function SpriteLab() {
     { label: 'coat', look: { ...combos[2], outfit: 'coat' } },
     { label: 'skeleton', look: { ...combos[3], costume: 'skeleton' } },
     { label: 'hooded', look: { ...combos[1], costume: 'hooded' } },
+    { label: 'karakuri (routines)', look: { ...combos[0], costume: 'karakuri' } },
     { label: 'pointy hat', look: { ...combos[0], cloth: 'green', accessory: 'pointyHat' } },
   ]
 

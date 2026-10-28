@@ -11,20 +11,30 @@ namespace Openspace.Application.Tests;
 public sealed class JobOffersTests : IDisposable
 {
     private readonly Harness _h = new();
-    private readonly string _profile = Path.Combine(Path.GetTempPath(), $"openspace-profile-{Guid.NewGuid():N}.md");
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"openspace-career-{Guid.NewGuid():N}");
     private readonly FakeBoard _board = new();
     private readonly FakeChat _chat = new();
 
-    public JobOffersTests() => File.WriteAllText(_profile, "A C# developer who likes clean code. Wants to live in Kyoto.");
+    public JobOffersTests()
+    {
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(Profile, "A C# developer who likes clean code. Wants to live in Kyoto.");
+    }
 
-    public void Dispose() => File.Delete(_profile);
+    private string Profile => Path.Combine(_root, "profile.md");
 
-    private JobOffers Kind() => new([_board], _chat);
+    private string Inbox => Path.Combine(_root, "inbox");
+
+    private string Saved => Path.Combine(_root, "offers");
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+
+    private JobOffers Kind() => new([_board], _chat, _h.Routines, _h.RoutineRequests);
 
     private Routine Create(string language = "English", string profile = "", int most = 8, string boards = "\"made-up\"")
     {
         var settings = $$"""
-            {"title":"Offers","language":"{{language}}","channel":"CAREER","profile":{{JsonSerializer.Serialize(profile.Length > 0 ? profile : _profile)}},
+            {"title":"Offers","language":"{{language}}","channel":"CAREER","profile":{{JsonSerializer.Serialize(profile.Length > 0 ? profile : Profile)}},"inbox":{{JsonSerializer.Serialize(Inbox)}},"offers":{{JsonSerializer.Serialize(Saved)}},
              "boards":[{{boards}}],"visa":true,"japaneseUpTo":"conversational","minSalary":4500000,"cities":["Kyoto","Osaka"],"most":{{most}},"fit":3}
             """;
         var routine = Routine.Create(_h.Office, "Offers", "job-offers", RoutineSchedule.Daily(new TimeOnly(8, 0)), settings, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
@@ -135,7 +145,7 @@ public sealed class JobOffersTests : IDisposable
         var next = await RunAsync(routine);
 
         Assert.Equal(ProposalStatus.Done, kyoto.Status);
-        Assert.Contains("https://jobs.example/jobs/kyo-front", kyoto.Outcome, StringComparison.Ordinal);
+        Assert.Contains("kyo-labs-frontend-engineer", kyoto.Outcome, StringComparison.Ordinal);
         Assert.Equal(SeenState.Taken, _h.Routines.Seen.Single(s => s.Key == "job:jobs.example/jobs/kyo-front").State);
         Assert.Equal(SeenState.Dismissed, _h.Routines.Seen.Single(s => s.Key == "role:acme|senior-net-developer").State);
         Assert.Equal("No new offers for you: 3 of 7 fit your rules, 0 new ones judged.", next.Summary);
@@ -280,6 +290,87 @@ public sealed class JobOffersTests : IDisposable
         Assert.True(JobOffers.Passes(JobSettings.Read(json.RootElement), Offer("y", "International Software Engineer")));
     }
 
+    private OfferInbox Inbox_() => new(_h.Routines, _h.RoutineRequests, _h.Clock);
+
+    private const string Pasted = "Platform Engineer at Faraway Inc, Sapporo. You will run our Go services. Business Japanese needed. Apply now.";
+
+    [Fact]
+    public async Task An_offer_the_person_brings_is_judged_whatever_the_rules_and_leaves_the_inbox()
+    {
+        var routine = Create();
+        await Inbox_().AddAsync(routine.Id, Pasted, "https://jobs.example/faraway/platform", default);
+        Assert.True(_h.RoutineRequests.TryTake(out var asked));
+        Assert.Equal(routine.Id, asked);
+        var file = Assert.Single(Directory.GetFiles(Inbox));
+        Assert.StartsWith("Link: https://jobs.example/faraway/platform\n\nPlatform Engineer", File.ReadAllText(file), StringComparison.Ordinal);
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal("1 brought offers judged; 0 new offers for you, of 0 judged; 0 of 0 fit your rules.", run.Summary);
+        Assert.Empty(Directory.GetFiles(Inbox));
+        var proposal = Assert.Single(_h.Routines.Proposals);
+        Assert.Equal("Platform Engineer — Faraway Inc, Sapporo", proposal.Title);
+        Assert.Contains("business Japanese · visa to check · 2/5", proposal.Body, StringComparison.Ordinal);
+        Assert.Contains(Pasted, _chat.Asked.Single(), StringComparison.Ordinal);
+        Assert.StartsWith("Offers: 1 new offer for you\n\n1. Platform Engineer — Faraway Inc (Sapporo)", _h.Outbox.Sent.Single().Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_brought_offer_the_model_cannot_judge_waits_in_the_inbox()
+    {
+        var routine = Create();
+        await Inbox_().AddAsync(routine.Id, Pasted, null, default);
+        _chat.Fail = true;
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal(RoutineRunStatus.Succeeded, run.Status);
+        Assert.Single(Directory.GetFiles(Inbox));
+        Assert.Empty(_h.Routines.Proposals);
+    }
+
+    [Theory]
+    [InlineData("Too short.", null, "between")]
+    [InlineData(Pasted, "ftp://jobs.example/x", "web address")]
+    public async Task The_inbox_takes_only_a_whole_offer_and_a_web_link(string text, string? link, string error)
+    {
+        var routine = Create();
+
+        var refused = await Assert.ThrowsAsync<Openspace.Domain.Common.DomainException>(() => Inbox_().AddAsync(routine.Id, text, link, default));
+
+        Assert.Contains(error, refused.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Inbox));
+    }
+
+    [Fact]
+    public async Task Only_a_job_offers_routine_takes_offers()
+    {
+        var paper = Routine.Create(_h.Office, "Paper", "morning-paper", RoutineSchedule.Daily(new TimeOnly(6, 0)), "{}", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        _h.Routines.Add(paper);
+
+        await Assert.ThrowsAsync<Openspace.Domain.Common.DomainException>(() => Inbox_().AddAsync(paper.Id, Pasted, null, default));
+    }
+
+    [Fact]
+    public async Task Yes_saves_the_offer_in_its_own_folder_and_asks_the_cv_routines_to_run()
+    {
+        var routine = Create();
+        var cv = Routine.Create(_h.Office, "CV", CvMaker.KindKey, RoutineSchedule.Daily(new TimeOnly(6, 0)), "{}", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        _h.Routines.Add(cv);
+        Board();
+        await RunAsync(routine);
+        var kyoto = _h.Routines.Proposals.Single(p => p.Title.Contains("Kyo Labs", StringComparison.Ordinal));
+
+        await Proposals().ApproveAsync(kyoto.Id, default);
+
+        var offer = File.ReadAllText(Path.Combine(Saved, "kyo-labs-frontend-engineer", JobOffers.OfferFile));
+        Assert.StartsWith("# Frontend Engineer\n\nCompany: Kyo Labs\nPlace: Kyoto\nLink: https://jobs.example/jobs/kyo-front?ref=list\nFacts: salary not stated", offer, StringComparison.Ordinal);
+        Assert.Contains("Details of Frontend Engineer.", offer, StringComparison.Ordinal);
+        Assert.True(_h.RoutineRequests.TryTake(out var asked));
+        Assert.Equal(cv.Id, asked);
+        Assert.EndsWith("its CV is on the way.", kyoto.Outcome, StringComparison.Ordinal);
+    }
+
     private sealed class FakeBoard : IJobBoard
     {
         public List<JobOffer> Offers { get; } = [];
@@ -313,6 +404,14 @@ public sealed class JobOffersTests : IDisposable
 
             Asked.Add(ask.User);
             Systems.Add(ask.System);
+            if (ask.User.StartsWith("A job offer the person found", StringComparison.Ordinal))
+            {
+                return Task.FromResult(JsonSerializer.Serialize(new
+                {
+                    fit = 2, why = "A stretch.", gaps = "Go.", japanese = "business", visa = "unknown", title = "Platform Engineer", company = "Faraway Inc", location = "Sapporo",
+                }));
+            }
+
             var title = ask.User.Split('\n')[1].Split(" at ")[0];
             var fit = title.Contains("Sales", StringComparison.Ordinal) ? 1 : title.Contains(".NET", StringComparison.Ordinal) ? 5 : 4;
             var japanese = ask.User.Contains("Japanese: Unknown", StringComparison.Ordinal) && ask.User.Contains("fluent Japanese", StringComparison.Ordinal) ? "business" : "none";

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, Pencil, Play, Plus, SkipForward, Square, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, CircleAlert, CircleCheck, CircleX, ClipboardPaste, LoaderCircle, Pencil, Play, Plus, Send, SkipForward, Square, Trash2 } from 'lucide-react'
 import {
   useAskFirst,
   useCreateRoutine,
@@ -13,6 +13,7 @@ import {
   useRoutineRuns,
   useRoutines,
   useRunRoutine,
+  useBringOffer,
   useStopRoutine,
   useTurnOnRoutine,
   useUpdateRoutine,
@@ -25,6 +26,7 @@ import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
 import { runNews } from './progress'
 import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
+import { offerProblem } from './offers'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
 
@@ -125,6 +127,7 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
   const toast = useToast()
   const [deleting, setDeleting] = useState(false)
   const [history, setHistory] = useState(false)
+  const [bringing, setBringing] = useState(false)
   const last = routine.lastRun
   const Icon = last ? RUN_ICON[last.status] : undefined
 
@@ -211,6 +214,11 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
         <button type="button" className="btn" onClick={onEdit}>
           <Pencil size={16} /> Change
         </button>
+        {routine.kind === 'job-offers' && (
+          <button type="button" className="btn" onClick={() => setBringing(true)}>
+            <ClipboardPaste size={16} /> Evaluate an offer
+          </button>
+        )}
         <button type="button" className="btn" aria-expanded={history} onClick={() => setHistory(!history)}>
           {history ? <ChevronUp size={16} /> : <ChevronDown size={16} />} History
         </button>
@@ -232,7 +240,51 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
         </span>
       </div>
       {history && <Runs routineId={routine.id} />}
+      <Dialog title="Evaluate an offer" open={bringing} onClose={() => setBringing(false)}>
+        <BringOffer routineId={routine.id} onDone={() => setBringing(false)} />
+      </Dialog>
     </li>
+  )
+}
+
+/** An offer from a site no routine may read: the person copies it from the page and pastes it here. */
+function BringOffer({ routineId, onDone }: { routineId: string; onDone: () => void }) {
+  const bring = useBringOffer()
+  const toast = useToast()
+  const [text, setText] = useState('')
+  const [link, setLink] = useState('')
+  const [tried, setTried] = useState(false)
+  const problem = offerProblem(text, link)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    setTried(true)
+    if (problem) return
+    bring.mutate({ id: routineId, text, link }, { onSuccess: () => { toast('Offer sent: it is judged in a moment and joins the offers waiting for you'); onDone() } })
+  }
+
+  return (
+    <form className="routine-form" onSubmit={submit} noValidate>
+      <p className="hint">Open the offer in your browser, select all its text, copy it and paste it here. It is judged against your profile like the others, whatever your rules say.</p>
+      <label className="field">
+        <span>Link to the offer (optional)</span>
+        <input className="input" type="url" inputMode="url" placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} />
+      </label>
+      <label className="field">
+        <span>The offer</span>
+        <textarea className="input" rows={12} value={text} onChange={(e) => setText(e.target.value)} aria-invalid={tried && Boolean(problem)} />
+      </label>
+      {tried && problem && <p className="error">{problem}</p>}
+      {bring.error && <p className="error">{bring.error.message}</p>}
+      <div className="row">
+        <button type="submit" className="btn btn-primary" disabled={bring.isPending}>
+          <Send size={16} /> Evaluate it
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   )
 }
 

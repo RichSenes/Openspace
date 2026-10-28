@@ -294,6 +294,15 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   for an answer, and the summary in `language` names it. Each conversation comes up
   once for its last message: a new message in it starts it over. `most` (20)
   conversations per run at most, sent ones first; nothing to say, nothing sent.
+- **Weekly recap** (`weekly`): one message through `channel`, in `language`: the
+  next `days` (7) from the agenda of `account` (events of the main calendar, tasks
+  of the default list not done yet), by day; the tasks left behind; the office's
+  proposals still waiting for a yes, by routine; and how many times each other
+  routine of the office ran in the past week, with what its last good run said.
+  Before noon it starts from today, after noon from tomorrow, so a Sunday evening
+  recap is about the week to come. The local model opens it with two sentences on
+  what the week looks like, or it goes without them. It only reads; without
+  `account` it leaves the agenda out.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

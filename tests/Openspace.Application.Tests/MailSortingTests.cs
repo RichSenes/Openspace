@@ -420,5 +420,8 @@ public sealed class MailSortingTests
             Added.Add(item);
             return Task.FromResult($"https://{(item.IsEvent ? "calendar" : "tasks")}.example/{Added.Count}");
         }
+
+        public Task<IReadOnlyList<AgendaEntry>> ReadAsync(string account, DateOnly from, DateOnly until, TimeZoneInfo zone, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<AgendaEntry>>([]);
     }
 }

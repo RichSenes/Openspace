@@ -285,6 +285,15 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   advertising is left out of the page), and gives it a topic; topics group the
   summaries, the busiest first, each linking back to its mail. Printed to PDF like
   the paper, numbered in `folder`, and delivered through `channel`.
+- **Follow-up** (`followup`): conversations of `account` from the last `window`
+  days (30) that went quiet for `wait` days (5). When the last message is the
+  person's and went to a person (no `noreply` addresses), the local model drafts a
+  short reminder in the mail's language, knowing who the person is (`me`): it
+  becomes a draft in the same conversation only after a yes, never sent. When the
+  last message came from a person, not a list, the decider judges whether it waits
+  for an answer, and the summary in `language` names it. Each conversation comes up
+  once for its last message: a new message in it starts it over. `most` (20)
+  conversations per run at most, sent ones first; nothing to say, nothing sent.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

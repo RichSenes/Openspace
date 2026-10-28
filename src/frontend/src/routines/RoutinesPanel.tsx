@@ -24,7 +24,7 @@ import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
 import { runNews } from './progress'
-import { readAgenda, readText, withAgenda, withText } from './settings'
+import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
 
@@ -437,7 +437,7 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
         {days.length === 0 && '. Pick days to run only on those.'}
       </p>
       {kind === 'morning-paper' && <KanjiChoiceField settings={settings} onChange={setSettings} />}
-      {(kind === 'mail' || kind === 'newsletters') && <AccountField settings={settings} onChange={setSettings} />}
+      {usesAccount(kind) && <AccountField settings={settings} onChange={setSettings} />}
       {kind === 'mail' && <AgendaField settings={settings} onChange={setSettings} />}
       <details className="routine-advanced">
         <summary>Advanced settings (JSON)</summary>

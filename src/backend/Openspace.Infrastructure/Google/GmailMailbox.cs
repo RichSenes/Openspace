@@ -38,6 +38,12 @@ internal sealed partial class GmailMailbox(HttpClient http, IGoogleAccounts acco
     public async Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken) =>
         Read(await GetAsync(account, $"messages/{Uri.EscapeDataString(messageId)}?format=full", cancellationToken).ConfigureAwait(false));
 
+    public async Task<IReadOnlyList<MailMessage>> ReadThreadAsync(string account, string threadId, CancellationToken cancellationToken)
+    {
+        var thread = await GetAsync(account, $"threads/{Uri.EscapeDataString(threadId)}?format=full", cancellationToken).ConfigureAwait(false);
+        return thread.TryGetProperty("messages", out var messages) ? [.. messages.EnumerateArray().Select(Read).OrderBy(m => m.Received)] : [];
+    }
+
     public async Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken)
     {
         var id = await LabelIdAsync(account, label, cancellationToken).ConfigureAwait(false);
@@ -123,7 +129,9 @@ internal sealed partial class GmailMailbox(HttpClient http, IGoogleAccounts acco
             WebUtility.HtmlDecode(message.TryGetProperty("snippet", out var snippet) ? snippet.GetString() ?? string.Empty : string.Empty),
             text.Length <= MostText ? text : text[..MostText],
             labels.Contains("UNREAD"),
-            headers.ContainsKey("List-Unsubscribe") || headers.ContainsKey("List-Id"));
+            headers.ContainsKey("List-Unsubscribe") || headers.ContainsKey("List-Id"),
+            Of("To"),
+            labels.Contains("SENT"));
     }
 
     /// <summary>The first part of this type, decoded: Gmail gives bodies in URL-safe base64.</summary>

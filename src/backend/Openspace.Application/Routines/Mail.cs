@@ -6,9 +6,11 @@ namespace Openspace.Application.Routines;
 /// <param name="MessageId">The Message-ID header, so an answer joins the conversation.</param>
 /// <param name="Text">The body as plain text, shortened.</param>
 /// <param name="Bulk">Sent to a list (it says how to unsubscribe): newsletters, offers, notices.</param>
+/// <param name="To">Who it went to, as the header says it.</param>
+/// <param name="Sent">The person sent it: it is theirs, not someone else's.</param>
 public sealed record MailMessage(
     string Id, string ThreadId, string From, string ReplyTo, string Subject, string MessageId, DateTimeOffset Received,
-    string Snippet, string Text, bool Unread, bool Bulk);
+    string Snippet, string Text, bool Unread, bool Bulk, string To = "", bool Sent = false);
 
 /// <param name="Next">Where the next page starts; null after the last.</param>
 public sealed record MailPage(IReadOnlyList<string> Ids, string? Next);
@@ -25,6 +27,9 @@ public interface IMailbox
     Task<MailPage> FindAsync(string account, string query, string? page, CancellationToken cancellationToken);
 
     Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken);
+
+    /// <summary>A whole conversation, oldest message first.</summary>
+    Task<IReadOnlyList<MailMessage>> ReadThreadAsync(string account, string threadId, CancellationToken cancellationToken);
 
     /// <summary>Puts a label on the message, making the label if needed, and takes it out of the inbox when asked.</summary>
     Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken);

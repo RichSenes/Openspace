@@ -198,6 +198,21 @@ public sealed class GoogleTests : IDisposable
     }
 
     [Fact]
+    public async Task A_conversation_is_read_whole_oldest_first_telling_the_person_s_own_mail()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var mailbox = new GmailMailbox(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options));
+
+        var thread = await mailbox.ReadThreadAsync(email, "t1", default);
+
+        Assert.Equal(["m1", "m3"], thread.Select(m => m.Id));
+        Assert.False(thread[0].Sent);
+        Assert.True(thread[1].Sent);
+        Assert.Equal("Ada Example <ada@example.com>", thread[1].To);
+        Assert.Contains(_google.Calls, c => c.Path == "/gmail/v1/users/me/threads/t1" && c.Query == "?format=full");
+    }
+
+    [Fact]
     public async Task A_label_is_made_once_and_archiving_takes_the_message_out_of_the_inbox()
     {
         var (accounts, email) = await ConnectedAsync();
@@ -306,6 +321,7 @@ public sealed class GoogleTests : IDisposable
                 ("/gmail/v1/users/me/messages", _) => Json("""{"messages":[{"id":"m1","threadId":"t1"}],"nextPageToken":"page-2","resultSizeEstimate":2}"""),
                 ("/gmail/v1/users/me/messages/m1", _) => Json(Personal()),
                 ("/gmail/v1/users/me/messages/m2", _) => Json(Letter()),
+                ("/gmail/v1/users/me/threads/t1", _) => Json($"{{\"id\":\"t1\",\"messages\":[{Answer()},{Personal()}]}}"),
                 ("/gmail/v1/users/me/labels", "GET") => Json("""{"labels":[{"id":"INBOX","name":"INBOX"},{"id":"Label_1","name":"Existing"}]}"""),
                 ("/gmail/v1/users/me/labels", "POST") => Json("""{"id":"Label_new","name":"Openspace/Newsletters"}"""),
                 ("/gmail/v1/users/me/drafts", _) => Json("""{"id":"draft-1"}"""),
@@ -331,6 +347,14 @@ public sealed class GoogleTests : IDisposable
                {"name":"Subject","value":"Dinner on Saturday?"},{"name":"Message-ID","value":"<abc@mail.example>"}],
               "parts":[{"mimeType":"text/plain","body":{"data":"{{{Base64Url("Shall we meet at eight?\nLet me know.")}}}"}},
                        {"mimeType":"text/html","body":{"data":"{{{Base64Url("<p>Shall we meet at eight?</p>")}}}"} }]} }
+            """;
+
+        /// <summary>The person's own answer to m1, a day later.</summary>
+        private static string Answer() => $$$"""
+            {"id":"m3","threadId":"t1","labelIds":["SENT"],"snippet":"Eight is fine.","internalDate":"1772474400000",
+             "payload":{"mimeType":"text/plain","headers":[{"name":"From","value":"Someone <someone@example.com>"},{"name":"To","value":"Ada Example <ada@example.com>"},
+               {"name":"Subject","value":"Re: Dinner on Saturday?"}],
+              "body":{"data":"{{{Base64Url("Eight is fine.")}}}"} } }
             """;
 
         private static string Letter() => $$$"""

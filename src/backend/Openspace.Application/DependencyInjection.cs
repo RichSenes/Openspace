@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IRoutineKind, Routines.Kinds.MorningPaper>();
         services.AddScoped<IRoutineKind, Routines.Kinds.MailSorting>();
         services.AddScoped<IRoutineKind, Routines.Kinds.NewsletterDigest>();
+        services.AddScoped<IRoutineKind, Routines.Kinds.FollowUp>();
         return services;
     }
 }

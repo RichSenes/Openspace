@@ -95,6 +95,12 @@ public static class DependencyInjection
             http.Timeout = TimeSpan.FromSeconds(20);
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
         });
+        // Job boards are read through the pages they serve to anyone, under the same honest name.
+        services.AddHttpClient<IJobBoard, Routines.JapanDevBoard>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(30);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
+        });
         services.AddHttpClient(Routines.FirefoxPdfPrinter.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(3));
         services.AddSingleton<IPdfPrinter, Routines.FirefoxPdfPrinter>();
 

@@ -268,6 +268,18 @@ public sealed class JobOffersTests : IDisposable
         Assert.Equal(passes, JobOffers.Passes(settings, Offer("x", "Developer", japanese: japanese, visa: visa, abroad: abroad, min: null, max: max)));
     }
 
+    [Theory]
+    [InlineData("Internship - AI Application Engineer")]
+    [InlineData("Research Intern for Deep Generative Modeling")]
+    [InlineData("エンジニア インターン")]
+    public void Internships_are_left_out(string title)
+    {
+        using var json = JsonDocument.Parse("{}");
+
+        Assert.False(JobOffers.Passes(JobSettings.Read(json.RootElement), Offer("x", title)));
+        Assert.True(JobOffers.Passes(JobSettings.Read(json.RootElement), Offer("y", "International Software Engineer")));
+    }
+
     private sealed class FakeBoard : IJobBoard
     {
         public List<JobOffer> Offers { get; } = [];

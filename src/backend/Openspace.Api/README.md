@@ -308,10 +308,13 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   Japan Dev, read through its public list page and each offer's schema.org posting.
   A company's own job page is named by its hiring service and the company's name
   there: `greenhouse:…`, `lever:…`, `ashby:…` or `workable:…`, read through the
-  public API each service publishes for listing openings, full text included; as
+  public API each service publishes for listing openings, full text included. A
+  Workday site is `workday:<tenant>.<pod>/<site>` (`acme.wd1/AcmeCareers` for
+  acme.wd1.myworkdayjobs.com/AcmeCareers), read the way its own pages read it,
+  where its robots.txt allows; each offer's text is read only when judged. As
   `{ "board": "greenhouse:…", "allInJapan": true }` every job of it counts as in
   Japan, for companies whose places say only "Hybrid". Offers first pass the
-  person's rules: in Japan; a title with one of the `roles` words (developer,
+  person's rules: in Japan; a job, not an internship; a title with one of the `roles` words (developer,
   engineer and the like by default); with `visa`, none that says it does not
   sponsor one or takes only people already in Japan; no more Japanese than
   `japaneseUpTo` (`none`, `basic`, `conversational`, `business`, `fluent`; a title

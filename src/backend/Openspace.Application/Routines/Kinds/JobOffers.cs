@@ -176,7 +176,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
     }
 
     /// <summary>
-    /// The person's own rules: in Japan, a role they look for, a visa when they need one, no more
+    /// The person's own rules: in Japan, a job and not an internship, a role they look for, a visa when they need one, no more
     /// Japanese than they allow, not paid less than they ask. What is not known yet does not count
     /// against an offer: the local model reads it, and the rules are asked again.
     /// </summary>
@@ -185,11 +185,17 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(offer);
         return offer.InJapan
+            && !Internship(offer.Title)
             && (settings.Roles.Count == 0 || settings.Roles.Any(r => offer.Title.Contains(r, StringComparison.OrdinalIgnoreCase)))
             && (!settings.Visa || (offer.SponsorsVisa != false && offer.FromAbroad != false))
             && offer.Japanese <= settings.JapaneseUpTo
             && (settings.MinSalary <= 0 || offer.SalaryMax is not { } top || top >= settings.MinSalary);
     }
+
+    /// <summary>"Internship - Research Engineer", "Software Engineer Intern": not a job to move for.</summary>
+    private static bool Internship(string title) =>
+        title.Split(Separators, StringSplitOptions.RemoveEmptyEntries).Any(w => w.Equals("intern", StringComparison.OrdinalIgnoreCase) || w.Equals("internship", StringComparison.OrdinalIgnoreCase))
+        || title.Contains("インターン", StringComparison.Ordinal);
 
     private static JapaneseLevel Level(string? said) =>
         Enum.TryParse<JapaneseLevel>(said, ignoreCase: true, out var level) ? level : JapaneseLevel.Unknown;

@@ -109,6 +109,14 @@ public static class DependencyInjection
         services.AddHttpClient(Routines.FirefoxPdfPrinter.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(3));
         services.AddSingleton<IPdfPrinter, Routines.FirefoxPdfPrinter>();
 
+        // Maintenance reads the projects' own files and asks public databases and registries, under an honest name.
+        services.AddSingleton<IDependencyReader, Upkeep.DependencyFiles>();
+        services.AddSingleton<ISystemUpdates, Upkeep.SystemPackages>();
+        services.AddSingleton<IRepositoryStates, Upkeep.RepositoryStates>();
+        services.AddHttpClient<IAdvisories, Upkeep.OsvAdvisories>(Honest);
+        services.AddHttpClient<IPackageRegistry, Upkeep.PackageRegistries>(Honest);
+        services.AddHttpClient<IToolchains, Upkeep.Toolchains>(Honest);
+
         // The kanji of the day reads open dictionaries kept on this computer.
         services.AddSingleton<IKanjiBook, Routines.KanjiBook>();
 
@@ -127,6 +135,13 @@ public static class DependencyInjection
         services.AddHttpClient<IMailbox, Google.GmailMailbox>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(2));
         services.AddHttpClient<IAgenda, Google.GoogleAgenda>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(1));
         return services;
+    }
+
+    /// <summary>Public services are asked under Openspace's own name, slowly enough to be polite.</summary>
+    private static void Honest(HttpClient http)
+    {
+        http.Timeout = TimeSpan.FromSeconds(60);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
     }
 
     private static void ConfigureOpenCode(IServiceProvider services, HttpClient http)

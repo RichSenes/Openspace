@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readAgenda, readText, withAgenda, withText } from './settings'
+import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
 
 describe('routine text settings', () => {
   it('reads a text setting, empty when missing or not text', () => {
@@ -23,5 +23,12 @@ describe('mail agenda settings', () => {
 
   it('writes both choices and keeps the rest', () => {
     expect(JSON.parse(withAgenda('{"account":"a"}', { tasks: false, calendar: true }))).toEqual({ account: 'a', agenda: { tasks: false, calendar: true } })
+  })
+})
+
+describe('routines on a Google account', () => {
+  it('asks for the account in mail, newsletter and follow-up routines only', () => {
+    expect(['mail', 'newsletters', 'followup'].every(usesAccount)).toBe(true)
+    expect(usesAccount('morning-paper')).toBe(false)
   })
 })

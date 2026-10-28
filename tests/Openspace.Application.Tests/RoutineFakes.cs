@@ -183,14 +183,21 @@ internal sealed class FakeMailbox : IMailbox
 
     public List<string> Queries { get; } = [];
 
-    /// <summary>Two ids a page, so the routine has to turn pages. Archived mail leaves the inbox; "newer_than" leaves out the old.</summary>
+    /// <summary>
+    /// Two ids a page, so the routine has to turn pages, newest first. Archived mail leaves the inbox; "in:sent"
+    /// finds the person's own, the rest only others'; "newer_than:Nd" and "older_than:Nd" count days back from the start.
+    /// </summary>
     public Task<MailPage> FindAsync(string account, string query, string? page, CancellationToken cancellationToken)
     {
         Accounts.Add(account);
         Queries.Add(query);
+        var sent = query.Contains("in:sent", StringComparison.Ordinal);
         var matching = Messages
+            .Where(m => m.Sent == sent)
             .Where(m => !Labelled.Any(l => l.Id == m.Id && l.Archive))
-            .Where(m => !query.Contains("newer_than", StringComparison.Ordinal) || m.Received >= Harness.Start.AddDays(-2))
+            .Where(m => Days(query, "newer_than:") is not { } newer || m.Received >= Harness.Start.AddDays(-newer))
+            .Where(m => Days(query, "older_than:") is not { } older || m.Received < Harness.Start.AddDays(-older))
+            .OrderByDescending(m => m.Received)
             .Select(m => m.Id)
             .ToList();
         var from = page is null ? 0 : int.Parse(page, System.Globalization.CultureInfo.InvariantCulture);
@@ -200,6 +207,15 @@ internal sealed class FakeMailbox : IMailbox
 
     public Task<MailMessage> ReadAsync(string account, string messageId, CancellationToken cancellationToken) =>
         Task.FromResult(Messages.Single(m => m.Id == messageId));
+
+    public Task<IReadOnlyList<MailMessage>> ReadThreadAsync(string account, string threadId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<MailMessage>>([.. Messages.Where(m => m.ThreadId == threadId).OrderBy(m => m.Received)]);
+
+    private static int? Days(string query, string word)
+    {
+        var at = query.IndexOf(word, StringComparison.Ordinal);
+        return at < 0 ? null : int.Parse(query[(at + word.Length)..].Split(' ')[0].TrimEnd('d'), System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     public Task LabelAsync(string account, string messageId, string label, bool archive, CancellationToken cancellationToken)
     {

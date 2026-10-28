@@ -335,7 +335,11 @@ public class GpuArbiterTests
         await _h.Shift().TickAsync(default);
         _h.ModelServer.Answering = true;
         await _h.Shift().TickAsync(default);
-        _h.Clock.Advance(LocalChat.Poll);
+        for (var i = 0; i < 50 && !answer.IsCompleted; i++)
+        {
+            _h.Clock.Advance(LocalChat.Poll);
+            await Task.Delay(10);
+        }
 
         Assert.Equal("Buongiorno.", await answer);
         Assert.Equal("Say good morning.", Assert.Single(api.Asked).User);
@@ -351,10 +355,12 @@ public class GpuArbiterTests
         var chat = new LocalChat(_h.Gpu, new FakeModelApi(), new LiveOptions<LocalModelOptions>(() => _h.LocalModels), _h.Clock);
 
         var answer = chat.AskAsync(new LocalAsk("local/gemma", "s", "u", Waiting: said.Add), default);
+
+        // A real pause after each step lets the waiting loop catch up even when the machine is busy with other tests.
         for (var i = 0; i < 25; i++)
         {
             _h.Clock.Advance(LocalChat.Poll);
-            await Task.Yield();
+            await Task.Delay(10);
         }
 
         Assert.Equal(["Waiting for the graphics card: Image studio is using it", "Waiting for the graphics card: Image studio is using it"], said);
@@ -363,7 +369,11 @@ public class GpuArbiterTests
         await _h.Shift().TickAsync(default);
         _h.ModelServer.Answering = true;
         await _h.Shift().TickAsync(default);
-        _h.Clock.Advance(LocalChat.Poll);
+        for (var i = 0; i < 50 && !answer.IsCompleted; i++)
+        {
+            _h.Clock.Advance(LocalChat.Poll);
+            await Task.Delay(10);
+        }
 
         Assert.Equal("Buongiorno.", await answer);
         Assert.Equal("The graphics card is free: the local model is writing", said[^1]);

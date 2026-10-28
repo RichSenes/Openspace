@@ -7,6 +7,11 @@ const objectOf = (text: string): Record<string, unknown> | undefined => {
   }
 }
 
+/** Kinds of routine that work on a connected Google account, so their form asks which one. */
+const ACCOUNT_KINDS = new Set(['mail', 'newsletters', 'followup'])
+
+export const usesAccount = (kind: string): boolean => ACCOUNT_KINDS.has(kind)
+
 /** A text setting of a routine, empty when it is missing or the settings are not valid JSON. */
 export function readText(settings: string, key: string): string {
   const value = objectOf(settings)?.[key]

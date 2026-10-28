@@ -347,6 +347,24 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   folder under `offers` with an `offer.md` and no CV gets one in
   `tailoredLanguage`, choosing and ordering what the role needs, five per run.
   Nothing changed and nothing waiting, nothing is made.
+- **Maintenance** (`maintenance`): keeps the projects safe and current. It reads
+  what each project depends on from its own files (npm's `package-lock.json`,
+  .NET project files with `Directory.Packages.props` and the restore's
+  `obj/project.assets.json`, pinned `requirements*.txt`), never entering
+  `node_modules`, builds, hidden folders or the office's private folders. The
+  projects are the offices' repositories (`offices`, minus the names or folders in
+  `skip`) and the `folders` named. Every package version is asked to OSV.dev, the
+  direct ones' latest to npm, NuGet and PyPI; the .NET SDKs and runtimes and Node
+  are checked against their makers' release lists, the system through apt's update
+  counter, Snap and Flatpak (nothing is installed, no password is asked), and git
+  says which work no remote has. On `reportOn` (`Thursday`; Italian day names
+  work too), or run by hand, it sends everything through `channel` and a PDF of
+  the full list saved in `folder`; on other days it speaks only when a new
+  vulnerability shows up, so it can be scheduled every morning. For a project of an
+  office it proposes there, once per set, a task that brings the vulnerable
+  packages to their fix and the others to their latest without a major version
+  change (`tasks`); a proposed task can be dropped, so it goes on its own unless
+  the routine asks first. It never updates anything itself.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

@@ -8,7 +8,7 @@ const objectOf = (text: string): Record<string, unknown> | undefined => {
 }
 
 /** Kinds of routine that work on a connected Google account, so their form asks which one. */
-const ACCOUNT_KINDS = new Set(['mail', 'newsletters', 'followup'])
+const ACCOUNT_KINDS = new Set(['mail', 'newsletters', 'followup', 'weekly'])
 
 export const usesAccount = (kind: string): boolean => ACCOUNT_KINDS.has(kind)
 

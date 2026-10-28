@@ -27,8 +27,8 @@ describe('mail agenda settings', () => {
 })
 
 describe('routines on a Google account', () => {
-  it('asks for the account in mail, newsletter and follow-up routines only', () => {
-    expect(['mail', 'newsletters', 'followup'].every(usesAccount)).toBe(true)
+  it('asks for the account in mail, newsletter, follow-up and weekly routines only', () => {
+    expect(['mail', 'newsletters', 'followup', 'weekly'].every(usesAccount)).toBe(true)
     expect(usesAccount('morning-paper')).toBe(false)
   })
 })

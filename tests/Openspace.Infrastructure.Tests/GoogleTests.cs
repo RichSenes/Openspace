@@ -294,6 +294,33 @@ public sealed class GoogleTests : IDisposable
         Assert.Equal("2026-03-15", allDay.RootElement.GetProperty("end").GetProperty("date").GetString());
     }
 
+    [Fact]
+    public async Task The_agenda_is_read_on_the_person_s_clock_with_open_tasks_late_ones_included()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var agenda = new GoogleAgenda(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options));
+        var rome = TimeZoneInfo.FindSystemTimeZoneById("Europe/Rome");
+
+        var entries = await agenda.ReadAsync(email, new DateOnly(2026, 3, 2), new DateOnly(2026, 3, 9), rome, default);
+
+        Assert.Equal(
+            [
+                new AgendaEntry(false, "Renew the card", new DateOnly(2026, 2, 27), null, ""),
+                new AgendaEntry(true, "Town fair", new DateOnly(2026, 3, 3), null, ""),
+                new AgendaEntry(true, "Dentist", new DateOnly(2026, 3, 3), new TimeOnly(10, 30), "Clinic"),
+                new AgendaEntry(false, "Pay the bill", new DateOnly(2026, 3, 3), null, ""),
+            ],
+            entries);
+        var events = Assert.Single(_google.Calls, c => c.Path == "/calendar/v3/calendars/primary/events");
+        Assert.Equal("GET", events.Method);
+        Assert.Contains("timeMin=2026-03-02T00%3A00%3A00%2B01%3A00", events.Query, StringComparison.Ordinal);
+        Assert.Contains("timeMax=2026-03-09T00%3A00%3A00%2B01%3A00", events.Query, StringComparison.Ordinal);
+        Assert.Contains("singleEvents=true", events.Query, StringComparison.Ordinal);
+        var tasks = Assert.Single(_google.Calls, c => c.Path == "/tasks/v1/lists/@default/tasks");
+        Assert.Contains("showCompleted=false", tasks.Query, StringComparison.Ordinal);
+        Assert.Contains("dueMax=2026-03-09T00%3A00%3A00.000Z", tasks.Query, StringComparison.Ordinal);
+    }
+
     private static string Base64Url(string text) => GoogleAccounts.Base64Url(Encoding.UTF8.GetBytes(text));
 
     /// <summary>Google's sign-in and Gmail, made up: answers by path, records every call.</summary>
@@ -325,6 +352,17 @@ public sealed class GoogleTests : IDisposable
                 ("/gmail/v1/users/me/labels", "GET") => Json("""{"labels":[{"id":"INBOX","name":"INBOX"},{"id":"Label_1","name":"Existing"}]}"""),
                 ("/gmail/v1/users/me/labels", "POST") => Json("""{"id":"Label_new","name":"Openspace/Newsletters"}"""),
                 ("/gmail/v1/users/me/drafts", _) => Json("""{"id":"draft-1"}"""),
+                ("/tasks/v1/lists/@default/tasks", "GET") => Json("""
+                    {"items":[{"id":"a","title":"Pay the bill","due":"2026-03-03T00:00:00.000Z","status":"needsAction"},
+                              {"id":"b","title":"Renew the card","due":"2026-02-27T00:00:00.000Z","status":"needsAction"},
+                              {"id":"c","title":"Done already","due":"2026-03-04T00:00:00.000Z","status":"completed"},
+                              {"id":"d","title":"Someday","status":"needsAction"}]}
+                    """),
+                ("/calendar/v3/calendars/primary/events", "GET") => Json("""
+                    {"items":[{"id":"1","summary":"Dentist","location":"Clinic","start":{"dateTime":"2026-03-03T09:30:00Z"}},
+                              {"id":"2","summary":"Town fair","start":{"date":"2026-03-03"}},
+                              {"id":"3","summary":"Called off","status":"cancelled","start":{"date":"2026-03-04"}}]}
+                    """),
                 ("/tasks/v1/lists/@default/tasks", "POST") => Json("""{"id":"task-1","webViewLink":"https://tasks.example/task-1"}"""),
                 ("/calendar/v3/calendars/primary/events", "POST") => Json("""{"id":"event-1","htmlLink":"https://calendar.example/event-1"}"""),
                 _ when uri.AbsolutePath.EndsWith("/modify", StringComparison.Ordinal) => Json("{}"),

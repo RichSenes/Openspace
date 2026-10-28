@@ -102,8 +102,41 @@ public sealed class CompanyBoardsTests
         Assert.Equal("ROS and C++.", await new CompanyBoards(new HttpClient()).DetailsAsync(offer, default));
     }
 
+    [Fact]
+    public async Task Workday_lists_page_by_page_and_reads_each_offer_s_text_when_asked()
+    {
+        var site = new WorkdaySite();
+        using var http = new HttpClient(site);
+        var board = new CompanyBoards(http);
+
+        var offers = await board.LatestAsync("workday:acme.wd3/AcmeJapan", default);
+        var text = await board.DetailsAsync(offers[0], default);
+
+        Assert.Equal(21, offers.Count);
+        var first = offers[0];
+        Assert.Equal("workday:acme.wd3/AcmeJapan", first.Board);
+        Assert.Equal(new Uri("https://acme.wd3.myworkdayjobs.com/AcmeJapan/job/Tokyo/Software-Engineer-0_JR-0"), first.Url);
+        Assert.Equal("Acme Group", first.Company);
+        Assert.Equal("Tokyo, Japan", first.Location);
+        Assert.True(first.InJapan);
+        Assert.Null(first.Text);
+        Assert.Equal("We build things.\nC# and TypeScript.", text);
+        Assert.Equal(["/wday/cxs/acme/AcmeJapan/jobs offset 0", "/wday/cxs/acme/AcmeJapan/jobs offset 20", "/wday/cxs/acme/AcmeJapan/job/Tokyo/Software-Engineer-0_JR-0"], site.Asked);
+    }
+
+    [Fact]
+    public async Task A_workday_board_written_wrong_says_how_to_write_it()
+    {
+        using var http = new HttpClient(new WorkdaySite());
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => new CompanyBoards(http).LatestAsync("workday:acme", default));
+
+        Assert.Contains("tenant.pod/site", error.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("japan-dev", false)]
+    [InlineData("workday:acme.wd1/AcmeCareers", true)]
     [InlineData("lever:acme", true)]
     [InlineData("greenhouse:acme", true)]
     [InlineData("teapot:acme", false)]
@@ -117,6 +150,37 @@ public sealed class CompanyBoardsTests
     [InlineData("Senior .NET Developer", false)]
     public void A_title_mostly_in_japanese_is_for_people_who_read_it(string title, bool japanese) =>
         Assert.Equal(japanese, JapanPlaces.WrittenInJapanese(title));
+
+    /// <summary>A made-up Workday site: 21 jobs, twenty a page, and each job's own data.</summary>
+    private sealed class WorkdaySite : HttpMessageHandler
+    {
+        public List<string> Asked { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            string json;
+            if (request.Method == HttpMethod.Post)
+            {
+                using var body = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+                var offset = body.RootElement.GetProperty("offset").GetInt32();
+                Asked.Add($"{path} offset {offset}");
+                var jobs = Enumerable.Range(offset, Math.Max(0, Math.Min(20, 21 - offset))).Select(i => $$"""
+                    {"title":"Software Engineer {{i}}","externalPath":"/job/Tokyo/Software-Engineer-{{i}}_JR-{{i}}","locationsText":"Tokyo","bulletFields":["JR-{{i}}","Japan","Acme Group"]}
+                    """);
+                json = $$"""{"total":21,"jobPostings":[{{string.Join(',', jobs)}}]}""";
+            }
+            else
+            {
+                Asked.Add(path);
+                json = """{"jobPostingInfo":{"title":"Software Engineer 0","jobDescription":"<p>We build things.</p><p>C# and TypeScript.</p>"}}""";
+            }
+
+            return request.RequestUri.Host == "acme.wd3.myworkdayjobs.com"
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") }
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+    }
 
     /// <summary>Answers one host only, as the service would: anything else is not found.</summary>
     private sealed class Answer(string host, string json) : HttpMessageHandler

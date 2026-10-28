@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Openspace.Application.Routines;
 using Openspace.Infrastructure.Google;
@@ -9,20 +10,33 @@ namespace Openspace.Infrastructure.Routines;
 /// <summary>
 /// Companies' own job pages, through the public APIs their hiring services publish so that
 /// anyone may list the openings: Greenhouse, Lever, Ashby and Workable. A board is named by
-/// service and company, "lever:acme"; one call gives the offers with their full text.
+/// service and company, "lever:acme"; one call gives the offers with their full text. Workday
+/// sites are read the way their own pages read them, where the site's robots.txt allows it:
+/// "workday:acme.wd1/AcmeCareers" is acme.wd1.myworkdayjobs.com, site AcmeCareers; each
+/// offer's text is read on request.
 /// </summary>
 internal sealed class CompanyBoards(HttpClient http) : IJobBoard
 {
     /// <summary>Of each offer's text, what routines read at most.</summary>
     private const int MostText = 8000;
 
-    private static readonly string[] Services = ["greenhouse", "lever", "ashby", "workable"];
+    private static readonly string[] Services = ["greenhouse", "lever", "ashby", "workable", "workday"];
+
+    /// <summary>Offers per page of a Workday site, and pages read at most.</summary>
+    private const int WorkdayPage = 20;
+
+    private const int WorkdayPages = 5;
 
     public bool Reads(string board) => Split(board) is { } named && Services.Contains(named.Service);
 
     public async Task<IReadOnlyList<JobOffer>> LatestAsync(string board, CancellationToken cancellationToken)
     {
         var (service, company) = Split(board) ?? throw new ArgumentException($"Not a company board: {board}.", nameof(board));
+        if (service == "workday")
+        {
+            return await WorkdayAsync($"{service}:{company}", company, cancellationToken).ConfigureAwait(false);
+        }
+
         var slug = Uri.EscapeDataString(company);
         var uri = service switch
         {
@@ -43,10 +57,72 @@ internal sealed class CompanyBoards(HttpClient http) : IJobBoard
         return [.. offers.Where(o => o.Title.Length > 0).DistinctBy(o => o.Url)];
     }
 
-    public Task<string> DetailsAsync(JobOffer offer, CancellationToken cancellationToken)
+    public async Task<string> DetailsAsync(JobOffer offer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(offer);
-        return Task.FromResult(offer.Text ?? string.Empty);
+        if (offer.Text is { } text)
+        {
+            return text;
+        }
+
+        if (Split(offer.Board) is not ("workday", var site) || Workday(site) is not { } place)
+        {
+            return string.Empty;
+        }
+
+        // The page's own address, /AcmeCareers/job/..., read through the site's data path.
+        var path = offer.Url.AbsolutePath;
+        var at = path.IndexOf("/job/", StringComparison.Ordinal);
+        using var json = JsonDocument.Parse(await http.GetStringAsync(new Uri(place.Data, $"{place.Site}{path[at..]}"), cancellationToken).ConfigureAwait(false));
+        var description = json.RootElement.TryGetProperty("jobPostingInfo", out var info) ? Plain(Text(info, "jobDescription")) : string.Empty;
+        return description.Length <= MostText ? description : description[..MostText];
+    }
+
+    /// <summary>"acme.wd1/AcmeCareers": where its pages are, and where their data is.</summary>
+    private static (Uri Pages, Uri Data, string Site)? Workday(string site)
+    {
+        var parts = site.Split('/', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2 || parts[0].Split('.') is not [var tenant, var pod] || tenant.Length == 0 || pod.Length == 0)
+        {
+            return null;
+        }
+
+        var host = new Uri($"https://{Uri.EscapeDataString(tenant)}.{Uri.EscapeDataString(pod)}.myworkdayjobs.com/");
+        return (host, new Uri(host, $"wday/cxs/{Uri.EscapeDataString(tenant)}/"), Uri.EscapeDataString(parts[1]));
+    }
+
+    private async Task<IReadOnlyList<JobOffer>> WorkdayAsync(string board, string site, CancellationToken cancellationToken)
+    {
+        var place = Workday(site) ?? throw new ArgumentException($"A Workday board is written as tenant.pod/site: {board}.", nameof(board));
+        var offers = new List<JobOffer>();
+        for (var page = 0; page < WorkdayPages; page++)
+        {
+            using var response = await http.PostAsJsonAsync(
+                new Uri(place.Data, $"{place.Site}/jobs"), new { appliedFacets = new { }, limit = WorkdayPage, offset = page * WorkdayPage, searchText = "" }, cancellationToken)
+                .ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+            var found = WorkdayList(board, place.Pages, place.Site, json.RootElement).ToList();
+            offers.AddRange(found);
+            if (found.Count < WorkdayPage || (json.RootElement.TryGetProperty("total", out var total) && total.TryGetInt32(out var all) && offers.Count >= all))
+            {
+                break;
+            }
+        }
+
+        return [.. offers.DistinctBy(o => o.Url)];
+    }
+
+    internal static IEnumerable<JobOffer> WorkdayList(string board, Uri pages, string site, JsonElement root)
+    {
+        foreach (var job in Array(root, "jobPostings"))
+        {
+            var bullets = Array(job, "bulletFields").Select(b => b.GetString() ?? string.Empty).ToList();
+            var place = string.Join(", ", new[] { Text(job, "locationsText"), bullets.Count > 1 ? bullets[1] : string.Empty }.Where(p => p.Length > 0).Distinct());
+            yield return Offer(
+                board, new Uri(pages, $"{site}{Text(job, "externalPath")}").ToString(), bullets.Count > 2 ? bullets[^1] : site, Text(job, "title"), place,
+                false, null, null, null, null);
+        }
     }
 
     private static (string Service, string Company)? Split(string board)
@@ -130,7 +206,7 @@ internal sealed class CompanyBoards(HttpClient http) : IJobBoard
 
     /// <summary>What every service gives the same way: Japanese when the posting or its title is in Japanese, the rest left for the local model to read.</summary>
     private static JobOffer Offer(
-        string board, string url, string company, string title, string place, bool japanesePosting, DateTimeOffset? posted, long? min, long? max, string text, string remote = "")
+        string board, string url, string company, string title, string place, bool japanesePosting, DateTimeOffset? posted, long? min, long? max, string? text, string remote = "")
     {
         title = title.Trim();
         return new JobOffer(
@@ -149,7 +225,7 @@ internal sealed class CompanyBoards(HttpClient http) : IJobBoard
             [],
             posted,
             JapanPlaces.Mentions(place),
-            text.Length <= MostText ? text : text[..MostText]);
+            text is null || text.Length <= MostText ? text : text[..MostText]);
     }
 
     private static List<JsonElement> Array(JsonElement element, string name) =>

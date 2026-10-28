@@ -55,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<IRoutineKind, Routines.Kinds.FollowUp>();
         services.AddScoped<IRoutineKind, Routines.Kinds.WeeklyRecap>();
         services.AddScoped<IRoutineKind, Routines.Kinds.JobOffers>();
+        services.AddScoped<IRoutineKind, Routines.Kinds.CvMaker>();
+        services.AddScoped<OfferInbox>();
         return services;
     }
 }

@@ -638,6 +638,15 @@ export function useDeleteRoutine() {
   return useWrite((id: string) => request<void>('DELETE', `/api/routines/${id}`), keys.routines)
 }
 
+/** An offer the person found and pastes in, for the job offers routine to judge now. */
+export function useBringOffer() {
+  return useWrite(
+    (input: { id: string; text: string; link: string }) =>
+      request<void>('POST', `/api/routines/${input.id}/offers`, { text: input.text.trim(), link: input.link.trim() || null }),
+    keys.routines,
+  )
+}
+
 export function useRunRoutine() {
   return useWrite((id: string) => request<void>('POST', `/api/routines/${id}/run`), keys.routines)
 }

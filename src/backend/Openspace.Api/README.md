@@ -212,6 +212,7 @@ clock, some days of the week (every day when none), every week or every few week
 | GET | `/api/routines/{id}/runs` | The latest 20 runs, with their log |
 | GET | `/api/routines/{id}/kanji` | A paper's kanji of the day: the next one, how many explained and known |
 | POST | `/api/routines/{id}/kanji/known` | `{ kanji }`: the person knows it, the paper never explains it |
+| POST | `/api/routines/{id}/offers` | `{ text, link? }`: an offer the person pasted, for a job offers routine to judge; the routine is asked to run |
 | DELETE | `/api/routines/{id}` | Delete it with its runs, proposals and memory, stopping a run first |
 | GET | `/api/offices/{id}/proposals?status=Pending` | What routines propose |
 | POST | `/api/proposals/{id}/approve` or `/reject` | Yes carries it out; no is remembered |
@@ -330,6 +331,22 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   come back; it comes back only when it changes in substance, unless turned down.
   `most` (8) new offers are judged per run, the newest first; when the model
   cannot judge any, the run fails and they stay new.
+  An offer the person found where no routine may read is pasted in Openspace
+  (Evaluate an offer): it waits as a file in `inbox` and the next run, asked at
+  once, judges it whatever the rules, the model reading its title, company and
+  place too. A yes saves the offer as `offer.md` in a folder of its own under
+  `offers` ("company-title") and asks the office's CV routines to run.
+- **CV** (`cv`): the person's CVs, written by the local model from `profile` only
+  and printed to PDF. Name, contacts, birth date, address and photo come from
+  `personal`, a JSON file on this computer the model never reads (a blank one is
+  made when missing; `photo` is a JPEG, PNG or WebP next to it). When the profile,
+  the personal data or the photo change, a new set goes in `folder`, numbered
+  (`v3-2026-11-12`): a CV in each of `languages`, in the Karuta look, and with
+  `japaneseForms` the rirekisho (履歴書) and the shokumu keirekisho (職務経歴書)
+  in their usual ruled layout; each file is delivered through `channel`. Each
+  folder under `offers` with an `offer.md` and no CV gets one in
+  `tailoredLanguage`, choosing and ordering what the role needs, five per run.
+  Nothing changed and nothing waiting, nothing is made.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

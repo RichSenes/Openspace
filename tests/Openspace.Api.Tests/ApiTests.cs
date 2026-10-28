@@ -304,6 +304,38 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task A_pasted_offer_waits_in_the_job_offers_inbox_and_nowhere_else()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+        var inbox = Path.Combine(Path.GetTempPath(), $"openspace-inbox-{Guid.NewGuid():N}");
+        var schedule = new { days = Array.Empty<string>(), at = "08:30", everyWeeks = 1 };
+        var offers = await PostAsync<Created>($"/api/offices/{officeId}/routines",
+            new { name = "Offers", kind = "job-offers", schedule, settings = JsonSerializer.Serialize(new { inbox }) });
+        var paper = await PostAsync<Created>($"/api/offices/{officeId}/routines", new { name = "Paper", kind = "morning-paper", schedule });
+        var text = "Frontend Engineer at Made-up KK, Kyoto. React, TypeScript, visa sponsored. Apply with your CV in English.";
+
+        try
+        {
+            var taken = await _http.PostAsJsonAsync($"/api/routines/{offers.Id}/offers", new { text, link = "https://jobs.example/made-up" });
+            var tooShort = await _http.PostAsJsonAsync($"/api/routines/{offers.Id}/offers", new { text = "Hi" });
+            var wrongKind = await _http.PostAsJsonAsync($"/api/routines/{paper.Id}/offers", new { text });
+
+            Assert.Equal(HttpStatusCode.Accepted, taken.StatusCode);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, tooShort.StatusCode);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, wrongKind.StatusCode);
+            Assert.EndsWith(text + "\n", File.ReadAllText(Assert.Single(Directory.GetFiles(inbox))), StringComparison.Ordinal);
+            Assert.Contains((await GetAsync<JsonElement>("/api/routine-kinds")).EnumerateArray(), k => k.GetProperty("key").GetString() == "cv");
+        }
+        finally
+        {
+            if (Directory.Exists(inbox))
+            {
+                Directory.Delete(inbox, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Google_says_where_its_client_goes_and_answers_a_refusal_with_a_page()
     {
         var status = await GetAsync<JsonElement>("/api/google");

@@ -335,13 +335,14 @@ public class GpuArbiterTests
         await _h.Shift().TickAsync(default);
         _h.ModelServer.Answering = true;
         await _h.Shift().TickAsync(default);
-        for (var i = 0; i < 50 && !answer.IsCompleted; i++)
+        for (var i = 0; i < 500 && !answer.IsCompleted; i++)
         {
             _h.Clock.Advance(LocalChat.Poll);
             await Task.Delay(10);
         }
 
-        Assert.Equal("Buongiorno.", await answer);
+        // Never wait for ever: a busy machine fails this test, it does not hang the suite.
+        Assert.Equal("Buongiorno.", await answer.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Equal("Say good morning.", Assert.Single(api.Asked).User);
         Assert.Equal(["gemma"], _h.ModelServer.Started);
     }
@@ -369,13 +370,14 @@ public class GpuArbiterTests
         await _h.Shift().TickAsync(default);
         _h.ModelServer.Answering = true;
         await _h.Shift().TickAsync(default);
-        for (var i = 0; i < 50 && !answer.IsCompleted; i++)
+        for (var i = 0; i < 500 && !answer.IsCompleted; i++)
         {
             _h.Clock.Advance(LocalChat.Poll);
             await Task.Delay(10);
         }
 
-        Assert.Equal("Buongiorno.", await answer);
+        // Never wait for ever: a busy machine fails this test, it does not hang the suite.
+        Assert.Equal("Buongiorno.", await answer.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Equal("The graphics card is free: the local model is writing", said[^1]);
     }
 

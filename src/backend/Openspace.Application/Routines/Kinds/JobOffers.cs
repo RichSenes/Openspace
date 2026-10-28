@@ -13,10 +13,18 @@ namespace Openspace.Application.Routines.Kinds;
 /// and what the text says on Japanese and visas when the board does not. The good ones reach the chat
 /// and wait in Openspace for "interested" or "no": an offer turned down never comes back, and
 /// an offer seen once comes back only when it changes in substance, under its own link or
-/// posted again under another.
+/// posted again under another. An offer the person brings, pasted into the inbox, is judged
+/// the same way and always shown. A yes saves the offer in its own folder for the CV routines
+/// of the office, which are asked to run and make a CV for it.
 /// </summary>
-public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : IRoutineKind
+public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Abstractions.IRoutineRepository routines, RoutineRequests requests) : IRoutineKind
 {
+    /// <summary>Offers the person brings: they come from no board.</summary>
+    public const string Brought = "brought";
+
+    /// <summary>In an offer's folder, the offer itself, which the CV routine reads.</summary>
+    public const string OfferFile = "offer.md";
+
     public const string InterestedAction = "interested";
 
     /// <summary>Offers by their link.</summary>
@@ -46,7 +54,9 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
           "minSalary": 0,
           "cities": [],
           "most": 8,
-          "fit": 3
+          "fit": 3,
+          "inbox": "~/Documents/CV/inbox",
+          "offers": "~/Documents/CV/offers"
         }
         """;
 
@@ -65,6 +75,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         }
 
         var profile = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+        var brought = await BroughtAsync(context, settings, words, profile, cancellationToken).ConfigureAwait(false);
         var offers = new List<JobOffer>();
         foreach (var choice in settings.Boards)
         {
@@ -117,6 +128,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
             {
                 Japanese = listed.Japanese == JapaneseLevel.Unknown ? Level(judgement.Japanese) : listed.Japanese,
                 SponsorsVisa = listed.SponsorsVisa ?? Visa(judgement.Visa),
+                Text = judgement.Details,
             };
             var title = Short($"{offer.Title} — {offer.Company}", 280);
             await context.MeetAsync(OfferKey(offer), Fingerprint(listed), title, cancellationToken).ConfigureAwait(false);
@@ -130,7 +142,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
             }
         }
 
-        if (fresh.Count > 0 && judged == 0)
+        if (fresh.Count > 0 && judged == 0 && brought.Count == 0)
         {
             throw new InvalidOperationException("The local model could not judge any offer: they stay new for the next run.");
         }
@@ -139,21 +151,70 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         good = [.. good.OrderBy(g => CityRank(settings, g.Offer)).ThenByDescending(g => g.Judgement.Fit)];
         foreach (var (offer, judgement) in good)
         {
-            await context.ProposeAsync(
-                InterestedAction,
-                Short($"{offer.Title} — {offer.Company}, {offer.Location}", 200),
-                Short($"{Facts(offer, words)} · {judgement.Fit}/5\n\n{judgement.Why}\n\n{words.Gaps}: {judgement.Gaps}\n\n{offer.Url}\n\n{words.Ask}", 20_000),
-                new OfferPayload(OfferKey(offer), RoleKey(offer), offer.Url.ToString()),
-                cancellationToken).ConfigureAwait(false);
+            await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false);
         }
 
+        // What the person brought comes first: they asked for it.
+        good = [.. brought, .. good];
         if (good.Count == 0)
         {
             return $"No new offers for you: {kept.Count} of {offers.Count} fit your rules, {judged} new ones judged.";
         }
 
         await context.DeliverAsync(Summary(settings, words, good), null, cancellationToken).ConfigureAwait(false);
-        return $"{good.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
+        return (brought.Count > 0 ? $"{brought.Count} brought offers judged; " : string.Empty)
+            + $"{good.Count - brought.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
+    }
+
+    private static Task<Proposal> ProposeAsync(RoutineContext context, JobWords words, JobOffer offer, Judgement judgement, CancellationToken cancellationToken) =>
+        context.ProposeAsync(
+            InterestedAction,
+            Short($"{offer.Title} — {offer.Company}, {offer.Location}", 200),
+            Short($"{Facts(offer, words)} · {judgement.Fit}/5\n\n{judgement.Why}\n\n{words.Gaps}: {judgement.Gaps}\n\n{offer.Url}\n\n{words.Ask}", 20_000),
+            new OfferPayload(OfferKey(offer), RoleKey(offer), offer.Url.ToString(), offer.Title, offer.Company, offer.Location, Facts(offer, JobWords.For("English")), offer.Text ?? string.Empty),
+            cancellationToken);
+
+    /// <summary>
+    /// The offers the person pasted into the inbox, each judged and shown whatever the rules: the
+    /// model also reads its title, company and place. A file judged leaves the inbox; one the
+    /// model could not judge stays for the next run.
+    /// </summary>
+    private async Task<List<(JobOffer Offer, Judgement Judgement)>> BroughtAsync(
+        RoutineContext context, JobSettings settings, JobWords words, string profile, CancellationToken cancellationToken)
+    {
+        var inbox = MorningPaper.Expand(settings.Inbox);
+        var files = Directory.Exists(inbox)
+            ? Directory.GetFiles(inbox).Where(f => f.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).ToList()
+            : [];
+        var judged = new List<(JobOffer, Judgement)>();
+        foreach (var (file, i) in files.Select((f, i) => (f, i)))
+        {
+            context.Progress($"Measuring the offer you brought, {i + 1} of {files.Count}");
+            var (link, text) = OfferInbox.Read(await File.ReadAllTextAsync(file, cancellationToken).ConfigureAwait(false));
+            var listed = new JobOffer(
+                Brought, link ?? new Uri($"https://brought.invalid/{RoutineContext.Fingerprint(text)}"), string.Empty, string.Empty, string.Empty,
+                JapaneseLevel.Unknown, null, null, null, null, string.Empty, string.Empty, [], context.Now, Text: text);
+            if (await JudgeAsync(context, settings, profile, listed, cancellationToken).ConfigureAwait(false) is not { } judgement)
+            {
+                continue;
+            }
+
+            var offer = listed with
+            {
+                Title = Short(judgement.Title?.Trim() is { Length: > 0 } named ? named : words.Untitled, 200),
+                Company = Short(judgement.Company?.Trim() is { Length: > 0 } company ? company : "?", 120),
+                Location = Short(judgement.Location?.Trim() is { Length: > 0 } place ? place : "?", 120),
+                Japanese = Level(judgement.Japanese),
+                SponsorsVisa = Visa(judgement.Visa),
+            };
+            await context.MeetAsync(OfferKey(offer), RoutineContext.Fingerprint(text), Short($"{offer.Title} — {offer.Company}", 280), cancellationToken).ConfigureAwait(false);
+            await context.MarkAsync(OfferKey(offer), SeenState.Shown, cancellationToken).ConfigureAwait(false);
+            await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false);
+            File.Delete(file);
+            judged.Add((offer, judgement));
+        }
+
+        return judged;
     }
 
     public async Task<string> CarryOutAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken)
@@ -163,7 +224,21 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         var payload = Payload(proposal);
         await context.MarkAsync(payload.OfferKey, SeenState.Taken, cancellationToken).ConfigureAwait(false);
         await context.MarkAsync(payload.RoleKey, SeenState.Taken, cancellationToken).ConfigureAwait(false);
-        return $"Noted as interesting: {payload.Url}";
+
+        // The offer in its own folder, where the CV routines make a CV for it.
+        var folder = Path.Combine(MorningPaper.Expand(JobSettings.Read(context.Settings).Offers), FolderName(payload.Company, payload.Title));
+        Directory.CreateDirectory(folder);
+        await File.WriteAllTextAsync(
+            Path.Combine(folder, OfferFile),
+            $"# {payload.Title}\n\nCompany: {payload.Company}\nPlace: {payload.Location}\nLink: {payload.Url}\nFacts: {payload.Facts}\n\n{payload.Text}\n",
+            cancellationToken).ConfigureAwait(false);
+        var makers = (await routines.ListAsync(context.Routine.OfficeId, cancellationToken).ConfigureAwait(false)).Where(r => r.Kind == CvMaker.KindKey).ToList();
+        foreach (var maker in makers)
+        {
+            requests.Ask(maker.Id);
+        }
+
+        return $"Noted as interesting and saved in {folder}" + (makers.Count > 0 ? ": its CV is on the way." : ". Add a CV routine to this office to have a CV made for it.");
     }
 
     public async Task RejectedAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken)
@@ -190,6 +265,14 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
             && (!settings.Visa || (offer.SponsorsVisa != false && offer.FromAbroad != false))
             && offer.Japanese <= settings.JapaneseUpTo
             && (settings.MinSalary <= 0 || offer.SalaryMax is not { } top || top >= settings.MinSalary);
+    }
+
+    /// <summary>"acme-senior-net-developer": the offer's folder, readable and short.</summary>
+    public static string FolderName(string company, string title)
+    {
+        var words = string.Join('-', $"{company} {title}".ToLowerInvariant().Split(Separators, StringSplitOptions.RemoveEmptyEntries));
+        words = words.Length <= 80 ? words : words[..80].TrimEnd('-');
+        return words.Length > 0 ? words : "offer";
     }
 
     /// <summary>"Internship - Research Engineer", "Software Engineer Intern": not a job to move for.</summary>
@@ -238,8 +321,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
     {
         try
         {
-            var board = boards.First(b => b.Reads(offer.Board));
-            var details = await board.DetailsAsync(offer, cancellationToken).ConfigureAwait(false);
+            var brought = offer.Board == Brought;
+            var details = offer.Text ?? await boards.First(b => b.Reads(offer.Board)).DetailsAsync(offer, cancellationToken).ConfigureAwait(false);
             var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model,
@@ -250,20 +333,20 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
                     {Short(profile, 6000)}
                     """,
                     $"""
-                    A job offer.
-                    {offer.Title} at {offer.Company}, {offer.Location}. Seniority: {offer.Seniority}. Remote: {offer.Remote}. Japanese: {offer.Japanese}.
-                    Salary: {Salary(offer, JobWords.For("English"))}. Kind: {string.Join(", ", offer.Tags)}.
+                    {(brought
+                        ? "A job offer the person found and pasted: read its title, company and place from the text, as written."
+                        : $"A job offer.\n{offer.Title} at {offer.Company}, {offer.Location}. Seniority: {offer.Seniority}. Remote: {offer.Remote}. Japanese: {offer.Japanese}.\nSalary: {Salary(offer, JobWords.For("English"))}. Kind: {string.Join(", ", offer.Tags)}.")}
 
                     {Short(details, Reading)}
 
                     How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it. Then, in one or two short sentences each: why it fits, and what they would have to fill in or watch out for.
-                    Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).
+                    Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
                     """,
                     JudgementSchema, MaxTokens: 600, Temperature: 0.2),
                 cancellationToken).ConfigureAwait(false);
             var judgement = JsonSerializer.Deserialize<Judgement>(answer, JsonSerializerOptions.Web);
             return judgement is { Fit: >= 1 and <= 5 } && !string.IsNullOrWhiteSpace(judgement.Why)
-                ? judgement with { Why = Short(judgement.Why.Trim(), 600), Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 600) }
+                ? judgement with { Why = Short(judgement.Why.Trim(), 600), Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 600), Details = details }
                 : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -320,12 +403,18 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
     private const string JudgementSchema = """
         {"type":"object","properties":{"fit":{"type":"integer","minimum":1,"maximum":5},"why":{"type":"string"},"gaps":{"type":"string"},
           "japanese":{"type":"string","enum":["none","basic","conversational","business","fluent","unknown"]},
-          "visa":{"type":"string","enum":["yes","no","unknown"]}},"required":["fit","why","gaps","japanese","visa"]}
+          "visa":{"type":"string","enum":["yes","no","unknown"]},
+          "title":{"type":"string"},"company":{"type":"string"},"location":{"type":"string"}},"required":["fit","why","gaps","japanese","visa"]}
         """;
 
-    private sealed record Judgement(int Fit, string Why, string? Gaps, string? Japanese = null, string? Visa = null);
+    /// <param name="Title">Read from the text, for offers the person brings; the same for <paramref name="Company"/> and <paramref name="Location"/>.</param>
+    /// <param name="Details">The offer's text the model read, kept for its CV.</param>
+    private sealed record Judgement(
+        int Fit, string Why, string? Gaps, string? Japanese = null, string? Visa = null, string? Title = null, string? Company = null, string? Location = null,
+        string? Details = null);
 
-    private sealed record OfferPayload(string OfferKey, string RoleKey, string Url);
+    private sealed record OfferPayload(
+        string OfferKey, string RoleKey, string Url, string Title = "", string Company = "", string Location = "", string Facts = "", string Text = "");
 }
 
 /// <summary>A job offers routine's settings, read from its JSON.</summary>
@@ -337,9 +426,12 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
 /// <param name="Fit">The least fit, from 1 to 5, worth showing.</param>
 /// <param name="Boards">Where offers come from: "japan-dev", or a hiring service and company, "lever:acme".</param>
 /// <param name="Roles">Words of which a title must have one: the roles looked for; none takes every role.</param>
+/// <param name="Inbox">Where the offers the person brings wait to be judged, one file each.</param>
+/// <param name="Offers">Where an offer the person wants goes, in a folder of its own, for its CV.</param>
 public sealed record JobSettings(
     string Title, string Language, string Model, string Profile, IReadOnlyList<JobSettings.BoardChoice> Boards, IReadOnlyList<string> Roles, bool Visa,
-    JapaneseLevel JapaneseUpTo, long MinSalary, IReadOnlyList<string> Cities, int Most, int Fit)
+    JapaneseLevel JapaneseUpTo, long MinSalary, IReadOnlyList<string> Cities, int Most, int Fit,
+    string Inbox = "~/Documents/CV/inbox", string Offers = "~/Documents/CV/offers")
 {
     /// <param name="AllInJapan">Every job of the board is in Japan, whatever its place says ("Hybrid").</param>
     public sealed record BoardChoice(string Board, bool AllInJapan);
@@ -380,12 +472,15 @@ public sealed record JobSettings(
             settings.TryGetProperty("minSalary", out var s) && s.TryGetInt64(out var salary) ? Math.Max(0, salary) : 0,
             List("cities"),
             settings.TryGetProperty("most", out var m) && m.TryGetInt32(out var most) ? Math.Clamp(most, 1, 40) : 8,
-            settings.TryGetProperty("fit", out var f) && f.TryGetInt32(out var fit) ? Math.Clamp(fit, 1, 5) : 3);
+            settings.TryGetProperty("fit", out var f) && f.TryGetInt32(out var fit) ? Math.Clamp(fit, 1, 5) : 3,
+            Text("inbox", "~/Documents/CV/inbox"),
+            Text("offers", "~/Documents/CV/offers"));
     }
 }
 
 /// <summary>The message's few fixed words, in the person's language.</summary>
-internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck)
+internal sealed record JobWords(
+    Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck, string Untitled)
 {
     public static JobWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
@@ -405,7 +500,8 @@ internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, strin
         "Da colmare",
         "Ti interessa? Sì la segna tra quelle da seguire, no la scarta per sempre.",
         "In Openspace, per ognuna: «sì» se ti interessa, «no» e non torna più.",
-        "visto da verificare");
+        "visto da verificare",
+        "Offerta senza titolo");
 
     private static readonly JobWords English = new(
         n => n == 1 ? "1 new offer for you" : $"{n} new offers for you",
@@ -423,5 +519,6 @@ internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, strin
         "To fill in",
         "Interested? Yes keeps it among those to follow, no drops it for good.",
         "In Openspace, for each: yes if it interests you, no and it never comes back.",
-        "visa to check");
+        "visa to check",
+        "Untitled offer");
 }

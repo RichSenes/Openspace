@@ -122,7 +122,7 @@ public sealed class JapanDevBoardTests
         using var http = new HttpClient(new Pages(new() { ["/jobs/acme/acme-dotnet-a1"] = page, ["/jobs"] = ListPage() }));
         var board = new JapanDevBoard(http);
 
-        var offers = await board.LatestAsync(default);
+        var offers = await board.LatestAsync("japan-dev", default);
         var text = await board.DetailsAsync(offers[0], default);
 
         Assert.Equal(2, offers.Count);

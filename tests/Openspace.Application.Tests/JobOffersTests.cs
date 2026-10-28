@@ -21,11 +21,11 @@ public sealed class JobOffersTests : IDisposable
 
     private JobOffers Kind() => new([_board], _chat);
 
-    private Routine Create(string language = "English", string profile = "", int most = 8)
+    private Routine Create(string language = "English", string profile = "", int most = 8, string boards = "\"made-up\"")
     {
         var settings = $$"""
             {"title":"Offers","language":"{{language}}","channel":"CAREER","profile":{{JsonSerializer.Serialize(profile.Length > 0 ? profile : _profile)}},
-             "boards":["made-up"],"visa":true,"japaneseUpTo":"conversational","minSalary":4500000,"cities":["Kyoto","Osaka"],"most":{{most}},"fit":3}
+             "boards":[{{boards}}],"visa":true,"japaneseUpTo":"conversational","minSalary":4500000,"cities":["Kyoto","Osaka"],"most":{{most}},"fit":3}
             """;
         var routine = Routine.Create(_h.Office, "Offers", "job-offers", RoutineSchedule.Daily(new TimeOnly(8, 0)), settings, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
         _h.Routines.Add(routine);
@@ -209,11 +209,56 @@ public sealed class JobOffersTests : IDisposable
         Assert.Contains("No profile at /nowhere/profile.md", run.Summary, StringComparison.Ordinal);
     }
 
+    /// <summary>A company board, as its reader gives offers: Japanese and visas only in the text.</summary>
+    private static JobOffer Posting(string slug, string title, string text, string place = "Hybrid") =>
+        new("lever:acme", new Uri($"https://jobs.example/acme/{slug}"), "Acme", title, place,
+            JapanPlaces.WrittenInJapanese(title) ? JapaneseLevel.Business : JapaneseLevel.Unknown, null, null, null, null,
+            "", "hybrid", [], Harness.Start.AddHours(-1), InJapan: JapanPlaces.Mentions(place), Text: text);
+
+    [Fact]
+    public async Task On_a_company_board_the_text_says_the_japanese_and_the_visa_and_the_rules_hold_for_them_too()
+    {
+        var routine = Create(boards: "{\"board\":\"lever:acme\",\"allInJapan\":true}");
+        _board.Company.AddRange([
+            Posting("a", "Frontend Engineer", "We sponsor visas. React and TypeScript."),
+            Posting("b", "Backend Engineer", "Go and Kubernetes."),
+            Posting("c", "Full Stack Engineer", "No visa support. Vue."),
+            Posting("d", "Mobile Engineer", "You need fluent Japanese."),
+            Posting("e", "Account Executive", "Sell our product."),
+            Posting("f", "Backend エンジニア開発チーム", "日本語のみ。"),
+        ]);
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal("2 new offers for you, of 4 judged; 4 of 6 fit your rules.", run.Summary);
+        var text = _h.Outbox.Sent.Single().Text;
+        Assert.Contains("Frontend Engineer — Acme (Hybrid)\nsalary not stated · Japanese not required · visa sponsored · 4/5", text, StringComparison.Ordinal);
+        Assert.Contains("Backend Engineer — Acme (Hybrid)\nsalary not stated · Japanese not required · visa to check · 4/5", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Full Stack", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mobile", text, StringComparison.Ordinal);
+        Assert.Contains("We sponsor visas. React and TypeScript.", _chat.Asked.First(a => a.Contains("Frontend", StringComparison.Ordinal)), StringComparison.Ordinal);
+        Assert.Equal(SeenState.Skipped, _h.Routines.Seen.Single(s => s.Key == "role:acme|full-stack-engineer").State);
+    }
+
+    [Fact]
+    public async Task Offers_outside_japan_and_boards_it_cannot_read_are_left_out()
+    {
+        var routine = Create(boards: "\"lever:acme\",\"teapot:acme\"");
+        _board.Company.AddRange([Posting("a", "Frontend Engineer", "We sponsor visas.", place: "London, UK"), Posting("b", "Backend Engineer", "We sponsor visas.", place: "Tokyo, Japan")]);
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal("1 new offers for you, of 1 judged; 1 of 2 fit your rules.", run.Summary);
+        Assert.Contains("No reader for the board teapot:acme", run.Log, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(JapaneseLevel.Conversational, true, true, 5_000_000L, true)]
     [InlineData(JapaneseLevel.Business, true, true, 5_000_000L, false)]
     [InlineData(JapaneseLevel.Unknown, true, null, null, true)]
-    [InlineData(JapaneseLevel.None, null, true, 9_000_000L, false)]
+    [InlineData(JapaneseLevel.None, null, true, 9_000_000L, true)]
+    [InlineData(JapaneseLevel.None, false, true, 9_000_000L, false)]
+    [InlineData(JapaneseLevel.None, true, false, 9_000_000L, false)]
     [InlineData(JapaneseLevel.None, true, true, 4_000_000L, false)]
     public void The_rules_ask_for_a_visa_little_japanese_and_enough_pay(JapaneseLevel japanese, bool? visa, bool? abroad, long? max, bool passes)
     {
@@ -227,13 +272,15 @@ public sealed class JobOffersTests : IDisposable
     {
         public List<JobOffer> Offers { get; } = [];
 
-        public string Key => "made-up";
+        /// <summary>A second board, of a company whose places say nothing ("Hybrid").</summary>
+        public List<JobOffer> Company { get; } = [];
 
-        public string Name => "Made-up board";
+        public bool Reads(string board) => board is "made-up" or "lever:acme";
 
-        public Task<IReadOnlyList<JobOffer>> LatestAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<JobOffer>>([.. Offers]);
+        public Task<IReadOnlyList<JobOffer>> LatestAsync(string board, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<JobOffer>>(board == "made-up" ? [.. Offers] : [.. Company]);
 
-        public Task<string> DetailsAsync(JobOffer offer, CancellationToken cancellationToken) => Task.FromResult($"Details of {offer.Title}.");
+        public Task<string> DetailsAsync(JobOffer offer, CancellationToken cancellationToken) => Task.FromResult(offer.Text ?? $"Details of {offer.Title}.");
     }
 
     /// <summary>Sales jobs fit poorly; .NET ones best; the rest well.</summary>
@@ -256,7 +303,9 @@ public sealed class JobOffersTests : IDisposable
             Systems.Add(ask.System);
             var title = ask.User.Split('\n')[1].Split(" at ")[0];
             var fit = title.Contains("Sales", StringComparison.Ordinal) ? 1 : title.Contains(".NET", StringComparison.Ordinal) ? 5 : 4;
-            return Task.FromResult(JsonSerializer.Serialize(new { fit, why = $"It fits {title}.", gaps = "Some Japanese helps." }));
+            var japanese = ask.User.Contains("Japanese: Unknown", StringComparison.Ordinal) && ask.User.Contains("fluent Japanese", StringComparison.Ordinal) ? "business" : "none";
+            var visa = ask.User.Contains("We sponsor visas.", StringComparison.Ordinal) ? "yes" : ask.User.Contains("No visa support.", StringComparison.Ordinal) ? "no" : "unknown";
+            return Task.FromResult(JsonSerializer.Serialize(new { fit, why = $"It fits {title}.", gaps = "Some Japanese helps.", japanese, visa }));
         }
     }
 }

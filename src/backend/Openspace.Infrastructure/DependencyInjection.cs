@@ -101,6 +101,11 @@ public static class DependencyInjection
             http.Timeout = TimeSpan.FromSeconds(30);
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
         });
+        services.AddHttpClient<IJobBoard, Routines.CompanyBoards>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(60);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
+        });
         services.AddHttpClient(Routines.FirefoxPdfPrinter.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(3));
         services.AddSingleton<IPdfPrinter, Routines.FirefoxPdfPrinter>();
 

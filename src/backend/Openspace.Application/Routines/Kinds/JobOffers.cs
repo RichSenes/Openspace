@@ -8,8 +8,9 @@ namespace Openspace.Application.Routines.Kinds;
 
 /// <summary>
 /// Job offers of the day, measured against the person's profile. The boards' newest offers
-/// pass the person's own rules first (visa, Japanese, salary); a local model then reads each
-/// new one with the profile and says how well it fits and why. The good ones reach the chat
+/// pass the person's own rules first (in Japan, a role they look for, visa, Japanese, salary);
+/// a local model then reads each new one with the profile and says how well it fits and why,
+/// and what the text says on Japanese and visas when the board does not. The good ones reach the chat
 /// and wait in Openspace for "interested" or "no": an offer turned down never comes back, and
 /// an offer seen once comes back only when it changes in substance, under its own link or
 /// posted again under another.
@@ -39,6 +40,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
           "model": "local/gemma",
           "profile": "~/Documents/CV/profile.md",
           "boards": ["japan-dev"],
+          "roles": ["developer", "engineer", "programmer", "frontend", "front-end", "backend", "back-end", "full stack", "full-stack", "fullstack", "software", "エンジニア"],
           "visa": true,
           "japaneseUpTo": "conversational",
           "minSalary": 0,
@@ -64,16 +66,23 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
 
         var profile = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
         var offers = new List<JobOffer>();
-        foreach (var board in boards.Where(b => settings.Boards.Contains(b.Key, StringComparer.OrdinalIgnoreCase)))
+        foreach (var choice in settings.Boards)
         {
-            context.Progress($"Reading {board.Name}");
+            if (boards.FirstOrDefault(b => b.Reads(choice.Board)) is not { } board)
+            {
+                context.Write($"No reader for the board {choice.Board}: write it as \"japan-dev\" or as service and company, \"lever:acme\".");
+                continue;
+            }
+
+            context.Progress($"Reading {choice.Board}");
             try
             {
-                offers.AddRange(await board.LatestAsync(cancellationToken).ConfigureAwait(false));
+                var found = await board.LatestAsync(choice.Board, cancellationToken).ConfigureAwait(false);
+                offers.AddRange(choice.AllInJapan ? found.Select(o => o with { InJapan = true }) : found);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
-                context.Write($"{board.Name} could not be read ({ex.Message}).");
+                context.Write($"{choice.Board} could not be read ({ex.Message}).");
             }
         }
 
@@ -93,19 +102,26 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
 
         var good = new List<(JobOffer Offer, Judgement Judgement)>();
         var judged = 0;
-        foreach (var (offer, i) in fresh.Select((o, i) => (o, i)))
+        foreach (var (listed, i) in fresh.Select((o, i) => (o, i)))
         {
             context.Progress($"Measuring offer {i + 1} of {fresh.Count} against your profile");
-            if (await JudgeAsync(context, settings, profile, offer, cancellationToken).ConfigureAwait(false) is not { } judgement)
+            if (await JudgeAsync(context, settings, profile, listed, cancellationToken).ConfigureAwait(false) is not { } judgement)
             {
                 continue;
             }
 
             judged++;
+
+            // What the board did not say, the text may: the rules hold for it too.
+            var offer = listed with
+            {
+                Japanese = listed.Japanese == JapaneseLevel.Unknown ? Level(judgement.Japanese) : listed.Japanese,
+                SponsorsVisa = listed.SponsorsVisa ?? Visa(judgement.Visa),
+            };
             var title = Short($"{offer.Title} — {offer.Company}", 280);
-            await context.MeetAsync(OfferKey(offer), Fingerprint(offer), title, cancellationToken).ConfigureAwait(false);
-            await context.MeetAsync(RoleKey(offer), Fingerprint(offer), title, cancellationToken).ConfigureAwait(false);
-            var state = judgement.Fit >= settings.Fit ? SeenState.Shown : SeenState.Skipped;
+            await context.MeetAsync(OfferKey(offer), Fingerprint(listed), title, cancellationToken).ConfigureAwait(false);
+            await context.MeetAsync(RoleKey(offer), Fingerprint(listed), title, cancellationToken).ConfigureAwait(false);
+            var state = judgement.Fit >= settings.Fit && Passes(settings, offer) ? SeenState.Shown : SeenState.Skipped;
             await context.MarkAsync(OfferKey(offer), state, cancellationToken).ConfigureAwait(false);
             await context.MarkAsync(RoleKey(offer), state, cancellationToken).ConfigureAwait(false);
             if (state == SeenState.Shown)
@@ -159,15 +175,31 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         await context.MarkAsync(payload.RoleKey, SeenState.Dismissed, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The person's own rules: a visa when they need one, no more Japanese than they allow, not paid less than they ask.</summary>
+    /// <summary>
+    /// The person's own rules: in Japan, a role they look for, a visa when they need one, no more
+    /// Japanese than they allow, not paid less than they ask. What is not known yet does not count
+    /// against an offer: the local model reads it, and the rules are asked again.
+    /// </summary>
     public static bool Passes(JobSettings settings, JobOffer offer)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(offer);
-        return (!settings.Visa || (offer.SponsorsVisa == true && offer.FromAbroad != false))
+        return offer.InJapan
+            && (settings.Roles.Count == 0 || settings.Roles.Any(r => offer.Title.Contains(r, StringComparison.OrdinalIgnoreCase)))
+            && (!settings.Visa || (offer.SponsorsVisa != false && offer.FromAbroad != false))
             && offer.Japanese <= settings.JapaneseUpTo
             && (settings.MinSalary <= 0 || offer.SalaryMax is not { } top || top >= settings.MinSalary);
     }
+
+    private static JapaneseLevel Level(string? said) =>
+        Enum.TryParse<JapaneseLevel>(said, ignoreCase: true, out var level) ? level : JapaneseLevel.Unknown;
+
+    private static bool? Visa(string? said) => said?.Trim().ToUpperInvariant() switch
+    {
+        "YES" => true,
+        "NO" => false,
+        _ => null,
+    };
 
     /// <summary>The link without what changes nothing: "https://board.example/jobs/acme/dev".</summary>
     public static string OfferKey(JobOffer offer)
@@ -200,7 +232,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
     {
         try
         {
-            var board = boards.First(b => b.Key == offer.Board);
+            var board = boards.First(b => b.Reads(offer.Board));
             var details = await board.DetailsAsync(offer, cancellationToken).ConfigureAwait(false);
             var answer = await chat.AskAsync(context,
                 new LocalAsk(
@@ -219,6 +251,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
                     {Short(details, Reading)}
 
                     How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it. Then, in one or two short sentences each: why it fits, and what they would have to fill in or watch out for.
+                    Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).
                     """,
                     JudgementSchema, MaxTokens: 600, Temperature: 0.2),
                 cancellationToken).ConfigureAwait(false);
@@ -254,9 +287,9 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
         return text.ToString();
     }
 
-    /// <summary>"¥7–10M · Japanese not required · visa sponsored".</summary>
+    /// <summary>"¥7–10M · Japanese not required · visa sponsored", or "visa to check" when nothing says.</summary>
     private static string Facts(JobOffer offer, JobWords words) =>
-        $"{Salary(offer, words)} · {words.Japanese(offer.Japanese)}{(offer.SponsorsVisa == true ? $" · {words.Visa}" : string.Empty)}";
+        $"{Salary(offer, words)} · {words.Japanese(offer.Japanese)} · {(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}";
 
     private static string Salary(JobOffer offer, JobWords words)
     {
@@ -279,10 +312,12 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
     private static readonly char[] Separators = [.. Enumerable.Range(0, 128).Select(i => (char)i).Where(c => !char.IsLetterOrDigit(c))];
 
     private const string JudgementSchema = """
-        {"type":"object","properties":{"fit":{"type":"integer","minimum":1,"maximum":5},"why":{"type":"string"},"gaps":{"type":"string"}},"required":["fit","why","gaps"]}
+        {"type":"object","properties":{"fit":{"type":"integer","minimum":1,"maximum":5},"why":{"type":"string"},"gaps":{"type":"string"},
+          "japanese":{"type":"string","enum":["none","basic","conversational","business","fluent","unknown"]},
+          "visa":{"type":"string","enum":["yes","no","unknown"]}},"required":["fit","why","gaps","japanese","visa"]}
         """;
 
-    private sealed record Judgement(int Fit, string Why, string? Gaps);
+    private sealed record Judgement(int Fit, string Why, string? Gaps, string? Japanese = null, string? Visa = null);
 
     private sealed record OfferPayload(string OfferKey, string RoleKey, string Url);
 }
@@ -294,10 +329,18 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat) : 
 /// <param name="Cities">Preferred cities, the dearest first: their offers come first.</param>
 /// <param name="Most">New offers judged per run at most; the rest wait for the next.</param>
 /// <param name="Fit">The least fit, from 1 to 5, worth showing.</param>
+/// <param name="Boards">Where offers come from: "japan-dev", or a hiring service and company, "lever:acme".</param>
+/// <param name="Roles">Words of which a title must have one: the roles looked for; none takes every role.</param>
 public sealed record JobSettings(
-    string Title, string Language, string Model, string Profile, IReadOnlyList<string> Boards, bool Visa, JapaneseLevel JapaneseUpTo,
-    long MinSalary, IReadOnlyList<string> Cities, int Most, int Fit)
+    string Title, string Language, string Model, string Profile, IReadOnlyList<JobSettings.BoardChoice> Boards, IReadOnlyList<string> Roles, bool Visa,
+    JapaneseLevel JapaneseUpTo, long MinSalary, IReadOnlyList<string> Cities, int Most, int Fit)
 {
+    /// <param name="AllInJapan">Every job of the board is in Japan, whatever its place says ("Hybrid").</param>
+    public sealed record BoardChoice(string Board, bool AllInJapan);
+
+    private static readonly string[] DefaultRoles =
+        ["developer", "engineer", "programmer", "frontend", "front-end", "backend", "back-end", "full stack", "full-stack", "fullstack", "software", "エンジニア"];
+
     public static JobSettings Read(JsonElement settings)
     {
         string Text(string name, string fallback) =>
@@ -307,10 +350,25 @@ public sealed record JobSettings(
                 ? [.. v.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(x.GetString())).Select(x => x.GetString()!.Trim())]
                 : [];
 
-        var boards = List("boards");
+        // A board is a name, "lever:acme", or an object saying so: { "board": "greenhouse:acme", "allInJapan": true }.
+        var boards = settings.TryGetProperty("boards", out var b) && b.ValueKind == JsonValueKind.Array
+            ? b.EnumerateArray()
+                .Select(x => x.ValueKind switch
+                {
+                    JsonValueKind.String => new BoardChoice(x.GetString()!.Trim(), false),
+                    JsonValueKind.Object when x.TryGetProperty("board", out var name) && name.ValueKind == JsonValueKind.String =>
+                        new BoardChoice(name.GetString()!.Trim(), x.TryGetProperty("allInJapan", out var all) && all.ValueKind == JsonValueKind.True),
+                    _ => null,
+                })
+                .OfType<BoardChoice>()
+                .Where(c => c.Board.Length > 0)
+                .DistinctBy(c => c.Board, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+            : [];
         return new JobSettings(
             Text("title", "Job offers"), Text("language", "English"), Text("model", "local/gemma"), Text("profile", "~/Documents/CV/profile.md"),
-            boards.Count > 0 ? boards : ["japan-dev"],
+            boards.Count > 0 ? boards : [new BoardChoice("japan-dev", false)],
+            settings.TryGetProperty("roles", out var r) && r.ValueKind == JsonValueKind.Array ? List("roles") : DefaultRoles,
             !settings.TryGetProperty("visa", out var visa) || visa.ValueKind != JsonValueKind.False,
             Enum.TryParse<JapaneseLevel>(Text("japaneseUpTo", "Conversational"), ignoreCase: true, out var level) && level != JapaneseLevel.Unknown ? level : JapaneseLevel.Conversational,
             settings.TryGetProperty("minSalary", out var s) && s.TryGetInt64(out var salary) ? Math.Max(0, salary) : 0,
@@ -321,7 +379,7 @@ public sealed record JobSettings(
 }
 
 /// <summary>The message's few fixed words, in the person's language.</summary>
-internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide)
+internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck)
 {
     public static JobWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
@@ -340,7 +398,8 @@ internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, strin
         "stipendio non indicato",
         "Da colmare",
         "Ti interessa? Sì la segna tra quelle da seguire, no la scarta per sempre.",
-        "In Openspace, per ognuna: «sì» se ti interessa, «no» e non torna più.");
+        "In Openspace, per ognuna: «sì» se ti interessa, «no» e non torna più.",
+        "visto da verificare");
 
     private static readonly JobWords English = new(
         n => n == 1 ? "1 new offer for you" : $"{n} new offers for you",
@@ -357,5 +416,6 @@ internal sealed record JobWords(Func<int, string> New, Func<JapaneseLevel, strin
         "salary not stated",
         "To fill in",
         "Interested? Yes keeps it among those to follow, no drops it for good.",
-        "In Openspace, for each: yes if it interests you, no and it never comes back.");
+        "In Openspace, for each: yes if it interests you, no and it never comes back.",
+        "visa to check");
 }

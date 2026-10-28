@@ -21,11 +21,11 @@ internal sealed partial class JapanDevBoard(HttpClient http) : IJobBoard
     /// <summary>Of each offer's text, what routines read at most.</summary>
     private const int MostText = 8000;
 
-    public string Key => "japan-dev";
+    public const string Key = "japan-dev";
 
-    public string Name => "Japan Dev";
+    public bool Reads(string board) => string.Equals(board, Key, StringComparison.OrdinalIgnoreCase);
 
-    public async Task<IReadOnlyList<JobOffer>> LatestAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<JobOffer>> LatestAsync(string board, CancellationToken cancellationToken)
     {
         var html = await http.GetStringAsync(new Uri(Home, "jobs"), cancellationToken).ConfigureAwait(false);
         return Offers(html);
@@ -162,7 +162,7 @@ internal sealed partial class JapanDevBoard(HttpClient http) : IJobBoard
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         return new JobOffer(
-            "japan-dev",
+            Key,
             new Uri(Home, $"jobs/{Uri.EscapeDataString(company)}/{Uri.EscapeDataString(slug)}"),
             Text("company_name") is { Length: > 0 } name ? name : company,
             Text("title"),

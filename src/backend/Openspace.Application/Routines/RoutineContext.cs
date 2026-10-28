@@ -110,6 +110,14 @@ public sealed class RoutineContext(
         return true;
     }
 
+    /// <summary>
+    /// Whether meeting it would give it a look, without meeting it: for a routine that looks first
+    /// and meets only what it could judge, so nothing is lost when judging fails.
+    /// </summary>
+    public async Task<bool> IsNewAsync(string key, string fingerprint, CancellationToken cancellationToken) =>
+        await SeenAsync(key, cancellationToken).ConfigureAwait(false) is not { } seen
+        || (seen.State != SeenState.Dismissed && !string.Equals(seen.Fingerprint, fingerprint, StringComparison.Ordinal));
+
     /// <summary>Says what became of something met: shown, skipped, dismissed or taken up.</summary>
     public async Task MarkAsync(string key, SeenState state, CancellationToken cancellationToken)
     {

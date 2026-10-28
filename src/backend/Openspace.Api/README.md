@@ -303,6 +303,21 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   recap is about the week to come. The local model opens it with two sentences on
   what the week looks like, or it goes without them. It only reads; without
   `account` it leaves the agenda out.
+- **Job offers** (`job-offers`): the newest offers of the `boards` (`japan-dev`:
+  Japan Dev, read through its public list page and each offer's schema.org
+  posting, honestly identified; boards that turn automatic readers away are left
+  out). Offers first pass the person's rules: with `visa`, only those that sponsor
+  one and take people from abroad; no more Japanese than `japaneseUpTo`
+  (`none`, `basic`, `conversational`, `business`, `fluent`); a stated top salary
+  not under `minSalary` (yen a year). Then the local model reads each new one with
+  the person's `profile` (a text file on this computer, never in the repository)
+  and gives it a fit from 1 to 5 with why and what to fill in; from `fit` (3) up
+  they reach `channel` in `language`, the `cities` first in their order, and wait
+  in Openspace for yes (followed) or no (never again). An offer is known by its
+  link and by company and title, so one posted again under another link does not
+  come back; it comes back only when it changes in substance, unless turned down.
+  `most` (8) new offers are judged per run, the newest first; when the model
+  cannot judge any, the run fails and they stay new.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

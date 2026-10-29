@@ -65,7 +65,9 @@ Each project has its own README with detailed specifications.
    all at once from the Merge desk, in the order it was accepted. Your checkout
    never moves, and nothing is touched if you have uncommitted changes. Work
    that conflicts goes back to its agent, which resolves the conflict in its own
-   working copy; accept it again and it merges cleanly.
+   working copy; accept it again and it merges cleanly. The same desk brings a
+   whole branch into another (beta into main, say), moving it forward when it
+   can, with the same safety, and pushes any branch even with no task waiting.
    After merging, each room's check command (`dotnet test`, `npm test`…) runs
    on the merged branch in a throwaway copy, and says what broke. From there you
    push the branch, never forced, or open a GitHub pull request for a task

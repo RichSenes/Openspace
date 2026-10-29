@@ -54,6 +54,13 @@ public interface IWorkspaceManager
         string repositoryPath, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Brings one of your branches into another (say beta into main), moving it forward when it
+    /// can and with a merge commit otherwise; the source stays. Same safety as a task's merge:
+    /// your checkout never moves, uncommitted changes or conflicts change nothing.
+    /// </summary>
+    Task<BranchMerge> MergeBranchAsync(string repositoryPath, string sourceBranch, string targetBranch, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Opens the task's working copy again on its branch and starts merging
     /// <paramref name="targetBranch"/> into it, leaving any conflicts marked in the files for
     /// the agent. Returns the files in conflict.
@@ -84,4 +91,17 @@ public interface IWorkspaceManager
 
     /// <summary>Removes the working copy and its branch.</summary>
     Task DiscardAsync(string repositoryPath, Workspace workspace, CancellationToken cancellationToken);
+}
+
+/// <summary>What bringing a branch into another did.</summary>
+public enum BranchMerge
+{
+    /// <summary>The target already had all of it.</summary>
+    UpToDate,
+
+    /// <summary>The target only moved forward: no merge commit.</summary>
+    FastForward,
+
+    /// <summary>Both had their own work: a merge commit joins them.</summary>
+    Merged,
 }

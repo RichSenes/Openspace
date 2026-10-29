@@ -204,6 +204,23 @@ public sealed class WorkTaskCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Brings one of your branches into another, such as beta into main; the source stays.</summary>
+    public async Task<BranchMerge> MergeBranchAsync(OfficeId officeId, string sourceBranch, string targetBranch, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        if (office.RepositoryPath is null)
+        {
+            throw new RejectedException("no-repository", $"Office '{office.Name}' has no repository yet: set it in Rooms first.");
+        }
+
+        if (string.IsNullOrWhiteSpace(sourceBranch) || string.IsNullOrWhiteSpace(targetBranch))
+        {
+            throw new RejectedException("branch-missing", "Choose both branches.");
+        }
+
+        return await workspaces.MergeBranchAsync(office.RepositoryPath, sourceBranch.Trim(), targetBranch.Trim(), cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Sends one of your branches to its remote: only when you ask, never forced.</summary>
     public async Task<string> PushAsync(OfficeId officeId, string branch, CancellationToken cancellationToken)
     {

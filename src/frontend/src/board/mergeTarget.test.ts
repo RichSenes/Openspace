@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
+import { defaultMergeSource, defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
 
 describe('defaultMergeTarget', () => {
   it('prefers the branch you have checked out', () => {
@@ -14,6 +14,18 @@ describe('defaultMergeTarget', () => {
     expect(defaultMergeTarget({ current: null, branches: ['release'] })).toBe('release')
     expect(defaultMergeTarget({ current: null, branches: [] })).toBe('')
     expect(defaultMergeTarget(undefined)).toBe('')
+  })
+})
+
+describe('defaultMergeSource', () => {
+  it('brings in the branch you have checked out, such as beta into main', () => {
+    expect(defaultMergeSource({ current: 'beta', branches: ['beta', 'main'] }, 'main')).toBe('beta')
+  })
+
+  it('takes the first other branch when the checked out one is the target, and nothing alone', () => {
+    expect(defaultMergeSource({ current: 'main', branches: ['beta', 'develop', 'main'] }, 'main')).toBe('beta')
+    expect(defaultMergeSource({ current: 'main', branches: ['main'] }, 'main')).toBe('')
+    expect(defaultMergeSource(undefined, 'main')).toBe('')
   })
 })
 

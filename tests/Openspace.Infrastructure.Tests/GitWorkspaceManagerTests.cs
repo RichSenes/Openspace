@@ -211,6 +211,81 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
         Assert.DoesNotContain("merge-", await Git("worktree", "list"), StringComparison.Ordinal);
     }
 
+    /// <summary>A beta branch with one commit of its own, made without leaving main.</summary>
+    private async Task BetaAheadAsync(string file = "beta.txt", string content = "beta\n")
+    {
+        await Git("branch", "beta");
+        await Git("checkout", "--quiet", "beta");
+        await File.WriteAllTextAsync(Path.Combine(Repo, file), content);
+        await Git("add", "--all");
+        await Git("commit", "--quiet", "--message", "Beta work");
+        await Git("checkout", "--quiet", "main");
+    }
+
+    [Fact]
+    public async Task A_branch_behind_another_is_moved_forward_and_the_source_stays()
+    {
+        await BetaAheadAsync();
+
+        var result = await _manager.MergeBranchAsync(Repo, "beta", "main", default);
+
+        Assert.Equal(Application.Abstractions.BranchMerge.FastForward, result);
+        Assert.Equal((await Git("rev-parse", "beta")).Trim(), (await Git("rev-parse", "main")).Trim());
+        Assert.True(File.Exists(Path.Combine(Repo, "beta.txt")));
+        Assert.Equal("beta", (await Git("branch", "--list", "beta")).Trim());
+    }
+
+    [Fact]
+    public async Task Branches_that_both_moved_are_joined_by_a_merge_commit_without_moving_your_checkout()
+    {
+        await BetaAheadAsync();
+        await File.WriteAllTextAsync(Path.Combine(Repo, "main.txt"), "main\n");
+        await Git("add", "--all");
+        await Git("commit", "--quiet", "--message", "Main work");
+        await Git("checkout", "--quiet", "beta");
+
+        var result = await _manager.MergeBranchAsync(Repo, "beta", "main", default);
+
+        Assert.Equal(Application.Abstractions.BranchMerge.Merged, result);
+        Assert.Equal("Merge beta into main", (await Git("log", "-1", "--format=%s", "main")).Trim());
+        Assert.Equal("beta", (await Git("branch", "--show-current")).Trim());
+        Assert.False(File.Exists(Path.Combine(Repo, "main.txt")));
+        Assert.DoesNotContain("merge-", await Git("worktree", "list"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_branch_already_inside_the_other_changes_nothing()
+    {
+        await Git("branch", "beta");
+        var before = (await Git("rev-parse", "main")).Trim();
+
+        Assert.Equal(Application.Abstractions.BranchMerge.UpToDate, await _manager.MergeBranchAsync(Repo, "beta", "main", default));
+        Assert.Equal(before, (await Git("rev-parse", "main")).Trim());
+    }
+
+    [Fact]
+    public async Task Branches_in_conflict_are_left_as_they_were_naming_the_files()
+    {
+        await BetaAheadAsync("index.html", "<header>beta</header>\n");
+        await File.WriteAllTextAsync(Path.Combine(Repo, "index.html"), "<header>main</header>\n");
+        await Git("commit", "--quiet", "--all", "--message", "Main header");
+        var before = (await Git("rev-parse", "main")).Trim();
+
+        var error = await Assert.ThrowsAsync<Application.RejectedException>(() => _manager.MergeBranchAsync(Repo, "beta", "main", default));
+
+        Assert.Equal("merge-conflict", error.Code);
+        Assert.StartsWith("beta and main both changed the same lines in index.html.", error.Message, StringComparison.Ordinal);
+        Assert.Equal(before, (await Git("rev-parse", "main")).Trim());
+        Assert.Equal(string.Empty, (await Git("status", "--porcelain")).Trim());
+    }
+
+    [Fact]
+    public async Task A_branch_into_itself_or_into_a_missing_one_is_refused()
+    {
+        Assert.Equal("same-branch", (await Assert.ThrowsAsync<Application.RejectedException>(() => _manager.MergeBranchAsync(Repo, "main", "main", default))).Code);
+        Assert.Equal("branch-missing", (await Assert.ThrowsAsync<Application.RejectedException>(() => _manager.MergeBranchAsync(Repo, "beta", "main", default))).Code);
+    }
+
     [Fact]
     public async Task Uncommitted_changes_in_your_branch_stop_the_merge()
     {

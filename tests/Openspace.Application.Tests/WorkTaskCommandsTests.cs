@@ -354,6 +354,20 @@ public class WorkTaskCommandsTests
     }
 
     [Fact]
+    public async Task A_branch_is_brought_into_another_only_in_an_office_with_a_repository()
+    {
+        var h = new Harness();
+
+        Assert.Equal(BranchMerge.FastForward, await h.Commands().MergeBranchAsync(h.Office.Id, " beta ", "main", default));
+        Assert.Equal(("beta", "main"), Assert.Single(h.Workspaces.BranchMerges));
+
+        var bare = new Harness(withRepository: false);
+        var error = await Assert.ThrowsAsync<RejectedException>(() => bare.Commands().MergeBranchAsync(bare.Office.Id, "beta", "main", default));
+        Assert.Equal("no-repository", error.Code);
+        Assert.Empty(bare.Workspaces.BranchMerges);
+    }
+
+    [Fact]
     public async Task Without_GitHub_signed_in_no_pull_request_is_tried()
     {
         var (h, task) = await AcceptedAsync();

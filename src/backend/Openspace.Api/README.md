@@ -361,10 +361,13 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   work too), or run by hand, it sends everything through `channel` and a PDF of
   the full list saved in `folder`; on other days it speaks only when a new
   vulnerability shows up, so it can be scheduled every morning. For a project of an
-  office it proposes there, once per set, a task that brings the vulnerable
-  packages to their fix and the others to their latest without a major version
-  change (`tasks`); a proposed task can be dropped, so it goes on its own unless
-  the routine asks first. It never updates anything itself.
+  office it hands the office's supervisor, once per set, the list that brings the
+  vulnerable packages to their fix and the others to their latest without a major
+  version change, each with the dependency files that bring it in (`tasks`): the
+  supervisor splits it by part of the project (a site, an app) into proposed tasks
+  for the desks that work on them, and when it cannot (no desks, no plan) a single
+  task is proposed instead. The proposal can be dropped, so it goes on its own
+  unless the routine asks first. It never updates anything itself.
 
 Google accounts are connected in Settings with the person's own OAuth client: a
 desktop app in their Google Cloud project, with the Gmail, Calendar and Tasks APIs,

@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Routines;
 using Openspace.Application.Routines.Kinds;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Routines;
 using Openspace.Domain.Work;
 
@@ -56,7 +58,7 @@ public sealed class MaintenanceTests : IDisposable
 
     private string Reports => Path.Combine(_root, "reports");
 
-    private Maintenance Kind() => new(_reader, _advisories, _registry, _tools, _system, _states, _backups, _h.Offices, _h.Tasks, new FakePrinter());
+    private Maintenance Kind() => new(_reader, _advisories, _registry, _tools, _system, _states, _backups, _h.Offices, _h.Tasks, _h.Supervisor(), new FakePrinter());
 
     private Routine Create(bool askFirst = false, string extra = "")
     {
@@ -111,7 +113,7 @@ public sealed class MaintenanceTests : IDisposable
             E Corp
             • Example.Json 4.0.0 → no fix yet · CRITICAL · GHSA-bbbb: Deserialization runs code (indirect)
             • left-pad 1.0.0 → 1.0.2 · HIGH · CVE-2015-0001: Padding overflows the buffer
-            I proposed a task in the E Corp office to update them.
+            I handed the updates to the supervisor of the E Corp office, who splits them among the desks.
 
             Tools
             • .NET SDK 10.0.402 → 10.0.403 · security
@@ -135,7 +137,7 @@ public sealed class MaintenanceTests : IDisposable
         Assert.Equal(Path.Combine(Reports, "Upkeep-2015-06-24.pdf"), _h.Outbox.Sent[1].File);
         Assert.True(File.Exists(_h.Outbox.Sent[1].File));
 
-        // The task waits in the office for a desk: the vulnerable package to its fix, the minor update, never the major one.
+        // No plan from the supervisor: one task waits in the office for a desk, the vulnerable package to its fix, the minor update, never the major one.
         var task = Assert.Single(_h.Tasks.Items);
         Assert.Equal(WorkTaskStatus.Proposed, task.Status);
         Assert.Equal("Fix the vulnerable dependencies", task.Title);
@@ -174,7 +176,7 @@ public sealed class MaintenanceTests : IDisposable
             Upkeep · new vulnerabilities · 27 June
             E Corp
             • tiny-router 2.1.0 → 2.1.5 · MODERATE · CVE-2015-0002: Routes leak headers
-            I proposed a task in the E Corp office to update them.
+            I handed the updates to the supervisor of the E Corp office, who splits them among the desks.
             """.ReplaceLineEndings("\n"),
             Assert.Single(_h.Outbox.Sent).Text);
         Assert.Equal(2, _h.Tasks.Items.Count);
@@ -255,6 +257,47 @@ public sealed class MaintenanceTests : IDisposable
     [InlineData("4.0.0", "4.0", 0)]
     public void Versions_are_ordered_as_package_managers_order_them(string left, string right, int expected) =>
         Assert.Equal(expected, Math.Sign(VersionOrder.Instance.Compare(left, right)));
+
+    [Fact]
+    public async Task The_supervisor_splits_the_updates_among_the_desks_of_each_part()
+    {
+        _reader.Projects[Shop].Add(new Dependency(Ecosystem.NuGet, "Example.Maps", "1.0.0", true, "app/App.csproj"));
+        _registry.Latest[(Ecosystem.NuGet, "Example.Maps")] = "1.1.0";
+        var room = _h.Office.OpenRoom("Mobile", Harness.Start);
+        var mobile = _h.Office.AddDesk(room.Id, "App", AgentProfile.Create("build"), Harness.Start);
+        _h.Runtime.Plan = JsonSerializer.Serialize(new
+        {
+            title = "Dependency updates",
+            tasks = new[]
+            {
+                new { title = "Update the site's packages", description = "left-pad and tiny-router", desk = "Frontend" },
+                new { title = "Update the app's packages", description = "Example.Maps", desk = "App" },
+            },
+        });
+
+        var run = await RunByHandAsync(Create());
+
+        Assert.Equal(RoutineRunStatus.Succeeded, run.Status);
+        var request = Assert.Single(_h.Runtime.PlanRequests).Text;
+        Assert.Contains("one task per part", request, StringComparison.Ordinal);
+        Assert.Contains("- Npm left-pad: 1.0.0 → 1.0.2 (CVE-2015-0001 (High)) — in web/package-lock.json", request, StringComparison.Ordinal);
+        Assert.Contains("- NuGet Example.Maps: 1.0.0 → 1.1.0 — in app/App.csproj", request, StringComparison.Ordinal);
+        Assert.Contains("Write titles and descriptions in English.", request, StringComparison.Ordinal);
+        Assert.Equal([_h.Desk.Id, mobile.Id], _h.Tasks.Items.Select(t => t.DeskId!.Value));
+        Assert.All(_h.Tasks.Items, t => Assert.Equal(("Routine Upkeep", WorkTaskStatus.Proposed), (t.RequestedBy, t.Status)));
+        Assert.StartsWith("The supervisor of E Corp split the updates into 2", Assert.Single(_h.Routines.Proposals).Outcome, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_brief_says_where_each_package_comes_from_without_drowning_in_files()
+    {
+        var files = Enumerable.Range(1, 6).Select(i => $"src/Part{i}/Part{i}.csproj").ToList();
+        var brief = Maintenance.Brief(new UpdatePayload("k", Guid.NewGuid(), "Shop", [],
+            [new UpdateItem("NuGet", "Example.Http", "1.1.0", "1.2.0", string.Empty, files), new UpdateItem("Npm", "tiny-router", "2.1.0", "2.4.1", string.Empty)]));
+
+        Assert.Contains("- NuGet Example.Http: 1.1.0 → 1.2.0 — in src/Part1/Part1.csproj, src/Part2/Part2.csproj, src/Part3/Part3.csproj, src/Part4/Part4.csproj and 2 more\n", brief, StringComparison.Ordinal);
+        Assert.Contains("- Npm tiny-router: 2.1.0 → 2.4.1\n", brief, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void The_brief_names_every_version_and_asks_for_the_tests()

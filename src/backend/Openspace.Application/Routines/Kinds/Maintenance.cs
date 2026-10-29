@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Openspace.Application.Abstractions;
+using Openspace.Application.Work;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Routines;
 using Openspace.Domain.Work;
@@ -15,8 +16,9 @@ namespace Openspace.Application.Routines.Kinds;
 /// SDKs, the system's packages and the work that exists only on this disk. On its report day,
 /// or when run by hand, it sends everything, with a PDF of the full list; on the other days it
 /// speaks only when a new vulnerability shows up, so it can run every morning. For a project of
-/// an office it proposes there a task that updates what is vulnerable and what moved on
-/// without breaking changes. It never updates anything itself.
+/// an office it hands its supervisor the updates of what is vulnerable and what moved on
+/// without breaking changes, to split them by part of the project among the desks. It never
+/// updates anything itself.
 /// </summary>
 public sealed class Maintenance(
     IDependencyReader dependencies,
@@ -28,12 +30,16 @@ public sealed class Maintenance(
     IDatabaseBackups backups,
     IOfficeRepository offices,
     IWorkTaskRepository tasks,
+    Supervisor supervisor,
     IPdfPrinter printer) : IRoutineKind
 {
     public const string KindKey = "maintenance";
 
-    /// <summary>The proposal that hands the updates to a project's office as a task.</summary>
+    /// <summary>The proposal that hands the updates to a project's office, through its supervisor.</summary>
     public const string UpdateAction = "update-dependencies";
+
+    /// <summary>Files named for one package in a task; a solution's many project files would drown the list.</summary>
+    private const int MaxFiles = 4;
 
     public string Key => KindKey;
 
@@ -141,11 +147,15 @@ public sealed class Maintenance(
             var vulnerable = fixes.Select(f => (f.Ecosystem, f.Name.ToUpperInvariant())).ToHashSet();
             var updates = used[project]
                 .Where(d => d.Direct && !vulnerable.Contains((d.Ecosystem, d.Name.ToUpperInvariant())))
-                .Select(d => latest.TryGetValue((d.Ecosystem, d.Name.ToUpperInvariant()), out var last) && last is not null && VersionOrder.Instance.Compare(last, d.Version) > 0
-                    ? new Update(d.Ecosystem, d.Name, d.Version, last, VersionOrder.IsMajor(d.Version, last))
-                    : null)
+                .GroupBy(d => (d.Ecosystem, Name: d.Name.ToUpperInvariant(), d.Version))
+                .Select(g =>
+                {
+                    var d = g.First();
+                    return latest.TryGetValue((d.Ecosystem, g.Key.Name), out var last) && last is not null && VersionOrder.Instance.Compare(last, d.Version) > 0
+                        ? new Update(d.Ecosystem, d.Name, d.Version, last, VersionOrder.IsMajor(d.Version, last), Files(g.Select(x => x.Manifest)))
+                        : null;
+                })
                 .OfType<Update>()
-                .DistinctBy(u => (u.Ecosystem, u.Name.ToUpperInvariant(), u.From))
                 .OrderBy(u => u.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -207,11 +217,28 @@ public sealed class Maintenance(
             ?? throw new InvalidOperationException("The proposal does not say what to update.");
         var office = await offices.FindAsync(new OfficeId(payload.OfficeId), cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The office of this project is gone.");
-        var words = MaintenanceWords.For(MaintenanceSettings.Read(context.Settings).Language);
-        var task = WorkTask.Propose(office, words.TaskTitle(payload.Fixes.Count, payload.Updates.Count), Brief(payload), Short($"Routine {context.Routine.Name}", 80), context.Now);
-        tasks.Add(task);
+        var settings = MaintenanceSettings.Read(context.Settings);
+        var words = MaintenanceWords.For(settings.Language);
+        var by = Short($"Routine {context.Routine.Name}", 80);
+
+        // A project often has parts with their own tools and desks (a site, an app): the
+        // supervisor knows the desks and splits the list. Without one, a single task.
+        string done;
+        try
+        {
+            var plan = await supervisor.PlanAsync(office.Id, Split(settings.Language) + Brief(payload), by, cancellationToken).ConfigureAwait(false);
+            done = $"The supervisor of {office.Name} split the updates into {plan.Tasks.Count} proposed tasks: approve them there.";
+        }
+        catch (RejectedException ex)
+        {
+            context.Write($"The supervisor of {office.Name} could not split the updates ({ex.Message}): one task instead.");
+            var task = WorkTask.Propose(office, words.TaskTitle(payload.Fixes.Count, payload.Updates.Count), Brief(payload), by, context.Now);
+            tasks.Add(task);
+            done = $"Proposed the task \"{task.Title}\" in {office.Name}: choose a desk there to start it.";
+        }
+
         await context.MarkAsync(payload.Key, SeenState.Taken, cancellationToken).ConfigureAwait(false);
-        return $"Proposed the task \"{task.Title}\" in {office.Name}: choose a desk there to start it.";
+        return done;
     }
 
     public async Task RejectedAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken)
@@ -312,7 +339,7 @@ public sealed class Maintenance(
                 var versions = g.Select(d => d.Dependency.Version).Distinct(StringComparer.Ordinal).Order(VersionOrder.Instance).ToList();
                 var target = found.All(a => a.Fixed is not null) ? found.Select(a => a.Fixed!).Max(VersionOrder.Instance) : null;
                 var first = g.First().Dependency;
-                return new Fix(first.Ecosystem, first.Name, string.Join(", ", versions), target, g.Any(d => d.Dependency.Direct), found);
+                return new Fix(first.Ecosystem, first.Name, string.Join(", ", versions), target, g.Any(d => d.Dependency.Direct), found, Files(g.Select(d => d.Dependency.Manifest)));
             })
             .OrderByDescending(f => f.Worst)
             .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)];
@@ -321,8 +348,8 @@ public sealed class Maintenance(
     /// <summary>Hands the project's updates to its office, once for each set of them.</summary>
     private static async Task<bool> ProposeAsync(RoutineContext context, ProjectReport report, MaintenanceWords words, CancellationToken cancellationToken)
     {
-        var fixes = report.Fixes.Where(f => f.To is not null).Select(f => new UpdateItem(f.Ecosystem.ToString(), f.Name, f.From, f.To!, string.Join(", ", f.Advisories.Select(a => $"{a.Name} ({a.Severity})")))).ToList();
-        var updates = report.Updates.Where(u => !u.Major).Select(u => new UpdateItem(u.Ecosystem.ToString(), u.Name, u.From, u.To, string.Empty)).ToList();
+        var fixes = report.Fixes.Where(f => f.To is not null).Select(f => new UpdateItem(f.Ecosystem.ToString(), f.Name, f.From, f.To!, string.Join(", ", f.Advisories.Select(a => $"{a.Name} ({a.Severity})")), f.Files)).ToList();
+        var updates = report.Updates.Where(u => !u.Major).Select(u => new UpdateItem(u.Ecosystem.ToString(), u.Name, u.From, u.To, string.Empty, u.Files)).ToList();
         if (fixes.Count + updates.Count == 0)
         {
             return false;
@@ -342,6 +369,15 @@ public sealed class Maintenance(
         return true;
     }
 
+    private static List<string> Files(IEnumerable<string> manifests) => [.. manifests.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+
+    /// <summary>How the supervisor is asked to share the list among the desks.</summary>
+    private static string Split(string language) =>
+        "Dependency updates found by the maintenance routine. Split them by the part of the project each dependency file belongs to "
+        + "(for example the web site and the mobile app): one task per part, for the desk that works on that part, each carrying "
+        + "its own packages and the instructions below word for word. Parts that share a package can each update their own copy. "
+        + $"Write titles and descriptions in {language}.\n\n";
+
     /// <summary>What the agent is asked: precise versions, the tests, nothing else touched.</summary>
     public static string Brief(UpdatePayload payload)
     {
@@ -351,7 +387,7 @@ public sealed class Maintenance(
             text.Append("Update these packages to at least the version shown: each one fixes known vulnerabilities.\n");
             foreach (var fix in payload.Fixes)
             {
-                text.Append(CultureInfo.InvariantCulture, $"- {fix.Ecosystem} {fix.Name}: {fix.From} → {fix.To} ({fix.Why})\n");
+                text.Append(CultureInfo.InvariantCulture, $"- {fix.Ecosystem} {fix.Name}: {fix.From} → {fix.To} ({fix.Why}){Where(fix)}\n");
             }
 
             text.Append("A package that is not named in the project's own files comes in through another one: update or override the one that brings it in.\n");
@@ -362,7 +398,7 @@ public sealed class Maintenance(
             text.Append(payload.Fixes.Count > 0 ? "\nThen these, newer releases without breaking changes:\n" : "Update these packages, newer releases without breaking changes:\n");
             foreach (var update in payload.Updates)
             {
-                text.Append(CultureInfo.InvariantCulture, $"- {update.Ecosystem} {update.Name}: {update.From} → {update.To}\n");
+                text.Append(CultureInfo.InvariantCulture, $"- {update.Ecosystem} {update.Name}: {update.From} → {update.To}{Where(update)}\n");
             }
         }
 
@@ -370,6 +406,18 @@ public sealed class Maintenance(
             .Append("If an update breaks something, fix it; if it cannot be fixed safely, leave that package where it was and say why. ")
             .Append("Do not update anything else and do not change the project's behaviour.");
         return text.ToString();
+    }
+
+    /// <summary>The files that bring the package in, so the work can be split by part of the project.</summary>
+    private static string Where(UpdateItem item)
+    {
+        if (item.Files is not { Count: > 0 } files)
+        {
+            return string.Empty;
+        }
+
+        var shown = string.Join(", ", files.Take(MaxFiles));
+        return files.Count > MaxFiles ? $" — in {shown} and {files.Count - MaxFiles} more" : $" — in {shown}";
     }
 
     /// <summary>The daily word when a new vulnerability shows up: only the new ones.</summary>
@@ -547,7 +595,8 @@ internal sealed record Project(string Name, string Folder, Guid? OfficeId, strin
 /// <param name="From">The versions in use, "1.2.0, 1.3.1" when several are locked.</param>
 /// <param name="To">The first version that fixes them all; null when one has no fix yet.</param>
 /// <param name="Advisories">The worst first.</param>
-internal sealed record Fix(Ecosystem Ecosystem, string Name, string From, string? To, bool Direct, IReadOnlyList<Advisory> Advisories)
+/// <param name="Files">The dependency files that bring it in, relative to the project.</param>
+internal sealed record Fix(Ecosystem Ecosystem, string Name, string From, string? To, bool Direct, IReadOnlyList<Advisory> Advisories, IReadOnlyList<string> Files)
 {
     public Severity Worst => Advisories[0].Severity;
 
@@ -556,7 +605,7 @@ internal sealed record Fix(Ecosystem Ecosystem, string Name, string From, string
 }
 
 /// <param name="Major">The first number changes: it may break things, so it is left to the person.</param>
-internal sealed record Update(Ecosystem Ecosystem, string Name, string From, string To, bool Major);
+internal sealed record Update(Ecosystem Ecosystem, string Name, string From, string To, bool Major, IReadOnlyList<string> Files);
 
 internal sealed record ProjectReport(Project Project, List<Fix> Fixes, List<Update> Updates, RepositoryState? State)
 {
@@ -564,7 +613,8 @@ internal sealed record ProjectReport(Project Project, List<Fix> Fixes, List<Upda
     public bool Proposed { get; set; }
 }
 
-public sealed record UpdateItem(string Ecosystem, string Name, string From, string To, string Why);
+/// <param name="Files">The dependency files that bring it in; null in proposals made before it was recorded.</param>
+public sealed record UpdateItem(string Ecosystem, string Name, string From, string To, string Why, IReadOnlyList<string>? Files = null);
 
 /// <summary>What a proposal hands to an office: the vulnerable packages to their fix, the safe updates.</summary>
 public sealed record UpdatePayload(string Key, Guid OfficeId, string Project, IReadOnlyList<UpdateItem> Fixes, IReadOnlyList<UpdateItem> Updates);
@@ -634,7 +684,7 @@ internal sealed record MaintenanceWords(
         n => n == 1 ? "(+1 altra)" : $"(+{n} altre)",
         "(indiretta)",
         n => $"altre {n} nel PDF",
-        office => $"Ho proposto un compito nell'ufficio {office} per aggiornarle.",
+        office => $"Ho passato gli aggiornamenti al supervisore dell'ufficio {office}, che li divide tra le scrivanie.",
         "Strumenti",
         "aggiornato",
         "sicurezza",
@@ -669,7 +719,7 @@ internal sealed record MaintenanceWords(
         n => n == 1 ? "(+1 more)" : $"(+{n} more)",
         "(indirect)",
         n => $"{n} more in the PDF",
-        office => $"I proposed a task in the {office} office to update them.",
+        office => $"I handed the updates to the supervisor of the {office} office, who splits them among the desks.",
         "Tools",
         "up to date",
         "security",

@@ -242,10 +242,70 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
             throw new RejectedException("branch-missing", $"There is no branch named {targetBranch}.");
         }
 
+        await InCheckoutAsync(
+                repositoryPath,
+                targetBranch,
+                path => MergeInAsync(
+                    path,
+                    sourceBranch,
+                    message,
+                    fastForward: false,
+                    where => $"The work conflicts with {targetBranch}{where}. Nothing was changed: let its agent bring it up to date, or merge it by hand.",
+                    cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // git branch -d only checks the checked-out branch; check the actual target instead.
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "merge-base", "--is-ancestor", sourceBranch, targetBranch).ConfigureAwait(false);
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "-D", sourceBranch).ConfigureAwait(false);
+    }
+
+    public async Task<BranchMerge> MergeBranchAsync(
+        string repositoryPath, string sourceBranch, string targetBranch, CancellationToken cancellationToken)
+    {
+        if (sourceBranch == targetBranch)
+        {
+            throw new RejectedException("same-branch", "Choose two different branches.");
+        }
+
+        foreach (var branch in new[] { sourceBranch, targetBranch })
+        {
+            if (!await SucceedsAsync(repositoryPath, cancellationToken, "rev-parse", "--verify", "--quiet", $"refs/heads/{branch}").ConfigureAwait(false))
+            {
+                throw new RejectedException("branch-missing", $"There is no branch named {branch}.");
+            }
+        }
+
+        if (await SucceedsAsync(repositoryPath, cancellationToken, "merge-base", "--is-ancestor", sourceBranch, targetBranch).ConfigureAwait(false))
+        {
+            return BranchMerge.UpToDate;
+        }
+
+        var fastForward = await SucceedsAsync(repositoryPath, cancellationToken, "merge-base", "--is-ancestor", targetBranch, sourceBranch).ConfigureAwait(false);
+        await InCheckoutAsync(
+                repositoryPath,
+                targetBranch,
+                path => MergeInAsync(
+                    path,
+                    sourceBranch,
+                    $"Merge {sourceBranch} into {targetBranch}",
+                    fastForward: true,
+                    where => $"{sourceBranch} and {targetBranch} both changed the same lines{where}. Nothing was changed: merge them by hand, or give a desk the task.",
+                    cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+        return fastForward ? BranchMerge.FastForward : BranchMerge.Merged;
+    }
+
+    /// <summary>
+    /// Runs a merge where <paramref name="targetBranch"/> lives: your own checkout only when nothing
+    /// of yours could be mixed in, any other branch in a throwaway worktree so your checkout never moves.
+    /// </summary>
+    private async Task InCheckoutAsync(string repositoryPath, string targetBranch, Func<string, Task> merge, CancellationToken cancellationToken)
+    {
         var current = (await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "--show-current").ConfigureAwait(false)).Trim();
         if (current == targetBranch)
         {
-            // Your own checkout: only merge into it when nothing of yours could be mixed in.
             var changes = await GitCli.RunAsync(repositoryPath, cancellationToken, "status", "--porcelain", "--untracked-files=no").ConfigureAwait(false);
             if (changes.Trim().Length > 0)
             {
@@ -254,35 +314,31 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
                     $"'{repositoryPath}' has uncommitted changes on {targetBranch}. Commit or stash them, then merge again.");
             }
 
-            await MergeInAsync(repositoryPath, sourceBranch, targetBranch, message, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            // Another branch: merge it in a throwaway worktree, so your checkout never moves.
-            var scratch = Path.Combine(options.Value.Root, $"merge-{Guid.NewGuid():N}");
-            await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", scratch, targetBranch).ConfigureAwait(false);
-            try
-            {
-                await MergeInAsync(scratch, sourceBranch, targetBranch, message, cancellationToken).ConfigureAwait(false);
-            }
-            finally
-            {
-                await GitCli.RunAsync(repositoryPath, CancellationToken.None, "worktree", "remove", "--force", scratch).ConfigureAwait(false);
-            }
+            await merge(repositoryPath).ConfigureAwait(false);
+            return;
         }
 
-        // git branch -d only checks the checked-out branch; check the actual target instead.
-        await GitCli.RunAsync(repositoryPath, cancellationToken, "merge-base", "--is-ancestor", sourceBranch, targetBranch).ConfigureAwait(false);
-        await GitCli.RunAsync(repositoryPath, cancellationToken, "branch", "-D", sourceBranch).ConfigureAwait(false);
+        var scratch = Path.Combine(options.Value.Root, $"merge-{Guid.NewGuid():N}");
+        await GitCli.RunAsync(repositoryPath, cancellationToken, "worktree", "add", scratch, targetBranch).ConfigureAwait(false);
+        try
+        {
+            await merge(scratch).ConfigureAwait(false);
+        }
+        finally
+        {
+            await GitCli.RunAsync(repositoryPath, CancellationToken.None, "worktree", "remove", "--force", scratch).ConfigureAwait(false);
+        }
     }
 
+    /// <param name="fastForward">Let git only move the branch when it can; a task's work always gets its merge commit.</param>
+    /// <param name="conflict">The words for a conflict, given " in the files" (or nothing).</param>
     private static async Task MergeInAsync(
-        string path, string sourceBranch, string targetBranch, string message, CancellationToken cancellationToken)
+        string path, string sourceBranch, string message, bool fastForward, Func<string, string> conflict, CancellationToken cancellationToken)
     {
         var identity = await IdentityArgsAsync(path, cancellationToken).ConfigureAwait(false);
         try
         {
-            await GitCli.RunAsync(path, cancellationToken, [.. identity, "merge", "--no-ff", "--no-edit", "--message", message, sourceBranch])
+            await GitCli.RunAsync(path, cancellationToken, [.. identity, "merge", fastForward ? "--ff" : "--no-ff", "--no-edit", "--message", message, sourceBranch])
                 .ConfigureAwait(false);
         }
         catch (InvalidOperationException)
@@ -290,9 +346,7 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
             var files = await ConflictedFilesAsync(path, CancellationToken.None).ConfigureAwait(false);
             await SucceedsAsync(path, CancellationToken.None, "merge", "--abort").ConfigureAwait(false);
             var where = files.Count > 0 ? $" in {string.Join(", ", files)}" : string.Empty;
-            throw new RejectedException(
-                "merge-conflict",
-                $"The work conflicts with {targetBranch}{where}. Nothing was changed: let its agent bring it up to date, or merge it by hand.");
+            throw new RejectedException("merge-conflict", conflict(where));
         }
     }
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readError, request } from './client'
 import type {
+  BranchMergeResult,
   DeskLook,
   AgentEngine,
   EnginesView,
@@ -301,6 +302,15 @@ export function useMergeAll(officeId: string) {
     (input: { target: string; taskIds: string[] }) =>
       request<MergeOutcome[]>('POST', `/api/offices/${officeId}/merge`, input),
     keys.tasks,
+  )
+}
+
+/** Brings one of the office's branches into another, such as beta into main; the source stays. */
+export function useMergeBranch(officeId: string) {
+  return useWrite(
+    (input: { source: string; target: string }) =>
+      request<{ result: BranchMergeResult }>('POST', `/api/offices/${officeId}/merge-branch`, input),
+    keys.branches(officeId),
   )
 }
 

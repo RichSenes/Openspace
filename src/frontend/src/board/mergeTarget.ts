@@ -7,6 +7,13 @@ export function defaultMergeTarget(list: BranchList | undefined): string {
   return list.branches.find((b) => b === 'main' || b === 'master') ?? list.branches[0]
 }
 
+/** The branch to bring into the target by default: the one checked out when it is not the target, else the first other. */
+export function defaultMergeSource(list: BranchList | undefined, target: string): string {
+  const others = list?.branches.filter((b) => b !== target) ?? []
+  if (list?.current && others.includes(list.current)) return list.current
+  return others[0] ?? ''
+}
+
 /** Why nothing can be merged into the target right now, said before trying; null when it can. */
 export function mergeBlocker(list: BranchList | undefined, target: string): string | null {
   const changes = list?.uncommittedChanges ?? 0

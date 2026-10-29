@@ -741,6 +741,17 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Bringing_a_branch_into_another_needs_the_office_repository()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        var merge = await _http.PostAsJsonAsync($"/api/offices/{officeId}/merge-branch", new { source = "beta", target = "main" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, merge.StatusCode);
+        Assert.Equal("no-repository", (await merge.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task An_office_kept_local_refuses_to_push()
     {
         var (officeId, _, _) = await FurnishAsync();

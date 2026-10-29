@@ -29,6 +29,8 @@ internal static class TaskEndpoints
 
     public sealed record PushRequest(string Branch);
 
+    public sealed record MergeBranchRequest(string Source, string Target);
+
     /// <param name="TaskIds">The tasks to merge; all accepted work not merged yet when null.</param>
     public sealed record MergeAllRequest(string Target, IReadOnlyList<Guid>? TaskIds = null);
 
@@ -72,6 +74,11 @@ internal static class TaskEndpoints
         app.MapPost("/api/offices/{officeId:guid}/push", async (
             Guid officeId, PushRequest request, WorkTaskCommands commands, CancellationToken ct) =>
             Results.Ok(new { to = await commands.PushAsync(new OfficeId(officeId), request.Branch, ct) }))
+            .WithTags("Tasks");
+
+        app.MapPost("/api/offices/{officeId:guid}/merge-branch", async (
+            Guid officeId, MergeBranchRequest request, WorkTaskCommands commands, CancellationToken ct) =>
+            Results.Ok(new { result = (await commands.MergeBranchAsync(new OfficeId(officeId), request.Source, request.Target, ct)).ToString() }))
             .WithTags("Tasks");
 
         tasks.MapPost("/{taskId:guid}/catch-up", (

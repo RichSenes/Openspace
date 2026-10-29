@@ -288,6 +288,19 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
 
     public List<string> Updated { get; } = [];
 
+    public List<(string Source, string Target)> BranchMerges { get; } = [];
+
+    public Task<BranchMerge> MergeBranchAsync(string repositoryPath, string sourceBranch, string targetBranch, CancellationToken cancellationToken)
+    {
+        if (MergeProblem is not null)
+        {
+            throw MergeProblem;
+        }
+
+        BranchMerges.Add((sourceBranch, targetBranch));
+        return Task.FromResult(BranchMerge.FastForward);
+    }
+
     public Task<string> PushAsync(string repositoryPath, string branch, CancellationToken cancellationToken)
     {
         if (MergeProblem is not null)

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, CircleSlash, ExternalLink, GitMerge, GitPullRequest, ListChecks, Upload, TriangleAlert, X } from 'lucide-react'
-import { useBranches, useCatchUp, useCheckPullRequest, useMergeAll, useOpenPullRequest, usePush, useRunChecks } from '../api/hooks'
-import type { CheckOutcome, MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
+import { useBranches, useCatchUp, useCheckPullRequest, useMergeAll, useMergeBranch, useOpenPullRequest, usePush, useRunChecks } from '../api/hooks'
+import type { BranchMergeResult, CheckOutcome, MergeOutcome, OfficeView, WorkTaskView } from '../api/types'
 import { Dialog } from '../ui/Dialog'
 import { emitCue } from '../sounds/rules'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
-import { defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
+import { defaultMergeSource, defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
 import { awaitingMerge, checksDone } from './taskRules'
 
 interface Props {
@@ -32,6 +32,8 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   const [outcomes, setOutcomes] = useState<MergeOutcome[]>([])
   const [caughtUp, setCaughtUp] = useState<ReadonlySet<string>>(new Set())
   const mergeAll = useMergeAll(office.id)
+  const mergeBranch = useMergeBranch(office.id)
+  const [chosenSource, setSource] = useState('')
   const runChecks = useRunChecks(office.id)
   const [checks, setChecks] = useState<{ branch: string; outcomes: CheckOutcome[] }>()
   const hasChecks = office.rooms.some((r) => r.check)
@@ -45,6 +47,7 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   const toast = useToast()
   const chosen = waiting.filter((t) => !skipped.has(t.id))
   const blocker = mergeBlocker(branches.data, target)
+  const source = chosenSource && chosenSource !== target ? chosenSource : defaultMergeSource(branches.data, target)
   const results = useRef<HTMLElement>(null)
   // The outcome shows below the button that asked for it, in view.
   useEffect(() => results.current?.scrollIntoView({ block: 'nearest' }), [outcomes])
@@ -71,6 +74,7 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
     setOutcomes([])
     setCaughtUp(new Set())
     mergeAll.reset()
+    mergeBranch.reset()
     catchUp.reset()
     push.reset()
     openPullRequest.reset()
@@ -114,38 +118,77 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
   return (
     <Dialog title="Merge desk" open={open} onClose={close}>
       <div className="merge-desk">
+        <label className="field">
+          <span>Branch</span>
+          <select className="input mono" value={target} onChange={(e) => setTarget(e.target.value)}>
+            {(branches.data?.branches ?? []).map((b) => (
+              <option key={b} value={b}>
+                {b}
+                {b === branches.data?.current ? ' (checked out)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {standing && (
+          <div className="merge-remote">
+            <span className="hint">{standing.text}</span>
+            {standing.canPush && (
+              <button
+                type="button"
+                className="btn"
+                disabled={push.isPending}
+                onClick={() => push.mutate(target, { onSuccess: (r) => toast(`Pushed ${target} to ${r.to}`) })}
+              >
+                <Upload size={16} aria-hidden /> Push to {branches.data?.remotes?.[0] ?? 'origin'}
+              </button>
+            )}
+          </div>
+        )}
+        {office.localOnly && <p className="hint">Kept on this machine: no push, no pull request.</p>}
+        {branches.data && branches.data.branches.length > 1 && (
+          <div className="merge-remote">
+            <label className="field">
+              <span>Bring in all of</span>
+              <select className="input mono" value={source} onChange={(e) => setSource(e.target.value)}>
+                {branches.data.branches
+                  .filter((b) => b !== target)
+                  .map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn"
+              disabled={!source || !target || Boolean(blocker) || mergeBranch.isPending}
+              onClick={() =>
+                mergeBranch.mutate(
+                  { source, target },
+                  {
+                    onSuccess: (r) => {
+                      void branches.refetch()
+                      toast(BRANCH_RESULT[r.result](source, target))
+                    },
+                  },
+                )
+              }
+            >
+              <GitMerge size={16} aria-hidden /> Bring {source || '…'} into {target || '…'}
+            </button>
+          </div>
+        )}
+        {blocker && (
+          <p className="merge-blocker" role="alert">
+            <TriangleAlert size={14} aria-hidden /> {blocker}
+          </p>
+        )}
         {waiting.length === 0 ? (
           <p className="hint">Nothing waiting to be merged. Accepted work shows up here until it is in one of your branches.</p>
         ) : (
           <>
-            <label className="field">
-              <span>Bring the work into</span>
-              <select className="input mono" value={target} onChange={(e) => setTarget(e.target.value)}>
-                {(branches.data?.branches ?? []).map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                    {b === branches.data?.current ? ' (checked out)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {standing && (
-              <div className="merge-remote">
-                <span className="hint">{standing.text}</span>
-                {standing.canPush && (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={push.isPending}
-                    onClick={() => push.mutate(target, { onSuccess: (r) => toast(`Pushed ${target} to ${r.to}`) })}
-                  >
-                    <Upload size={16} aria-hidden /> Push to {branches.data?.remotes?.[0] ?? 'origin'}
-                  </button>
-                )}
-              </div>
-            )}
-            {office.localOnly && <p className="hint">Kept on this machine: no push, no pull request.</p>}
 
             <fieldset className="merge-pick">
               <legend className="pixel notes-title">Accepted, not merged yet · first accepted first</legend>
@@ -185,11 +228,6 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
               </ol>
             </fieldset>
 
-            {blocker && (
-              <p className="merge-blocker" role="alert">
-                <TriangleAlert size={14} aria-hidden /> {blocker}
-              </p>
-            )}
             <div className="row">
               <button type="button" className="btn btn-primary" disabled={!target || chosen.length === 0 || Boolean(blocker) || mergeAll.isPending} onClick={merge}>
                 <GitMerge size={16} aria-hidden /> Merge {chosen.length} into {target || '…'}
@@ -300,10 +338,18 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
         {(push.error ?? openPullRequest.error ?? checkPullRequest.error) && (
           <p className="error">{(push.error ?? openPullRequest.error ?? checkPullRequest.error)?.message}</p>
         )}
-        {(mergeAll.error ?? catchUp.error ?? runChecks.error) && <p className="error">{(mergeAll.error ?? catchUp.error ?? runChecks.error)?.message}</p>}
+        {(mergeAll.error ?? mergeBranch.error ?? catchUp.error ?? runChecks.error) && (
+          <p className="error">{(mergeAll.error ?? mergeBranch.error ?? catchUp.error ?? runChecks.error)?.message}</p>
+        )}
       </div>
     </Dialog>
   )
+}
+
+const BRANCH_RESULT: Record<BranchMergeResult, (source: string, target: string) => string> = {
+  UpToDate: (source, target) => `${target} already has all of ${source}`,
+  FastForward: (source, target) => `${target} moved forward to ${source}`,
+  Merged: (source, target) => `${source} merged into ${target}`,
 }
 
 const RESULT_LABEL: Record<MergeOutcome['result'], string> = {

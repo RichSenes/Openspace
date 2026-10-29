@@ -500,3 +500,6 @@ export interface GoogleStatusView {
   folder: string
   accounts: GoogleAccountView[]
 }
+
+/** What bringing a branch into another did. */
+export type BranchMergeResult = 'UpToDate' | 'FastForward' | 'Merged'

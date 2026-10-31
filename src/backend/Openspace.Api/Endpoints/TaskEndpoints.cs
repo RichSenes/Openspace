@@ -91,6 +91,7 @@ internal static class TaskEndpoints
             .WithTags("Tasks");
 
         app.MapGet("/api/activity", (Guid? officeId, ActivityBoard board) => board.Snapshot(officeId)).WithTags("Activity");
+        app.MapGet("/api/context", (Guid? officeId, ContextBoard board) => board.Snapshot(officeId)).WithTags("Activity");
 
         tasks.MapPost("/", async (
             CreateTaskRequest request,

@@ -122,7 +122,8 @@ internal sealed partial class ClaudeCodeRuntime(
         session.Aborted = false;
         var process = Start(workspacePath, args, text);
         session.Process = process;
-        var reading = Task.Run(() => ReadRunAsync(sessionId, session, process), CancellationToken.None);
+        var window = ClaudeCodeEvents.WindowOf(setup.Model, options.Value.ContextWindow);
+        var reading = Task.Run(() => ReadRunAsync(sessionId, session, process, window), CancellationToken.None);
         session.Following = reading;
         _ = AnnounceEndAsync(reading);
     }
@@ -231,9 +232,9 @@ internal sealed partial class ClaudeCodeRuntime(
     }
 
     /// <summary>Reads a run to its end, passing on its progress; returns how it ended, nothing when aborted.</summary>
-    private async Task<IReadOnlyList<AgentSignal>> ReadRunAsync(string sessionId, Session session, Process process)
+    private async Task<IReadOnlyList<AgentSignal>> ReadRunAsync(string sessionId, Session session, Process process, long contextWindow)
     {
-        var events = new ClaudeCodeEvents(sessionId);
+        var events = new ClaudeCodeEvents(sessionId, contextWindow);
         var ending = new List<AgentSignal>();
         var errors = new StringBuilder();
         process.ErrorDataReceived += (_, e) =>

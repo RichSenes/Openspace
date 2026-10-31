@@ -29,5 +29,12 @@ internal abstract record AgentSignal(string SessionId)
     public sealed record OutOfLimits(string SessionId, string Scope, DateTimeOffset? Until, string Reason) : AgentSignal(SessionId);
 
     /// <summary>Tokens a session spent; <paramref name="MessageId"/> names the answer, so it is counted once.</summary>
-    public sealed record Used(string SessionId, TokenCount Tokens, string? MessageId = null) : AgentSignal(SessionId);
+    /// <param name="Model">The model that answered, as <c>provider/model</c>, when the engine says.</param>
+    public sealed record Used(string SessionId, TokenCount Tokens, string? MessageId = null, string? Model = null) : AgentSignal(SessionId);
+
+    /// <summary>
+    /// How full the conversation is after an answer. <paramref name="Window"/> is the most the
+    /// model holds; when it is unknown, the window of <paramref name="Model"/> is looked up.
+    /// </summary>
+    public sealed record Context(string SessionId, long Tokens, long? Window, string? Model = null) : AgentSignal(SessionId);
 }

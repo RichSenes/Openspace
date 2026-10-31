@@ -300,6 +300,25 @@ export interface DeskActivity {
   question?: boolean
 }
 
+/** How full a desk's conversation is: its agent's energy. */
+export interface DeskContext {
+  officeId: string
+  deskId: string
+  taskId: string
+  sessionId: string
+  /** Tokens the conversation holds, as of the latest answer. */
+  used: number
+  /** The most the model holds; null when unknown. */
+  window: number | null
+  /** Times the engine summarised the conversation to make room. */
+  compactions: number
+  at: string
+  /** The last time the agent got its energy back on this task. */
+  refreshedAt: string | null
+  /** Share of the context still free, 1 to 0; null when the window is unknown. */
+  left: number | null
+}
+
 export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'
 
 export interface RoleView {

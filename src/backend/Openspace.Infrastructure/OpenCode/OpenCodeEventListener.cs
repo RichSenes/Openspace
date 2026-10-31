@@ -78,6 +78,12 @@ internal sealed partial class OpenCodeEventListener(
             {
                 await DispatchAsync(signal, stoppingToken).ConfigureAwait(false);
             }
+
+            // A finished answer also says how full the conversation is: all it read, plus what it wrote.
+            if (signal is AgentSignal.Used { MessageId: not null } used)
+            {
+                await DispatchAsync(new AgentSignal.Context(used.SessionId, used.Tokens.Total, null, used.Model), stoppingToken).ConfigureAwait(false);
+            }
         }
     }
 

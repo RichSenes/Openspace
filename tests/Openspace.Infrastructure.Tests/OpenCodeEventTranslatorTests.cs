@@ -90,6 +90,14 @@ public class OpenCodeEventTranslatorTests
     }
 
     [Fact]
+    public void A_finished_answer_names_its_model_so_its_window_can_be_looked_up()
+    {
+        var signal = Translate("""{"type":"message.updated","properties":{"info":{"id":"msg_2","sessionID":"ses_1","role":"assistant","providerID":"opencode","modelID":"free-model","time":{"created":1,"completed":2},"tokens":{"input":10,"output":5,"reasoning":0,"cache":{"read":100,"write":0}}}}}""");
+
+        Assert.Equal("opencode/free-model", Assert.IsType<AgentSignal.Used>(signal).Model);
+    }
+
+    [Fact]
     public void Idle_means_finished()
     {
         Assert.Equal(new AgentSignal.Finished("ses_1"), Translate("""{"type":"session.idle","properties":{"sessionID":"ses_1"}}"""));

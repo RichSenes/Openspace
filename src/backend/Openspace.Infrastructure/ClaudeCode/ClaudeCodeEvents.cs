@@ -11,8 +11,21 @@ namespace Openspace.Infrastructure.ClaudeCode;
 /// line, into agent signals. It remembers each tool call until its result arrives, the
 /// agent's last words and how much of the account's limits is used.
 /// </summary>
-internal sealed partial class ClaudeCodeEvents(string sessionId)
+/// <param name="contextWindow">The most the model holds, when it is known; else it is guessed from what the answers hold.</param>
+internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWindow = null)
 {
+    /// <summary>What Claude models hold unless they run with the long context.</summary>
+    public const long StandardWindow = 200_000;
+
+    /// <summary>The long context, for models named with <c>[1m]</c>.</summary>
+    public const long LongWindow = 1_000_000;
+
+    /// <summary>The window of a run: set in the options, else from the model's name.</summary>
+    public static long WindowOf(string? model, long? configured) =>
+        configured is > 0 ? configured.Value
+        : model?.Contains("[1m]", StringComparison.OrdinalIgnoreCase) == true ? LongWindow
+        : StandardWindow;
+
     private readonly Dictionary<string, (string Name, JsonElement Input)> _calls = [];
 
     /// <summary>The text of the agent's last answer, usually its summary of the work.</summary>
@@ -36,6 +49,8 @@ internal sealed partial class ClaudeCodeEvents(string sessionId)
                 return FromAssistant(root);
             case "user":
                 return FromResults(root);
+            case "system" when Text(root, "subtype") == "compact_boundary":
+                return [new AgentSignal.Compacted(sessionId)];
             case "rate_limit_event":
                 usage?.Update(root);
                 return [];
@@ -95,6 +110,11 @@ internal sealed partial class ClaudeCodeEvents(string sessionId)
     private List<AgentSignal> FromAssistant(JsonElement root)
     {
         var signals = new List<AgentSignal>();
+        if (ContextOf(root) is { } context)
+        {
+            signals.Add(context);
+        }
+
         foreach (var part in Content(root))
         {
             var kind = Text(part, "type");
@@ -124,6 +144,35 @@ internal sealed partial class ClaudeCodeEvents(string sessionId)
         }
 
         return signals;
+    }
+
+    /// <summary>
+    /// How full the conversation is after this answer: all it read, plus what it wrote.
+    /// Answers of helpers the agent delegated to have conversations of their own and do not count.
+    /// </summary>
+    private AgentSignal.Context? ContextOf(JsonElement root)
+    {
+        if (root.TryGetProperty("parent_tool_use_id", out var parent) && parent.ValueKind == JsonValueKind.String
+            || !root.TryGetProperty("message", out var message) || !message.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        long Count(string name) => usage.TryGetProperty(name, out var n) && n.ValueKind == JsonValueKind.Number ? n.GetInt64() : 0;
+        var used = Count("input_tokens") + Count("cache_read_input_tokens") + Count("cache_creation_input_tokens") + Count("output_tokens");
+        if (used <= 0)
+        {
+            return null;
+        }
+
+        // More than the standard window means the model runs with the long one.
+        var window = contextWindow ?? StandardWindow;
+        if (used > window && contextWindow is null or StandardWindow)
+        {
+            window = LongWindow;
+        }
+
+        return new AgentSignal.Context(sessionId, used, window);
     }
 
     private List<AgentSignal> FromResults(JsonElement root)

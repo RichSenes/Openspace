@@ -342,6 +342,14 @@ internal sealed class RecordingPublisher : IActivityPublisher
         LogChanges.Add(taskId);
         return Task.CompletedTask;
     }
+
+    public List<DeskContext> Contexts { get; } = [];
+
+    public Task ContextChangedAsync(DeskContext context, CancellationToken cancellationToken)
+    {
+        Contexts.Add(context);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryAuditLog : IAuditLog

@@ -49,6 +49,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
+| GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
 | GET | `/api/epics?officeId=` | Epics of an office |
 | POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |
@@ -116,14 +117,15 @@ SignalR hub at `/hubs/building`, server to client only:
 | `OfficeChanged` | office id | an office, room or desk changes |
 | `TaskChanged` | task id | a task is created, changes status, gets a note or a check, or spends tokens |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
+| `DeskContext` | the energy | an answer changed how full a desk's conversation is, or the engine summarised it |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
 | `EpicsChanged` | none | the supervisor opened an epic |
 | `ReportsChanged` | none | a report was written |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
-domain events after each successful save. `DeskActivity` carries the data itself,
-because activity is not stored.
+domain events after each successful save. `DeskActivity` and `DeskContext` carry the
+data themselves, because activity and energy are not stored.
 
 ## Run
 

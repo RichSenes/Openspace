@@ -213,6 +213,33 @@ public class AgentSignalsTests
     }
 
     [Fact]
+    public async Task An_answer_sets_the_energy_of_the_desk_and_still_counts_once_the_work_is_in_review()
+    {
+        var task = await RunningTaskAsync();
+        await _h.Signals().ContextAsync("ses_1", 40_000, 200_000, default);
+        await _h.Signals().FinishedAsync("ses_1", default);
+
+        await _h.Signals().ContextAsync("ses_1", 50_000, 200_000, default);
+        await _h.Signals().ContextAsync("ses_someone_else", 199_000, 200_000, default);
+
+        var context = Assert.Single(_h.Context.Snapshot());
+        Assert.Equal((_h.Desk.Id.Value, task.Id.Value, 50_000L, 0.75), (context.DeskId, context.TaskId, context.Used, context.Left));
+    }
+
+    [Fact]
+    public async Task A_compaction_gives_the_agent_its_energy_back()
+    {
+        await RunningTaskAsync();
+        await _h.Signals().ContextAsync("ses_1", 190_000, 200_000, default);
+
+        await _h.Signals().CompactedAsync("ses_1", default);
+
+        var context = Assert.Single(_h.Context.Snapshot());
+        Assert.Equal((0L, 1), (context.Used, context.Compactions));
+        Assert.Equal(_h.Clock.GetUtcNow(), context.RefreshedAt);
+    }
+
+    [Fact]
     public async Task Tokens_count_on_the_round_even_once_the_work_is_in_review()
     {
         var task = await RunningTaskAsync();

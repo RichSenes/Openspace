@@ -71,6 +71,8 @@ internal sealed class Harness
 
     public ActivityBoard Activity { get; }
 
+    public ContextBoard Context { get; }
+
     /// <summary>A person answers every request unless a test says otherwise.</summary>
     public Autonomy Autonomy { get; set; } = Autonomy.Ask;
 
@@ -85,6 +87,7 @@ internal sealed class Harness
         Limits = new EngineLimits(Clock);
         Gpu = new GpuArbiter(new LiveOptions<LocalModelOptions>(() => LocalModels), Clock);
         Activity = new ActivityBoard(Publisher);
+        Context = new ContextBoard(Publisher);
         Office = Office.Open("E Corp", Start);
         Room = Office.OpenRoom("Web", Start);
         Office.UpdateRoomContext(Room.Id, "Never touch the payments module.", Start);
@@ -123,7 +126,7 @@ internal sealed class Harness
         Gpu, GpuProbe, ModelServer, Tasks, Offices, Runtime, Activity, UnitOfWork, new LiveOptions<LocalModelOptions>(() => LocalModels), Clock);
 
     public AgentSignals Signals() => new(
-        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Audit, Publisher, Reviews, Permissions,
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Context, Audit, Publisher, Reviews, Permissions,
         new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, Clock);
 
     public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);

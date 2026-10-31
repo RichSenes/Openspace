@@ -46,6 +46,7 @@ public static class DependencyInjection
         // Planning and drafting wait for the model to answer: allow minutes, not seconds.
         services.AddHttpClient<OpenCodeRuntime>(ConfigureOpenCode)
             .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(5));
+        services.AddSingleton<OpenCodeContextWindows>();
         services.AddSingleton<ClaudeCodeRuntime>();
         services.AddSingleton<ClaudeCodeUsage>();
         services.AddScoped<IAgentRuntime, AgentRuntimeRouter>();

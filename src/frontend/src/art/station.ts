@@ -1,4 +1,5 @@
 import { BONE, CHARACTER_COLORS, DOLL_LIPS, PORCELAIN, GLOVES, CLOTH_COLORS, HAIR_COLORS, MOUTHS, OBJECT_COLORS, SIGNAL_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone, type ThemeColors } from './palette'
+import { batteryPixels } from './energy'
 import { FAN_COLORS, FAN_COSTUMES } from './fanPack'
 import type { Light } from './lighting'
 import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, WINDUP_KEY, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
@@ -20,7 +21,7 @@ export interface Appearance {
   costume?: Costume
 }
 
-export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'cheer' | 'stuck'
+export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'cheer' | 'stuck' | 'sip'
 
 /**
  * What the agent does with the arms: raised arms are drawn behind the desk, hands
@@ -33,6 +34,7 @@ export const GESTURE_PARTS: Record<Gesture, { arms?: SpriteDef; hands?: SpriteDe
   wave: { arms: GESTURES.wave, hands: HANDS.left },
   cheer: { arms: GESTURES.cheer },
   stuck: { arms: GESTURES.stuck },
+  sip: { arms: GESTURES.sip, hands: HANDS.left },
 }
 
 export type ScreenState = 'off' | 'on' | 'alert'
@@ -44,6 +46,10 @@ export interface StationPose {
   screen: ScreenState
   /** Shown above the head: an idea, a surprise, a question, sleep, done, trouble. */
   signal?: Signal
+  /** The energy shown on the battery beside the agent, from 0 to 1; no battery when unknown. */
+  energy?: number
+  /** Pixels the agent sinks into its chair when exhausted. */
+  slump?: number
 }
 
 /**
@@ -111,15 +117,22 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const doll = look.costume === 'karakuri'
   // A karakuri's key turns while it works, and stands still while it sleeps.
   const key = doll ? pixelsOf(WINDUP_KEY, pose.screen === 'on' ? Math.floor(pose.frame / 2) % 2 : 0, person, cx, cy) : []
-  const layers = [...self, look.accessory && ACCESSORIES[look.accessory], arms]
-  const behind = [...key, ...layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, cy) : []))]
+  // An exhausted agent sinks into its chair; its arms still reach the desk.
+  const sunk = cy + (pose.slump ?? 0)
+  const layers = [...self, look.accessory && ACCESSORIES[look.accessory]]
+  const behind = [
+    ...key,
+    ...layers.flatMap((sprite) => (sprite ? pixelsOf(sprite, pose.frame, person, cx, sunk) : [])),
+    ...(arms ? pixelsOf(arms, pose.frame, person, cx, cy) : []),
+  ]
   const desk = [
     ...pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY),
     ...(doll ? pixelsOf(HOURGLASS, pose.screen === 'on' ? Math.floor(pose.frame / 3) % 2 : 0, themeColors(theme.colors), 26, STATION.deskY + 7) : []),
   ]
   const front = hands ? pixelsOf(hands, pose.frame, person, cx, cy) : []
   const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme.colors), cx + 8, cy - 11) : []
-  return [...behind, ...desk, ...front, ...signal]
+  const battery = pose.energy === undefined ? [] : batteryPixels(pose.energy)
+  return [...behind, ...desk, ...front, ...signal, ...battery]
 }
 
 /** The hourglass on a routine's desk: sand runs down while it works. */

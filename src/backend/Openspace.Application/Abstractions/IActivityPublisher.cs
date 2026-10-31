@@ -9,4 +9,7 @@ public interface IActivityPublisher
 
     /// <summary>New lines were added to a task's audit log.</summary>
     Task LogChangedAsync(Guid taskId, CancellationToken cancellationToken);
+
+    /// <summary>How full a desk's conversation is changed: the agent's energy.</summary>
+    Task ContextChangedAsync(DeskContext context, CancellationToken cancellationToken);
 }

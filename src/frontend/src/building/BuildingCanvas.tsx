@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
-import type { DeskActivity, FloorCut, OfficeView, WorkTaskView } from '../api/types'
+import type { DeskActivity, DeskContext, FloorCut, OfficeView, WorkTaskView } from '../api/types'
 import { paintInto } from '../art/canvas'
 import { inTheDark, unlit, type Light } from '../art/lighting'
 import { deskItem, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
@@ -12,6 +12,7 @@ import { STATION, themeColors } from '../art/station'
 import { themeOf, type Theme } from '../art/themes'
 import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { AgentState } from '../art/agentStates'
+import { energyOf } from '../activity/energy'
 import { agentStateOf, lookOf } from './agents'
 import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
@@ -58,6 +59,8 @@ interface Props {
   activities: ReadonlyMap<string, DeskActivity>
   /** States decided elsewhere, by desk id: the routines' dolls. */
   states?: ReadonlyMap<string, AgentState>
+  /** How full each desk's conversation is, by desk id: the battery beside each agent. */
+  contexts?: ReadonlyMap<string, DeskContext>
   /** Lights off: only screens, lamps and other glowing things light the rooms. */
   dark: boolean
   /** More controls beside Fit. */
@@ -99,7 +102,7 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, states, dark, controls, arrange, onPickDesk }: Props) {
+export function BuildingCanvas({ office, tasks, activities, states, contexts, dark, controls, arrange, onPickDesk }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
@@ -120,7 +123,7 @@ export function BuildingCanvas({ office, tasks, activities, states, dark, contro
       view.layout = layout
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
-      const drawn = drawBuilding(layout, { office, tasks, activities, states, dark }, arrange?.selection)
+      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, dark }, arrange?.selection)
       app.stage.addChild(drawn.world)
       Object.assign(view, drawn)
       view.hall?.paint()
@@ -195,7 +198,7 @@ export function BuildingCanvas({ office, tasks, activities, states, dark, contro
   }, [])
 
   const arranging = Boolean(arrange)
-  useEffect(() => draw.current(), [office, tasks, activities, states, dark, arranging, arrange?.selection])
+  useEffect(() => draw.current(), [office, tasks, activities, states, contexts, dark, arranging, arrange?.selection])
 
   return (
     <div className="building-canvas" ref={host}>
@@ -534,6 +537,7 @@ interface Scene {
   office: OfficeView
   tasks: readonly WorkTaskView[]
   activities: ReadonlyMap<string, DeskActivity>
+  contexts?: ReadonlyMap<string, DeskContext>
   states?: ReadonlyMap<string, AgentState>
   dark: boolean
 }
@@ -830,7 +834,8 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   const states = new Map(room.desks.map((d) => [d.id, scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
   return {
     paint: (tick) => {
-      const phase = phaseOf(new Date().getHours())
+      const now = Date.now()
+      const phase = phaseOf(new Date(now).getHours())
       const openings: SceneItem[] = room.windows.map((x) => {
         const view = behind(room, layout, sources, x + GLASS.x, GLASS.width, GLASS.height, tick, phase)
         const lights: Light[] = view.outside && dark ? windowLight(phase) : []
@@ -844,7 +849,10 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
         ...openings,
         ...room.props.map((p) => propItem(p.name, p.x, p.y, tick, theme, size)),
         ...room.desks.map((d, i) =>
-          deskItem(looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme),
+          deskItem(
+            looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme, undefined,
+            energyOf(scene.contexts?.get(d.id), states.get(d.id)!, now),
+          ),
         ),
       ]
       paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, dark))

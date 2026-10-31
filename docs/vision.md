@@ -86,6 +86,30 @@ In scope:
 
 Later, in rough order of appearance:
 
+- **A livelier office.** Agreed after looking at other agent dashboards, in this order:
+  1. ~~Energy~~ Done: a battery beside each busy agent shows the room left in its
+     conversation; tired and exhausted looks; a coffee when the engine summarises it.
+  2. A live feed of what happens in the whole building, filterable by office and room.
+  3. Interns: when an agent delegates to a helper, an intern appears beside its desk
+     in a puff of smoke, with a badge and a clipboard, and leaves the same way.
+  4. Weather at the windows (rain, snow, fog, storms, stars) from the real weather
+     of the person's town, and a minimap that is a sketch, not a copy: rooms as
+     blocks in their theme colour, agents as dots shaped by their state.
+  5. Stations and walks: furniture with a purpose (shelves, cabinets and printers
+     for documents; racks for commands and tests; whiteboards for plans; the coffee
+     machine for breaks). Agents walk to a nearby one now and then, never far; when
+     they need you they go back to their desk. Two agents who meet stop for a chat
+     with made-up bubbles, shaped unlike the real ones. Needs standing and walking
+     sprites: a round of art.
+  6. Guests: Claude Code sessions started outside Openspace appear, read only, in a
+     guest room of the office whose repository holds the folder they work in (the
+     folder is on every line of their log), working on laptops with a visitor
+     badge. In offices with private folders they stay anonymous. Openspace gets an
+     office of its own to see this.
+  7. Releases and a "new version" notice: published releases on GitHub, a banner
+     with the notes, remind me tomorrow, never an automatic update.
+  8. The README rewritten, and kept up to date after every round from then on.
+
 - ~~**Claude Code.**~~ Done: desks choose their engine, OpenCode with any of its
   models (picked from the list OpenCode gives) or Claude Code with the person's
   own account. Claude Code plans, drafts and reviews finished work with a note

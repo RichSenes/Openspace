@@ -21,6 +21,18 @@ const SIGNAL_ROOM = 11
 const EMOTIONS = Object.keys(FACES).filter((e) => e !== 'blink') as Emotion[]
 const STATES = Object.keys(AGENT_LOOKS) as AgentState[]
 
+/** Agents at every level of energy, plus a coffee break that starts again every eight seconds. */
+const ENERGY_SAMPLES: { label: string; state: AgentState; left: number; coffee?: true }[] = [
+  { label: 'coffee break', state: 'working', left: 1, coffee: true },
+  { label: 'fresh', state: 'working', left: 0.95 },
+  { label: 'steady', state: 'working', left: 0.45 },
+  { label: 'tired', state: 'working', left: 0.2 },
+  { label: 'exhausted', state: 'working', left: 0.05 },
+  { label: 'tired, reading', state: 'reading', left: 0.2 },
+  { label: 'tired, asks you', state: 'waiting', left: 0.2 },
+  { label: 'done', state: 'done', left: 0.55 },
+]
+
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
 function Pixels({ width, height, pixels, scale, label }: { width: number; height: number; pixels: Pixel[]; scale: number; label: string }) {
   const url = useMemo(() => toCanvas(width, height, pixels).toDataURL(), [width, height, pixels])
@@ -233,6 +245,28 @@ export function SpriteLab() {
                 label={state}
               />
               <figcaption>{state}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Energy</h2>
+        <div className="lab-pieces">
+          {ENERGY_SAMPLES.map((sample, i) => (
+            <figure key={sample.label}>
+              <Pixels
+                width={STATION.width}
+                height={STATION.height}
+                pixels={stationPixels(
+                  PEOPLE[i % PEOPLE.length],
+                  poseOf(sample.state, tick + i * 5, undefined, sample.coffee ? { left: 1, sinceRefresh: (tick / FPS) % 8 } : { left: sample.left }),
+                  theme,
+                )}
+                scale={small}
+                label={sample.label}
+              />
+              <figcaption>{sample.label}</figcaption>
             </figure>
           ))}
         </div>

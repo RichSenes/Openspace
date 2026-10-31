@@ -24,6 +24,7 @@ internal static partial class AgentSignalDispatch
                 AgentSignal.Compacted c => signals.CompactedAsync(c.SessionId, cancellationToken),
                 AgentSignal.OutOfLimits o => signals.OutOfLimitsAsync(o.SessionId, o.Scope, o.Until, o.Reason, cancellationToken),
                 AgentSignal.Used u => signals.UsedAsync(u.SessionId, u.Tokens, cancellationToken),
+                AgentSignal.Context c => ContextAsync(scope.ServiceProvider, signals, c, cancellationToken),
                 _ => Task.CompletedTask,
             };
             await work.ConfigureAwait(false);
@@ -32,6 +33,18 @@ internal static partial class AgentSignalDispatch
         {
             LogHandlingFailed(logger, ex, signal.GetType().Name, signal.SessionId);
         }
+    }
+
+    private static async Task ContextAsync(IServiceProvider services, AgentSignals signals, AgentSignal.Context context, CancellationToken cancellationToken)
+    {
+        var window = context.Window;
+        if (window is null && context.Model is { } model)
+        {
+            window = await services.GetRequiredService<OpenCodeContextWindows>()
+                .ForAsync(model, services.GetRequiredService<OpenCodeRuntime>(), cancellationToken).ConfigureAwait(false);
+        }
+
+        await signals.ContextAsync(context.SessionId, context.Tokens, window, cancellationToken).ConfigureAwait(false);
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Could not handle {Signal} for session {SessionId}")]

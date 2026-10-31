@@ -24,6 +24,50 @@ public class ClaudeCodeEventsTests
         "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"" + id
         + "\",\"content\":" + JsonSerializer.Serialize(content) + ",\"is_error\":" + (error ? "true" : "false") + "}]}}";
 
+    private static string Answer(string usage, string parent = "null") =>
+        "{\"type\":\"assistant\",\"parent_tool_use_id\":" + parent + ",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Looking at the header.\"}],\"usage\":" + usage + "}}";
+
+    [Fact]
+    public void An_answer_says_how_full_the_conversation_is_but_a_helper_answer_does_not()
+    {
+        var events = new ClaudeCodeEvents("claude-1", 200_000);
+        const string Usage = """{"input_tokens":4,"cache_creation_input_tokens":1200,"cache_read_input_tokens":30000,"output_tokens":300}""";
+
+        Assert.Equal(new AgentSignal.Context("claude-1", 31_504, 200_000), Assert.Single(events.Read(Answer(Usage))));
+        Assert.Empty(events.Read(Answer(Usage, "\"toolu_9\"")));
+    }
+
+    [Fact]
+    public void A_conversation_past_the_standard_window_runs_with_the_long_one()
+    {
+        var events = new ClaudeCodeEvents("claude-1", ClaudeCodeEvents.WindowOf("sonnet", null));
+
+        var context = Assert.IsType<AgentSignal.Context>(Assert.Single(events.Read(Answer("""{"input_tokens":10,"cache_read_input_tokens":250000,"output_tokens":90}"""))));
+
+        Assert.Equal(ClaudeCodeEvents.LongWindow, context.Window);
+    }
+
+    [Theory]
+    [InlineData("sonnet", null, ClaudeCodeEvents.StandardWindow)]
+    [InlineData(null, null, ClaudeCodeEvents.StandardWindow)]
+    [InlineData("opus[1m]", null, ClaudeCodeEvents.LongWindow)]
+    [InlineData("opus[1m]", 400_000L, 400_000L)]
+    public void The_window_comes_from_the_options_else_from_the_model_name(string? model, long? configured, long expected)
+    {
+        Assert.Equal(expected, ClaudeCodeEvents.WindowOf(model, configured));
+    }
+
+    [Fact]
+    public void A_summary_of_the_conversation_is_a_compaction()
+    {
+        var events = new ClaudeCodeEvents("claude-1");
+
+        var signal = Assert.Single(events.Read("""{"type":"system","subtype":"compact_boundary","session_id":"abc","compact_metadata":{"trigger":"auto","pre_tokens":190000}}"""));
+
+        Assert.Equal(new AgentSignal.Compacted("claude-1"), signal);
+        Assert.Empty(events.Read("""{"type":"system","subtype":"init","session_id":"abc"}"""));
+    }
+
     [Fact]
     public void A_tool_call_shows_what_the_agent_does_and_its_result_goes_in_the_log()
     {

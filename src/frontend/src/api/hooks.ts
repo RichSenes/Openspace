@@ -17,6 +17,7 @@ import type {
   BranchList,
   SoundsView,
   DeskActivity,
+  DeskContext,
   EpicView,
   OfficeView,
   PlanView,
@@ -41,6 +42,7 @@ export const keys = {
   diff: (taskId: string) => ['tasks', 'diff', taskId] as const,
   log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
+  context: ['context'] as const,
   roles: ['roles'] as const,
   epics: ['epics'] as const,
   officeEpics: (officeId: string) => ['epics', officeId] as const,
@@ -250,6 +252,11 @@ export const INITIALIZABLE = new Set(['not-a-repository', 'no-commits'])
 /** Every desk's current activity. Kept fresh by SignalR, which writes into this cache. */
 export function useActivity() {
   return useQuery({ queryKey: keys.activity, queryFn: () => request<DeskActivity[]>('GET', '/api/activity') })
+}
+
+/** Every desk's energy. Kept fresh by SignalR, which writes into this cache. */
+export function useDeskContexts() {
+  return useQuery({ queryKey: keys.context, queryFn: () => request<DeskContext[]>('GET', '/api/context') })
 }
 
 export function useTaskDiff(taskId: string, enabled: boolean) {

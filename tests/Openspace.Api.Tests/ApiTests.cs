@@ -513,7 +513,7 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
-    public async Task Activity_starts_empty_and_a_task_without_agent_has_no_diff()
+    public async Task Activity_and_energy_start_empty_and_a_task_without_agent_has_no_diff()
     {
         var (officeId, _, deskId) = await FurnishAsync();
         var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
@@ -522,7 +522,10 @@ public sealed class ApiTests : IDisposable
         var diff = await _http.GetStringAsync($"/api/tasks/{task.Id}/diff");
         var permission = await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/permission", new { allow = true });
 
+        var energy = await GetAsync<List<JsonElement>>($"/api/context?officeId={officeId}");
+
         Assert.Empty(activity);
+        Assert.Empty(energy);
         Assert.Equal(string.Empty, diff);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, permission.StatusCode);
     }

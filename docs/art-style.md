@@ -142,7 +142,8 @@ thicker low down; drizzle, rain and storms fall in drops slanting left, more and
 longer each time, in front of the skyline; snow sways down slowly; a storm flashes
 now and then, lighting the room. Stars shine only on a clear night, and a grey sky
 lets in less, greyer light. On an
-inner wall they show what is painted just behind the wall. Either way the view is
+inner wall they show the floor and walls just behind it, never what stands there: furniture and
+agents behind a wall already show above it, and would show twice. Either way the view is
 glazed, a little paler and bluer, so a window never reads as a hole. A door in a
 back wall is a doorway with posts and a lintel that shows the same view.
 

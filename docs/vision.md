@@ -89,7 +89,8 @@ Later, in rough order of appearance:
 - **A livelier office.** Agreed after looking at other agent dashboards, in this order:
   1. ~~Energy~~ Done: a battery beside each busy agent shows the room left in its
      conversation; tired and exhausted looks; a coffee when the engine summarises it.
-  2. A live feed of what happens in the whole building, filterable by office and room.
+  2. ~~Live feed~~ Done: the Activity panel in the building, for an office, a room or
+     every office, newest first, with the start of each note.
   3. Interns: when an agent delegates to a helper, an intern appears beside its desk
      in a puff of smoke, with a badge and a clipboard, and leaves the same way.
   4. Weather at the windows (rain, snow, fog, storms, stars) from the real weather

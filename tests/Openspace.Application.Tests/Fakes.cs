@@ -365,6 +365,15 @@ internal sealed class InMemoryAuditLog : IAuditLog
     public Task<IReadOnlyList<WorkTaskId>> TasksActiveBetweenAsync(DateTimeOffset since, DateTimeOffset until, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<WorkTaskId>>([.. Items.Where(e => e.At >= since && e.At < until).Select(e => e.TaskId).Distinct()]);
 
+    public Task<IReadOnlyList<AuditEntry>> LatestAsync(
+        IReadOnlyCollection<WorkTaskId>? tasks, IReadOnlyCollection<AuditKind>? kinds, long? before, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AuditEntry>>([.. Items
+            .Select((e, i) => (Entry: e, Order: e.Id == 0 ? i + 1 : e.Id))
+            .Where(x => (tasks is null || tasks.Contains(x.Entry.TaskId)) && (kinds is null || kinds.Contains(x.Entry.Kind)) && (before is null || x.Order < before))
+            .OrderByDescending(x => x.Order)
+            .Take(limit)
+            .Select(x => x.Entry)]);
+
     public void Add(AuditEntry entry) => Items.Add(entry);
 }
 

@@ -319,6 +319,25 @@ export interface DeskContext {
   left: number | null
 }
 
+/** One thing that happened in the building, with who did it and on which task. */
+export interface FeedLine {
+  id: number
+  at: string
+  kind: AuditKind
+  summary: string
+  succeeded: boolean | null
+  taskId: string
+  taskTitle: string
+  officeId: string
+  officeName: string
+  roomId: string | null
+  roomName: string | null
+  deskId: string | null
+  deskName: string | null
+  /** For a note, the start of what it says. */
+  excerpt: string | null
+}
+
 export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'
 
 export interface RoleView {

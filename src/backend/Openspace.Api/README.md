@@ -50,6 +50,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
+| GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
 | GET | `/api/epics?officeId=` | Epics of an office |
 | POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |

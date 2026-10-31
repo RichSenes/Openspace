@@ -25,6 +25,7 @@ export function useBuildingHub(): LinkState {
 
     hub.on('OfficeChanged', () => void client.invalidateQueries({ queryKey: keys.offices }))
     hub.on('TaskChanged', () => {
+      void client.invalidateQueries({ queryKey: keys.feed })
       void client.invalidateQueries({ queryKey: keys.tasks })
       void client.invalidateQueries({ queryKey: keys.deskUsage })
     })
@@ -33,7 +34,10 @@ export function useBuildingHub(): LinkState {
     hub.on('RoutineProgress', (progress: { routineId: string; line: string }) => reportRoutineProgress(progress.routineId, progress.line))
     hub.on('EpicsChanged', () => void client.invalidateQueries({ queryKey: keys.epics }))
     hub.on('RolesChanged', () => void client.invalidateQueries({ queryKey: keys.roles }))
-    hub.on('TaskLogChanged', (taskId: string) => void client.invalidateQueries({ queryKey: keys.log(taskId) }))
+    hub.on('TaskLogChanged', (taskId: string) => {
+      void client.invalidateQueries({ queryKey: keys.log(taskId) })
+      void client.invalidateQueries({ queryKey: keys.feed })
+    })
     hub.on('DeskActivity', (activity: DeskActivity) => {
       client.setQueryData<DeskActivity[]>(keys.activity, (list) => mergeActivity(list, activity))
       const cue = cueOfActivity(activity)

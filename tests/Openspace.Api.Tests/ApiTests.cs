@@ -549,6 +549,24 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_feed_shows_the_latest_lines_of_the_office_and_pages_back()
+    {
+        var (officeId, roomId, deskId) = await FurnishAsync();
+        var task = await PostAsync<Created>("/api/tasks", new { officeId, deskId, title = "Patch the VPN" });
+        (await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/notes", new { text = "Use the new certificate." })).EnsureSuccessStatusCode();
+
+        var latest = await GetAsync<List<JsonElement>>($"/api/feed?officeId={officeId}&roomId={roomId}&limit=1");
+        var older = await GetAsync<List<JsonElement>>($"/api/feed?officeId={officeId}&before={latest[0].GetProperty("id").GetInt64()}");
+        var unknownRoom = await _http.GetAsync($"/api/feed?officeId={officeId}&roomId={Guid.NewGuid()}");
+
+        var line = Assert.Single(latest);
+        Assert.Equal(("Note", "Patch the VPN", "Web"), (line.GetProperty("kind").GetString(), line.GetProperty("taskTitle").GetString(), line.GetProperty("roomName").GetString()));
+        Assert.Equal("Task created", older[^1].GetProperty("summary").GetString());
+        Assert.DoesNotContain(older, l => l.GetProperty("kind").GetString() == "Note");
+        Assert.Equal(HttpStatusCode.NotFound, unknownRoom.StatusCode);
+    }
+
+    [Fact]
     public async Task A_task_has_a_log_and_a_downloadable_report()
     {
         var (officeId, _, deskId) = await FurnishAsync();

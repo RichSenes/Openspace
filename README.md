@@ -42,7 +42,10 @@ Each project has its own README with detailed specifications.
 2. When a seat is free, Openspace creates a git worktree on a new
    `openspace/...` branch and opens an OpenCode session there, briefing the agent
    with the room's rules, the task and the team's notes.
-3. While it works, the agent's todo list and tool calls become speech bubbles.
+3. While it works, the agent's todo list and tool calls become speech bubbles,
+   and a battery beside it shows how much room is left in its conversation:
+   it gets tired as the battery runs down and has a coffee when the engine
+   summarises the conversation.
    Through Openspace's own MCP tools it can also leave notes on the task,
    announce what it is doing and re-read its brief.
    If it asks for a permission, Openspace answers on its own in auto mode
@@ -59,6 +62,8 @@ Each project has its own README with detailed specifications.
    not reach review until all of them are done.
 7. Every step, file change, command (with its output), permission and note is
    kept in the task's audit log, and can be downloaded as a Markdown report.
+   The Activity panel in the building follows those lines live, for an office,
+   a room or every office at once.
 8. Reports of a day or of an epic are written from the audit log in the
    language you choose, ready to copy into an email or a chat.
 9. Accepted work is merged into the branch you choose, one task at a time or

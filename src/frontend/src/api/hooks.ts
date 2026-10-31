@@ -18,6 +18,7 @@ import type {
   SoundsView,
   DeskActivity,
   DeskContext,
+  FeedLine,
   EpicView,
   OfficeView,
   PlanView,
@@ -43,6 +44,8 @@ export const keys = {
   log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
   context: ['context'] as const,
+  feed: ['feed'] as const,
+  feedOf: (filter: FeedFilter) => ['feed', filter] as const,
   roles: ['roles'] as const,
   epics: ['epics'] as const,
   officeEpics: (officeId: string) => ['epics', officeId] as const,
@@ -252,6 +255,28 @@ export const INITIALIZABLE = new Set(['not-a-repository', 'no-commits'])
 /** Every desk's current activity. Kept fresh by SignalR, which writes into this cache. */
 export function useActivity() {
   return useQuery({ queryKey: keys.activity, queryFn: () => request<DeskActivity[]>('GET', '/api/activity') })
+}
+
+/** Which part of the building the feed follows. */
+export interface FeedFilter {
+  /** Null for every office. */
+  officeId: string | null
+  roomId: string | null
+  /** Reads and searches too. */
+  everything: boolean
+  limit: number
+}
+
+/** The latest things that happened, newest first. Refetched when a task or its log changes. */
+export function useFeed(filter: FeedFilter) {
+  const query = new URLSearchParams({ everything: String(filter.everything), limit: String(filter.limit) })
+  if (filter.officeId) query.set('officeId', filter.officeId)
+  if (filter.officeId && filter.roomId) query.set('roomId', filter.roomId)
+  return useQuery({
+    queryKey: keys.feedOf(filter),
+    queryFn: () => request<FeedLine[]>('GET', `/api/feed?${query}`),
+    placeholderData: (previous) => previous,
+  })
 }
 
 /** Every desk's energy. Kept fresh by SignalR, which writes into this cache. */

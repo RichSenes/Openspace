@@ -9,6 +9,7 @@ import { useToast } from '../ui/toastContext'
 import { editFloor, editRoom, moveRoom, NO_DRAFTS, placeIn, resize, resizeFloor, setCut, withDrafts, type Drafts } from './arrange'
 import { desksOf } from '../board/deskLookup'
 import { NewTaskDialog } from '../board/NewTaskDialog'
+import { ActivityFeed } from './ActivityFeed'
 import { AgentCard } from './AgentCard'
 import { ArrangePanel } from './ArrangePanel'
 import { BuildingCanvas, type DeskPick, type Selection } from './BuildingCanvas'
@@ -48,7 +49,8 @@ interface Props {
   /** Shows the office's routines: a click on one of their dolls. */
   onOpenRoutines: () => void
   /** Shows a task on the Board. */
-  onOpenTask: (taskId: string) => void
+  /** Opens a task on the board; the office is given when it may be another one. */
+  onOpenTask: (taskId: string, officeId?: string) => void
 }
 
 /** Where the card of a clicked agent goes: beside the click, kept inside the building. */
@@ -199,6 +201,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
           onLook={() => setDressing(pickedDesk.id)}
         />
       )}
+      {!arranging && <ActivityFeed key={office.id} office={office} onOpenTask={onOpenTask} />}
       {giving && <NewTaskDialog key={giving} office={office} desks={desks} open initialDeskId={giving} onClose={() => setGiving(undefined)} />}
       <LookDialog officeId={office.id} theme={office.theme} desk={desks.find((d) => d.id === dressing)} onClose={() => setDressing(undefined)} />
       {arranging && (

@@ -256,3 +256,39 @@ pixels across with a dark rim, so its state reads from the shape as well as the 
 diamond at work (green, pulsing) or reading (blue), a ring in the queue, a dot when idle, a
 square when done, an exclamation mark that blinks when it needs you, a red cross when it
 failed. A light frame shows what the screen sees.
+
+## On their feet
+
+A standing agent (`src/frontend/src/art/walker.ts`) uses the same 24 by 32 frame as the
+seated one: body, head, face, hair and accessory are the desk's, and legs come under them
+(`art/sheets/standing.ts`): hands hanging at the sides, trousers in `pants.light` and
+`pants.dark`, shoes in `shoe`. Four frames: standing, a step with the left foot, standing,
+a step with the right; the legs move a frame every four pixels walked. The back is made
+from the front drawings, so every hairstyle has one: head and hair become one silhouette
+filled with hair and shaded on the right, the collar and zips become plain cloth, glasses
+disappear. Costumes have no back and always face the room. Walking up the room shows the
+back, anything else the front. On a break the agent faces the room and now and then sips
+from the red mug.
+
+## Stations and chats
+
+Furniture with a purpose (`src/frontend/src/building/stations.ts`):
+
+| Purpose | Furniture |
+| --- | --- |
+| Reading, searching, looking things up | bookshelf, filing cabinet, printer |
+| Commands, tests, builds | server rack |
+| Plans | whiteboard |
+| Breaks | coffee machine, water cooler, vending machine, side table, arcade cabinet |
+
+The filing cabinet (14 by 30, three labelled drawers and a folder on top, in the theme's
+metal), the printer (20 by 21, a page coming out, on a low cupboard) and the coffee machine
+(18 by 27, a cup under it, on a counter) were drawn for this. Agents stand in front of a
+station, facing it, to work, and beside it, facing the room, on a break, so it still shows;
+agents of the same station stand a little apart. While an agent is away its desk shows
+without it, the screen as the work left it.
+
+A chat (`src/frontend/src/art/chat.ts`) is a round bubble with a tail of dots, 11 by 10, in
+`chat.paper`, never with words: dots, a note, a heart, "!?" or a coffee. The real bubbles
+are boxes with text, so the two never mix up. The two agents take turns, a bubble each, and
+smile.

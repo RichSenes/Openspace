@@ -98,12 +98,13 @@ Later, in rough order of appearance:
      set in Settings (clouds, fog, drizzle, rain, snow, storms with flashes, stars
      only when clear), and a minimap sketches the building: rooms as blocks in
      their mood's colours, agents as marks shaped by their state; press it to go.
-  5. Stations and walks: furniture with a purpose (shelves, cabinets and printers
-     for documents; racks for commands and tests; whiteboards for plans; the coffee
-     machine for breaks). Agents walk to a nearby one now and then, never far; when
-     they need you they go back to their desk. Two agents who meet stop for a chat
-     with made-up bubbles, shaped unlike the real ones. Needs standing and walking
-     sprites: a round of art.
+  5. ~~Stations and walks~~ Done: furniture has a purpose (bookshelves, filing
+     cabinets and printers for reading; server racks for commands and tests;
+     whiteboards for plans; coffee machines, water coolers and the like for
+     breaks). Now and then a step sends an agent to a station of its own room, a
+     short walk at most; agents with nothing to do take a break; an agent that
+     needs you hurries back to its desk. Two agents who meet stop for a chat with
+     made-up round bubbles. Standing and walking agents, front and back.
   6. Guests: Claude Code sessions started outside Openspace appear, read only, in a
      guest room of the office whose repository holds the folder they work in (the
      folder is on every line of their log), working on laptops with a visitor

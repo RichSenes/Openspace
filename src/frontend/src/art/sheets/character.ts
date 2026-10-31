@@ -36,6 +36,9 @@ export const CHARACTER_LEGEND = {
   y: 'eye.dim',
   u: 'mug.light',
   U: 'mug.dark',
+  j: 'pants.light',
+  J: 'pants.dark',
+  g: 'shoe',
 } as const
 
 const character = (name: string, frames: string[][]): SpriteDef => ({

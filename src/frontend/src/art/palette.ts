@@ -27,6 +27,9 @@ export const CHARACTER_COLORS = {
   'hood.inner': '#2c1418',
   'mug.light': '#d9574a',
   'mug.dark': '#9e3a32',
+  'pants.light': '#454c63',
+  'pants.dark': '#313648',
+  shoe: '#5a3f30',
 } as const
 
 /** Light, mid and shadow tones of black gloves, for the hooded costume. */

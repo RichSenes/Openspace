@@ -1165,6 +1165,120 @@ const CLUB_SOFA: SpriteDef = {
   ],
 }
 
+/** A metal filing cabinet, three drawers with labels and a folder on top. */
+const FILING_CABINET: SpriteDef = {
+  name: 'filing-cabinet',
+  width: 14,
+  height: 30,
+  legend: { o: 'outline', j: 'metal.light', k: 'metal.mid', K: 'metal.dark', P: 'poster.paper', p: 'poster.shade' },
+  frames: [
+    [
+      '....ooooo.....',
+      '...oPPPPPo....',
+      '..oPpPPPPPo...',
+      'oooooooooooooo',
+      'ojjjjjjjjjjjjo',
+      'oKKKKKKKKKKKKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkkoPPPokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkoKKKKokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'oKKKKKKKKKKKKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkkoPPPokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkoKKKKokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'oKKKKKKKKKKKKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkkoPPPokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'ojkkoKKKKokkKo',
+      'ojkkkoooookkKo',
+      'ojkkkkkkkkkkKo',
+      'oooooooooooooo',
+    ],
+  ],
+}
+
+/** A printer on a low cupboard, a page coming out. */
+const PRINTER: SpriteDef = {
+  name: 'printer',
+  width: 20,
+  height: 21,
+  legend: { o: 'outline', W: 'appliance.light', w: 'appliance.dark', P: 'poster.paper', p: 'poster.shade', L: 'led.on', B: 'button.blue', T: 'wood.light', t: 'wood.mid', f: 'wood.dark', j: 'metal.light' },
+  frames: [
+    [
+      '....oooooooooo......',
+      '....oPPPPPPPPo......',
+      '....oPppppPPPo......',
+      'oooooooooooooooooooo',
+      'oWWWWWWWWWWWWWWWWWwo',
+      'oWWWWWWWWWWWWLWBWWwo',
+      'owwwwwwwwwwwwwwwwwwo',
+      'owoooooooooooooowwwo',
+      'owwoPPPPPPPPPPowwwwo',
+      'oooooooooooooooooooo',
+      '.oTTTTTTTTTTTTTTTTo.',
+      '.oooooooooooooooooo.',
+      '.otttttttoottttttto.',
+      '.otttttttoottttttto.',
+      '.ottttttjoojtttttto.',
+      '.otttttttoottttttto.',
+      '.otttttttoottttttto.',
+      '.offffffffffffffffo.',
+      '.oooooooooooooooooo.',
+      '.of..............fo.',
+      '.oo..............oo.',
+    ],
+  ],
+}
+
+/** A coffee machine on a counter, a cup waiting under it. */
+const COFFEE_MACHINE: SpriteDef = {
+  name: 'coffee-machine',
+  width: 18,
+  height: 27,
+  legend: { o: 'outline', j: 'metal.light', k: 'metal.mid', K: 'metal.dark', L: 'led.on', R: 'button.red', u: 'mug.light', U: 'mug.dark', T: 'wood.light', t: 'wood.mid', f: 'wood.dark' },
+  frames: [
+    [
+      '..oooooooooooooo..',
+      '..ojjjjjjjjjjjjo..',
+      '..okkkkkkkkkkkKo..',
+      '..okLkkkkkkkRkKo..',
+      '..okkkkkkkkkkkKo..',
+      '..oKKKKKKKKKKKKo..',
+      '..okkoooooookkKo..',
+      '..okkoKKKKKokkKo..',
+      '..okkooKKKookkKo..',
+      '..okko.oKo.okkKo..',
+      '..okko.....okkKo..',
+      '..okko.uUu.okkKo..',
+      '..okko.uuu.okkKo..',
+      '..okkooooooookKo..',
+      '..oooooooooooooo..',
+      'oooooooooooooooooo',
+      'oTTTTTTTTTTTTTTTTo',
+      'oooooooooooooooooo',
+      '.otttttttttttttfo.',
+      '.otoooooooooootfo.',
+      '.ototttttttttotfo.',
+      '.otottttjjtttotfo.',
+      '.ototttttttttotfo.',
+      '.ototttttttttotfo.',
+      '.otoooooooooootfo.',
+      '.offffffffffffffo.',
+      '.oooooooooooooooo.',
+    ],
+  ],
+}
+
 export const PROPS = {
   plant: prop(PLANT, 'Watered by whoever closes the last task of the day.'),
   sideTable: prop(SIDE_TABLE, 'Coffee: the real orchestrator.'),
@@ -1189,6 +1303,9 @@ export const PROPS = {
   corpPoster: prop(CORP_POSTER, 'Together we build a better world. Terms apply.', { layer: 'wall' }),
   throne: prop(THRONE, 'Worth two dragons, according to some traders.'),
   clubSofa: prop(CLUB_SOFA, 'Members only. Membership expired in 2009.'),
+  filingCabinet: prop(FILING_CABINET, 'Everything is in here. Nobody knows where.'),
+  printer: prop(PRINTER, 'Out of toner since the last sprint.', { lights: [{ x: 13, y: 5, radius: 8, color: 'led.on' }] }),
+  coffeeMachine: prop(COFFEE_MACHINE, 'Fuel for the next merge.', { lights: [{ x: 4, y: 3, radius: 10, color: 'led.on' }] }),
 } as const
 
 export type PropName = keyof typeof PROPS

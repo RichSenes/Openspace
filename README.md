@@ -68,7 +68,11 @@ Each project has its own README with detailed specifications.
    a room or every office at once. A little map in the corner shows the whole
    building with every agent as a mark for its state; press it to go there.
    The windows show the real weather of your town (set in Settings), from
-   Open-Meteo: no key, only the town leaves your computer.
+   Open-Meteo: no key, only the town leaves your computer. Agents get up now
+   and then: to a shelf, a filing cabinet or a printer while they read, to a
+   server rack while they run commands, to a whiteboard to plan, to the coffee
+   when they have nothing to do, and back to their desk at once when they need
+   you. Colleagues who meet stop for a chat.
 8. Reports of a day or of an epic are written from the audit log in the
    language you choose, ready to copy into an email or a chat.
 9. Accepted work is merged into the branch you choose, one task at a time or

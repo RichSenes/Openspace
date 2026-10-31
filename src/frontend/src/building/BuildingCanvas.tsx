@@ -14,6 +14,10 @@ import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WI
 import type { AgentState } from '../art/agentStates'
 import { energyOf } from '../activity/energy'
 import { InternStage } from '../activity/interns'
+import { WalkStage, type DeskDoing } from '../activity/walks'
+import { walkerItems } from '../art/chat'
+import { WALKER } from '../art/walker'
+import { placesOf } from './stations'
 import { agentStateOf, lookOf } from './agents'
 import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
@@ -119,6 +123,8 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
   const pickRef = useRef(onPickDesk)
   // Remembers who stands beside each desk across redraws, so arrivals and departures can puff.
   const stage = useRef(new InternStage())
+  // Remembers who is away from their desk, so walks carry on across redraws.
+  const walks = useRef(new WalkStage())
   const mapCanvas = useRef<HTMLCanvasElement>(null)
   const mapFrame = useRef<HTMLDivElement>(null)
 
@@ -136,12 +142,16 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
       stage.current.update(interns ?? NO_INTERNS, Date.now(), !reducedMotion())
-      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, interns: stage.current, dark, weather }, arrange?.selection)
+      // Nobody walks while rooms are arranged, nor for people who prefer less motion.
+      const walking = !arrange && !reducedMotion() ? walks.current : undefined
+      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, interns: stage.current, walks: walking, dark, weather }, arrange?.selection)
       app.stage.addChild(drawn.world)
       Object.assign(view, drawn)
       view.hall?.paint()
       drawn.rooms.forEach((room) => room.paint(view.tick))
       view.map = mapPainter(layout, drawn.scene, mapCanvas.current, mapFrame.current, app)
+      view.walk = walking ? walker(layout, drawn.scene, walking) : undefined
+      view.walk?.()
       view.map?.paint(view.tick)
       if (view.auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
@@ -196,6 +206,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
         const timer = setInterval(() => {
           const view = viewOf(app)
           view.tick++
+          view.walk?.()
           view.rooms?.forEach((room) => room.paint(view.tick))
           view.map?.paint(view.tick)
         }, 1000 / FPS)
@@ -288,6 +299,8 @@ interface View {
   animation?: number
   /** The little map, when shown: repainted on every frame, its frame moved with the camera. */
   map?: MapPainter
+  /** Moves the agents away from their desks on, once a frame. */
+  walk?: () => void
 }
 
 const views = new WeakMap<Application, View>()
@@ -305,6 +318,20 @@ function apply(view: View) {
   view.world?.position.set(Math.round(view.camera.x), Math.round(view.camera.y))
   view.world?.scale.set(view.camera.scale)
   view.map?.follow(view.camera)
+}
+
+/** What every desk is up to, for the walks: its state and its step. */
+function walker(layout: BuildingLayout, scene: Scene, walks: WalkStage): () => void {
+  const places = placesOf(layout)
+  const doing = new Map<string, DeskDoing>(
+    layout.rooms.flatMap((room) =>
+      room.desks.map((d) => {
+        const activity = scene.activities.get(d.id)
+        return [d.id, { state: scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, activity), doing: activity?.doing }] as const
+      }),
+    ),
+  )
+  return () => walks.update(places, doing, Date.now())
 }
 
 interface MapPainter {
@@ -328,8 +355,14 @@ function mapPainter(layout: BuildingLayout, scene: Scene, canvas: HTMLCanvasElem
   const agents: MapAgent[] = layout.rooms.flatMap((room) =>
     room.desks.map((d) => ({ x: d.x, y: d.y, state: scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id)) })),
   )
+  // An agent away from its desk shows where it walks.
+  const now = (agent: MapAgent, deskId: string): MapAgent => {
+    const away = scene.walks?.at(deskId, Date.now())
+    return away ? { ...agent, x: away.x + WALKER.width / 2 - STATION.width / 2, y: away.y + WALKER.height / 2 - STATION.height / 2 } : agent
+  }
+  const desks = layout.rooms.flatMap((room) => room.desks.map((d) => d.id))
   return {
-    paint: (tick) => paintInto(canvas, size.width, size.height, minimapPixels(layout, hall, inks, agents, tick)),
+    paint: (tick) => paintInto(canvas, size.width, size.height, minimapPixels(layout, hall, inks, agents.map((a, i) => now(a, desks[i])), tick)),
     follow: (camera) => {
       const seen = mapView(camera, app.screen)
       const left = Math.max(0, seen.x)
@@ -630,6 +663,7 @@ interface Scene {
   activities: ReadonlyMap<string, DeskActivity>
   contexts?: ReadonlyMap<string, DeskContext>
   interns?: InternStage
+  walks?: WalkStage
   states?: ReadonlyMap<string, AgentState>
   dark: boolean
   weather?: Sky
@@ -943,12 +977,14 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
       const items = [
         ...openings,
         ...room.props.map((p) => propItem(p.name, p.x, p.y, tick, theme, size)),
-        ...room.desks.map((d, i) =>
-          deskItem(
+        ...room.desks.flatMap((d, i) => {
+          const away = scene.walks?.at(d.id, now)
+          const desk = deskItem(
             looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme, undefined,
-            energyOf(scene.contexts?.get(d.id), states.get(d.id)!, now),
-          ),
-        ),
+            energyOf(scene.contexts?.get(d.id), states.get(d.id)!, now), Boolean(away),
+          )
+          return away ? [desk, ...walkerItems(looks.get(d.id)!, away, room.x * TILE, room.y * TILE)] : [desk]
+        }),
         ...room.desks.flatMap((d, i) =>
           internItems(looks.get(d.id)!, scene.interns?.at(d.id, now) ?? [], d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7),
         ),

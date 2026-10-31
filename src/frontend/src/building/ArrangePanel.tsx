@@ -4,6 +4,7 @@ import { useSaveFloorPlan } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { toCanvas } from '../art/canvas'
 import { FURNITURE } from '../art/fanPack'
+import { ERRAND_WORDS, ERRANDS } from './stations'
 import type { PropName } from '../art/sheets/props'
 import { pixelsOf } from '../art/sprite'
 import { themeColors } from '../art/station'
@@ -77,8 +78,11 @@ function describe(target: Target | undefined, office: OfficeView, roomId: string
   switch (target.kind) {
     case 'desk':
       return `${office.rooms.find((r) => r.id === roomId)?.desks.find((d) => d.id === target.id)?.name ?? 'Desk'}: drag it or use the arrows.`
-    case 'piece':
-      return `${furnitureLabel(pieceName ?? '')}: drag it, use the arrows or remove it.`
+    case 'piece': {
+      const errand = ERRANDS[(pieceName ?? '') as PropName]
+      const use = errand && roomId !== BUILDING ? ` ${ERRAND_WORDS[errand]}` : ''
+      return `${furnitureLabel(pieceName ?? '')}: drag it, use the arrows or remove it.${use}`
+    }
     case 'door':
       return 'Door: drag it along any wall of the room, or use the arrows.'
     case 'window':

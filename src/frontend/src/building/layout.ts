@@ -176,13 +176,15 @@ function plannedLayout(office: OfficeView): BuildingLayout {
   const cuts = (office.cuts ?? []).map((c) => ({ x: OUT + c.left, y: OUT + c.top, width: c.width, height: c.height }))
   const rooms: RoomBox[] = []
   const waiting: RoomView[] = []
+  const furniture = (office.furniture ?? []).filter((p) => isProp(p.name)).map((p) => tilesOf(p.name as PropName, p.x + floor.x * TILE, p.y + floor.y * TILE))
   for (const room of office.rooms) {
     if (room.left != null && room.top != null) rooms.push(boxOf(room, OUT + room.left, OUT + room.top))
     else waiting.push(room)
   }
   for (const room of waiting) {
     const { width, height } = sizeOf(room)
-    const spot = freeSpot([...rooms, ...cuts], floor, width, height) ?? { x: floor.x, y: floor.y + floor.height }
+    // Clear of the corridor's furniture if it can be, or at least of the other rooms.
+    const spot = freeSpot([...rooms, ...cuts, ...furniture], floor, width, height) ?? freeSpot([...rooms, ...cuts], floor, width, height) ?? { x: floor.x, y: floor.y + floor.height }
     floor.height = Math.max(floor.height, spot.y + height - floor.y)
     rooms.push(boxOf(room, spot.x, spot.y))
   }
@@ -190,6 +192,20 @@ function plannedLayout(office: OfficeView): BuildingLayout {
     .filter((p) => isProp(p.name))
     .map((p) => ({ name: p.name as PropName, x: p.x + floor.x * TILE, y: p.y + floor.y * TILE }))
   return { rooms, floor, cuts, doors: rooms.map(doorOf), hall, planned: true, width: floor.width + 2 * OUT, height: floor.height + 2 * OUT }
+}
+
+/** The tiles a piece of furniture standing at (x, y), in world pixels, covers. */
+function tilesOf(name: PropName, x: number, y: number): TileRect {
+  const { width, height } = FURNITURE[name].sprite
+  const left = Math.floor(x / TILE)
+  const top = Math.floor(y / TILE)
+  return { x: left, y: top, width: Math.ceil((x + width) / TILE) - left, height: Math.ceil((y + height) / TILE) - top }
+}
+
+/** Whether a piece of the corridor's furniture lies under a room. */
+export function underRoom(layout: Pick<BuildingLayout, 'rooms'>, piece: PropSpot): boolean {
+  const t = tilesOf(piece.name, piece.x, piece.y)
+  return layout.rooms.some((r) => t.x < r.x + r.width && r.x < t.x + t.width && t.y < r.y + r.height && r.y < t.y + t.height)
 }
 
 /** The first place on the floor, back to front and left to right, where a room fits among what is already there. */

@@ -38,7 +38,7 @@ import {
   type Target,
 } from './arrange'
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
-import { doorOf, inBuilding, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
+import { doorOf, inBuilding, layoutOffice, TILE, underRoom, WALL, type BuildingLayout, type RoomBox } from './layout'
 import { wallPlan } from './walls'
 import { centredOn, inkOf, mapSize, mapView, minimapPixels, type MapAgent, type RoomInk } from './minimap'
 
@@ -728,9 +728,8 @@ function drawBuilding(
   )
   const walls = new Graphics()
   drawWalls(walls, layout, scene, theme)
+  // Openings see the corridor's floor only, never what stands there: it already shows.
   const hall = hallFurniture(layout, scene, theme)
-  // Windows see what stands in the corridor too, over its floor.
-  sources.push(hall.source)
   world.addChild(walls, hall.sprite)
   const names = new Map<string, Text>()
   const said: { text: Text; activity: DeskActivity; deskId: string; x: number; y: number }[] = []
@@ -892,7 +891,10 @@ function spriteOf(canvas: HTMLCanvasElement, x: number, y: number): Sprite {
 /** The common floor's furniture, in pixels from the building's corner, with its lights. */
 function hallItems(layout: BuildingLayout, theme: Theme) {
   const size = { width: layout.floor.width * TILE, height: layout.floor.height * TILE }
-  const items = layout.hall.map((p) => propItem(p.name, p.x - layout.floor.x * TILE, p.y - layout.floor.y * TILE, 0, theme, size))
+  // Furniture a room was put over stays hidden under it rather than drawn on top.
+  const items = layout.hall
+    .filter((p) => !underRoom(layout, p))
+    .map((p) => propItem(p.name, p.x - layout.floor.x * TILE, p.y - layout.floor.y * TILE, 0, theme, size))
   return { size, items, lights: sceneLights(items) }
 }
 
@@ -954,10 +956,14 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   paintInto(canvas, size.width, size.height, shell)
   const sprite = spriteOf(canvas, room.x * TILE, room.y * TILE)
   world.addChild(sprite)
-  sources.push({ canvas, x: room.x * TILE, y: room.y * TILE })
   const colors = themeColors(theme.colors)
   // Some moods keep the lights off whatever the hour.
   const dark = scene.dark || Boolean(theme.dark)
+  // Openings in the walls around see only the room's floor and walls: what stands in it
+  // already shows above the wall, and would show twice.
+  const bare = document.createElement('canvas')
+  paintInto(bare, size.width, size.height, roomPixels(theme, shell, [], dark))
+  sources.push({ canvas: bare, x: room.x * TILE, y: room.y * TILE })
 
   const views = new Map(scene.office.rooms.flatMap((r) => r.desks).map((d) => [d.id, d]))
   // Guests wear a visitor's badge and work on a laptop.

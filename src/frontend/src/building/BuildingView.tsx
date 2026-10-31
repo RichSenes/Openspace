@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
+import { Lightbulb, LightbulbOff, Map as MapIcon, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
 import { contextByDesk } from '../activity/energy'
 import { internsByDesk } from '../activity/interns'
-import { useActivity, useDeskContexts, useInterns, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
+import { useActivity, useDeskContexts, useInterns, useWeather, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
@@ -17,6 +17,7 @@ import { BuildingCanvas, type DeskPick, type Selection } from './BuildingCanvas'
 import { LookDialog } from './LookDialog'
 import { useRoutineProgress } from '../realtime/routineProgress'
 import { routineBubble, routineStateOf, withRoutines } from './routines'
+import { usePersistentState } from '../usePersistentState'
 import './building.css'
 
 const lightsKey = (officeId: string) => `openspace.lights-off.${officeId}`
@@ -68,6 +69,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const energy = useDeskContexts()
   const contexts = useMemo(() => contextByDesk(energy.data, office.id), [energy.data, office.id])
   const helpers = useInterns()
+  const weather = useWeather().data?.now?.sky
   const interns = useMemo(() => internsByDesk(helpers.data, office.id), [helpers.data, office.id])
   const routines = useRoutines(office.id)
   const proposals = useProposals(office.id)
@@ -91,6 +93,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const toast = useToast()
   const noTasks = useMemo(() => [], [])
   const [arranging, setArranging] = useState(false)
+  const [map, setMap] = usePersistentState<'yes' | 'no'>('openspace.minimap', 'yes')
   const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
   // While arranging, the routines room shows empty: its dolls place themselves.
@@ -138,6 +141,8 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
         contexts={contexts}
         interns={interns}
         dark={lightsOff}
+        weather={weather}
+        minimap={map === 'yes' && !arranging}
         arrange={
           arranging
             ? {
@@ -167,6 +172,9 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
             </button>
             <button type="button" className="btn" aria-pressed={lightsOff} onClick={() => setLightsOff(!lightsOff)}>
               {lightsOff ? <LightbulbOff size={16} /> : <Lightbulb size={16} />} {lightsOff ? 'Lights on' : 'Lights off'}
+            </button>
+            <button type="button" className="btn" aria-pressed={map === 'yes'} onClick={() => setMap(map === 'yes' ? 'no' : 'yes')}>
+              <MapIcon size={16} /> {map === 'yes' ? 'Hide map' : 'Map'}
             </button>
             <label className="sr-only" htmlFor="office-theme">
               Mood of {office.name}

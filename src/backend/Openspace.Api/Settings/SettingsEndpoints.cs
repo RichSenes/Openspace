@@ -81,19 +81,23 @@ internal static class SettingsEndpoints
     }
 
     /// <summary>Keeps whatever else the file holds; blank models are written empty, which means the default.</summary>
-    private static void Write(string path, SettingsView settings)
+    private static void Write(string path, SettingsView settings) => Patch(path, section =>
     {
-        var root = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) as JsonObject ?? [] : [];
-        JsonObject Section(string name) => root[name] as JsonObject ?? (JsonObject)(root[name] = new JsonObject());
-
-        Section(AgentOptions.SectionName)["Autonomy"] = settings.Autonomy.ToString();
-        Section(QueueOptions.SectionName)["Seats"] = settings.Seats;
-        var claude = Section(ClaudeCodeOptions.SectionName);
+        section(AgentOptions.SectionName)["Autonomy"] = settings.Autonomy.ToString();
+        section(QueueOptions.SectionName)["Seats"] = settings.Seats;
+        var claude = section(ClaudeCodeOptions.SectionName);
         claude["Supervise"] = settings.ClaudeSupervises;
         claude["SupervisorModel"] = settings.SupervisorModel ?? string.Empty;
         claude["Review"] = settings.ClaudeReviews;
         claude["ReviewModel"] = settings.ReviewModel ?? string.Empty;
-        Section(OpenCodeOptions.SectionName)["DraftModel"] = settings.DraftModel ?? string.Empty;
+        section(OpenCodeOptions.SectionName)["DraftModel"] = settings.DraftModel ?? string.Empty;
+    });
+
+    /// <summary>Changes some sections of the settings file, keeping the rest, and swaps the file in whole.</summary>
+    internal static void Patch(string path, Action<Func<string, JsonObject>> change)
+    {
+        var root = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) as JsonObject ?? [] : [];
+        change(name => root[name] as JsonObject ?? (JsonObject)(root[name] = new JsonObject()));
 
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

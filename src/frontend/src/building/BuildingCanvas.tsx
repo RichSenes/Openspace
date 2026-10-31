@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
-import type { DeskActivity, DeskContext, FloorCut, Intern, OfficeView, WorkTaskView } from '../api/types'
+import type { DeskActivity, DeskContext, FloorCut, Intern, OfficeView, Sky, WorkTaskView } from '../api/types'
 import { paintInto } from '../art/canvas'
 import { inTheDark, unlit, type Light } from '../art/lighting'
 import { deskItem, internItems, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
@@ -35,6 +35,7 @@ import {
 import { between, fit, pan, toWorld, wheelFactor, zoomAt, type Camera } from './camera'
 import { doorOf, inBuilding, layoutOffice, TILE, WALL, type BuildingLayout, type RoomBox } from './layout'
 import { wallPlan } from './walls'
+import { centredOn, inkOf, mapSize, mapView, minimapPixels, type MapAgent, type RoomInk } from './minimap'
 
 /** Frames per second of the pixel art, as in docs/art-style.md. */
 const FPS = 5
@@ -66,6 +67,10 @@ interface Props {
   interns?: ReadonlyMap<string, readonly Intern[]>
   /** Lights off: only screens, lamps and other glowing things light the rooms. */
   dark: boolean
+  /** The weather of the person's town, at the windows; clear when none is set. */
+  weather?: Sky
+  /** A little map of the building in a corner: where the screen is, and every agent. */
+  minimap?: boolean
   /** More controls beside Fit. */
   controls?: ReactNode
   /** Present while the person arranges rooms: things can then be picked up and moved. */
@@ -105,7 +110,7 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, states, contexts, interns, dark, controls, arrange, onPickDesk }: Props) {
+export function BuildingCanvas({ office, tasks, activities, states, contexts, interns, dark, weather, minimap, controls, arrange, onPickDesk }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
@@ -114,6 +119,8 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
   const pickRef = useRef(onPickDesk)
   // Remembers who stands beside each desk across redraws, so arrivals and departures can puff.
   const stage = useRef(new InternStage())
+  const mapCanvas = useRef<HTMLCanvasElement>(null)
+  const mapFrame = useRef<HTMLDivElement>(null)
 
   // Refreshed after every render so the canvas callbacks always see the latest props.
   useEffect(() => {
@@ -129,11 +136,13 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
       stage.current.update(interns ?? NO_INTERNS, Date.now(), !reducedMotion())
-      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, interns: stage.current, dark }, arrange?.selection)
+      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, interns: stage.current, dark, weather }, arrange?.selection)
       app.stage.addChild(drawn.world)
       Object.assign(view, drawn)
       view.hall?.paint()
       drawn.rooms.forEach((room) => room.paint(view.tick))
+      view.map = mapPainter(layout, drawn.scene, mapCanvas.current, mapFrame.current, app)
+      view.map?.paint(view.tick)
       if (view.auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
     }
@@ -188,6 +197,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
           const view = viewOf(app)
           view.tick++
           view.rooms?.forEach((room) => room.paint(view.tick))
+          view.map?.paint(view.tick)
         }, 1000 / FPS)
         listeners.push(() => clearInterval(timer))
       }
@@ -204,7 +214,24 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
   }, [])
 
   const arranging = Boolean(arrange)
-  useEffect(() => draw.current(), [office, tasks, activities, states, contexts, interns, dark, arranging, arrange?.selection])
+  useEffect(() => draw.current(), [office, tasks, activities, states, contexts, interns, dark, weather, minimap, arranging, arrange?.selection])
+
+  // Pressing the map flies there; dragging across it follows the pointer.
+  const goTo = (e: React.PointerEvent<HTMLCanvasElement>, glide: boolean) => {
+    const app = appRef.current
+    const canvas = mapCanvas.current
+    if (!app || !canvas) return
+    const view = viewOf(app)
+    const box = canvas.getBoundingClientRect()
+    const target = centredOn(view.camera, app.screen, ((e.clientX - box.left) / box.width) * canvas.width, ((e.clientY - box.top) / box.height) * canvas.height)
+    view.auto = false
+    if (glide) flyTo(view, target)
+    else {
+      if (view.animation) cancelAnimationFrame(view.animation)
+      view.camera = target
+      apply(view)
+    }
+  }
 
   return (
     <div className="building-canvas" ref={host}>
@@ -219,6 +246,20 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
         </button>
         {controls}
       </div>
+      {minimap && (
+        <div className="minimap">
+          <canvas
+            ref={mapCanvas}
+            aria-label="Map of the building: press to go there"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              goTo(e, true)
+            }}
+            onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && goTo(e, false)}
+          />
+          <div className="minimap-view" ref={mapFrame} />
+        </div>
+      )}
     </div>
   )
 }
@@ -245,6 +286,8 @@ interface View {
   /** Frames of pixel art shown so far. */
   tick: number
   animation?: number
+  /** The little map, when shown: repainted on every frame, its frame moved with the camera. */
+  map?: MapPainter
 }
 
 const views = new WeakMap<Application, View>()
@@ -261,6 +304,48 @@ function viewOf(app: Application): View {
 function apply(view: View) {
   view.world?.position.set(Math.round(view.camera.x), Math.round(view.camera.y))
   view.world?.scale.set(view.camera.scale)
+  view.map?.follow(view.camera)
+}
+
+interface MapPainter {
+  paint: (tick: number) => void
+  follow: (camera: Camera) => void
+}
+
+/**
+ * The little map of the building: rooms in their mood's colours, agents as marks for their
+ * state, and a frame around what the screen shows, clipped to the map.
+ */
+function mapPainter(layout: BuildingLayout, scene: Scene, canvas: HTMLCanvasElement | null, frame: HTMLDivElement | null, app: Application): MapPainter | undefined {
+  if (!canvas || !frame) return undefined
+  const size = mapSize(layout)
+  canvas.style.width = `${size.width * size.zoom}px`
+  canvas.style.height = `${size.height * size.zoom}px`
+  const moods = new Map(scene.office.rooms.map((r) => [r.id, r.mood]))
+  const office = themeOf(scene.office.theme).colors
+  const hall = { ...inkOf(office), floor: office['wall.light'] }
+  const inks = new Map<string, RoomInk>(layout.rooms.map((room) => [room.id, inkOf(themeOf(moods.get(room.id) ?? scene.office.theme).colors)]))
+  const agents: MapAgent[] = layout.rooms.flatMap((room) =>
+    room.desks.map((d) => ({ x: d.x, y: d.y, state: scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id)) })),
+  )
+  return {
+    paint: (tick) => paintInto(canvas, size.width, size.height, minimapPixels(layout, hall, inks, agents, tick)),
+    follow: (camera) => {
+      const seen = mapView(camera, app.screen)
+      const left = Math.max(0, seen.x)
+      const top = Math.max(0, seen.y)
+      const right = Math.min(size.width, seen.x + seen.width)
+      const bottom = Math.min(size.height, seen.y + seen.height)
+      const whole = left <= 0 && top <= 0 && right >= size.width && bottom >= size.height
+      frame.hidden = whole || right <= left || bottom <= top
+      Object.assign(frame.style, {
+        left: `${left * size.zoom}px`,
+        top: `${top * size.zoom}px`,
+        width: `${(right - left) * size.zoom}px`,
+        height: `${(bottom - top) * size.zoom}px`,
+      })
+    },
+  }
 }
 
 const worldRect = (layout: BuildingLayout) => ({ x: 0, y: 0, width: layout.width * TILE, height: layout.height * TILE })
@@ -547,6 +632,7 @@ interface Scene {
   interns?: InternStage
   states?: ReadonlyMap<string, AgentState>
   dark: boolean
+  weather?: Sky
 }
 
 const NO_INTERNS: ReadonlyMap<string, readonly Intern[]> = new Map()
@@ -819,9 +905,9 @@ function drawWalls(g: Graphics, layout: BuildingLayout, scene: Scene, theme: The
  * What a window or a doorway in a back wall shows: the sky when the wall is the building's
  * own, otherwise whatever is painted just behind it.
  */
-function behind(room: RoomBox, layout: BuildingLayout, sources: Source[], x: number, width: number, height: number, tick: number, phase: DayPhase): { pixels: Pixel[]; outside: boolean } {
+function behind(room: RoomBox, layout: BuildingLayout, sources: Source[], x: number, width: number, height: number, tick: number, phase: DayPhase, weather: Sky | undefined): { pixels: Pixel[]; outside: boolean } {
   const worldX = room.x * TILE + x
-  if (!inBuilding(layout, Math.floor((worldX + width / 2) / TILE), room.y - 1)) return { pixels: skyPixels(worldX, width, height, tick, phase), outside: true }
+  if (!inBuilding(layout, Math.floor((worldX + width / 2) / TILE), room.y - 1)) return { pixels: skyPixels(worldX, width, height, tick, phase, weather), outside: true }
   return { pixels: sample(sources, worldX, room.y * TILE - height, width, height), outside: false }
 }
 
@@ -846,12 +932,12 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
       const now = Date.now()
       const phase = phaseOf(new Date(now).getHours())
       const openings: SceneItem[] = room.windows.map((x) => {
-        const view = behind(room, layout, sources, x + GLASS.x, GLASS.width, GLASS.height, tick, phase)
-        const lights: Light[] = view.outside && dark ? windowLight(phase) : []
+        const view = behind(room, layout, sources, x + GLASS.x, GLASS.width, GLASS.height, tick, phase, scene.weather)
+        const lights: Light[] = view.outside && dark ? windowLight(phase, scene.weather, tick) : []
         return { x, y: WINDOW.y, height: WINDOW_SIZE.height, pixels: windowPixels(view.pixels, colors), layer: 'wall', lights }
       })
       if (room.door.wall === 'Back') {
-        const view = behind(room, layout, sources, room.door.offset * TILE + 3, 26, 27, tick, phase)
+        const view = behind(room, layout, sources, room.door.offset * TILE + 3, 26, 27, tick, phase, scene.weather)
         openings.push({ x: room.door.offset * TILE, y: 0, height: WALL_HEIGHT, pixels: doorwayPixels(view.pixels, colors), layer: 'wall' })
       }
       const items = [

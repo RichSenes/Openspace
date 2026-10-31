@@ -13,6 +13,8 @@ import { SIGNALS, type Signal } from '../art/sheets/signals'
 import { pixelsOf, type Pixel, type SpriteDef } from '../art/sprite'
 import { STATION, stationPixels, themeColors, type Appearance, type ScreenState } from '../art/station'
 import { THEMES, type Theme, type ThemeName } from '../art/themes'
+import { GLASS, skyPixels, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
+import type { Sky } from '../api/types'
 import './lab.css'
 
 const FPS = 5
@@ -34,6 +36,17 @@ const ENERGY_SAMPLES: { label: string; state: AgentState; left: number; coffee?:
   { label: 'tired, asks you', state: 'waiting', left: 0.2 },
   { label: 'done', state: 'done', left: 0.55 },
 ]
+
+const SKIES: Sky[] = ['Clear', 'Cloudy', 'Fog', 'Drizzle', 'Rain', 'Snow', 'Storm']
+const PHASES: DayPhase[] = ['day', 'dusk', 'night']
+
+/** One window per time of day, side by side, in the same weather. */
+function weatherStrip(weather: Sky, tick: number, theme: Theme): Pixel[] {
+  const colors = themeColors(theme.colors)
+  return PHASES.flatMap((phase, i) =>
+    windowPixels(skyPixels(i * 40, GLASS.width, GLASS.height, tick, phase, weather), colors).map((p) => ({ ...p, x: p.x + i * (WINDOW_SIZE.width + 2) })),
+  )
+}
 
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
 function Pixels({ width, height, pixels, scale, label }: { width: number; height: number; pixels: Pixel[]; scale: number; label: string }) {
@@ -301,6 +314,18 @@ export function SpriteLab() {
             <figure key={i}>
               <Pixels width={INTERN_SCENE.width} height={INTERN_SCENE.height} pixels={internScene(PEOPLE[i], i, tick, theme)} scale={small} label={INTERN_LABELS[i]} />
               <figcaption>{INTERN_LABELS[i]}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Weather (day, dusk, night)</h2>
+        <div className="lab-pieces">
+          {SKIES.map((weather) => (
+            <figure key={weather}>
+              <Pixels width={WINDOW_SIZE.width * 3 + 4} height={WINDOW_SIZE.height} pixels={weatherStrip(weather, tick, theme)} scale={small} label={weather} />
+              <figcaption>{weather}</figcaption>
             </figure>
           ))}
         </div>

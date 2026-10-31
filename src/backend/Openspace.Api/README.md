@@ -72,6 +72,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
+| GET | `/api/weather` | The town whose weather the windows show and its weather: `{ place, now: { place, sky, temperature, at } }`; `sky` is Clear, Cloudy, Fog, Drizzle, Rain, Snow or Storm; read from Open-Meteo at most every 15 minutes, the last reading kept if it cannot be reached |
+| PUT | `/api/weather` | `{ place }`: looks the town up ("Turin" or "Turin, Italy") and keeps it in the settings file; empty stops the weather; 422 for a town nobody knows |
 | GET | `/api/sounds` | `{ muted, volume, rules, files }`: which sound each moment plays (`needs-you`, `question`, `review`, `verdict`, `failed`, `plan-ready`, `checks-failed`, `paused`, `all-done`, `offline`), in general or for one room or desk, and your own sound files |
 | PUT | `/api/sounds` | `{ muted, volume, rules }`, each rule `{ event, roomId?, deskId?, sound }` with `sound` = `builtin:<name>`, `file:<name>` or `silent` |
 | POST | `/api/sounds/files` | A sound file of yours (form field `file`; mp3, ogg, opus, wav, m4a, webm or flac, 3 MB at most), kept on this machine |

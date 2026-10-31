@@ -560,3 +560,19 @@ export interface GoogleStatusView {
 
 /** What bringing a branch into another did. */
 export type BranchMergeResult = 'UpToDate' | 'FastForward' | 'Merged'
+
+/** What the sky is doing in the person's town. */
+export type Sky = 'Clear' | 'Cloudy' | 'Fog' | 'Drizzle' | 'Rain' | 'Snow' | 'Storm'
+
+export interface WeatherNow {
+  place: string
+  sky: Sky
+  temperature: number
+  at: string
+}
+
+/** The town the windows show the weather of, and its weather once read. */
+export interface WeatherView {
+  place: string | null
+  now: WeatherNow | null
+}

@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Openspace.Application.Abstractions;
+using Openspace.Application.Weather;
 
 namespace Openspace.Api.Tests;
 
@@ -72,6 +73,8 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
         // Added last, so the person's appsettings.Local.json, read by the API itself, never wins over them.
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings));
+        // Never the real weather service: one made-up town, always raining.
+        builder.ConfigureTestServices(services => services.AddSingleton<IWeatherSource, MadeUpWeather>());
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));
@@ -93,4 +96,13 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
             }
         }
     }
+}
+
+/// <summary>A weather service that knows one town, where it always rains.</summary>
+internal sealed class MadeUpWeather : IWeatherSource
+{
+    public Task<Place?> FindAsync(string name, CancellationToken cancellationToken) =>
+        Task.FromResult(name.StartsWith("Gotham", StringComparison.OrdinalIgnoreCase) ? new Place("Gotham, United States", 40.7, -74) : null);
+
+    public Task<Reading> CurrentAsync(Place place, CancellationToken cancellationToken) => Task.FromResult(new Reading(Sky.Rain, 11));
 }

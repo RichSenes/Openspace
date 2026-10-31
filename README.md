@@ -65,7 +65,10 @@ Each project has its own README with detailed specifications.
 7. Every step, file change, command (with its output), permission and note is
    kept in the task's audit log, and can be downloaded as a Markdown report.
    The Activity panel in the building follows those lines live, for an office,
-   a room or every office at once.
+   a room or every office at once. A little map in the corner shows the whole
+   building with every agent as a mark for its state; press it to go there.
+   The windows show the real weather of your town (set in Settings), from
+   Open-Meteo: no key, only the town leaves your computer.
 8. Reports of a day or of an epic are written from the audit log in the
    language you choose, ready to copy into an email or a chat.
 9. Accepted work is merged into the branch you choose, one task at a time or

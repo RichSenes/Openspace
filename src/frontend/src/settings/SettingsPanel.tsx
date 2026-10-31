@@ -5,6 +5,7 @@ import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
 import { GoogleCard } from './GoogleCard'
 import { SoundsCard } from './SoundsCard'
+import { WeatherCard } from './WeatherCard'
 import './settings.css'
 
 const MAX_SEATS = 12
@@ -38,6 +39,7 @@ export function SettingsPanel() {
         <ClaudeUsageMeters />
       </section>
       <SoundsCard />
+      <WeatherCard />
       <Backups />
       <GoogleCard />
       <Accounts />

@@ -50,6 +50,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
+| GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
 | GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
 | GET | `/api/epics?officeId=` | Epics of an office |
@@ -118,6 +119,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `OfficeChanged` | office id | an office, room or desk changes |
 | `TaskChanged` | task id | a task is created, changes status, gets a note or a check, or spends tokens |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
+| `DeskInterns` | the desk's interns | an agent hands work to a helper, the helper comes back, or the agent stops |
 | `DeskContext` | the energy | an answer changed how full a desk's conversation is, or the engine summarised it |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
@@ -125,8 +127,8 @@ SignalR hub at `/hubs/building`, server to client only:
 | `ReportsChanged` | none | a report was written |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
-domain events after each successful save. `DeskActivity` and `DeskContext` carry the
-data themselves, because activity and energy are not stored.
+domain events after each successful save. `DeskActivity`, `DeskContext` and `DeskInterns`
+carry the data themselves, because activity, energy and interns are not stored.
 
 ## Run
 

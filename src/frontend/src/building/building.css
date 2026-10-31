@@ -442,3 +442,8 @@
   grid-column: 3;
   overflow-wrap: anywhere;
 }
+
+.agent-card-interns {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

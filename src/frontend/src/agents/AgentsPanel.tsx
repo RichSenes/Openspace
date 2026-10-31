@@ -6,7 +6,7 @@ import { modelOptions } from '../engines/engines'
 import { EnginesCard } from '../engines/EnginesCard'
 import { DeskUsage } from './DeskUsage'
 import { useToast } from '../ui/toastContext'
-import { CAPABILITIES, formFrom, PERMISSION_LABEL, permissionSummary } from './roleForm'
+import { CAPABILITIES, formFrom, HELPER_LABEL, PERMISSION_LABEL, permissionSummary } from './roleForm'
 import './agents.css'
 
 /** Defines the kinds of agents desks can host: what they do, how, and what they may do alone. */
@@ -157,6 +157,20 @@ function RoleEditor({ role, onSaved, onDeleted }: EditorProps) {
             </select>
           </label>
         ))}
+        <label className="field">
+          <span>Call in interns</span>
+          <select className="input" value={form.helpers === 'Allow' ? 'Allow' : 'Deny'} onChange={(e) => set('helpers', e.target.value as PermissionLevel)}>
+            {(Object.keys(HELPER_LABEL) as PermissionLevel[]).map((level) => (
+              <option key={level} value={level}>
+                {HELPER_LABEL[level]}
+              </option>
+            ))}
+          </select>
+          <span className="hint">
+            Claude Code agents may hand parts of the work to helpers, who show up as interns beside the desk. Each one uses your Claude
+            plan and follows the same rules as the desk. OpenCode agents always can.
+          </span>
+        </label>
       </fieldset>
 
       {(save.error ?? remove.error) && <p className="error">{(save.error ?? remove.error)!.message}</p>}

@@ -11,6 +11,7 @@ const auditor: RoleView = {
   edit: 'Ask',
   bash: 'Deny',
   web: 'Allow',
+  helpers: 'Deny',
 }
 
 describe('permissionSummary', () => {
@@ -20,6 +21,8 @@ describe('permissionSummary', () => {
 
   it('says when an agent works freely', () => {
     expect(permissionSummary(EMPTY_ROLE)).toBe('Works freely')
+    expect(permissionSummary({ ...EMPTY_ROLE, helpers: 'Allow' })).toBe('Works freely · Can call in interns')
+    expect(permissionSummary({ ...EMPTY_ROLE, bash: 'Deny', helpers: 'Allow' })).toBe('Run commands: not allowed · Can call in interns')
   })
 })
 

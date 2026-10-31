@@ -20,6 +20,7 @@ export const EMPTY_ROLE: RoleInput = {
   edit: 'Allow',
   bash: 'Allow',
   web: 'Allow',
+  helpers: 'Deny',
 }
 
 export function formFrom(role: RoleView | undefined): RoleInput {
@@ -28,10 +29,20 @@ export function formFrom(role: RoleView | undefined): RoleInput {
   return input
 }
 
-/** "Change files: asks you · Run commands: not allowed", leaving out what is simply allowed. */
-export function permissionSummary(role: Pick<RoleView, 'edit' | 'bash' | 'web'>): string {
+/** Helpers are on or off: asking at every hand-off would stop the agent each time. */
+export const HELPER_LABEL: Partial<Record<PermissionLevel, string>> = {
+  Deny: 'Not allowed',
+  Allow: 'Allowed',
+}
+
+/**
+ * "Change files: asks you · Run commands: not allowed", leaving out what is simply allowed;
+ * helpers are off unless the role turns them on, so only that is said.
+ */
+export function permissionSummary(role: Pick<RoleView, 'edit' | 'bash' | 'web'> & Partial<Pick<RoleView, 'helpers'>>): string {
   const limits = CAPABILITIES.filter((c) => role[c.key] !== 'Allow').map(
     (c) => `${c.label}: ${PERMISSION_LABEL[role[c.key]].toLowerCase()}`,
   )
-  return limits.length === 0 ? 'Works freely' : limits.join(' · ')
+  const helpers = role.helpers === 'Allow' ? ['Can call in interns'] : []
+  return limits.length === 0 ? ['Works freely', ...helpers].join(' · ') : [...limits, ...helpers].join(' · ')
 }

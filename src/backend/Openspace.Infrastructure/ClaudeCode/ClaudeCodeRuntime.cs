@@ -214,6 +214,11 @@ internal sealed partial class ClaudeCodeRuntime(
         Add(edit, "Edit", "Write", "NotebookEdit");
         Add(bash, "Bash");
         Add(web, "WebFetch", "WebSearch");
+        if (permissions?.Helpers == PermissionLevel.Allow)
+        {
+            Add(PermissionLevel.Allow, ClaudeCodeEvents.HelperTool);
+        }
+
         return (tools, allowed);
     }
 

@@ -523,9 +523,11 @@ public sealed class ApiTests : IDisposable
         var permission = await _http.PostAsJsonAsync($"/api/tasks/{task.Id}/permission", new { allow = true });
 
         var energy = await GetAsync<List<JsonElement>>($"/api/context?officeId={officeId}");
+        var interns = await GetAsync<List<JsonElement>>($"/api/interns?officeId={officeId}");
 
         Assert.Empty(activity);
         Assert.Empty(energy);
+        Assert.Empty(interns);
         Assert.Equal(string.Empty, diff);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, permission.StatusCode);
     }
@@ -589,8 +591,9 @@ public sealed class ApiTests : IDisposable
 
         var created = await PostAsync<Created>("/api/roles", new
         {
-            name = "Auditor", description = "Reviews changes", instructions = "Never change code.", edit = "Ask", bash = "Deny", web = "Deny",
+            name = "Auditor", description = "Reviews changes", instructions = "Never change code.", edit = "Ask", bash = "Deny", web = "Deny", helpers = "Allow",
         });
+        var plain = await PostAsync<Created>("/api/roles", new { name = "Writer", helpers = "Ask" });
         var duplicate = await _http.PostAsJsonAsync("/api/roles", new { name = "auditor" });
         (await _http.PutAsJsonAsync($"/api/offices/{officeId}/desks/{deskId}/role", new { roleId = created.Id })).EnsureSuccessStatusCode();
         var inUse = await _http.DeleteAsync($"/api/roles/{created.Id}");
@@ -601,6 +604,9 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(HttpStatusCode.UnprocessableEntity, duplicate.StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, inUse.StatusCode);
         Assert.Equal(("Auditor", "Ask", "Deny"), (roles[0].GetProperty("name").GetString(), roles[0].GetProperty("edit").GetString(), roles[0].GetProperty("bash").GetString()));
+        // Helpers are on or off: asking for each hand-off is not offered.
+        Assert.Equal(["Allow", "Deny"], roles.OrderBy(r => r.GetProperty("name").GetString()).Select(r => r.GetProperty("helpers").GetString()));
+        Assert.NotEqual(Guid.Empty, plain.Id);
         Assert.Equal(created.Id, office.GetProperty("rooms")[0].GetProperty("desks")[0].GetProperty("roleId").GetGuid());
     }
 

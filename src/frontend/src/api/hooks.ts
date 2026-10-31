@@ -18,6 +18,7 @@ import type {
   SoundsView,
   DeskActivity,
   DeskContext,
+  DeskInterns,
   FeedLine,
   EpicView,
   OfficeView,
@@ -44,6 +45,7 @@ export const keys = {
   log: (taskId: string) => ['tasks', 'log', taskId] as const,
   activity: ['activity'] as const,
   context: ['context'] as const,
+  interns: ['interns'] as const,
   feed: ['feed'] as const,
   feedOf: (filter: FeedFilter) => ['feed', filter] as const,
   roles: ['roles'] as const,
@@ -277,6 +279,11 @@ export function useFeed(filter: FeedFilter) {
     queryFn: () => request<FeedLine[]>('GET', `/api/feed?${query}`),
     placeholderData: (previous) => previous,
   })
+}
+
+/** Every desk's interns. Kept fresh by SignalR, which writes into this cache. */
+export function useInterns() {
+  return useQuery({ queryKey: keys.interns, queryFn: () => request<DeskInterns[]>('GET', '/api/interns') })
 }
 
 /** Every desk's energy. Kept fresh by SignalR, which writes into this cache. */

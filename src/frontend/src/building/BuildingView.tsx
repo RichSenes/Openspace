@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
 import { contextByDesk } from '../activity/energy'
-import { useActivity, useDeskContexts, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
+import { internsByDesk } from '../activity/interns'
+import { useActivity, useDeskContexts, useInterns, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
@@ -66,6 +67,8 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const activity = useActivity()
   const energy = useDeskContexts()
   const contexts = useMemo(() => contextByDesk(energy.data, office.id), [energy.data, office.id])
+  const helpers = useInterns()
+  const interns = useMemo(() => internsByDesk(helpers.data, office.id), [helpers.data, office.id])
   const routines = useRoutines(office.id)
   const proposals = useProposals(office.id)
   const progress = useRoutineProgress()
@@ -133,6 +136,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
         activities={bubbles}
         states={routineStates}
         contexts={contexts}
+        interns={interns}
         dark={lightsOff}
         arrange={
           arranging
@@ -193,6 +197,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
           theme={office.theme}
           activity={bubbles.get(pickedDesk.id)}
           context={contexts.get(pickedDesk.id)}
+          interns={interns.get(pickedDesk.id)}
           tasks={(tasks.data ?? []).filter((t) => t.deskId === pickedDesk.id)}
           style={picked.style}
           onClose={() => setPicked(undefined)}

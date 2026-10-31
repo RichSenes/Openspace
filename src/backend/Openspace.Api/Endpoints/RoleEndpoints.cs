@@ -12,9 +12,11 @@ internal static class RoleEndpoints
         string? Model,
         PermissionLevel Edit = PermissionLevel.Allow,
         PermissionLevel Bash = PermissionLevel.Allow,
-        PermissionLevel Web = PermissionLevel.Allow)
+        PermissionLevel Web = PermissionLevel.Allow,
+        PermissionLevel Helpers = PermissionLevel.Deny)
     {
-        public RolePermissions Permissions => new(Edit, Bash, Web);
+        // Helpers are on or off: asking each time would stop the agent at every hand-off.
+        public RolePermissions Permissions => new(Edit, Bash, Web, Helpers == PermissionLevel.Allow ? PermissionLevel.Allow : PermissionLevel.Deny);
     }
 
     public sealed record DraftRequest(string Name, string Description);

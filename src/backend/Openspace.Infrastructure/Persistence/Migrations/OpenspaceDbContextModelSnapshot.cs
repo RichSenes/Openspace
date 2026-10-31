@@ -800,6 +800,11 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                 .HasColumnType("TEXT")
                                 .HasColumnName("CanEdit");
 
+                            b1.Property<string>("Helpers")
+                                .IsRequired()
+                                .HasColumnType("TEXT")
+                                .HasColumnName("CanDelegate");
+
                             b1.Property<string>("Web")
                                 .IsRequired()
                                 .HasColumnType("TEXT")

@@ -12,4 +12,7 @@ public interface IActivityPublisher
 
     /// <summary>How full a desk's conversation is changed: the agent's energy.</summary>
     Task ContextChangedAsync(DeskContext context, CancellationToken cancellationToken);
+
+    /// <summary>An intern arrived at a desk or left it.</summary>
+    Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken);
 }

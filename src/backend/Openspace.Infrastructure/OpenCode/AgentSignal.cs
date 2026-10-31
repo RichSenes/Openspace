@@ -21,6 +21,12 @@ internal abstract record AgentSignal(string SessionId)
 
     public sealed record Failed(string SessionId, string Reason) : AgentSignal(SessionId);
 
+    /// <summary>The agent handed part of its work to a helper agent; <paramref name="CallId"/> names the hand-off.</summary>
+    public sealed record Delegated(string SessionId, string CallId, string What) : AgentSignal(SessionId);
+
+    /// <summary>The helper of a hand-off came back with its result.</summary>
+    public sealed record Returned(string SessionId, string CallId) : AgentSignal(SessionId);
+
     /// <summary>The engine summarised the conversation to make room in the model's context.</summary>
     public sealed record Compacted(string SessionId) : AgentSignal(SessionId);
 

@@ -37,6 +37,28 @@ internal static class OpenCodeEventTranslator
         };
     }
 
+    /// <summary>
+    /// A hand-off to a helper agent, from the same event as <see cref="Translate"/>: the
+    /// <c>task</c> tool running brings a helper in, its end sends it away.
+    /// </summary>
+    public static AgentSignal? Delegation(JsonElement payload)
+    {
+        if (Text(payload, "type") != "message.part.updated" || !payload.TryGetProperty("properties", out var props)
+            || !props.TryGetProperty("part", out var part) || Text(part, "type") != "tool" || Text(part, "tool") != "task"
+            || !part.TryGetProperty("state", out var state) || Text(part, "callID") is not { } callId || Text(part, "sessionID") is not { } sessionId)
+        {
+            return null;
+        }
+
+        var input = state.TryGetProperty("input", out var i) ? i : default;
+        return Text(state, "status") switch
+        {
+            "running" => new AgentSignal.Delegated(sessionId, callId, Shorten(Text(input, "description") ?? "part of the work")),
+            "completed" or "error" => new AgentSignal.Returned(sessionId, callId),
+            _ => null,
+        };
+    }
+
     public static string? DescribeTool(string tool, JsonElement input, string? title)
     {
         string? File(string name) => Text(input, name) is { } path ? Path.GetFileName(path) : null;
@@ -133,6 +155,7 @@ internal static class OpenCodeEventTranslator
             "glob" or "grep" or "list" or "codesearch" =>
                 (AuditKind.Search, Text(input, "pattern") is { } pattern ? $"Searched the code for {pattern}" : "Searched the code", output),
             "webfetch" or "websearch" => (AuditKind.Other, $"Looked up {Text(input, "url") ?? Text(input, "query") ?? "something online"}", null),
+            "task" => (AuditKind.Other, $"A helper did: {Text(input, "description") ?? "part of the work"}", output),
             _ => (AuditKind.Other, $"Used {tool}", output),
         };
 

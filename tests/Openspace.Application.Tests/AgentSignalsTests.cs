@@ -240,6 +240,31 @@ public class AgentSignalsTests
     }
 
     [Fact]
+    public async Task A_hand_off_brings_an_intern_who_leaves_when_the_helper_is_back()
+    {
+        await RunningTaskAsync();
+
+        await _h.Signals().DelegatedAsync("ses_1", "call_1", "Find the login form", default);
+        await _h.Signals().DelegatedAsync("ses_1", "call_2", "Read the tests", default);
+        await _h.Signals().ReturnedAsync("ses_1", "call_1", default);
+
+        Assert.Equal(["Read the tests"], _h.Interns.AtDesk(_h.Desk.Id.Value).Select(i => i.What));
+        Assert.Equal("Delegating: Read the tests", Assert.Single(_h.Activity.Snapshot()).Doing);
+    }
+
+    [Fact]
+    public async Task The_interns_leave_when_the_agent_finishes()
+    {
+        await RunningTaskAsync();
+        await _h.Signals().DelegatedAsync("ses_1", "call_1", "Find the login form", default);
+
+        await _h.Signals().FinishedAsync("ses_1", default);
+        await _h.Signals().DelegatedAsync("ses_1", "call_2", "Too late", default);
+
+        Assert.Empty(_h.Interns.AtDesk(_h.Desk.Id.Value));
+    }
+
+    [Fact]
     public async Task Tokens_count_on_the_round_even_once_the_work_is_in_review()
     {
         var task = await RunningTaskAsync();

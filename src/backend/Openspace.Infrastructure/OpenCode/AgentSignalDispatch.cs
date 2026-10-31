@@ -24,6 +24,8 @@ internal static partial class AgentSignalDispatch
                 AgentSignal.Compacted c => signals.CompactedAsync(c.SessionId, cancellationToken),
                 AgentSignal.OutOfLimits o => signals.OutOfLimitsAsync(o.SessionId, o.Scope, o.Until, o.Reason, cancellationToken),
                 AgentSignal.Used u => signals.UsedAsync(u.SessionId, u.Tokens, cancellationToken),
+                AgentSignal.Delegated d => signals.DelegatedAsync(d.SessionId, d.CallId, d.What, cancellationToken),
+                AgentSignal.Returned r => signals.ReturnedAsync(r.SessionId, r.CallId, cancellationToken),
                 AgentSignal.Context c => ContextAsync(scope.ServiceProvider, signals, c, cancellationToken),
                 _ => Task.CompletedTask,
             };

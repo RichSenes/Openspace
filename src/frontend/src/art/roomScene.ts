@@ -6,7 +6,10 @@ import { sceneLights, scenePixels, type SceneItem } from './scene'
 import type { PropName } from './sheets/props'
 import type { Signal } from './sheets/signals'
 import { pixelsOf, type Pixel, type SpriteDef } from './sprite'
-import { STATION, stationLights, stationPixels, themeColors, type Appearance } from './station'
+import type { OnStage } from '../activity/interns'
+import { CLIPBOARD_COLORS, INTERN, INTERN_SPOTS, PUFF, PUFF_COLORS } from './interns'
+import { HAIR_COLORS, SKIN_TONES } from './palette'
+import { characterColors, STATION, stationLights, stationPixels, themeColors, type Appearance } from './station'
 import type { Theme } from './themes'
 
 /** Floor tiles are this many pixels wide; walls are two tiles tall. */
@@ -65,4 +68,39 @@ export function deskItem(
 export function roomPixels(theme: Theme, shell: Pixel[], items: SceneItem[], dark: boolean): Pixel[] {
   const pixels = [...shell, ...scenePixels(items)]
   return dark ? inTheDark(pixels, sceneLights(items), theme.colors.night) : pixels
+}
+
+/** An intern's own skin and hair, picked from the hand-off it came for; it wears its agent's colours. */
+export function internLook(agent: Appearance, id: string): Appearance {
+  let hash = 0
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  const skins = Object.keys(SKIN_TONES) as (keyof typeof SKIN_TONES)[]
+  const hairs = Object.keys(HAIR_COLORS) as (keyof typeof HAIR_COLORS)[]
+  return { skin: skins[hash % skins.length], hair: hairs[(hash >>> 4) % hairs.length], hairStyle: 'short', cloth: agent.cloth }
+}
+
+/**
+ * The interns beside a desk standing at (x, y), with their puffs of smoke: each one at its
+ * spot, in front of the desk, the puff in front of the intern.
+ */
+export function internItems(agent: Appearance, interns: readonly OnStage[], x: number, y: number, tick: number): SceneItem[] {
+  return interns.flatMap((s) => {
+    const spot = INTERN_SPOTS[s.spot]
+    const ix = x + spot.dx
+    const iy = y + spot.dy
+    const person = characterColors(internLook(agent, s.intern.id))
+    const colors = (name: string) => (CLIPBOARD_COLORS as Record<string, string>)[name] ?? person(name)
+    const items: SceneItem[] = []
+    if (s.visible) items.push({ x: ix, y: iy, height: INTERN.height, pixels: pixelsOf(INTERN, Math.floor(tick / 4), colors) })
+    if (s.puff !== undefined) {
+      const puff = (name: string) => (PUFF_COLORS as Record<string, string>)[name] ?? null
+      items.push({
+        x: ix + INTERN.width / 2 - PUFF.width / 2,
+        y: iy + INTERN.height - PUFF.height + 2,
+        height: PUFF.height,
+        pixels: pixelsOf(PUFF, s.puff, puff),
+      })
+    }
+    return items
+  })
 }

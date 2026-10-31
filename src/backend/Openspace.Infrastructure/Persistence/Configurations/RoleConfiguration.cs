@@ -20,6 +20,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             p.Property(x => x.Edit).HasColumnName("CanEdit").HasConversion<string>();
             p.Property(x => x.Bash).HasColumnName("CanRunCommands").HasConversion<string>();
             p.Property(x => x.Web).HasColumnName("CanUseWeb").HasConversion<string>();
+            p.Property(x => x.Helpers).HasColumnName("CanDelegate").HasConversion<string>();
         });
         builder.Navigation(r => r.Permissions).IsRequired();
     }

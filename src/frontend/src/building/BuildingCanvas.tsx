@@ -1,10 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Maximize } from 'lucide-react'
 import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
-import type { DeskActivity, DeskContext, FloorCut, OfficeView, WorkTaskView } from '../api/types'
+import type { DeskActivity, DeskContext, FloorCut, Intern, OfficeView, WorkTaskView } from '../api/types'
 import { paintInto } from '../art/canvas'
 import { inTheDark, unlit, type Light } from '../art/lighting'
-import { deskItem, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
+import { deskItem, internItems, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
 import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
 import { HALL_FLOOR } from '../art/sheets/rooms'
 import { pixelsOf, type Pixel } from '../art/sprite'
@@ -13,6 +13,7 @@ import { themeOf, type Theme } from '../art/themes'
 import { doorwayPixels, GLASS, phaseOf, skyPixels, windowLight, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { AgentState } from '../art/agentStates'
 import { energyOf } from '../activity/energy'
+import { InternStage } from '../activity/interns'
 import { agentStateOf, lookOf } from './agents'
 import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
@@ -61,6 +62,8 @@ interface Props {
   states?: ReadonlyMap<string, AgentState>
   /** How full each desk's conversation is, by desk id: the battery beside each agent. */
   contexts?: ReadonlyMap<string, DeskContext>
+  /** The helpers working for each desk, by desk id: interns standing beside it. */
+  interns?: ReadonlyMap<string, readonly Intern[]>
   /** Lights off: only screens, lamps and other glowing things light the rooms. */
   dark: boolean
   /** More controls beside Fit. */
@@ -102,13 +105,15 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, states, contexts, dark, controls, arrange, onPickDesk }: Props) {
+export function BuildingCanvas({ office, tasks, activities, states, contexts, interns, dark, controls, arrange, onPickDesk }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
   const fitAll = useRef<() => void>(() => {})
   const arrangeRef = useRef(arrange)
   const pickRef = useRef(onPickDesk)
+  // Remembers who stands beside each desk across redraws, so arrivals and departures can puff.
+  const stage = useRef(new InternStage())
 
   // Refreshed after every render so the canvas callbacks always see the latest props.
   useEffect(() => {
@@ -123,7 +128,8 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, da
       view.layout = layout
 
       app.stage.removeChildren().forEach((child) => child.destroy({ children: true, texture: true, textureSource: true }))
-      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, dark }, arrange?.selection)
+      stage.current.update(interns ?? NO_INTERNS, Date.now(), !reducedMotion())
+      const drawn = drawBuilding(layout, { office, tasks, activities, states, contexts, interns: stage.current, dark }, arrange?.selection)
       app.stage.addChild(drawn.world)
       Object.assign(view, drawn)
       view.hall?.paint()
@@ -198,7 +204,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, da
   }, [])
 
   const arranging = Boolean(arrange)
-  useEffect(() => draw.current(), [office, tasks, activities, states, contexts, dark, arranging, arrange?.selection])
+  useEffect(() => draw.current(), [office, tasks, activities, states, contexts, interns, dark, arranging, arrange?.selection])
 
   return (
     <div className="building-canvas" ref={host}>
@@ -538,9 +544,12 @@ interface Scene {
   tasks: readonly WorkTaskView[]
   activities: ReadonlyMap<string, DeskActivity>
   contexts?: ReadonlyMap<string, DeskContext>
+  interns?: InternStage
   states?: ReadonlyMap<string, AgentState>
   dark: boolean
 }
+
+const NO_INTERNS: ReadonlyMap<string, readonly Intern[]> = new Map()
 
 /** A canvas already painted, somewhere in the world: windows look through to it. */
 interface Source {
@@ -853,6 +862,9 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
             looks.get(d.id)!, states.get(d.id)!, d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7, theme, undefined,
             energyOf(scene.contexts?.get(d.id), states.get(d.id)!, now),
           ),
+        ),
+        ...room.desks.flatMap((d, i) =>
+          internItems(looks.get(d.id)!, scene.interns?.at(d.id, now) ?? [], d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7),
         ),
       ]
       paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, dark))

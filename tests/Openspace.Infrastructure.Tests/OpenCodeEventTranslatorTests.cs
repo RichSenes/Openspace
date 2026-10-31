@@ -98,6 +98,23 @@ public class OpenCodeEventTranslatorTests
     }
 
     [Fact]
+    public void The_task_tool_brings_a_helper_while_it_runs_and_sends_it_away_when_it_ends()
+    {
+        static AgentSignal? Of(string tool, string status)
+        {
+            using var doc = JsonDocument.Parse("{\"type\":\"message.part.updated\",\"properties\":{\"part\":{\"type\":\"tool\",\"tool\":\"" + tool
+                + "\",\"callID\":\"call_5\",\"sessionID\":\"ses_1\",\"state\":{\"status\":\"" + status + "\",\"input\":{\"description\":\"Map the routes\"}}}}}");
+            return OpenCodeEventTranslator.Delegation(doc.RootElement);
+        }
+
+        Assert.Equal(new AgentSignal.Delegated("ses_1", "call_5", "Map the routes"), Of("task", "running"));
+        Assert.Equal(new AgentSignal.Returned("ses_1", "call_5"), Of("task", "completed"));
+        Assert.Equal(new AgentSignal.Returned("ses_1", "call_5"), Of("task", "error"));
+        Assert.Null(Of("task", "pending"));
+        Assert.Null(Of("bash", "running"));
+    }
+
+    [Fact]
     public void Idle_means_finished()
     {
         Assert.Equal(new AgentSignal.Finished("ses_1"), Translate("""{"type":"session.idle","properties":{"sessionID":"ses_1"}}"""));

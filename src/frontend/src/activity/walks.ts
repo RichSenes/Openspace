@@ -118,7 +118,8 @@ function along(path: readonly Spot[], distance: number): { at: Spot; facing: Fac
     const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
     if (left < length) {
       const t = left / length
-      return { at: { x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) }, facing: b.y < a.y ? 'back' : 'front', done: false }
+      const facing: Facing = b.y === a.y ? (b.x > a.x ? 'right' : 'left') : b.y < a.y ? 'back' : 'front'
+      return { at: { x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) }, facing, done: false }
     }
     left -= length
   }

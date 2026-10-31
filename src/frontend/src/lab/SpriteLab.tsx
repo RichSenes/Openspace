@@ -377,14 +377,16 @@ export function SpriteLab() {
       </section>
 
       <section>
-        <h2>On their feet (front, walking, back, on a break)</h2>
+        <h2>On their feet (front, walking, back, on a break, walking right and left)</h2>
         <div className="lab-pieces">
-          {PEOPLE.map((look, i) => (
+          {[...PEOPLE, { skin: 'fair', hair: 'blonde', hairStyle: 'long', cloth: 'green', outfit: 'coat', accessory: 'pointyHat' } as Appearance].map((look, i) => (
             <figure key={i}>
               <Pixels
-                width={WALKER.width * 4}
+                width={WALKER.width * 6}
                 height={WALKER.height}
                 pixels={[
+                  ...walkerPixels(look, { facing: 'right', step: tick }).map((p) => ({ ...p, x: p.x + WALKER.width * 4 })),
+                  ...walkerPixels(look, { facing: 'left', step: tick + 1 }).map((p) => ({ ...p, x: p.x + WALKER.width * 5 })),
                   ...walkerPixels(look, { facing: 'front', step: 0 }),
                   ...walkerPixels(look, { facing: 'front', step: tick }).map((p) => ({ ...p, x: p.x + WALKER.width })),
                   ...walkerPixels(look, { facing: 'back', step: tick }).map((p) => ({ ...p, x: p.x + WALKER.width * 2 })),

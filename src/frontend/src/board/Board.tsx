@@ -36,8 +36,8 @@ export function Board({ office, initialTaskId }: Props) {
   const [showMerged, setShowMerged] = usePersistentState<'yes' | 'no'>('openspace.show-merged', 'no')
   const { shown, hidden } = useMemo(() => {
     const found = searchTasks(filterByEpic(tasks.data ?? [], epicFilter), query)
-    return showMerged === 'yes' ? { shown: found, hidden: 0 } : withoutMerged(found)
-  }, [tasks.data, epicFilter, query, showMerged])
+    return showMerged === 'yes' ? { shown: found, hidden: 0 } : withoutMerged(found, openTaskId)
+  }, [tasks.data, epicFilter, query, showMerged, openTaskId])
   const groups = useMemo(() => groupByColumn(shown), [shown])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
   const toMerge = awaitingMerge(tasks.data ?? []).length
@@ -84,8 +84,10 @@ export function Board({ office, initialTaskId }: Props) {
       <div className="columns">
         {COLUMNS.map((column) => {
           const items = groups.get(column.status) ?? []
-          // With a task open, empty columns fold to a strip so the others keep their width.
-          const folded = Boolean(openTask) && items.length === 0
+          // With a task open, empty columns fold to a strip so the others keep their width;
+          // Done keeps its width while it has merged work to show.
+          const toggles = column.status === 'Done' && (hidden > 0 || showMerged === 'yes')
+          const folded = Boolean(openTask) && items.length === 0 && !toggles
           return (
             <section key={column.status} className={folded ? 'column column-folded' : 'column'} aria-label={column.label}>
               <header className="column-head">
@@ -159,7 +161,7 @@ export function Board({ office, initialTaskId }: Props) {
                   })}
                 </ul>
               )}
-              {!folded && column.status === 'Done' && (hidden > 0 || showMerged === 'yes') && (
+              {toggles && (
                 <button type="button" className="btn btn-quiet column-more" onClick={() => setShowMerged(showMerged === 'yes' ? 'no' : 'yes')}>
                   {showMerged === 'yes' ? 'Hide merged work' : `Show ${hidden} merged`}
                 </button>

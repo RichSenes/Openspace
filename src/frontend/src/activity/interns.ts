@@ -1,8 +1,8 @@
 import type { DeskInterns, Intern } from '../api/types'
 
 /** How long the puff of smoke lasts when an intern arrives or leaves. */
-export const PUFF_MS = 800
-const PUFF_FRAMES = 4
+export const PUFF_MS = 1000
+const PUFF_FRAMES = 6
 
 /** Interns drawn beside a desk; more are listed on the agent's card. */
 export const SPOTS = 2

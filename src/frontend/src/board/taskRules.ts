@@ -65,9 +65,12 @@ export function searchTasks(tasks: WorkTaskView[], query: string): WorkTaskView[
   })
 }
 
-/** Done work already merged somewhere is history: the Board can leave it out. */
-export function withoutMerged(tasks: WorkTaskView[]): { shown: WorkTaskView[]; hidden: number } {
-  const shown = tasks.filter((t) => !(t.status === 'Done' && t.mergedInto !== null))
+/**
+ * Done work already merged somewhere is history: the Board can leave it out. The task open in
+ * the drawer stays, so a merge never pulls the card from under the person looking at it.
+ */
+export function withoutMerged(tasks: WorkTaskView[], keep?: string): { shown: WorkTaskView[]; hidden: number } {
+  const shown = tasks.filter((t) => t.id === keep || !(t.status === 'Done' && t.mergedInto !== null))
   return { shown, hidden: tasks.length - shown.length }
 }
 

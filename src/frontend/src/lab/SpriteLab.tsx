@@ -54,11 +54,11 @@ const SAMPLE_INTERN = { id: 'a', what: 'Find the login form', since: '' }
 /** A desk with its interns: one, two, or one coming and going in a puff every three seconds. */
 function internScene(look: Appearance, sample: number, tick: number, theme: Theme): Pixel[] {
   const t = (tick % (3 * FPS)) / FPS
-  const frame = (since: number) => Math.min(3, Math.floor((since / 0.8) * 4))
+  const frame = (since: number) => Math.min(5, Math.floor(since * 6))
   const looping: OnStage =
-    t < 0.8 ? { intern: SAMPLE_INTERN, spot: 0, visible: frame(t) >= 2, puff: frame(t) }
-    : t < 2.2 ? { intern: SAMPLE_INTERN, spot: 0, visible: true }
-    : { intern: SAMPLE_INTERN, spot: 0, visible: frame(t - 2.2) < 2, puff: frame(t - 2.2) }
+    t < 1 ? { intern: SAMPLE_INTERN, spot: 0, visible: frame(t) >= 3, puff: frame(t) }
+    : t < 2 ? { intern: SAMPLE_INTERN, spot: 0, visible: true }
+    : { intern: SAMPLE_INTERN, spot: 0, visible: frame(t - 2) < 3, puff: frame(t - 2) }
   const stage: OnStage[] =
     sample === 0 ? [{ intern: SAMPLE_INTERN, spot: 0, visible: true }]
     : sample === 1 ? [{ intern: SAMPLE_INTERN, spot: 0, visible: true }, { intern: { ...SAMPLE_INTERN, id: 'zz' }, spot: 1, visible: true }]

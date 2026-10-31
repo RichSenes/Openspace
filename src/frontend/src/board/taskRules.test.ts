@@ -168,6 +168,13 @@ describe('withoutMerged', () => {
     expect(result.shown.map((t) => t.title)).toEqual(['Waiting', 'Running'])
     expect(result.hidden).toBe(1)
   })
+
+  it('keeps the open task even once merged', () => {
+    const merged = { ...task('Merged', 'Done'), mergedInto: 'beta' }
+    const result = withoutMerged([merged, { ...task('Older', 'Done'), mergedInto: 'beta' }], 'Merged')
+    expect(result.shown.map((t) => t.title)).toEqual(['Merged'])
+    expect(result.hidden).toBe(1)
+  })
 })
 
 describe('waitingFor', () => {

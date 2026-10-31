@@ -26,7 +26,7 @@ describe('the intern stage', () => {
     stage.update(new Map(), 0, true)
     stage.update(at('d1', 'a'), 1000, true)
     expect(stage.at('d1', 1000)[0]).toMatchObject({ visible: false, puff: 0 })
-    expect(stage.at('d1', 1000 + PUFF_MS / 2)[0]).toMatchObject({ visible: true, puff: 2 })
+    expect(stage.at('d1', 1000 + PUFF_MS / 2)[0]).toMatchObject({ visible: true, puff: 3 })
     expect(stage.at('d1', 1000 + PUFF_MS)[0]).toEqual({ intern: intern('a'), spot: 0, visible: true })
   })
 
@@ -35,7 +35,7 @@ describe('the intern stage', () => {
     stage.update(at('d1', 'a'), 0, true)
     stage.update(at('d1'), 5000, true)
     expect(stage.at('d1', 5000)[0]).toMatchObject({ visible: true, puff: 0 })
-    expect(stage.at('d1', 5000 + PUFF_MS / 2)[0]).toMatchObject({ visible: false, puff: 2 })
+    expect(stage.at('d1', 5000 + PUFF_MS / 2)[0]).toMatchObject({ visible: false, puff: 3 })
     expect(stage.at('d1', 5000 + PUFF_MS)).toEqual([])
   })
 

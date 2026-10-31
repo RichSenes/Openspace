@@ -83,7 +83,9 @@ green above 60% left, yellow down to 30%, red below.
 **Interns** are helpers an agent called in: 12×22, standing beside the desk (right,
 then left; two at most), in their agent's colours with a skin and hair of their own, a
 visitor badge on a lanyard and a clipboard (`art/interns.ts`). They come and go in a
-four-frame puff of smoke with sparks (`PUFF`, 0.8 seconds); with reduced motion they
+six-frame puff of smoke with sparks (`PUFF`, one second): a small ball, billows taller
+than the intern in four greys lit from the top left, then wisps drifting apart. The intern
+shows up or goes away behind the thickest frame. With reduced motion they
 simply appear and disappear.
 
 Sweat drops and the hand on the chin are taken (`worried` and `reading`), so they are

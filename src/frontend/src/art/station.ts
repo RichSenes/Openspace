@@ -50,6 +50,8 @@ export interface StationPose {
   energy?: number
   /** Pixels the agent sinks into its chair when exhausted. */
   slump?: number
+  /** Gone for a walk: only the desk is drawn, its screen as the work left it. */
+  away?: boolean
 }
 
 /**
@@ -129,6 +131,7 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
     ...pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY),
     ...(doll ? pixelsOf(HOURGLASS, pose.screen === 'on' ? Math.floor(pose.frame / 3) % 2 : 0, themeColors(theme.colors), 26, STATION.deskY + 7) : []),
   ]
+  if (pose.away) return desk
   const front = hands ? pixelsOf(hands, pose.frame, person, cx, cy) : []
   const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme.colors), cx + 8, cy - 11) : []
   const battery = pose.energy === undefined ? [] : batteryPixels(pose.energy)

@@ -15,6 +15,11 @@ import { STATION, stationPixels, themeColors, type Appearance, type ScreenState 
 import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import { GLASS, skyPixels, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { Sky } from '../api/types'
+import { walkerPixels, WALKER } from '../art/walker'
+import { WalkStage, type DeskDoing } from '../activity/walks'
+import { walkerItems } from '../art/chat'
+import { placesOf } from '../building/stations'
+import type { BuildingLayout, RoomBox } from '../building/layout'
 import './lab.css'
 
 const FPS = 5
@@ -46,6 +51,57 @@ function weatherStrip(weather: Sky, tick: number, theme: Theme): Pixel[] {
   return PHASES.flatMap((phase, i) =>
     windowPixels(skyPixels(i * 40, GLASS.width, GLASS.height, tick, phase, weather), colors).map((p) => ({ ...p, x: p.x + i * (WINDOW_SIZE.width + 2) })),
   )
+}
+
+/** A room where agents get up: one reads and runs commands in turn, two take breaks often. */
+const WALK_ROOM: RoomBox = {
+  id: 'walks',
+  name: 'Walks',
+  x: 0,
+  y: 0,
+  width: 14,
+  height: 9,
+  desks: [
+    { id: 'w1', name: 'Reader', x: 40, y: 56 },
+    { id: 'w2', name: 'Idle', x: 104, y: 56 },
+    { id: 'w3', name: 'Done', x: 152, y: 92 },
+  ],
+  props: [
+    { name: 'bookshelf', x: 8, y: 30 },
+    { name: 'filingCabinet', x: 46, y: 22 },
+    { name: 'printer', x: 6, y: 100 },
+    { name: 'serverRack', x: 186, y: 26 },
+    { name: 'whiteboard', x: 140, y: 26 },
+    { name: 'coffeeMachine', x: 196, y: 104 },
+  ],
+  door: { wall: 'Front', offset: 5 },
+  windows: [],
+}
+const WALK_LAYOUT: BuildingLayout = { rooms: [WALK_ROOM], floor: { x: 0, y: 0, width: 14, height: 9 }, cuts: [], doors: [], hall: [], planned: true, width: 14, height: 9 }
+const WALK_PLACES = placesOf(WALK_LAYOUT)
+const WALK_STEPS = ['Reading a.ts', 'Running the tests', 'Searching the code', 'Reading b.ts', 'Building the project', 'Reading c.ts', 'Planning the work', 'Reading d.ts']
+
+function walkScene(stage: WalkStage, tick: number, theme: Theme): Pixel[] {
+  const now = (tick / FPS) * 1000
+  const step = WALK_STEPS[Math.floor(now / 7000) % WALK_STEPS.length]
+  const doing = new Map<string, DeskDoing>([
+    ['w1', { state: step.startsWith('Reading') || step.startsWith('Searching') ? 'reading' : 'working', doing: `${step} ${Math.floor(now / 7000)}` }],
+    ['w2', { state: 'idle' }],
+    ['w3', { state: 'done' }],
+  ])
+  stage.update(WALK_PLACES, doing, now)
+  const room = WALK_ROOM
+  const size = { width: room.width * TILE, height: room.height * TILE }
+  const items: SceneItem[] = [
+    ...room.props.map((p) => propItem(p.name, p.x, p.y, tick, theme, size)),
+    ...room.desks.flatMap((d, i) => {
+      const away = stage.at(d.id, now)
+      const state = doing.get(d.id)!.state
+      const desk = deskItem(PEOPLE[i], state, d.x, d.y, tick + i * 5, theme, undefined, undefined, Boolean(away))
+      return away ? [desk, ...walkerItems(PEOPLE[i], away, 0, 0)] : [desk]
+    }),
+  ]
+  return roomPixels(theme, roomShell(theme, room.width, room.height - WALL_HEIGHT / TILE), items, false)
 }
 
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
@@ -192,6 +248,7 @@ export function SpriteLab() {
   const [dark, setDark] = useState(false)
   const [hairStyle, setHairStyle] = useState<HairStyle>('short')
   const room = useMemo(() => roomPixelsAt(tick, themeName, dark), [tick, themeName, dark])
+  const [walks] = useState(() => new WalkStage(20_000))
   const theme = THEMES[themeName]
   const small = Math.max(2, scale - 1)
 
@@ -317,6 +374,33 @@ export function SpriteLab() {
             </figure>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2>On their feet (front, walking, back, on a break)</h2>
+        <div className="lab-pieces">
+          {PEOPLE.map((look, i) => (
+            <figure key={i}>
+              <Pixels
+                width={WALKER.width * 4}
+                height={WALKER.height}
+                pixels={[
+                  ...walkerPixels(look, { facing: 'front', step: 0 }),
+                  ...walkerPixels(look, { facing: 'front', step: tick }).map((p) => ({ ...p, x: p.x + WALKER.width })),
+                  ...walkerPixels(look, { facing: 'back', step: tick }).map((p) => ({ ...p, x: p.x + WALKER.width * 2 })),
+                  ...walkerPixels(look, { facing: 'front', step: 0, sip: true, emotion: 'happy' }).map((p) => ({ ...p, x: p.x + WALKER.width * 3 })),
+                ]}
+                scale={small}
+                label={`person ${i + 1}`}
+              />
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Walks (stations, breaks and chats)</h2>
+        <Pixels width={WALK_ROOM.width * TILE} height={WALK_ROOM.height * TILE} pixels={walkScene(walks, tick, theme)} scale={small} label="Walks" />
       </section>
 
       <section>

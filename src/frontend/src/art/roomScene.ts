@@ -58,9 +58,9 @@ export function propItem(name: PropName, x: number, y: number, tick: number, the
 
 /** A desk with its agent at (x, y), in a state, at a tick of the animation clock, with its energy when known. */
 export function deskItem(
-  look: Appearance, state: AgentState, x: number, y: number, tick: number, theme: Theme, signal?: Signal, energy?: Energy,
+  look: Appearance, state: AgentState, x: number, y: number, tick: number, theme: Theme, signal?: Signal, energy?: Energy, away = false,
 ): SceneItem {
-  const pose = poseOf(state, tick, signal, energy)
+  const pose = { ...poseOf(state, tick, signal, energy), away }
   return { x, y, height: STATION.height, pixels: stationPixels(look, pose, theme), lights: stationLights(pose, theme) }
 }
 

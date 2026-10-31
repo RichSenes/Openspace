@@ -18,6 +18,7 @@ import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { WALKER } from '../art/walker'
 import { placesOf } from './stations'
+import { isGuestDesk } from './guests'
 import { agentStateOf, lookOf } from './agents'
 import { bubbleText, placeBubbles, type PlacedBubble } from './bubbles'
 import {
@@ -959,7 +960,8 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   const dark = scene.dark || Boolean(theme.dark)
 
   const views = new Map(scene.office.rooms.flatMap((r) => r.desks).map((d) => [d.id, d]))
-  const looks = new Map(room.desks.map((d) => [d.id, lookOf(views.get(d.id) ?? d)]))
+  // Guests wear a visitor's badge and work on a laptop.
+  const looks = new Map(room.desks.map((d) => [d.id, isGuestDesk(d.id) ? { ...lookOf(d), visitor: true } : lookOf(views.get(d.id) ?? d)]))
   const states = new Map(room.desks.map((d) => [d.id, scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))]))
   return {
     paint: (tick) => {

@@ -140,7 +140,7 @@ export interface RoomView {
   /** The command run on a branch after the room's work is merged into it, e.g. dotnet test. */
   check?: string | null
   /** "Routines" for the room where the office's routines sit: it has no desks of its own. */
-  kind?: 'Work' | 'Routines'
+  kind?: 'Work' | 'Routines' | 'Guests'
 }
 
 export interface ProcedureStepView {
@@ -575,4 +575,21 @@ export interface WeatherNow {
 export interface WeatherView {
   place: string | null
   now: WeatherNow | null
+}
+
+/** A Claude Code session started outside Openspace, working on an office's folder. */
+export interface Guest {
+  id: string
+  officeId: string
+  /** Where it works, from the office's repository; empty at its root; null in an office with private folders. */
+  folder: string | null
+  branch: string | null
+  state: 'Working' | 'Reading' | 'Idle'
+  since: string
+  lastAt: string
+}
+
+export interface OfficeGuests {
+  officeId: string
+  guests: Guest[]
 }

@@ -105,11 +105,11 @@ Later, in rough order of appearance:
      short walk at most; agents with nothing to do take a break; an agent that
      needs you hurries back to its desk. Two agents who meet stop for a chat with
      made-up round bubbles. Standing and walking agents, front, back and in profile.
-  6. Guests: Claude Code sessions started outside Openspace appear, read only, in a
-     guest room of the office whose repository holds the folder they work in (the
-     folder is on every line of their log), working on laptops with a visitor
-     badge. In offices with private folders they stay anonymous. Openspace gets an
-     office of its own to see this.
+  6. ~~Guests~~ Done: Claude Code sessions started outside Openspace appear, read
+     only, in a guest room of the office whose repository holds the folder they
+     work in (the folder is on every line of their log), working on laptops with a
+     visitor badge. In offices with private folders they stay anonymous. An office
+     for Openspace itself shows its own guests.
   7. Releases and a "new version" notice: published releases on GitHub, a banner
      with the notes, remind me tomorrow, never an automatic update.
   8. The README rewritten, and kept up to date after every round from then on.

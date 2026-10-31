@@ -65,6 +65,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
             ["Google:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-google-{Guid.NewGuid():N}"),
             ["Operator:Name"] = "elliot",
             ["Queue:Enabled"] = "false",
+
+            // Never the person's own Claude Code sessions: no guests are looked for.
+            ["Guests:Enabled"] = "false",
         };
         foreach (var (key, value) in settings)
         {

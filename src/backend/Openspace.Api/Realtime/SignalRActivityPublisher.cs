@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
+using Openspace.Application.Guests;
 
 namespace Openspace.Api.Realtime;
 
@@ -18,4 +19,7 @@ internal sealed class SignalRActivityPublisher(IHubContext<BuildingHub> hub) : I
 
     public Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken) =>
         hub.Clients.All.SendAsync("DeskInterns", interns, cancellationToken);
+
+    public Task GuestsChangedAsync(OfficeGuests guests, CancellationToken cancellationToken) =>
+        hub.Clients.All.SendAsync("OfficeGuests", guests, cancellationToken);
 }

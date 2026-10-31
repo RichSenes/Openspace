@@ -1,4 +1,5 @@
 using Openspace.Application.Agents;
+using Openspace.Application.Guests;
 
 namespace Openspace.Application.Abstractions;
 
@@ -15,4 +16,7 @@ public interface IActivityPublisher
 
     /// <summary>An intern arrived at a desk or left it.</summary>
     Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken);
+
+    /// <summary>A guest came into an office, changed what it does, or left.</summary>
+    Task GuestsChangedAsync(OfficeGuests guests, CancellationToken cancellationToken);
 }

@@ -32,6 +32,7 @@ import type {
   DeskUsageView,
   SettingsView,
   WeatherView,
+  Guest,
   MergeOutcome,
   CheckOutcome,
   BackupView,
@@ -47,6 +48,7 @@ export const keys = {
   activity: ['activity'] as const,
   context: ['context'] as const,
   interns: ['interns'] as const,
+  guests: ['guests'] as const,
   feed: ['feed'] as const,
   feedOf: (filter: FeedFilter) => ['feed', filter] as const,
   roles: ['roles'] as const,
@@ -281,6 +283,11 @@ export function useFeed(filter: FeedFilter) {
     queryFn: () => request<FeedLine[]>('GET', `/api/feed?${query}`),
     placeholderData: (previous) => previous,
   })
+}
+
+/** The guests of every office. Kept fresh by SignalR, which writes into this cache. */
+export function useGuests() {
+  return useQuery({ queryKey: keys.guests, queryFn: () => request<Guest[]>('GET', '/api/guests') })
 }
 
 /** Every desk's interns. Kept fresh by SignalR, which writes into this cache. */

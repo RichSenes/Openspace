@@ -31,8 +31,8 @@ function usePortrait(look: Appearance, theme: Theme, animate = true): string {
 }
 
 /** A small still picture of a desk's agent, for lists. */
-export function Portrait({ desk, theme, label }: { desk: DeskView; theme: string; label?: string }) {
-  const src = usePortrait(lookOf(desk), themeOf(theme), false)
+export function Portrait({ desk, theme, label, visitor }: { desk: DeskView; theme: string; label?: string; visitor?: boolean }) {
+  const src = usePortrait(visitor ? { ...lookOf(desk), visitor } : lookOf(desk), themeOf(theme), false)
   return <img className="portrait" src={src} alt={label ?? ''} width={STATION.width} height={STATION.height} />
 }
 

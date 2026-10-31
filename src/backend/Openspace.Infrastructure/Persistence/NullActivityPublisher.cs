@@ -9,4 +9,6 @@ internal sealed class NullActivityPublisher : IActivityPublisher
     public Task PublishAsync(DeskActivity activity, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task LogChangedAsync(Guid taskId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task ContextChangedAsync(DeskContext context, CancellationToken cancellationToken) => Task.CompletedTask;
 }

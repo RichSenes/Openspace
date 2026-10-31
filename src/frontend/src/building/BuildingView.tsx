@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { Lightbulb, LightbulbOff, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
-import { useActivity, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
+import { contextByDesk } from '../activity/energy'
+import { useActivity, useDeskContexts, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
@@ -61,6 +62,8 @@ function cardPlace(pick: DeskPick, box: DOMRect | undefined): React.CSSPropertie
 export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }: Props) {
   const tasks = useOfficeTasks(office.id)
   const activity = useActivity()
+  const energy = useDeskContexts()
+  const contexts = useMemo(() => contextByDesk(energy.data, office.id), [energy.data, office.id])
   const routines = useRoutines(office.id)
   const proposals = useProposals(office.id)
   const progress = useRoutineProgress()
@@ -127,6 +130,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
         tasks={tasks.data ?? noTasks}
         activities={bubbles}
         states={routineStates}
+        contexts={contexts}
         dark={lightsOff}
         arrange={
           arranging
@@ -186,6 +190,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
           desk={pickedDesk}
           theme={office.theme}
           activity={bubbles.get(pickedDesk.id)}
+          context={contexts.get(pickedDesk.id)}
           tasks={(tasks.data ?? []).filter((t) => t.deskId === pickedDesk.id)}
           style={picked.style}
           onClose={() => setPicked(undefined)}

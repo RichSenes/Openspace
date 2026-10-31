@@ -142,6 +142,33 @@ internal sealed class OpenCodeRuntime(
         return [.. models.OrderBy(m => defaults.Contains(m.Id) ? 0 : 1).ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
+    /// <summary>The most each model holds in its context, by <c>provider/model</c>, for the models that say.</summary>
+    public async Task<IReadOnlyDictionary<string, long>> ContextWindowsAsync(CancellationToken cancellationToken)
+    {
+        using var config = await GetJsonAsync("config/providers", cancellationToken).ConfigureAwait(false);
+        var windows = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var provider in config.RootElement.GetProperty("providers").EnumerateArray())
+        {
+            if (provider.GetProperty("id").GetString() is not { } providerId
+                || !provider.TryGetProperty("models", out var list) || list.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var model in list.EnumerateObject())
+            {
+                if (model.Value.ValueKind == JsonValueKind.Object
+                    && model.Value.TryGetProperty("limit", out var limit) && limit.ValueKind == JsonValueKind.Object
+                    && limit.TryGetProperty("context", out var context) && context.ValueKind == JsonValueKind.Number && context.GetInt64() > 0)
+                {
+                    windows[$"{providerId}/{model.Name}"] = context.GetInt64();
+                }
+            }
+        }
+
+        return windows;
+    }
+
     /// <summary>The header that tells the Openspace tools which task a call belongs to.</summary>
     public const string TaskHeader = "X-Openspace-Task";
 

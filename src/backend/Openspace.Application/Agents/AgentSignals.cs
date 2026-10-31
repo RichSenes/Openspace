@@ -15,6 +15,7 @@ public sealed partial class AgentSignals(
     IUnitOfWork unitOfWork,
     IAgentRuntime runtime,
     ActivityBoard activity,
+    ContextBoard context,
     IAuditLog audit,
     IActivityPublisher publisher,
     Review.PendingReviews reviews,
@@ -76,6 +77,23 @@ public sealed partial class AgentSignals(
 
         task.RecordUsage(tokens, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// An answer said how full the agent's conversation is: the desk's energy. Like tokens,
+    /// it counts whatever the task's status, as long as the task is still on its desk.
+    /// </summary>
+    /// <param name="window">The most the model holds, when the engine knows it.</param>
+    public async Task ContextAsync(string sessionId, long used, long? window, CancellationToken cancellationToken)
+    {
+        var task = await tasks.FindBySessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is not { DeskId: not null } || used <= 0)
+        {
+            return;
+        }
+
+        await context.RecordAsync(task.OfficeId.Value, task.DeskId.Value.Value, task.Id.Value, sessionId, used, window, clock.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>The brief again, with the notes written since: what the agent reads to get its bearings.</summary>
@@ -149,6 +167,7 @@ public sealed partial class AgentSignals(
             return;
         }
 
+        await context.CompactedAsync(task.DeskId!.Value.Value, sessionId, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
         var times = loops.Compacted(sessionId);
         if (times >= LoopGuard.Compactions)
         {

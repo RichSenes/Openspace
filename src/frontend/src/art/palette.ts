@@ -25,6 +25,8 @@ export const CHARACTER_COLORS = {
   'coat.shine': '#5c5a68',
   'eye.dim': '#a8741f',
   'hood.inner': '#2c1418',
+  'mug.light': '#d9574a',
+  'mug.dark': '#9e3a32',
 } as const
 
 /** Light, mid and shadow tones of black gloves, for the hooded costume. */
@@ -70,6 +72,20 @@ export const SIGNAL_COLORS = {
   'icon.green': '#8fd282',
   'icon.cloud': '#c3c6d1',
   'icon.cloudShade': '#8f92a0',
+} as const
+
+/**
+ * Colours of the battery beside an agent: its energy, the room left in its conversation.
+ * The length of the charge says the level; the colour repeats it.
+ */
+export const ENERGY_COLORS = {
+  'energy.high': '#6cc46a',
+  'energy.highShade': '#4a9a4e',
+  'energy.mid': '#f0c43c',
+  'energy.midShade': '#c49a26',
+  'energy.low': '#e65a46',
+  'energy.lowShade': '#b23c30',
+  'energy.empty': '#3a3442',
 } as const
 
 /** Base and shade. */
@@ -511,4 +527,5 @@ export const EMISSIVE: ReadonlySet<string> = new Set([
   'bike.lamp',
   'window',
   ...Object.keys(SIGNAL_COLORS),
+  ...Object.keys(ENERGY_COLORS),
 ])

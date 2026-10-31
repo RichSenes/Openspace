@@ -1,17 +1,20 @@
 import { ChevronRight, ListTodo, Palette, Plus, X } from 'lucide-react'
 import { useAnswerPermission } from '../api/hooks'
-import type { DeskActivity, WorkTaskView } from '../api/types'
+import type { DeskActivity, DeskContext, WorkTaskView } from '../api/types'
 import type { DeskWithRoom } from '../board/deskLookup'
 import { ENGINE_LABEL } from '../engines/engines'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
 import { Portrait } from './LookDialog'
 import { answersFor } from '../activity/activity'
+import { energyWords } from '../activity/energy'
 
 interface Props {
   desk: DeskWithRoom
   theme: string
   activity: DeskActivity | undefined
+  /** How full the agent's conversation is. */
+  context?: DeskContext
   /** The desk's tasks, oldest first. */
   tasks: readonly WorkTaskView[]
   /** Where on the building it opens, in pixels from its corner. */
@@ -25,7 +28,7 @@ interface Props {
 const OPEN: WorkTaskView['status'][] = ['Running', 'Queued', 'Review', 'Failed', 'Proposed']
 
 /** What an agent is up to and what you can do with it, opened by clicking it in the building. */
-export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpenTask, onNewTask, onLook }: Props) {
+export function AgentCard({ desk, theme, activity, context, tasks, style, onClose, onOpenTask, onNewTask, onLook }: Props) {
   const answer = useAnswerPermission()
   const toast = useToast()
   const current = tasks.find((t) => t.id === activity?.taskId && t.status === 'Running') ?? tasks.find((t) => t.status === 'Running')
@@ -56,6 +59,7 @@ export function AgentCard({ desk, theme, activity, tasks, style, onClose, onOpen
         <div className="agent-card-now">
           <TaskRow task={current} onOpen={onOpenTask} />
           {activity?.taskId === current.id && activity.headline && <p className={waiting ? 'agent-card-ask' : 'hint'}>{activity.headline}</p>}
+          {context?.taskId === current.id && energyWords(context) && <p className="hint">Energy: {energyWords(context)}</p>}
           {waiting && activity.detail && <code className="mono agent-card-detail">{activity.detail}</code>}
           {waiting && (
             <div className="row">

@@ -72,7 +72,8 @@ internal static class OpenCodeEventTranslator
         return new AgentSignal.Used(
             sessionId,
             new TokenCount(Count(tokens, "input"), Count(tokens, "output") + Count(tokens, "reasoning"), Count(cache, "read"), Count(cache, "write")),
-            Text(info, "id"));
+            Text(info, "id"),
+            Text(info, "providerID") is { } provider && Text(info, "modelID") is { } model ? $"{provider}/{model}" : null);
     }
 
     private static AgentSignal.Progress? FromTodos(JsonElement props)

@@ -68,6 +68,22 @@ characters, one per pixel) and where sprites live are described at the end.
 | `done`: sent to review | `cheer` (both fists raised) | `happy` | on | `check` |
 | `failed` | `stuck` (hands on the cheeks) | `worried` | off | `storm` |
 
+While working or reading, the agent's **energy** changes its look. Energy is the room
+left in its conversation, shown by a battery left of the agent (`art/energy.ts`): the
+charge gets shorter as the conversation fills, so it reads without colours, and it is
+green above 60% left, yellow down to 30%, red below.
+
+| Energy left | Face | Also |
+| --- | --- | --- |
+| above 30% | the state's own | |
+| 10% to 30%: `tired` | `tired` (heavy lids, shadows under the eyes) | `yawn` every eight seconds |
+| below 10%: `exhausted` | `tired` | sinks two pixels into the chair, types at half speed, yawns every five seconds |
+| just got it back | `blink` with the `sip` gesture (a red mug at the mouth) for three seconds while the battery charges, then `happy` for two | |
+
+Sweat drops and the hand on the chin are taken (`worried` and `reading`), so they are
+not used for tiredness. States that concern you (waiting, done, failed) keep their own
+look and only show the battery.
+
 The table lives in `src/frontend/src/art/agentStates.ts`. Momentary signals, such as
 `bulb` for a finding or `exclaim` for a failed command, replace the state's own
 signal for a few seconds.

@@ -71,7 +71,7 @@ export function placesOf(layout: BuildingLayout): DeskPlace[] {
       const seat = { x: d.x + SEAT.x, y: d.y + SEAT.y }
       const exits = [inside(room, d.x - WALKER.width + 2, seat.y), inside(room, d.x + STATION.width - 2, seat.y)] as const
       // Agents at the same station stand a little apart.
-      const shift = ((i % 3) - 1) * 8
+      const shift = ((i % 3) - 1) * 13
       return { deskId: d.id, roomId: room.id, seat, exits, stations: stations.map((s) => ({ ...s.spot, x: s.spot.x + shift })) }
     })
   })

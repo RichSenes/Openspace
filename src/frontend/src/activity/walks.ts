@@ -93,6 +93,16 @@ export function chance(text: string): number {
   return (hash % 10007) / 10007
 }
 
+/** How often agents get up: chance per new step, chance and slot of breaks, rest after a walk. */
+export interface Pacing {
+  wander: number
+  breakChance: number
+  breakSlot: number
+  rest: number
+}
+
+const OFFICE_PACING: Pacing = { wander: WANDER, breakChance: BREAK_CHANCE, breakSlot: BREAK_SLOT, rest: REST }
+
 const lengthOf = (path: readonly Spot[]) => path.slice(1).reduce((sum, p, i) => sum + Math.abs(p.x - path[i].x) + Math.abs(p.y - path[i].y), 0)
 
 /** The way from the seat to a station: out beside the desk, along, then across. */
@@ -151,11 +161,11 @@ const pausedNow = (trip: Trip, now: number) => trip.pauses.some((p) => p.from <=
  * chat. Everything follows the clock and the desks' names, so redraws agree.
  */
 export class WalkStage {
-  private readonly breakSlot: number
+  private readonly pace: Pacing
 
-  /** `breakSlot` shortens the wait between breaks, for the sprite lab. */
-  constructor(breakSlot = BREAK_SLOT) {
-    this.breakSlot = breakSlot
+  /** The office's pacing by default; the sprite lab makes everyone walk far more often. */
+  constructor(pace: Partial<Pacing> = {}) {
+    this.pace = { ...OFFICE_PACING, ...pace }
   }
 
   private readonly outings = new Map<string, Outing>()
@@ -181,11 +191,11 @@ export class WalkStage {
     const needed = now.state === 'waiting'
 
     if (!outing) {
-      if (needed || errand === null || time - (this.backAt.get(place.deskId) ?? -Infinity) < REST) return
+      if (needed || errand === null || time - (this.backAt.get(place.deskId) ?? -Infinity) < this.pace.rest) return
       const choices = place.stations.filter((s) => s.errand === errand)
       if (choices.length === 0) return
       const roll = errand === 'break' ? this.breakRoll(place.deskId, time) : fresh ? chance(`${place.deskId}:${key}`) : 1
-      if (roll >= (errand === 'break' ? BREAK_CHANCE : WANDER)) return
+      if (roll >= (errand === 'break' ? this.pace.breakChance : this.pace.wander)) return
       const station = choices[Math.floor(chance(`${place.deskId}:${key}:${time}`) * choices.length)]
       const path = routeTo(place, station)
       if (lengthOf(path) > REACH) return
@@ -219,9 +229,9 @@ export class WalkStage {
 
   /** A break comes at most once a slot, at a moment of the slot of its own. */
   private breakRoll(deskId: string, time: number): number {
-    const slot = Math.floor(time / this.breakSlot)
+    const slot = Math.floor(time / this.pace.breakSlot)
     if (this.breaks.get(deskId) === slot) return 1
-    const at = slot * this.breakSlot + chance(`${deskId}:at:${slot}`) * Math.max(0, this.breakSlot - BREAK_STAY * 2)
+    const at = slot * this.pace.breakSlot + chance(`${deskId}:at:${slot}`) * Math.max(0, this.pace.breakSlot - BREAK_STAY * 2)
     if (time < at) return 1
     this.breaks.set(deskId, slot)
     return chance(`${deskId}:break:${slot}`)

@@ -83,9 +83,9 @@ const WALK_STEPS = ['Reading a.ts', 'Running the tests', 'Searching the code', '
 
 function walkScene(stage: WalkStage, tick: number, theme: Theme): Pixel[] {
   const now = (tick / FPS) * 1000
-  const step = WALK_STEPS[Math.floor(now / 7000) % WALK_STEPS.length]
+  const step = WALK_STEPS[Math.floor(now / 5000) % WALK_STEPS.length]
   const doing = new Map<string, DeskDoing>([
-    ['w1', { state: step.startsWith('Reading') || step.startsWith('Searching') ? 'reading' : 'working', doing: `${step} ${Math.floor(now / 7000)}` }],
+    ['w1', { state: step.startsWith('Reading') || step.startsWith('Searching') ? 'reading' : 'working', doing: `${step} ${Math.floor(now / 5000)}` }],
     ['w2', { state: 'idle' }],
     ['w3', { state: 'done' }],
   ])
@@ -248,7 +248,8 @@ export function SpriteLab() {
   const [dark, setDark] = useState(false)
   const [hairStyle, setHairStyle] = useState<HairStyle>('short')
   const room = useMemo(() => roomPixelsAt(tick, themeName, dark), [tick, themeName, dark])
-  const [walks] = useState(() => new WalkStage(20_000))
+  // Here every new step sends the reader off, and breaks come every few seconds, so walks always show.
+  const [walks] = useState(() => new WalkStage({ wander: 1, breakChance: 1, breakSlot: 30_000, rest: 2_000 }))
   const theme = THEMES[themeName]
   const small = Math.max(2, scale - 1)
 

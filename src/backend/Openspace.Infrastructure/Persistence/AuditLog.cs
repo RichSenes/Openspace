@@ -18,5 +18,34 @@ internal sealed class AuditLog(OpenspaceDbContext db) : IAuditLog
         await db.AuditEntries.Where(e => e.At >= since && e.At < until).Select(e => e.TaskId).Distinct()
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
+    public async Task<IReadOnlyList<AuditEntry>> LatestAsync(
+        IReadOnlyCollection<WorkTaskId>? tasks, IReadOnlyCollection<AuditKind>? kinds, long? before, int limit, CancellationToken cancellationToken)
+    {
+        if (tasks is { Count: 0 })
+        {
+            return [];
+        }
+
+        var query = db.AuditEntries.AsQueryable();
+        if (tasks is not null)
+        {
+            var ids = tasks.ToList();
+            query = query.Where(e => ids.Contains(e.TaskId));
+        }
+
+        if (kinds is not null)
+        {
+            var wanted = kinds.ToList();
+            query = query.Where(e => wanted.Contains(e.Kind));
+        }
+
+        if (before is { } last)
+        {
+            query = query.Where(e => e.Id < last);
+        }
+
+        return await query.OrderByDescending(e => e.Id).Take(limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public void Add(AuditEntry entry) => db.AuditEntries.Add(entry);
 }

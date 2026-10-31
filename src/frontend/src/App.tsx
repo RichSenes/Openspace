@@ -68,7 +68,8 @@ export default function App() {
               office={office}
               onOpenRooms={() => setView('rooms')}
               onOpenRoutines={() => setView('routines')}
-              onOpenTask={(taskId) => {
+              onOpenTask={(taskId, officeId) => {
+                if (officeId) setSelectedId(officeId)
                 setFocusTask(taskId)
                 setView('board')
               }}

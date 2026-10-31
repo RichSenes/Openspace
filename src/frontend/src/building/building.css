@@ -289,3 +289,130 @@
 .agent-card-now .agent-card-task:hover {
   background: var(--bg);
 }
+
+/* The activity feed: top right of the building, clear of the controls below and under the agent card. */
+.feed-toggle,
+.feed {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.feed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(420px, calc(100% - 32px));
+  padding: 8px 12px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.feed-toggle:hover {
+  background: var(--raised);
+}
+
+.feed-toggle-latest {
+  overflow: hidden;
+  color: var(--mute);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  width: min(420px, calc(100% - 32px));
+  max-height: min(calc(100% - 88px), 520px);
+  padding: 12px;
+}
+
+.feed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feed-head h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-filters select {
+  width: auto;
+  max-width: 100%;
+}
+
+.feed-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mute);
+}
+
+.feed-empty {
+  margin: 0;
+}
+
+.feed-lines {
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.feed-line {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 2px 8px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feed-line:hover,
+.feed-line:focus-visible {
+  background: var(--raised);
+}
+
+.feed-time {
+  color: var(--mute);
+}
+
+.feed-kind {
+  color: var(--accent);
+}
+
+.feed-failed {
+  color: var(--danger);
+}
+
+.feed-summary {
+  overflow-wrap: anywhere;
+}
+
+.feed-where {
+  grid-column: 3;
+  overflow-wrap: anywhere;
+}

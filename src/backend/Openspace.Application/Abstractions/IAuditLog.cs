@@ -13,5 +13,12 @@ public interface IAuditLog
     /// <summary>Tasks with at least one line recorded in [since, until).</summary>
     Task<IReadOnlyList<WorkTaskId>> TasksActiveBetweenAsync(DateTimeOffset since, DateTimeOffset until, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The latest lines, newest first. Null <paramref name="tasks"/> or <paramref name="kinds"/>
+    /// means any; <paramref name="before"/> pages back from a line.
+    /// </summary>
+    Task<IReadOnlyList<AuditEntry>> LatestAsync(
+        IReadOnlyCollection<WorkTaskId>? tasks, IReadOnlyCollection<AuditKind>? kinds, long? before, int limit, CancellationToken cancellationToken);
+
     void Add(AuditEntry entry);
 }

@@ -2,7 +2,7 @@ import { Activity, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import { useFeed } from '../api/hooks'
 import type { OfficeView } from '../api/types'
-import { FEED_MAX, FEED_PAGE, feedKind, feedPlace, feedText, feedTime, moreLines } from '../activity/feed'
+import { byDay, FEED_MAX, FEED_PAGE, feedKind, feedPlace, feedText, feedTime, moreLines } from '../activity/feed'
 
 interface Props {
   office: OfficeView
@@ -24,7 +24,7 @@ export function ActivityFeed({ office, onOpenTask }: Props) {
   const [limit, setLimit] = useState(FEED_PAGE)
   const feed = useFeed({ officeId: everyOffice ? null : office.id, roomId: roomId || null, everything, limit })
   const lines = feed.data ?? []
-  // Times read against when the lines arrived: today shows the hour only.
+  // Days read against when the lines arrived: Today, Yesterday, then dates.
   const now = new Date(feed.dataUpdatedAt)
 
   const toggle = () => {
@@ -96,22 +96,29 @@ export function ActivityFeed({ office, onOpenTask }: Props) {
             : 'Nothing happened here yet. When agents work, their steps, changes, commands and notes show up here as they happen.'}
         </p>
       ) : (
-        <ol className="feed-lines">
-          {lines.map((line) => (
-            <li key={line.id}>
-              <button type="button" className="feed-line" onClick={() => onOpenTask(line.taskId, line.officeId)}>
-                <time className="feed-time mono" dateTime={line.at}>
-                  {feedTime(line.at, now)}
-                </time>
-                <span className={line.succeeded === false ? 'feed-kind feed-failed' : 'feed-kind'}>{feedKind(line)}</span>
-                <span className="feed-summary">{feedText(line)}</span>
-                <span className="feed-where hint">
-                  {feedPlace(line, everyOffice)} · {line.taskTitle}
-                </span>
-              </button>
-            </li>
+        <div className="feed-lines">
+          {byDay(lines, now).map((group) => (
+            <section key={group.day} className="feed-day" aria-label={group.day}>
+              <h3 className="feed-day-name pixel">{group.day}</h3>
+              <ol className="feed-day-lines">
+                {group.lines.map((line) => (
+                  <li key={line.id}>
+                    <button type="button" className="feed-line" onClick={() => onOpenTask(line.taskId, line.officeId)}>
+                      <time className="feed-time mono" dateTime={line.at}>
+                        {feedTime(line.at)}
+                      </time>
+                      <span className={line.succeeded === false ? 'feed-kind feed-failed' : 'feed-kind'}>{feedKind(line)}</span>
+                      <span className="feed-summary">{feedText(line)}</span>
+                      <span className="feed-where hint">
+                        {feedPlace(line, everyOffice)} · {line.taskTitle}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </section>
           ))}
-        </ol>
+        </div>
       )}
       {lines.length >= limit && limit < FEED_MAX && (
         <button type="button" className="btn" onClick={() => setLimit(moreLines(limit))}>

@@ -329,7 +329,7 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 10px;
-  width: min(420px, calc(100% - 32px));
+  width: min(460px, calc(100% - 32px));
   max-height: min(calc(100% - 88px), 520px);
   padding: 12px;
 }
@@ -370,17 +370,42 @@
 }
 
 .feed-lines {
+  /* One grid for every day and line, so time, kind and text line up whatever their length. */
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.feed-day,
+.feed-day-lines,
+.feed-day-lines li,
+.feed-line {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.feed-day-lines {
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
 }
 
+.feed-day-name {
+  grid-column: 1 / -1;
+  margin: 8px 0 2px;
+  color: var(--mute);
+  font-size: 11px;
+}
+
+.feed-day:first-child .feed-day-name {
+  margin-top: 0;
+}
+
 .feed-line {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
   gap: 2px 8px;
-  width: 100%;
   padding: 6px 4px;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -402,6 +427,7 @@
 
 .feed-kind {
   color: var(--accent);
+  white-space: nowrap;
 }
 
 .feed-failed {

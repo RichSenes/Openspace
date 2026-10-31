@@ -1,11 +1,28 @@
 import type { FeedLine } from '../api/types'
 import { KIND_LABEL } from '../board/auditLabels'
 
-/** The time of a line: the hour today, the day and hour before today. */
-export function feedTime(at: string, now: Date): string {
+/** The time of a line, always the same width: the day goes in the heading above it. */
+export const feedTime = (at: string) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+/** The heading of a day: Today, Yesterday, else the date. */
+export function feedDay(at: string, now: Date): string {
   const when = new Date(at)
-  const time = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  return when.toDateString() === now.toDateString() ? time : `${when.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${time}`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (when.toDateString() === now.toDateString()) return 'Today'
+  if (when.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return when.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** Lines grouped by day, in the order they come (newest first). */
+export function byDay(lines: readonly FeedLine[], now: Date): { day: string; lines: FeedLine[] }[] {
+  const days: { day: string; lines: FeedLine[] }[] = []
+  for (const line of lines) {
+    const day = feedDay(line.at, now)
+    if (days.at(-1)?.day === day) days.at(-1)!.lines.push(line)
+    else days.push({ day, lines: [line] })
+  }
+  return days
 }
 
 /** Who did it and where: the desk and its room, plus the office when the feed follows them all. */

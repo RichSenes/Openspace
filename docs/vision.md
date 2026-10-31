@@ -104,7 +104,7 @@ Later, in rough order of appearance:
      breaks). Now and then a step sends an agent to a station of its own room, a
      short walk at most; agents with nothing to do take a break; an agent that
      needs you hurries back to its desk. Two agents who meet stop for a chat with
-     made-up round bubbles. Standing and walking agents, front and back.
+     made-up round bubbles. Standing and walking agents, front, back and in profile.
   6. Guests: Claude Code sessions started outside Openspace appear, read only, in a
      guest room of the office whose repository holds the folder they work in (the
      folder is on every line of their log), working on laptops with a visitor

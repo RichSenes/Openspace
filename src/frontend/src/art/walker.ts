@@ -1,5 +1,6 @@
 import { FAN_COSTUMES } from './fanPack'
 import { ACCESSORIES, BODY, COSTUMES, FACES, GESTURES, HAIR_STYLES, HEAD, OUTFITS, type Emotion, type HairStyle } from './sheets/character'
+import { PROFILE_ACCESSORIES, PROFILE_ARM, PROFILE_BODY, PROFILE_HAIR, PROFILE_HEAD, PROFILE_LEGS, PROFILE_OUTFITS } from './sheets/profile'
 import { LEGS } from './sheets/standing'
 import { pixelsOf, type Pixel, type SpriteDef } from './sprite'
 import { characterColors, type Appearance } from './station'
@@ -7,8 +8,8 @@ import { characterColors, type Appearance } from './station'
 /** A standing agent is the 24 by 32 frame of the seated one, legs and all. */
 export const WALKER = { width: 24, height: 32 } as const
 
-/** Facing the room, or showing its back: walking away, or busy at a shelf or a board. */
-export type Facing = 'front' | 'back'
+/** Facing the room, showing its back (walking away, or busy at a shelf or a board), or walking across. */
+export type Facing = 'front' | 'back' | 'left' | 'right'
 
 export interface WalkerPose {
   facing: Facing
@@ -59,6 +60,30 @@ function backBody(body: SpriteDef): SpriteDef {
   return { ...body, name: `back-${body.name}`, frames: body.frames.map((f) => f.map((row) => row.replace(/[zZw]/g, plain(row)))) }
 }
 
+/** The coat's own sleeve: the arm in the coat's colours. */
+const COAT_ARM: SpriteDef = { ...PROFILE_ARM, name: 'profile-coat-arm', frames: PROFILE_ARM.frames.map((f) => f.map((row) => row.replace(/C/g, 'B').replace(/c/g, 'n'))) }
+
+/**
+ * An agent walking across, facing right: legs striding, the near arm swinging against them,
+ * head, hair and what it wears in profile. Facing left mirrors it.
+ */
+function profilePixels(look: Appearance, step: number, left: boolean): Pixel[] {
+  const person = characterColors(look)
+  const frame = step % PROFILE_LEGS.frames.length
+  const body = look.outfit ? PROFILE_OUTFITS[look.outfit] : PROFILE_BODY
+  const accessory = look.accessory && PROFILE_ACCESSORIES[look.accessory]
+  const layers: [SpriteDef, number][] = [
+    [PROFILE_LEGS, frame],
+    [body, 0],
+    [PROFILE_HEAD, 0],
+    [PROFILE_HAIR[look.hairStyle], 0],
+    ...(accessory ? [[accessory, 0] as [SpriteDef, number]] : []),
+    [look.outfit === 'coat' ? COAT_ARM : PROFILE_ARM, frame],
+  ]
+  const pixels = layers.flatMap(([sprite, f]) => pixelsOf(sprite, f, person))
+  return left ? pixels.map((p) => ({ ...p, x: WALKER.width - 1 - p.x })) : pixels
+}
+
 const backs = new Map<string, SpriteDef>()
 const memo = (key: string, make: () => SpriteDef) => {
   let sprite = backs.get(key)
@@ -68,14 +93,15 @@ const memo = (key: string, make: () => SpriteDef) => {
 
 /**
  * An agent on its feet, in its own 24 by 32 pixels: legs, then body, head, face, hair and
- * what it wears, as at its desk. From the back the face and glasses are hidden. Costumes
- * have no back: they always face the room.
+ * what it wears, as at its desk. From the back the face and glasses are hidden; walking
+ * across it is seen in profile. Costumes have no back nor profile: they always face the room.
  */
 export function walkerPixels(look: Appearance, pose: WalkerPose): Pixel[] {
   const person = characterColors(look)
   const legs = pixelsOf(LEGS, pose.step % LEGS.frames.length, person)
   const costume = look.costume && (FAN_COSTUMES?.[look.costume] ?? COSTUMES[look.costume])
   if (costume) return [...legs, ...pixelsOf(costume.body, 0, person), ...pixelsOf(costume.open, 0, person)]
+  if (pose.facing === 'left' || pose.facing === 'right') return profilePixels(look, pose.step, pose.facing === 'left')
   const body = look.outfit ? OUTFITS[look.outfit] : BODY
   const accessory = look.accessory && ACCESSORIES[look.accessory]
   const layers: (SpriteDef | undefined)[] =

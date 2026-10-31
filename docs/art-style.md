@@ -266,8 +266,13 @@ seated one: body, head, face, hair and accessory are the desk's, and legs come u
 a step with the right; the legs move a frame every four pixels walked. The back is made
 from the front drawings, so every hairstyle has one: head and hair become one silhouette
 filled with hair and shaded on the right, the collar and zips become plain cloth, glasses
-disappear. Costumes have no back and always face the room. Walking up the room shows the
-back, anything else the front. On a break the agent faces the room and now and then sips
+disappear. Walking across the room shows the agent in profile (`art/sheets/profile.ts`),
+drawn facing right and mirrored for the left: a fuller head with ear, eye, nose and mouth,
+each hairstyle over the top and down the back (the bun a round knot behind the head), the
+shirt, hoodie (hood hanging behind the neck) and coat (down over the hips) seen from the
+side, glasses, headset and hat in profile, legs that stride with the far leg darker, and the
+near arm swinging against them. Walking up the room shows the back, walking down the front.
+Costumes have neither back nor profile and always face the room. On a break the agent faces the room and now and then sips
 from the red mug.
 
 ## Stations and chats

@@ -1,5 +1,6 @@
 using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
+using Openspace.Application.Guests;
 
 namespace Openspace.Infrastructure.Persistence;
 
@@ -13,4 +14,6 @@ internal sealed class NullActivityPublisher : IActivityPublisher
     public Task ContextChangedAsync(DeskContext context, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task GuestsChangedAsync(OfficeGuests guests, CancellationToken cancellationToken) => Task.CompletedTask;
 }

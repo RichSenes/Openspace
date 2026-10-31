@@ -9,6 +9,9 @@ public enum RoomKind
 
     /// <summary>The office's routines, each at a place of its own: no desks.</summary>
     Routines,
+
+    /// <summary>Claude Code sessions started outside Openspace, seen working on the office's folder: no desks.</summary>
+    Guests,
 }
 
 /// <summary>An area of competence inside an office, with its own desks and context.</summary>
@@ -134,6 +137,11 @@ public sealed class Room
         if (Kind == RoomKind.Routines)
         {
             throw new DomainException($"'{Name}' holds the office's routines: desks go in the other rooms.");
+        }
+
+        if (Kind == RoomKind.Guests)
+        {
+            throw new DomainException($"'{Name}' is for guests: desks go in the other rooms.");
         }
 
         var deskName = UniqueDeskName(name, null);

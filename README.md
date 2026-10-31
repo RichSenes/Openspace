@@ -72,7 +72,10 @@ Each project has its own README with detailed specifications.
    and then: to a shelf, a filing cabinet or a printer while they read, to a
    server rack while they run commands, to a whiteboard to plan, to the coffee
    when they have nothing to do, and back to their desk at once when they need
-   you. Colleagues who meet stop for a chat.
+   you. Colleagues who meet stop for a chat. Claude Code sessions you start
+   yourself in a terminal show up as guests, in the guest room of the office
+   whose repository they work in, at a laptop with a visitor's badge: Openspace
+   reads only the folder, branch and time from their logs, never what was said.
 8. Reports of a day or of an epic are written from the audit log in the
    language you choose, ready to copy into an email or a chat.
 9. Accepted work is merged into the branch you choose, one task at a time or

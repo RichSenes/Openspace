@@ -203,6 +203,11 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
 
         {room.kind === 'Routines' ? (
           <p className="hint">This room holds the office's routines, each as a karakuri at its desk. Add and change them in Routines.</p>
+        ) : room.kind === 'Guests' ? (
+          <p className="hint">
+            Guests sit here: Claude Code sessions started outside Openspace that work in this office's repository, each at a laptop with a visitor's
+            badge. They come and go by themselves; Openspace only sees them.
+          </p>
         ) : (
           <form className="desk-new" onSubmit={submitDesk}>
             <label className="field">

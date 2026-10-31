@@ -105,3 +105,54 @@ export const DESK: SpriteDef = {
     ],
   ],
 }
+
+
+/**
+ * A guest's table: a laptop open on it, lid towards the viewer, on the left where desks
+ * keep their monitor, so the visitor's badge shows. Same size as a desk.
+ */
+export const GUEST_DESK: SpriteDef = {
+  name: 'guest-desk',
+  width: 32,
+  height: 21,
+  legend: {
+    o: 'outline',
+    j: 'metal.light',
+    k: 'metal.mid',
+    K: 'metal.dark',
+    T: 'wood.light',
+    t: 'wood.mid',
+    F: 'wood.mid',
+    f: 'wood.dark',
+    a: 'key.light',
+    A: 'key.dark',
+    g: 'screen',
+    G: 'glow',
+    P: 'spill',
+  },
+  frames: [
+    [
+      '................................',
+      '................................',
+      '....oooooooooooo................',
+      '....ojjjjjjjjjjogG..............',
+      '....ojkkkkkkkkkogG..............',
+      '....ojkkkkkkkkkogG..............',
+      '....ojkkkaakkkkogG..............',
+      '....ojkkkkkkkkkogG..............',
+      '....okkkkkkkkkKog...............',
+      '....oKKKKKKKKKKo................',
+      '.oooooooooooooooooooooooooooooo.',
+      '.oTTTTTTTTTTPPPPTTTTTTTTTTTTTTo.',
+      '.oTTTTTTTTTTPPTTTTTTTTTTTTTTTto.',
+      '.oTTTTTTTTTTTTTTTTTTTTTTTTTTtto.',
+      '.otttttttttttttttttttttttttttto.',
+      '.oooooooooooooooooooooooooooooo.',
+      '.oFFFFFFFFFFFFFFFFFFFFFFFFFFFFo.',
+      '.oFFFFFFFFFFFFFFFFFFFFFFFFFFFfo.',
+      '.ofFFFFFFFFFFFFFFFFFFFFFFFFFffo.',
+      '.offffffffffffffffffffffffffffo.',
+      '.oooooooooooooooooooooooooooooo.',
+    ],
+  ],
+}

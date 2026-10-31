@@ -37,6 +37,10 @@ public static class DependencyInjection
         services.AddSingleton<IDatabaseBackups>(sp => new SqliteBackups(
             connectionString, sp.GetRequiredService<IOptions<BackupOptions>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddHostedService<BackupService>();
+
+        // Claude Code sessions started outside Openspace come in as guests.
+        services.AddSingleton<Application.Guests.IClaudeSessions, Guests.ClaudeSessionLogs>();
+        services.AddHostedService<GuestService>();
         return services;
     }
 

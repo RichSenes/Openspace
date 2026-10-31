@@ -358,6 +358,14 @@ internal sealed class RecordingPublisher : IActivityPublisher
         Interns.Add(interns);
         return Task.CompletedTask;
     }
+
+    public List<Guests.OfficeGuests> Guests { get; } = [];
+
+    public Task GuestsChangedAsync(Guests.OfficeGuests guests, CancellationToken cancellationToken)
+    {
+        Guests.Add(guests);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryAuditLog : IAuditLog

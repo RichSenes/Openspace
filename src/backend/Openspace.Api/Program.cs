@@ -42,6 +42,7 @@ builder.Services.Configure<Openspace.Infrastructure.Routines.PdfOptions>(builder
 builder.Services.Configure<Openspace.Infrastructure.Routines.KanjiOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.KanjiOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Google.GoogleOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Google.GoogleOptions.SectionName));
 builder.Services.Configure<Openspace.Application.Weather.WeatherOptions>(builder.Configuration.GetSection(Openspace.Application.Weather.WeatherOptions.SectionName));
+builder.Services.Configure<Openspace.Application.Guests.GuestOptions>(builder.Configuration.GetSection(Openspace.Application.Guests.GuestOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));

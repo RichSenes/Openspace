@@ -3,7 +3,7 @@ import { Lightbulb, LightbulbOff, Map as MapIcon, Move } from 'lucide-react'
 import { activityByDesk } from '../activity/activity'
 import { contextByDesk } from '../activity/energy'
 import { internsByDesk } from '../activity/interns'
-import { useActivity, useDeskContexts, useInterns, useWeather, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
+import { useActivity, useDeskContexts, useGuests, useInterns, useWeather, useOfficeTasks, useProposals, useRoutines, useSetOfficeTheme } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { THEMES, type ThemeName } from '../art/themes'
 import { useToast } from '../ui/toastContext'
@@ -17,6 +17,8 @@ import { BuildingCanvas, type DeskPick, type Selection } from './BuildingCanvas'
 import { LookDialog } from './LookDialog'
 import { useRoutineProgress } from '../realtime/routineProgress'
 import { routineBubble, routineStateOf, withRoutines } from './routines'
+import { guestDesk, guestStateOf, isGuestDesk, withGuests } from './guests'
+import { GuestCard } from './GuestCard'
 import { usePersistentState } from '../usePersistentState'
 import './building.css'
 
@@ -72,14 +74,20 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const weather = useWeather().data?.now?.sky
   const interns = useMemo(() => internsByDesk(helpers.data, office.id), [helpers.data, office.id])
   const routines = useRoutines(office.id)
+  const guests = useGuests()
+  const ownGuests = useMemo(() => (guests.data ?? []).filter((g) => g.officeId === office.id), [guests.data, office.id])
   const proposals = useProposals(office.id)
   const progress = useRoutineProgress()
   const desksBubbles = useMemo(() => activityByDesk(activity.data, office.id), [activity.data, office.id])
   // The routines' dolls: their state, and their bubbles beside the desks'.
   const routineStates = useMemo(() => {
     const waiting = (id: string) => proposals.data?.filter((p) => p.routineId === id).length ?? 0
-    return new Map((routines.data ?? []).map((r) => [r.id, routineStateOf(r, progress.has(r.id), waiting(r.id))]))
-  }, [routines.data, proposals.data, progress])
+    // Guests too: they never take tasks, their state comes from their own session.
+    return new Map([
+      ...(routines.data ?? []).map((r) => [r.id, routineStateOf(r, progress.has(r.id), waiting(r.id))] as const),
+      ...ownGuests.map((g) => [guestDesk(g).id, guestStateOf(g)] as const),
+    ])
+  }, [routines.data, proposals.data, progress, ownGuests])
   const bubbles = useMemo(() => {
     const all = new Map(desksBubbles)
     for (const r of routines.data ?? []) {
@@ -96,10 +104,10 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const [map, setMap] = usePersistentState<'yes' | 'no'>('openspace.minimap', 'yes')
   const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
-  // While arranging, the routines room shows empty: its dolls place themselves.
+  // While arranging, the routines room and the guest room show empty: who sits there places itself.
   const shown = useMemo(
-    () => (arranging ? withDrafts(office, drafts) : withRoutines(withDrafts(office, drafts), routines.data)),
-    [office, drafts, arranging, routines.data],
+    () => (arranging ? withDrafts(office, drafts) : withGuests(withRoutines(withDrafts(office, drafts), routines.data), ownGuests)),
+    [office, drafts, arranging, routines.data, ownGuests],
   )
   const wrapper = useRef<HTMLDivElement>(null)
   const [picked, setPicked] = useState<{ pick: DeskPick; style: React.CSSProperties }>()
@@ -107,6 +115,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const [dressing, setDressing] = useState<string>()
   const desks = useMemo(() => desksOf(office), [office])
   const pickedDesk = desks.find((d) => d.id === picked?.pick.deskId)
+  const pickedGuest = ownGuests.find((g) => guestDesk(g).id === picked?.pick.deskId)
   /** Changes the drafts from the office as they show it, whatever changed in between. */
   const edit = (change: (shown: OfficeView, drafts: Drafts) => Drafts) => setDrafts((d) => change(withDrafts(office, d), d))
   const stopArranging = () => {
@@ -131,7 +140,8 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
     <div className={arranging ? 'building arranging' : 'building'} ref={wrapper}>
       <BuildingCanvas
         onPickDesk={(pick) => {
-          if (pick && routineStates.has(pick.deskId)) onOpenRoutines()
+          if (pick && isGuestDesk(pick.deskId)) setPicked({ pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) })
+          else if (pick && routineStates.has(pick.deskId)) onOpenRoutines()
           else setPicked(pick ? { pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) } : undefined)
         }}
         office={shown}
@@ -199,6 +209,7 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
           )
         }
       />
+      {pickedGuest && picked && !arranging && <GuestCard guest={pickedGuest} office={office} style={picked.style} onClose={() => setPicked(undefined)} />}
       {pickedDesk && picked && !arranging && (
         <AgentCard
           desk={pickedDesk}

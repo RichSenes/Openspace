@@ -269,4 +269,18 @@ public class OfficeTests
         Assert.Throws<DomainException>(() => reserved.KeepLocal(true, Now));
         Assert.False(reserved.LocalOnly);
     }
+
+    [Fact]
+    public void The_guest_room_opens_once_takes_no_desks_and_never_steals_a_name()
+    {
+        var office = ECorp();
+        office.OpenRoom("Guest room", Now);
+
+        var room = office.GuestRoom("Guest room", Now);
+
+        Assert.Same(room, office.GuestRoom("Guest room", Now));
+        Assert.Equal(RoomKind.Guests, room.Kind);
+        Assert.NotEqual("Guest room", room.Name);
+        Assert.Throws<DomainException>(() => office.AddDesk(room.Id, "Visitor", AgentProfile.Create("visitor", null), Now));
+    }
 }

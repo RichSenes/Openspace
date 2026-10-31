@@ -297,3 +297,11 @@ A chat (`src/frontend/src/art/chat.ts`) is a round bubble with a tail of dots, 1
 `chat.paper`, never with words: dots, a note, a heart, "!?" or a coffee. The real bubbles
 are boxes with text, so the two never mix up. The two agents take turns, a bubble each, and
 smile.
+
+## Guests
+
+A guest sits at a table with a laptop (`GUEST_DESK`, 32 by 21 like a desk, in the theme's
+wood and metal): the lid faces the viewer on the left, where desks keep their monitor, with a
+sticker on it and the screen's glow at its edge, and no keyboard on the table. On its chest a
+visitor's badge (`VISITOR_BADGE`) hangs on a lanyard in `string`, a card in `gear.light`
+with a yellow stripe. Guests look like agents otherwise, picked from their id.

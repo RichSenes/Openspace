@@ -2,10 +2,11 @@ import { BONE, CHARACTER_COLORS, DOLL_LIPS, PORCELAIN, GLOVES, CLOTH_COLORS, HAI
 import { batteryPixels } from './energy'
 import { FAN_COLORS, FAN_COSTUMES } from './fanPack'
 import type { Light } from './lighting'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, WINDUP_KEY, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
+import { ACCESSORIES, BODY, CHARACTER_LEGEND, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, WINDUP_KEY, type Accessory, type Costume, type Emotion, type HairStyle, type Outfit } from './sheets/character'
 import { SIGNALS, type Signal } from './sheets/signals'
 import { pixelsOf, type Pixel, type Resolve, type SpriteDef } from './sprite'
 import type { Theme } from './themes'
+import { GUEST_DESK } from './sheets/room'
 
 /** How the agent at a desk looks. */
 export interface Appearance {
@@ -19,6 +20,8 @@ export interface Appearance {
   outfit?: Outfit
   /** Replaces head, hair and clothes: for the special agents. */
   costume?: Costume
+  /** A guest from outside Openspace: a visitor's badge, and a laptop instead of a monitor. */
+  visitor?: boolean
 }
 
 export type Gesture = 'rest' | 'typing' | 'think' | 'wave' | 'cheer' | 'stuck' | 'sip'
@@ -115,7 +118,7 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const costume = look.costume && (FAN_COSTUMES?.[look.costume] ?? COSTUMES[look.costume])
   const self = costume
     ? [costume.body, closed ? costume.closed : costume.open]
-    : [look.outfit ? OUTFITS[look.outfit] : BODY, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
+    : [look.outfit ? OUTFITS[look.outfit] : BODY, look.visitor ? VISITOR_BADGE : undefined, HEAD, FACES[pose.emotion], HAIR_STYLES[look.hairStyle]]
   const doll = look.costume === 'karakuri'
   // A karakuri's key turns while it works, and stands still while it sleeps.
   const key = doll ? pixelsOf(WINDUP_KEY, pose.screen === 'on' ? Math.floor(pose.frame / 2) % 2 : 0, person, cx, cy) : []
@@ -128,7 +131,7 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
     ...(arms ? pixelsOf(arms, pose.frame, person, cx, cy) : []),
   ]
   const desk = [
-    ...pixelsOf(theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY),
+    ...pixelsOf(look.visitor ? GUEST_DESK : theme.desk, 0, themeColors(theme.colors, pose.screen), 0, STATION.deskY),
     ...(doll ? pixelsOf(HOURGLASS, pose.screen === 'on' ? Math.floor(pose.frame / 3) % 2 : 0, themeColors(theme.colors), 26, STATION.deskY + 7) : []),
   ]
   if (pose.away) return desk
@@ -136,6 +139,27 @@ export function stationPixels(look: Appearance, pose: StationPose, theme: Theme)
   const signal = pose.signal ? pixelsOf(SIGNALS[pose.signal], 0, themeColors(theme.colors), cx + 8, cy - 11) : []
   const battery = pose.energy === undefined ? [] : batteryPixels(pose.energy)
   return [...behind, ...desk, ...front, ...signal, ...battery]
+}
+
+/** A visitor's badge on a lanyard, hanging on the chest of a guest. */
+export const VISITOR_BADGE: SpriteDef = {
+  name: 'visitor-badge',
+  width: 24,
+  height: 32,
+  legend: CHARACTER_LEGEND,
+  frames: [
+    [
+      ...Array<string>(17).fill('........................'),
+      '.........w....w.........',
+      '.........w....w.........',
+      '..........w..w..........',
+      '..........oooo..........',
+      '..........oYYo..........',
+      '..........okko..........',
+      '..........oooo..........',
+      ...Array<string>(8).fill('........................'),
+    ],
+  ],
 }
 
 /** The hourglass on a routine's desk: sand runs down while it works. */

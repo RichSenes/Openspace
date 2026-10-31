@@ -51,6 +51,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
+| GET | `/api/guests?officeId=` | Claude Code sessions started outside Openspace, working in an office's repository now: `{ id, officeId, folder, branch, state, since, lastAt }`; `folder` and `branch` are null in offices with private folders |
 | GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
 | GET | `/api/epics?officeId=` | Epics of an office |
@@ -122,6 +123,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `TaskChanged` | task id | a task is created, changes status, gets a note or a check, or spends tokens |
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
 | `DeskInterns` | the desk's interns | an agent hands work to a helper, the helper comes back, or the agent stops |
+| `OfficeGuests` | an office's guests | a guest comes in, changes what it does, or leaves |
 | `DeskContext` | the energy | an answer changed how full a desk's conversation is, or the engine summarised it |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
@@ -129,8 +131,9 @@ SignalR hub at `/hubs/building`, server to client only:
 | `ReportsChanged` | none | a report was written |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
-domain events after each successful save. `DeskActivity`, `DeskContext` and `DeskInterns`
-carry the data themselves, because activity, energy and interns are not stored.
+domain events after each successful save. `DeskActivity`, `DeskContext`, `DeskInterns` and
+`OfficeGuests` carry the data themselves, because activity, energy, interns and guests are
+not stored.
 
 ## Run
 
@@ -165,6 +168,8 @@ On startup it applies pending database migrations.
 | `GitHub:Command` | `gh` | The GitHub CLI, signed in with `gh auth login`; also looked for in `~/.local/bin` |
 | `Operator:Name` | `operator` | Who you are: recorded as requester and note author |
 | `Queue:Enabled` | `true` | Run the queue in the background |
+| `Guests:Enabled` | `true` | Look for Claude Code sessions started outside Openspace every few seconds (`Guests:Every`, 5 s); a session quiet for `Guests:StayFor` (15 minutes) leaves |
+| `Guests:Folder` | empty | Where Claude Code keeps its sessions' logs; empty for `~/.claude/projects` |
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
@@ -543,3 +548,21 @@ allowed; editing, commands and the web follow the role (allowed, asked, or not g
 all). Anything to be asked goes through the `permission` tool of Openspace's MCP server,
 which waits for the person's answer in Openspace. Work counts against the limits of the
 account Claude Code is signed in with, shared with everything else done with it.
+
+## Guests
+
+Claude Code sessions people start themselves, in a terminal, show up as guests. Every few
+seconds Openspace reads the end of the session logs Claude Code wrote in the last quarter of
+an hour (`~/.claude/projects/*/*.jsonl`), and keeps only, from each: the folder the session
+works in now (`cwd`, written on every line, so it follows the session wherever it goes), its
+branch, the time, how it was started, and the names of the tools it used. What was said is
+never kept. Sessions Openspace started itself (`entrypoint` `sdk-cli`, or in its own working
+copies) are not guests.
+
+A session is the guest of the office whose repository holds its folder, the deepest one when
+repositories sit inside each other. The first guest of an office opens its guest room (a room
+of kind `Guests`, without desks, like the routines room). A guest works (its last reply used a
+tool), reads (that tool only looks: Read, Grep, Glob, web), or waits for its person (its last
+reply ended its turn, or nothing happened for three minutes). In an office with private folders
+guests stay anonymous: no folder, no branch. Openspace only watches them: it cannot pause,
+answer or give them tasks.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FeedLine } from '../api/types'
-import { FEED_MAX, feedKind, feedPlace, feedText, feedTime, moreLines } from './feed'
+import { byDay, FEED_MAX, feedDay, feedKind, feedPlace, feedText, feedTime, moreLines } from './feed'
 
 const line = (over: Partial<FeedLine> = {}): FeedLine => ({
   id: 1,
@@ -38,10 +38,25 @@ describe('feed lines', () => {
     expect(feedText(line({ kind: 'Note', summary: 'Note from Frontend', excerpt: 'The header is shared.' }))).toBe('Note from Frontend: The header is shared.')
   })
 
-  it('show the hour today and the day before today', () => {
-    const today = new Date('2015-06-24T18:00:00')
-    expect(feedTime('2015-06-24T09:30:00', today)).not.toMatch(/Jun|giu/i)
-    expect(feedTime('2015-06-20T09:30:00', today)).toMatch(/20/)
+  it('show only the hour, the same width every time, and the day in a heading above', () => {
+    expect(feedTime('2015-06-24T09:05:00')).toBe(feedTime('2015-06-24T09:05:00'))
+    expect(feedTime('2015-06-24T09:05:00')).toHaveLength(feedTime('2015-06-24T21:45:00').length)
+    const now = new Date('2015-06-24T18:00:00')
+    expect(feedDay('2015-06-24T09:30:00', now)).toBe('Today')
+    expect(feedDay('2015-06-23T23:59:00', now)).toBe('Yesterday')
+    expect(feedDay('2015-06-20T09:30:00', now)).toMatch(/20/)
+  })
+
+  it('group lines by day, newest first', () => {
+    const now = new Date('2015-06-24T18:00:00')
+    const days = byDay(
+      [line({ id: 3, at: '2015-06-24T10:00:00' }), line({ id: 2, at: '2015-06-24T09:00:00' }), line({ id: 1, at: '2015-06-23T09:00:00' })],
+      now,
+    )
+    expect(days.map((d) => [d.day, d.lines.map((l) => l.id)])).toEqual([
+      ['Today', [3, 2]],
+      ['Yesterday', [1]],
+    ])
   })
 
   it('ask for older lines a page at a time, up to what the server gives', () => {

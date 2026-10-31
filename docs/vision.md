@@ -94,9 +94,10 @@ Later, in rough order of appearance:
   3. ~~Interns~~ Done: when an agent hands work to a helper, an intern appears beside
      its desk in a puff of smoke, with a badge and a clipboard, and leaves the same
      way. Claude Code desks may call them in only when their role allows it.
-  4. Weather at the windows (rain, snow, fog, storms, stars) from the real weather
-     of the person's town, and a minimap that is a sketch, not a copy: rooms as
-     blocks in their theme colour, agents as dots shaped by their state.
+  4. ~~Weather and minimap~~ Done: the windows show the real weather of the town
+     set in Settings (clouds, fog, drizzle, rain, snow, storms with flashes, stars
+     only when clear), and a minimap sketches the building: rooms as blocks in
+     their mood's colours, agents as marks shaped by their state; press it to go.
   5. Stations and walks: furniture with a purpose (shelves, cabinets and printers
      for documents; racks for commands and tests; whiteboards for plans; the coffee
      machine for breaks). Agents walk to a nearby one now and then, never far; when

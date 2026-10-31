@@ -31,6 +31,7 @@ import type {
   ClaudeUsage,
   DeskUsageView,
   SettingsView,
+  WeatherView,
   MergeOutcome,
   CheckOutcome,
   BackupView,
@@ -58,6 +59,7 @@ export const keys = {
   engines: ['engines'] as const,
   gpu: ['gpu'] as const,
   settings: ['settings'] as const,
+  weather: ['weather'] as const,
   backups: ['backups'] as const,
   sounds: ['sounds'] as const,
   deskUsage: ['usage', 'desks'] as const,
@@ -570,6 +572,20 @@ export function useBackups() {
 
 export function useBackUp() {
   return useWrite(() => request<BackupView>('POST', '/api/backups'), keys.backups)
+}
+
+/** The weather at the windows: the API asks again every quarter of an hour, so does the page. */
+export function useWeather() {
+  return useQuery({ queryKey: keys.weather, queryFn: () => request<WeatherView>('GET', '/api/weather'), refetchInterval: 15 * 60_000 })
+}
+
+/** Sets the town of the weather; empty stops it. */
+export function useSaveWeather() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (place: string) => request<WeatherView>('PUT', '/api/weather', { place }),
+    onSuccess: (saved) => client.setQueryData(keys.weather, saved),
+  })
 }
 
 export function useSettings() {

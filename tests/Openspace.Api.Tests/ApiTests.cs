@@ -655,6 +655,30 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_town_of_the_weather_is_looked_up_and_kept_in_the_settings_file()
+    {
+        var before = await GetAsync<JsonElement>("/api/weather");
+
+        var put = await _http.PutAsJsonAsync("/api/weather", new { place = " gotham " });
+        put.EnsureSuccessStatusCode();
+        var after = await GetAsync<JsonElement>("/api/weather");
+
+        Assert.Equal(JsonValueKind.Null, before.GetProperty("place").ValueKind);
+        Assert.Equal("Gotham, United States", after.GetProperty("place").GetString());
+        Assert.Equal("Rain", after.GetProperty("now").GetProperty("sky").GetString());
+        Assert.Contains("Gotham, United States", await File.ReadAllTextAsync(_app.SettingsPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_town_nobody_knows_is_refused()
+    {
+        var put = await _http.PutAsJsonAsync("/api/weather", new { place = "Atlantis" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, put.StatusCode);
+        Assert.False(File.Exists(_app.SettingsPath));
+    }
+
+    [Fact]
     public async Task Checks_to_try_by_hand_are_ticked_through_the_api()
     {
         var (officeId, _, deskId) = await FurnishAsync();

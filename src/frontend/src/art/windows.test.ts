@@ -52,3 +52,39 @@ describe('glazed', () => {
     expect(glazed('#cfe6ff')).toBe('#cfe6ff')
   })
 })
+
+describe('the weather', () => {
+  const colorsOf = (weather: Parameters<typeof skyPixels>[5], tick = 0, phase: 'day' | 'night' = 'day') =>
+    skyPixels(0, GLASS.width, GLASS.height, tick, phase, weather).map((p) => p.color)
+  const all = ['Clear', 'Cloudy', 'Fog', 'Drizzle', 'Rain', 'Snow', 'Storm'] as const
+
+  it('changes the sky, each weather its own way', () => {
+    const skies = all.map((w) => colorsOf(w).join())
+    expect(new Set(skies).size).toBe(all.length)
+  })
+
+  it('keeps one sky across neighbouring windows whatever falls', () => {
+    for (const weather of all) {
+      const left = skyPixels(100, 10, 16, 7, 'day', weather)
+      const both = skyPixels(100, 20, 16, 7, 'day', weather)
+      expect(both.filter((p) => p.x < 10).map((p) => p.color)).toEqual(left.map((p) => p.color))
+    }
+  })
+
+  it('lets rain and snow fall', () => {
+    expect(colorsOf('Rain', 1)).not.toEqual(colorsOf('Rain', 0))
+    expect(colorsOf('Snow', 2)).not.toEqual(colorsOf('Snow', 0))
+  })
+
+  it('shows stars only on a clear night', () => {
+    const stars = (weather: (typeof all)[number]) => [0, 3, 6].some((t) => colorsOf(weather, t, 'night').includes('#e8ecff'))
+    expect(stars('Clear')).toBe(true)
+    expect(stars('Cloudy')).toBe(false)
+  })
+
+  it('lets in less light under a grey sky, and a flash in a storm', () => {
+    expect(windowLight('day', 'Rain')[0].radius).toBeLessThan(windowLight('day')[0].radius)
+    const flash = Array.from({ length: 400 }, (_, t) => t).find((t) => windowLight('night', 'Storm', t)[0].radius > 30)
+    expect(flash).toBeDefined()
+  })
+})

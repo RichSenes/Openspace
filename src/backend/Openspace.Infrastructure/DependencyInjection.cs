@@ -118,6 +118,9 @@ public static class DependencyInjection
         services.AddHttpClient<IPackageRegistry, Upkeep.PackageRegistries>(Honest);
         services.AddHttpClient<IToolchains, Upkeep.Toolchains>(Honest);
 
+        // The windows show the weather of the person's town, from a public service with no key.
+        services.AddHttpClient<Application.Weather.IWeatherSource, Weather.OpenMeteo>(Honest);
+
         // The kanji of the day reads open dictionaries kept on this computer.
         services.AddSingleton<IKanjiBook, Routines.KanjiBook>();
 

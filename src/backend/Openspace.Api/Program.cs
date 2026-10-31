@@ -41,6 +41,7 @@ builder.Services.Configure<Openspace.Infrastructure.Telegram.TelegramOptions>(bu
 builder.Services.Configure<Openspace.Infrastructure.Routines.PdfOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.PdfOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Routines.KanjiOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Routines.KanjiOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Google.GoogleOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Google.GoogleOptions.SectionName));
+builder.Services.Configure<Openspace.Application.Weather.WeatherOptions>(builder.Configuration.GetSection(Openspace.Application.Weather.WeatherOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
@@ -83,6 +84,7 @@ app.MapGpuEndpoints();
 app.MapRoutineEndpoints();
 app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
+app.MapWeatherEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");

@@ -447,3 +447,32 @@
   margin: 4px 0 0;
   padding-left: 18px;
 }
+
+/* The little map: top left, clear of the controls below and the feed on the right. */
+.minimap {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 1;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgb(11 12 16 / 0.82);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.building-canvas .minimap canvas {
+  position: static;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+/* What the screen shows, a light frame over the map. */
+.minimap-view {
+  position: absolute;
+  margin: 6px;
+  border: 1px solid rgb(236 232 223 / 0.9);
+  border-radius: 2px;
+  background: rgb(236 232 223 / 0.08);
+  pointer-events: none;
+}

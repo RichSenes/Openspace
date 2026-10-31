@@ -135,7 +135,13 @@ Windows (`src/frontend/src/art/windows.ts`) are 24 by 22: a frame in `trim.light
 a cross that splits four panes, a sill, and a two-pixel glint in each pane. On an
 outer back wall they show the sky for the hour on the viewer's clock (day, dusk,
 night) with bands dithered like pixel art, a far skyline, drifting clouds by day
-and twinkling stars and lit windows by night; by day they light a dark room. On an
+and twinkling stars and lit windows by night; by day they light a dark room. With
+a town set in Settings they show its weather too (`Sky`): cloudy greys the bands and
+sends two layers of heavier clouds across, the near one faster; fog veils everything,
+thicker low down; drizzle, rain and storms fall in drops slanting left, more and
+longer each time, in front of the skyline; snow sways down slowly; a storm flashes
+now and then, lighting the room. Stars shine only on a clear night, and a grey sky
+lets in less, greyer light. On an
 inner wall they show what is painted just behind the wall. Either way the view is
 glazed, a little paler and bluer, so a window never reads as a hole. A door in a
 back wall is a doorway with posts and a lintel that shows the same view.
@@ -239,3 +245,14 @@ Tests check every sprite: rows of the right width, the right number of rows,
 every character in the legend, every legend name in every palette. The sprite
 lab (a page of the app, available while developing) shows every sprite,
 animation and combination at several zoom levels.
+
+## Minimap
+
+The building's little map (`src/frontend/src/building/minimap.ts`) is a sketch, not a
+copy: two map pixels per tile, enlarged on screen by whole steps only. The corridors are
+the office's wall grey with the building's edge in its outline colour, each room a block in
+its own mood's floor colour with its back wall along the top, and each agent a mark three
+pixels across with a dark rim, so its state reads from the shape as well as the colour: a
+diamond at work (green, pulsing) or reading (blue), a ring in the queue, a dot when idle, a
+square when done, an exclamation mark that blinks when it needs you, a red cross when it
+failed. A light frame shows what the screen sees.

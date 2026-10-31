@@ -92,6 +92,7 @@ internal static class TaskEndpoints
 
         app.MapGet("/api/activity", (Guid? officeId, ActivityBoard board) => board.Snapshot(officeId)).WithTags("Activity");
         app.MapGet("/api/context", (Guid? officeId, ContextBoard board) => board.Snapshot(officeId)).WithTags("Activity");
+        app.MapGet("/api/interns", (Guid? officeId, InternBoard board) => board.Snapshot(officeId)).WithTags("Activity");
         app.MapGet("/api/feed", (Guid? officeId, Guid? roomId, bool? everything, long? before, int? limit, FeedQueries feed, CancellationToken ct) =>
             feed.ListAsync(
                 officeId is { } o ? new OfficeId(o) : null, roomId is { } r ? new RoomId(r) : null, everything ?? false, before, limit, ct))

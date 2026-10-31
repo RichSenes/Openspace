@@ -68,6 +68,44 @@ public class ClaudeCodeEventsTests
         Assert.Empty(events.Read("""{"type":"system","subtype":"init","session_id":"abc"}"""));
     }
 
+    private static string HelperCall(string id, string name, string description, string parent = "null") =>
+        "{\"type\":\"assistant\",\"parent_tool_use_id\":" + parent + ",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"" + id
+        + "\",\"name\":\"" + name + "\",\"input\":{\"description\":\"" + description + "\",\"prompt\":\"Look around.\",\"subagent_type\":\"Explore\"}}]}}";
+
+    [Theory]
+    [InlineData("Agent")]
+    [InlineData("Task")]
+    public void A_hand_off_brings_a_helper_that_leaves_with_its_result(string tool)
+    {
+        var events = new ClaudeCodeEvents("claude-1");
+
+        var arrived = Assert.Single(events.Read(HelperCall("toolu_7", tool, "Find the login form")));
+        var back = events.Read(ToolResult("toolu_7", "The form is in login.php"));
+
+        Assert.Equal(new AgentSignal.Delegated("claude-1", "toolu_7", "Find the login form"), arrived);
+        Assert.Equal(new AgentSignal.Returned("claude-1", "toolu_7"), back[0]);
+        Assert.Equal("A helper did: Find the login form", Assert.IsType<AgentSignal.ToolFinished>(back[1]).Summary);
+    }
+
+    [Fact]
+    public void A_helper_handing_off_again_brings_no_new_intern()
+    {
+        var events = new ClaudeCodeEvents("claude-1");
+
+        Assert.IsType<AgentSignal.Progress>(Assert.Single(events.Read(HelperCall("toolu_8", "Agent", "Deeper", "\"toolu_7\""))));
+    }
+
+    [Fact]
+    public void Helpers_are_offered_only_to_roles_that_allow_them()
+    {
+        var (tools, allowed) = ClaudeCodeRuntime.Tools(new RolePermissions(PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow));
+        var (without, _) = ClaudeCodeRuntime.Tools(new RolePermissions(PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow));
+
+        Assert.Contains(ClaudeCodeEvents.HelperTool, tools);
+        Assert.Contains(ClaudeCodeEvents.HelperTool, allowed);
+        Assert.DoesNotContain(ClaudeCodeEvents.HelperTool, without);
+    }
+
     [Fact]
     public void A_tool_call_shows_what_the_agent_does_and_its_result_goes_in_the_log()
     {

@@ -45,7 +45,9 @@ Each project has its own README with detailed specifications.
 3. While it works, the agent's todo list and tool calls become speech bubbles,
    and a battery beside it shows how much room is left in its conversation:
    it gets tired as the battery runs down and has a coffee when the engine
-   summarises the conversation.
+   summarises the conversation. Helpers it calls in (subagents) stand beside
+   its desk as interns; Claude Code agents call them in only if their role
+   allows it.
    Through Openspace's own MCP tools it can also leave notes on the task,
    announce what it is doing and re-read its brief.
    If it asks for a permission, Openspace answers on its own in auto mode

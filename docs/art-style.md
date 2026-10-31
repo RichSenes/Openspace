@@ -80,6 +80,12 @@ green above 60% left, yellow down to 30%, red below.
 | below 10%: `exhausted` | `tired` | sinks two pixels into the chair, types at half speed, yawns every five seconds |
 | just got it back | `blink` with the `sip` gesture (a red mug at the mouth) for three seconds while the battery charges, then `happy` for two | |
 
+**Interns** are helpers an agent called in: 12×22, standing beside the desk (right,
+then left; two at most), in their agent's colours with a skin and hair of their own, a
+visitor badge on a lanyard and a clipboard (`art/interns.ts`). They come and go in a
+four-frame puff of smoke with sparks (`PUFF`, 0.8 seconds); with reduced motion they
+simply appear and disappear.
+
 Sweat drops and the hand on the chin are taken (`worried` and `reading`), so they are
 not used for tiredness. States that concern you (waiting, done, failed) keep their own
 look and only show the battery.

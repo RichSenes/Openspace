@@ -3,9 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { mergeActivity } from '../activity/activity'
 import { mergeContext } from '../activity/energy'
+import { mergeInterns } from '../activity/interns'
 import { reportRoutineProgress } from './routineProgress'
 import { keys } from '../api/hooks'
-import type { DeskActivity, DeskContext } from '../api/types'
+import type { DeskActivity, DeskContext, DeskInterns } from '../api/types'
 import { retryDelay } from './retry'
 import { cueOfActivity, emitCue, type SoundEvent } from '../sounds/rules'
 
@@ -43,6 +44,7 @@ export function useBuildingHub(): LinkState {
       const cue = cueOfActivity(activity)
       if (cue) emitCue(cue)
     })
+    hub.on('DeskInterns', (interns: DeskInterns) => client.setQueryData<DeskInterns[]>(keys.interns, (list) => mergeInterns(list, interns)))
     hub.on('DeskContext', (context: DeskContext) => client.setQueryData<DeskContext[]>(keys.context, (list) => mergeContext(list, context)))
     hub.on('TaskCue', (c: { taskId: string | null; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>
       emitCue({ event: c.cue, officeId: c.officeId, deskId: c.deskId, key: `${c.taskId ?? c.officeId}:${c.cue}:${Date.now()}` }),

@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<AgentSignals>();
         services.AddSingleton<ActivityBoard>();
         services.AddSingleton<ContextBoard>();
+        services.AddSingleton<InternBoard>();
         services.AddSingleton<Review.PendingReviews>();
         services.AddSingleton<PermissionRequests>();
         services.AddSingleton<EngineLimits>();

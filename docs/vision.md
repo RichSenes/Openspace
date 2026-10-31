@@ -91,8 +91,9 @@ Later, in rough order of appearance:
      conversation; tired and exhausted looks; a coffee when the engine summarises it.
   2. ~~Live feed~~ Done: the Activity panel in the building, for an office, a room or
      every office, newest first, with the start of each note.
-  3. Interns: when an agent delegates to a helper, an intern appears beside its desk
-     in a puff of smoke, with a badge and a clipboard, and leaves the same way.
+  3. ~~Interns~~ Done: when an agent hands work to a helper, an intern appears beside
+     its desk in a puff of smoke, with a badge and a clipboard, and leaves the same
+     way. Claude Code desks may call them in only when their role allows it.
   4. Weather at the windows (rain, snow, fog, storms, stars) from the real weather
      of the person's town, and a minimap that is a sketch, not a copy: rooms as
      blocks in their theme colour, agents as dots shaped by their state.

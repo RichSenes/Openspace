@@ -338,6 +338,23 @@ export interface FeedLine {
   excerpt: string | null
 }
 
+/** A helper agent working for a desk: an intern beside it. */
+export interface Intern {
+  /** The hand-off it came for. */
+  id: string
+  /** What it was asked to do, in a few words. */
+  what: string
+  since: string
+}
+
+/** The interns at one desk, oldest first. */
+export interface DeskInterns {
+  officeId: string
+  deskId: string
+  taskId: string
+  interns: Intern[]
+}
+
 export type PermissionLevel = 'Allow' | 'Ask' | 'Deny'
 
 export interface RoleView {
@@ -349,6 +366,8 @@ export interface RoleView {
   edit: PermissionLevel
   bash: PermissionLevel
   web: PermissionLevel
+  /** Claude Code agents may hand work to helpers (interns): Allow or Deny. */
+  helpers: PermissionLevel
 }
 
 export type RoleInput = Omit<RoleView, 'id'>

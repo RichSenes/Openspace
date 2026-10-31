@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { AGENT_LOOKS, poseOf, type AgentState } from '../art/agentStates'
 import { toCanvas } from '../art/canvas'
 import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, type ClothColor, type HairColor, type SkinTone } from '../art/palette'
-import { deskItem, propItem, roomPixels, roomShell, TILE, WALL_HEIGHT } from '../art/roomScene'
+import { deskItem, internItems, propItem, roomPixels, roomShell, TILE, WALL_HEIGHT } from '../art/roomScene'
+import { scenePixels } from '../art/scene'
+import type { OnStage } from '../activity/interns'
 import type { SceneItem } from '../art/scene'
 import { ACCESSORIES, FACES, HAIR_STYLES, type Accessory, type Emotion, type HairStyle } from '../art/sheets/character'
 import { FURNITURE } from '../art/fanPack'
@@ -43,6 +45,26 @@ function Pixels({ width, height, pixels, scale, label }: { width: number; height
 function Station({ pixels, scale, label }: { pixels: Pixel[]; scale: number; label: string }) {
   const cropped = pixels.map((p) => ({ ...p, y: p.y - SIGNAL_ROOM }))
   return <Pixels width={STATION.width} height={STATION.height - SIGNAL_ROOM} pixels={cropped} scale={scale} label={label} />
+}
+
+const INTERN_SCENE = { width: 72, height: 52, deskX: 20 }
+const INTERN_LABELS = ['one intern', 'two interns', 'arriving and leaving (3 s loop)']
+const SAMPLE_INTERN = { id: 'a', what: 'Find the login form', since: '' }
+
+/** A desk with its interns: one, two, or one coming and going in a puff every three seconds. */
+function internScene(look: Appearance, sample: number, tick: number, theme: Theme): Pixel[] {
+  const t = (tick % (3 * FPS)) / FPS
+  const frame = (since: number) => Math.min(3, Math.floor((since / 0.8) * 4))
+  const looping: OnStage =
+    t < 0.8 ? { intern: SAMPLE_INTERN, spot: 0, visible: frame(t) >= 2, puff: frame(t) }
+    : t < 2.2 ? { intern: SAMPLE_INTERN, spot: 0, visible: true }
+    : { intern: SAMPLE_INTERN, spot: 0, visible: frame(t - 2.2) < 2, puff: frame(t - 2.2) }
+  const stage: OnStage[] =
+    sample === 0 ? [{ intern: SAMPLE_INTERN, spot: 0, visible: true }]
+    : sample === 1 ? [{ intern: SAMPLE_INTERN, spot: 0, visible: true }, { intern: { ...SAMPLE_INTERN, id: 'zz' }, spot: 1, visible: true }]
+    : [looping]
+  const x = INTERN_SCENE.deskX
+  return scenePixels([deskItem(look, 'working', x, 0, tick, theme), ...internItems(look, stage, x, 0, tick)])
 }
 
 /** A frame counter at the animation speed of the art style. */
@@ -267,6 +289,18 @@ export function SpriteLab() {
                 label={sample.label}
               />
               <figcaption>{sample.label}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Interns</h2>
+        <div className="lab-pieces">
+          {[0, 1, 2].map((i) => (
+            <figure key={i}>
+              <Pixels width={INTERN_SCENE.width} height={INTERN_SCENE.height} pixels={internScene(PEOPLE[i], i, tick, theme)} scale={small} label={INTERN_LABELS[i]} />
+              <figcaption>{INTERN_LABELS[i]}</figcaption>
             </figure>
           ))}
         </div>

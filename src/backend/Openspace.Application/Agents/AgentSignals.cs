@@ -16,6 +16,7 @@ public sealed partial class AgentSignals(
     IAgentRuntime runtime,
     ActivityBoard activity,
     ContextBoard context,
+    InternBoard interns,
     IAuditLog audit,
     IActivityPublisher publisher,
     Review.PendingReviews reviews,
@@ -94,6 +95,30 @@ public sealed partial class AgentSignals(
 
         await context.RecordAsync(task.OfficeId.Value, task.DeskId.Value.Value, task.Id.Value, sessionId, used, window, clock.GetUtcNow(), cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>The agent handed part of its work to a helper: an intern arrives at its desk.</summary>
+    public async Task DelegatedAsync(string sessionId, string callId, string what, CancellationToken cancellationToken)
+    {
+        var task = await RunningTaskAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task is null)
+        {
+            return;
+        }
+
+        await interns.ArriveAsync(task.OfficeId.Value, task.DeskId!.Value.Value, task.Id.Value, callId, what, clock.GetUtcNow(), cancellationToken)
+            .ConfigureAwait(false);
+        await ShowProgressAsync(task, null, $"Delegating: {what}", cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>A helper came back with its result: its intern leaves.</summary>
+    public async Task ReturnedAsync(string sessionId, string callId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.FindBySessionAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (task?.DeskId is { } deskId)
+        {
+            await interns.LeaveAsync(deskId.Value, callId, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>The brief again, with the notes written since: what the agent reads to get its bearings.</summary>
@@ -182,6 +207,7 @@ public sealed partial class AgentSignals(
     /// </summary>
     private async Task StartOverAsync(WorkTask task, string why, CancellationToken cancellationToken)
     {
+        await interns.DismissAsync(task.DeskId!.Value.Value, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var run = task.Run!;
         if (loops.TryRestart(task, run.SessionId, why))
@@ -364,6 +390,9 @@ public sealed partial class AgentSignals(
             return;
         }
 
+        // The agent stopped: its interns leave with it.
+        await interns.DismissAsync(task.DeskId!.Value.Value, cancellationToken).ConfigureAwait(false);
+
         var now = clock.GetUtcNow();
         var summary = await runtime.GetLastReplyAsync(sessionId, task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(summary))
@@ -434,6 +463,9 @@ public sealed partial class AgentSignals(
             return;
         }
 
+        // The agent stopped: its interns leave with it.
+        await interns.DismissAsync(task.DeskId!.Value.Value, cancellationToken).ConfigureAwait(false);
+
         limits.Pause(scope, until);
         var now = clock.GetUtcNow();
         var resumes = limits.PausedUntil(scope) ?? now;
@@ -456,6 +488,9 @@ public sealed partial class AgentSignals(
         {
             return;
         }
+
+        // The agent stopped: its interns leave with it.
+        await interns.DismissAsync(task.DeskId!.Value.Value, cancellationToken).ConfigureAwait(false);
 
         task.Fail(reason, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

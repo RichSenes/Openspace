@@ -14,6 +14,11 @@ namespace Openspace.Infrastructure.ClaudeCode;
 /// <param name="contextWindow">The most the model holds, when it is known; else it is guessed from what the answers hold.</param>
 internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWindow = null)
 {
+    /// <summary>The tool that hands work to a helper agent; older versions of Claude Code called it Task.</summary>
+    public const string HelperTool = "Agent";
+
+    private static bool IsHelper(string tool) => tool is HelperTool or "Task";
+
     /// <summary>What Claude models hold unless they run with the long context.</summary>
     public const long StandardWindow = 200_000;
 
@@ -130,6 +135,14 @@ internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWi
 
             var input = part.TryGetProperty("input", out var i) ? i.Clone() : default;
             _calls[id] = (name, input);
+
+            // A helper's own calls belong to the helper: only the agent's hand-offs bring one in.
+            if (IsHelper(name) && !IsFromHelper(root))
+            {
+                signals.Add(new AgentSignal.Delegated(sessionId, id, Shorten(HelperTask(input), 120)));
+                continue;
+            }
+
             if (name == "TodoWrite")
             {
                 if (CurrentTodo(input) is { } step)
@@ -146,13 +159,20 @@ internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWi
         return signals;
     }
 
+    /// <summary>What a helper was asked to do, in a few words.</summary>
+    private static string HelperTask(JsonElement input) =>
+        Text(input, "description") ?? Text(input, "subagent_type") ?? "part of the work";
+
+    private static bool IsFromHelper(JsonElement root) =>
+        root.TryGetProperty("parent_tool_use_id", out var parent) && parent.ValueKind == JsonValueKind.String;
+
     /// <summary>
     /// How full the conversation is after this answer: all it read, plus what it wrote.
     /// Answers of helpers the agent delegated to have conversations of their own and do not count.
     /// </summary>
     private AgentSignal.Context? ContextOf(JsonElement root)
     {
-        if (root.TryGetProperty("parent_tool_use_id", out var parent) && parent.ValueKind == JsonValueKind.String
+        if (IsFromHelper(root)
             || !root.TryGetProperty("message", out var message) || !message.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
         {
             return null;
@@ -190,6 +210,11 @@ internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWi
                 continue;
             }
 
+            if (IsHelper(call.Name))
+            {
+                signals.Add(new AgentSignal.Returned(sessionId, id));
+            }
+
             var failed = part.TryGetProperty("is_error", out var e) && e.ValueKind == JsonValueKind.True;
             signals.Add(Finished(id, call.Name, call.Input, ResultText(part), failed));
         }
@@ -211,6 +236,7 @@ internal sealed partial class ClaudeCodeEvents(string sessionId, long? contextWi
             "Grep" or "Glob" =>
                 (AuditKind.Search, Text(input, "pattern") is { } pattern ? $"Searched the code for {pattern}" : "Searched the code", output),
             "WebFetch" or "WebSearch" => (AuditKind.Other, $"Looked up {Text(input, "url") ?? Text(input, "query") ?? "something online"}", null),
+            _ when IsHelper(tool) => (AuditKind.Other, $"A helper did: {HelperTask(input)}", output),
             _ => (AuditKind.Other, $"Used {tool}", output),
         };
 

@@ -57,11 +57,13 @@ internal sealed partial class OpenCodeEventListener(
             }
 
             AgentSignal? signal;
+            AgentSignal? delegation;
             try
             {
                 using var json = JsonDocument.Parse(line.AsMemory(5));
                 var payload = json.RootElement.TryGetProperty("payload", out var p) ? p : json.RootElement;
                 signal = OpenCodeEventTranslator.Translate(payload);
+                delegation = OpenCodeEventTranslator.Delegation(payload);
             }
             catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
             {
@@ -77,6 +79,12 @@ internal sealed partial class OpenCodeEventListener(
             if (signal is not null)
             {
                 await DispatchAsync(signal, stoppingToken).ConfigureAwait(false);
+            }
+
+            // A hand-off to a helper is told apart from the progress of the same event.
+            if (delegation is not null)
+            {
+                await DispatchAsync(delegation, stoppingToken).ConfigureAwait(false);
             }
 
             // A finished answer also says how full the conversation is: all it read, plus what it wrote.

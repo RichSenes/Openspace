@@ -350,6 +350,14 @@ internal sealed class RecordingPublisher : IActivityPublisher
         Contexts.Add(context);
         return Task.CompletedTask;
     }
+
+    public List<DeskInterns> Interns { get; } = [];
+
+    public Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken)
+    {
+        Interns.Add(interns);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryAuditLog : IAuditLog

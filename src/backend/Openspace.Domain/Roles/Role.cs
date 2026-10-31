@@ -18,7 +18,11 @@ public enum PermissionLevel
 /// <param name="Edit">Creating and changing files.</param>
 /// <param name="Bash">Running shell commands.</param>
 /// <param name="Web">Fetching pages from the internet.</param>
-public sealed record RolePermissions(PermissionLevel Edit, PermissionLevel Bash, PermissionLevel Web)
+/// <param name="Helpers">
+/// Whether a Claude Code agent may hand part of its work to helper agents of its own
+/// (subagents): Allow or Deny, off unless the role turns it on. OpenCode agents always may.
+/// </param>
+public sealed record RolePermissions(PermissionLevel Edit, PermissionLevel Bash, PermissionLevel Web, PermissionLevel Helpers = PermissionLevel.Deny)
 {
     /// <summary>OpenCode's own defaults: work freely.</summary>
     public static RolePermissions Default { get; } = new(PermissionLevel.Allow, PermissionLevel.Allow, PermissionLevel.Allow);

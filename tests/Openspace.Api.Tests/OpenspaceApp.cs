@@ -68,6 +68,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
             // Never the person's own Claude Code sessions: no guests are looked for.
             ["Guests:Enabled"] = "false",
+
+            // Never GitHub: releases come from a made-up source, and only when asked.
+            ["Releases:Enabled"] = "false",
         };
         foreach (var (key, value) in settings)
         {
@@ -78,6 +81,7 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings));
         // Never the real weather service: one made-up town, always raining.
         builder.ConfigureTestServices(services => services.AddSingleton<IWeatherSource, MadeUpWeather>());
+        builder.ConfigureTestServices(services => services.AddSingleton<Openspace.Application.Releases.IReleaseSource, MadeUpReleases>());
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));
@@ -108,4 +112,11 @@ internal sealed class MadeUpWeather : IWeatherSource
         Task.FromResult(name.StartsWith("Gotham", StringComparison.OrdinalIgnoreCase) ? new Place("Gotham, United States", 40.7, -74) : null);
 
     public Task<Reading> CurrentAsync(Place place, CancellationToken cancellationToken) => Task.FromResult(new Reading(Sky.Rain, 11));
+}
+
+/// <summary>One made-up release, far in the future, so any build is older.</summary>
+internal sealed class MadeUpReleases : Openspace.Application.Releases.IReleaseSource
+{
+    public Task<Openspace.Application.Releases.Release?> LatestAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<Openspace.Application.Releases.Release?>(new("99.0.0", "Openspace 99.0.0", "- Flying desks", new Uri("https://example.com/releases/v99.0.0"), null));
 }

@@ -125,6 +125,10 @@ public static class DependencyInjection
         // The windows show the weather of the person's town, from a public service with no key.
         services.AddHttpClient<Application.Weather.IWeatherSource, Weather.OpenMeteo>(Honest);
 
+        // New releases of Openspace itself, from GitHub's public API: told, never installed.
+        services.AddHttpClient<Application.Releases.IReleaseSource, Releases.GitHubReleases>(Honest);
+        services.AddHostedService<ReleaseService>();
+
         // The kanji of the day reads open dictionaries kept on this computer.
         services.AddSingleton<IKanjiBook, Routines.KanjiBook>();
 

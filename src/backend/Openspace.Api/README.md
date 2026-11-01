@@ -74,6 +74,8 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once |
+| GET | `/api/version` | The version running and the latest release seen: `{ current, latest: { version, name, notes, url, publishedAt }, newer, checkedAt }`; `latest` is null until a release is found |
+| POST | `/api/version/check` | Look for a new release on GitHub now; `502` when GitHub does not answer |
 | GET | `/api/weather` | The town whose weather the windows show and its weather: `{ place, now: { place, sky, temperature, at } }`; `sky` is Clear, Cloudy, Fog, Drizzle, Rain, Snow or Storm; read from Open-Meteo at most every 15 minutes, the last reading kept if it cannot be reached |
 | PUT | `/api/weather` | `{ place }`: looks the town up ("Turin" or "Turin, Italy") and keeps it in the settings file; empty stops the weather; 422 for a town nobody knows |
 | GET | `/api/sounds` | `{ muted, volume, rules, files }`: which sound each moment plays (`needs-you`, `question`, `review`, `verdict`, `failed`, `plan-ready`, `checks-failed`, `paused`, `all-done`, `offline`), in general or for one room or desk, and your own sound files |
@@ -172,6 +174,8 @@ On startup it applies pending database migrations.
 | `Queue:Enabled` | `true` | Run the queue in the background |
 | `Guests:Enabled` | `true` | Look for Claude Code sessions started outside Openspace every few seconds (`Guests:Every`, 5 s); a session quiet for `Guests:StayFor` (15 minutes) leaves |
 | `Guests:Folder` | empty | Where Claude Code keeps its sessions' logs; empty for `~/.claude/projects` |
+| `Releases:Enabled` | `true` | Look for new releases of Openspace every `Releases:Every` (12 hours) on GitHub's public API, without a key. It only tells: nothing is downloaded or installed |
+| `Releases:Repository` | empty | Where releases are published, as `owner/name`; empty for the GitHub repository this copy was cloned from (`git remote get-url origin`) |
 | `Queue:PollInterval` | `00:00:02` | How often free seats are filled |
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |

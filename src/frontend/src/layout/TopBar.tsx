@@ -1,4 +1,5 @@
 import { NeedsYou } from '../activity/NeedsYou'
+import { ReleaseBanner } from '../release/ReleaseBanner'
 import { MuteButton } from '../sounds/MuteButton'
 import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
@@ -64,6 +65,7 @@ export function TopBar({ view, onView, link }: Props) {
         <GpuStatus onOpen={() => onView('board')} />
         <ClaudeMeter onOpen={() => onView('settings')} />
       </div>
+      <ReleaseBanner />
     </div>
   )
 }

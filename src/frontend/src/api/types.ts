@@ -601,3 +601,22 @@ export interface OfficeGuests {
   officeId: string
   guests: Guest[]
 }
+
+/** A published release of Openspace. */
+export interface Release {
+  /** Its number, without the "v" of its tag. */
+  version: string
+  name: string
+  /** What changed, in Markdown. */
+  notes: string
+  url: string
+  publishedAt: string | null
+}
+
+/** The version running here and the latest release seen; Openspace never updates itself. */
+export interface VersionView {
+  current: string
+  latest: Release | null
+  newer: boolean
+  checkedAt: string | null
+}

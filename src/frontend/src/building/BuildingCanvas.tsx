@@ -4,7 +4,7 @@ import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js
 import type { DeskActivity, DeskContext, FloorCut, Intern, OfficeView, Sky, WorkTaskView } from '../api/types'
 import { paintInto } from '../art/canvas'
 import { inTheDark, unlit, type Light } from '../art/lighting'
-import { deskItem, internItems, propItem, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
+import { deskItem, internItems, propItem, roomLayers, roomPixels, roomShell, upperWall, WALL_HEIGHT } from '../art/roomScene'
 import { sceneLights, scenePixels, type SceneItem } from '../art/scene'
 import { HALL_FLOOR } from '../art/sheets/rooms'
 import { pixelsOf, type Pixel } from '../art/sprite'
@@ -656,6 +656,8 @@ function attachNavigation(
 /** A room drawn as pixel art, repainted at every frame of the animation. */
 interface RoomPainter {
   paint: (tick: number) => void
+  /** What stands in the room, drawn above the names. */
+  standing: Sprite
 }
 
 interface Scene {
@@ -766,8 +768,9 @@ function drawBuilding(
 
   const selection = new Graphics()
   outline(selection, layout, selected)
-  // Names, then bubbles, go on top of every room, so they can spill over walls.
-  world.addChild(labels, bubbles, selection)
+  // Names go over floors and walls, so they can spill over them, but under people and
+  // furniture, which walk and stand in front of them; bubbles go on top of everything.
+  world.addChild(labels, ...[...rooms.values()].map((r) => r.standing), bubbles, selection)
   return { world, rooms, hall: hall.painter, walls, names, selection, scene, bubbles: placed }
 }
 
@@ -956,6 +959,9 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
   paintInto(canvas, size.width, size.height, shell)
   const sprite = spriteOf(canvas, room.x * TILE, room.y * TILE)
   world.addChild(sprite)
+  const top = document.createElement('canvas')
+  paintInto(top, size.width, size.height, [])
+  const standing = spriteOf(top, room.x * TILE, room.y * TILE)
   const colors = themeColors(theme.colors)
   // Some moods keep the lights off whatever the hour.
   const dark = scene.dark || Boolean(theme.dark)
@@ -997,9 +1003,13 @@ function drawRoom(room: RoomBox, layout: BuildingLayout, scene: Scene, theme: Th
           internItems(looks.get(d.id)!, scene.interns?.at(d.id, now) ?? [], d.x - room.x * TILE, d.y - room.y * TILE, tick + i * 7),
         ),
       ]
-      paintInto(canvas, size.width, size.height, roomPixels(theme, shell, items, dark))
+      const layers = roomLayers(theme, shell, items, dark)
+      paintInto(canvas, size.width, size.height, layers.base)
+      paintInto(top, size.width, size.height, layers.standing)
       sprite.texture.source.update()
+      standing.texture.source.update()
     },
+    standing,
   }
 }
 

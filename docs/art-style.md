@@ -206,7 +206,8 @@ Copies are often bigger than our scale: `--height` brings them down to match the
 agents, keeping outlines crisp. `--largest` drops signatures and captions, `--hole`
 empties a ring's inside, `--cell`/`--offset` set the grid by hand when a picture is
 stretched, `--outline` adds a black line for art drawn on black. A fan module can
-also redraw a costume (`costumes.skeleton`, with `open`, `closed` and `body`).
+also redraw a costume (`costumes.skeleton`, with `open`, `closed` and `body`, and
+`back` and `side` for walking; without both the redrawn costume always faces the room).
 
 The tool has its own tests: `python3 -m unittest discover tools`.
 
@@ -273,8 +274,15 @@ each hairstyle over the top and down the back (the bun a round knot behind the h
 shirt, hoodie (hood hanging behind the neck) and coat (down over the hips) seen from the
 side, glasses, headset and hat in profile, legs that stride with the far leg darker, and the
 near arm swinging against them. Walking up the room shows the back, walking down the front.
-Costumes have neither back nor profile and always face the room. On a break the agent faces the room and now and then sips
+Costumes have their own back and profile (`art/sheets/costumeViews.ts`): head and body in one
+drawing each, over everybody's legs and swinging arm, in the costume's sleeve (the hooded
+one's is its coat). On a break the agent faces the room and now and then sips
 from the red mug.
+
+Room and desk names are drawn over floors and walls but under whatever stands in a room:
+people walking past, desks and furniture cover them, rugs and what hangs on walls do not.
+Corridor furniture is hidden under a room only when it stands on the room's floor; a tall
+piece against a room's wall still shows.
 
 ## Stations and chats
 

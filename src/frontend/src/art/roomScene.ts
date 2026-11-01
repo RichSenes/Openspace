@@ -70,6 +70,18 @@ export function roomPixels(theme: Theme, shell: Pixel[], items: SceneItem[], dar
   return dark ? inTheDark(pixels, sceneLights(items), theme.colors.night) : pixels
 }
 
+/**
+ * A room in two layers: what lies on its floor or hangs on its walls, and what stands in
+ * it. Names are drawn between the two, so people and furniture walk in front of them.
+ */
+export function roomLayers(theme: Theme, shell: Pixel[], items: SceneItem[], dark: boolean): { base: Pixel[]; standing: Pixel[] } {
+  const lit = (pixels: Pixel[]) => (dark ? inTheDark(pixels, sceneLights(items), theme.colors.night) : pixels)
+  return {
+    base: lit([...shell, ...scenePixels(items.filter((i) => i.layer))]),
+    standing: lit(scenePixels(items.filter((i) => !i.layer))),
+  }
+}
+
 /** An intern's own skin and hair, picked from the hand-off it came for; it wears its agent's colours. */
 export function internLook(agent: Appearance, id: string): Appearance {
   let hash = 0

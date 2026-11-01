@@ -657,6 +657,21 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_version_running_is_told_and_a_newer_release_only_once_looked_for()
+    {
+        var before = await GetAsync<JsonElement>("/api/version");
+        var check = await _http.PostAsync("/api/version/check", null);
+        var after = await check.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Matches(@"^\d+\.\d+\.\d+$", before.GetProperty("current").GetString());
+        Assert.Equal(JsonValueKind.Null, before.GetProperty("latest").ValueKind);
+        Assert.False(before.GetProperty("newer").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, check.StatusCode);
+        Assert.True(after.GetProperty("newer").GetBoolean());
+        Assert.Equal("99.0.0", after.GetProperty("latest").GetProperty("version").GetString());
+    }
+
+    [Fact]
     public async Task The_town_of_the_weather_is_looked_up_and_kept_in_the_settings_file()
     {
         var before = await GetAsync<JsonElement>("/api/weather");

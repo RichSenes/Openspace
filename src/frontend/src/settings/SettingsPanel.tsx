@@ -6,6 +6,7 @@ import { useToast } from '../ui/toastContext'
 import { GoogleCard } from './GoogleCard'
 import { SoundsCard } from './SoundsCard'
 import { WeatherCard } from './WeatherCard'
+import { VersionCard } from './VersionCard'
 import './settings.css'
 
 const MAX_SEATS = 12
@@ -40,6 +41,7 @@ export function SettingsPanel() {
       </section>
       <SoundsCard />
       <WeatherCard />
+      <VersionCard />
       <Backups />
       <GoogleCard />
       <Accounts />

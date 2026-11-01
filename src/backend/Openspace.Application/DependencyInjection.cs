@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddSingleton<InternBoard>();
         services.AddSingleton<Queue.QueueWaits>();
         services.AddSingleton<Weather.WeatherReport>();
+        services.AddSingleton<Releases.ReleaseWatch>();
         services.AddSingleton<Guests.GuestBoard>();
         services.AddScoped<Guests.GuestWatcher>();
         services.AddSingleton<Review.PendingReviews>();

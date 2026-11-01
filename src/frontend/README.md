@@ -37,12 +37,19 @@ src/
 | Board | Ask the supervisor to split a request into proposed tasks, then approve them all at once or one by one; filter by epic. Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
 | Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
 | Reports | Write a report of a day or of an epic in a chosen language, read it rendered, copy it or download it as Markdown |
-| Settings | Permissions, how many agents work at once, who plans and reviews, the Claude account's limits, sounds, the town of the weather at the windows (looked up as you save it, with its weather now), backups and Google accounts |
+| Settings | Permissions, how many agents work at once, who plans and reviews, the Claude account's limits, sounds, the town of the weather at the windows (looked up as you save it, with its weather now), the version running (with a button to look for a new one), backups and Google accounts |
 | Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking, including whether a Claude Code agent may call in interns (helpers, off by default) |
 
 While agents wait for a permission, "Needs you" cards pop up at the bottom right
 of every view, one per desk, with Allow once and Refuse, and pop out once answered
 (no motion when the system asks for reduced motion).
+
+Under the views, a strip shows what the accounts and the graphics card are up to (a
+provider over its limits, who uses the local model, the Claude account), only when
+there is something to say; it wraps on narrow windows. When a newer release of
+Openspace is out, a banner says so, with what changed, a link to GitHub and "Remind
+me tomorrow" (remembered in this browser for that version): Openspace never updates
+itself. Queued tasks say on the board why they wait.
 
 Confirmations appear as short toasts at the bottom; errors stay next to the form
 that caused them, with the server's reason.

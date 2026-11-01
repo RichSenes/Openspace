@@ -165,6 +165,18 @@ account: put your own OAuth client (a desktop app of your Google Cloud project) 
 `~/.config/openspace/google-client.json`, then connect the account in Settings,
 under Google accounts. Keys stay on your computer; no routine can send mail.
 
+### Updates
+
+Openspace never updates itself. Twice a day it looks at the releases published on
+GitHub for the repository it was cloned from, and when a newer one is out a banner
+says so, with what changed and a "remind me tomorrow". Settings shows the version
+running. To update: `git pull`, then `scripts/openspace restart`.
+
+To publish a version (for whoever maintains the repository): write what changed in
+a Markdown file, then `scripts/release 0.10.0 notes.md` from a clean `main`. It sets
+the number in `Directory.Build.props` and the page's `package.json`, commits, tags
+`v0.10.0`, pushes and opens the GitHub release with those notes.
+
 Logs and process ids live in `~/.local/state/openspace`. Ports change with
 `OPENSPACE_API_PORT`, `OPENSPACE_WEB_PORT` and `OPENSPACE_OPENCODE_PORT`.
 

@@ -37,6 +37,7 @@ import type {
   CheckOutcome,
   BackupView,
   QueueWait,
+  VersionView,
 } from './types'
 
 export const keys = {
@@ -51,6 +52,7 @@ export const keys = {
   interns: ['interns'] as const,
   guests: ['guests'] as const,
   queueWaits: ['queue-waits'] as const,
+  version: ['version'] as const,
   feed: ['feed'] as const,
   feedOf: (filter: FeedFilter) => ['feed', filter] as const,
   roles: ['roles'] as const,
@@ -595,6 +597,20 @@ export function useBackUp() {
 /** The weather at the windows: the API asks again every quarter of an hour, so does the page. */
 export function useWeather() {
   return useQuery({ queryKey: keys.weather, queryFn: () => request<WeatherView>('GET', '/api/weather'), refetchInterval: 15 * 60_000 })
+}
+
+/** The version running here and the latest release seen, asked again every hour. */
+export function useVersion() {
+  return useQuery({ queryKey: keys.version, queryFn: () => request<VersionView>('GET', '/api/version'), refetchInterval: 60 * 60_000 })
+}
+
+/** Looks for a new release now. */
+export function useCheckVersion() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => request<VersionView>('POST', '/api/version/check'),
+    onSuccess: (view) => client.setQueryData(keys.version, view),
+  })
 }
 
 /** Sets the town of the weather; empty stops it. */

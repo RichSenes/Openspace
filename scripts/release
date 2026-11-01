@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Publishes a version of Openspace: sets the number, commits it, tags it and opens the
+# GitHub release with its notes. Running instances then tell their people about it; none
+# updates itself.
+#
+#   scripts/release 0.10.0 notes.md     notes.md: what changed, in Markdown, for people
+#
+# It runs from a clean main that is up to date with origin, and needs gh signed in.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fail() { printf 'release: %s\n' "$*" >&2; exit 1; }
+
+[ $# -eq 2 ] || fail "usage: scripts/release X.Y.Z notes.md"
+VERSION="$1"
+NOTES="$(realpath "$2")"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "the version must be three numbers, such as 0.10.0"
+[ -s "$NOTES" ] || fail "the notes file is missing or empty"
+command -v gh >/dev/null 2>&1 || [ -x "$HOME/.local/bin/gh" ] || fail "gh is not installed"
+GH="$(command -v gh || echo "$HOME/.local/bin/gh")"
+
+cd "$ROOT"
+[ "$(git branch --show-current)" = main ] || fail "switch to main first"
+[ -z "$(git status --porcelain)" ] || fail "commit or put aside the changes first"
+git fetch -q origin main
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main and origin/main differ: pull or push first"
+git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && fail "v$VERSION is already tagged"
+
+# One number, in the backend's build and in the page's package.
+sed -i -E "s|<Version>[^<]*</Version>|<Version>$VERSION</Version>|" Directory.Build.props
+grep -q "<Version>$VERSION</Version>" Directory.Build.props || fail "Directory.Build.props has no <Version> to change"
+(cd src/frontend && npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null)
+
+git add Directory.Build.props src/frontend/package.json src/frontend/package-lock.json
+git commit -q -m "Released $VERSION"
+git tag -a "v$VERSION" -m "Openspace $VERSION"
+git push -q origin main "v$VERSION"
+"$GH" release create "v$VERSION" --title "Openspace $VERSION" --notes-file "$NOTES"
+printf 'Openspace %s is out.\n' "$VERSION"

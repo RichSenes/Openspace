@@ -202,10 +202,14 @@ function tilesOf(name: PropName, x: number, y: number): TileRect {
   return { x: left, y: top, width: Math.ceil((x + width) / TILE) - left, height: Math.ceil((y + height) / TILE) - top }
 }
 
-/** Whether a piece of the corridor's furniture lies under a room. */
+/**
+ * Whether a piece of the corridor's furniture lies under a room: where it stands on the
+ * floor, not how tall it is, so a statue against a room's wall still shows.
+ */
 export function underRoom(layout: Pick<BuildingLayout, 'rooms'>, piece: PropSpot): boolean {
   const t = tilesOf(piece.name, piece.x, piece.y)
-  return layout.rooms.some((r) => t.x < r.x + r.width && r.x < t.x + t.width && t.y < r.y + r.height && r.y < t.y + t.height)
+  const feet = t.y + t.height - 1
+  return layout.rooms.some((r) => t.x < r.x + r.width && r.x < t.x + t.width && feet >= r.y && feet < r.y + r.height)
 }
 
 /** The first place on the floor, back to front and left to right, where a room fits among what is already there. */

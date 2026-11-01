@@ -114,6 +114,14 @@ describe('layoutOffice, drawn by hand', () => {
     expect(underRoom(covered, covered.hall[0])).toBe(true)
   })
 
+  it('keeps a tall piece standing against a room in sight: only where it stands counts', () => {
+    const web = room('Web', 1, { width: 8, depth: 4, left: 0, top: 0 })
+    const against = layoutOffice({ ...planned(web), furniture: [{ name: 'mechStatue', x: 0, y: 70 }] })
+    expect(underRoom(against, against.hall[0])).toBe(false)
+    const inside = layoutOffice({ ...planned(web), furniture: [{ name: 'mechStatue', x: 0, y: 40 }] })
+    expect(underRoom(inside, inside.hall[0])).toBe(true)
+  })
+
   it('makes the building deeper when a new room fits nowhere', () => {
     const full = { ...planned(room('Web', 1, { width: 30, depth: 14, left: 0, top: 0 }), room('New', 1)) }
     const layout = layoutOffice(full)

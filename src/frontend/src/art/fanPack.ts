@@ -1,4 +1,5 @@
 import type { Costume, COSTUMES } from './sheets/character'
+import type { CostumeViews } from './sheets/costumeViews'
 import { PROPS, type PropDef, type PropName } from './sheets/props'
 
 /**
@@ -9,7 +10,8 @@ import { PROPS, type PropDef, type PropName } from './sheets/props'
 export interface FanModule {
   colors: Record<string, string>
   props: Partial<Record<PropName, Partial<PropDef> & Pick<PropDef, 'sprite'>>>
-  costumes?: Partial<Record<Costume, (typeof COSTUMES)[Costume]>>
+  /** A redrawn costume may bring its back and profile too; without them it always faces the room. */
+  costumes?: Partial<Record<Costume, (typeof COSTUMES)[Costume] & Partial<CostumeViews>>>
 }
 
 /** Merges fan modules over the props: a redrawn sprite drops the lights of the old one. */

@@ -3,13 +3,16 @@ import { BONE, CHARACTER_COLORS, CLOTH_COLORS, DOLL_LIPS, HAIR_COLORS, MOUTHS, P
 import { AGENT_LOOKS, poseOf, type AgentState } from './agentStates'
 import { FAN_MODULES, withFanPack, type FanModule } from './fanPack'
 import { inTheDark } from './lighting'
+import { roomLayers } from './roomScene'
 import { baseline, sceneLights, scenePixels } from './scene'
-import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS } from './sheets/character'
+import { ACCESSORIES, BODY, FACES, GESTURES, HAIR_STYLES, HANDS, HEAD, COSTUMES, OUTFITS, type Costume } from './sheets/character'
 import { PROPS } from './sheets/props'
 import { SIGNALS } from './sheets/signals'
-import { problemsOf, pixelsOf, type SpriteDef } from './sprite'
-import { characterColors, flashing, GESTURE_PARTS, STATION, stationLights, stationPixels, themeColors, type Gesture } from './station'
-import { THEMES } from './themes'
+import { problemsOf, pixelsOf, type Pixel, type SpriteDef } from './sprite'
+import { characterColors, flashing, GESTURE_PARTS, STATION, stationLights, stationPixels, themeColors, type Appearance, type Gesture } from './station'
+import { THEMES, themeOf } from './themes'
+import { COSTUME_VIEWS } from './sheets/costumeViews'
+import { WALKER, walkerPixels, type Facing } from './walker'
 
 const characterSprites: SpriteDef[] = [
   HEAD,
@@ -111,7 +114,7 @@ describe('fan pack', () => {
     const resolve = themeColors(THEMES.cozy.colors)
     const sprites = FAN_MODULES.flatMap((m) => [
       ...Object.values(m.props).map((p) => p!.sprite),
-      ...Object.values(m.costumes ?? {}).flatMap((c) => Object.values(c!)),
+      ...Object.values(m.costumes ?? {}).flatMap((c) => Object.values(c!).filter((v): v is SpriteDef => typeof v === 'object')),
     ])
     for (const sprite of sprites) {
       expect(problemsOf(sprite)).toEqual([])
@@ -338,5 +341,41 @@ describe('scenePixels', () => {
 
   it('moves every pixel to where its item stands', () => {
     expect(scenePixels([{ x: 3, y: 4, height: 1, pixels: dot('a') }])[0]).toMatchObject({ x: 3, y: 4 })
+  })
+})
+
+describe('room layers', () => {
+  it('keeps rugs and what hangs on walls under the names, and what stands above them', () => {
+    const theme = themeOf('cozy')
+    const dot = (color: string) => [{ x: 0, y: 0, color }]
+    const layers = roomLayers(theme, dot('#000001'), [
+      { x: 1, y: 1, height: 1, pixels: dot('#000002'), layer: 'floor' },
+      { x: 2, y: 2, height: 1, pixels: dot('#000003'), layer: 'wall' },
+      { x: 3, y: 3, height: 1, pixels: dot('#000004') },
+    ], false)
+    expect(layers.base.map((p) => p.color)).toEqual(['#000001', '#000002', '#000003'])
+    expect(layers.standing).toEqual([{ x: 3, y: 3, color: '#000004' }])
+  })
+})
+
+describe('costumes on their feet', () => {
+  const look: Appearance = { skin: 'fair', hair: 'black', hairStyle: 'short', cloth: 'blue' }
+
+  it.each(Object.keys(COSTUME_VIEWS) as Costume[])('%s has a back and a profile that are well formed and resolve', (costume) => {
+    const views = COSTUME_VIEWS[costume]
+    const person = characterColors({ ...look, costume })
+    for (const sprite of [views.back, views.side]) {
+      expect(problemsOf(sprite)).toEqual([])
+      expect(pixelsOf(sprite, 0, person).length).toBeGreaterThan(0)
+    }
+  })
+
+  it.each(Object.keys(COSTUME_VIEWS) as Costume[])('%s turns: front, back and the two profiles differ, left mirrors right', (costume) => {
+    const at = (facing: Facing) => walkerPixels({ ...look, costume }, { facing, step: 1 })
+    const key = (pixels: Pixel[]) => pixels.map((p) => `${p.x},${p.y},${p.color}`).sort().join(' ')
+    expect(key(at('back'))).not.toEqual(key(at('front')))
+    expect(key(at('right'))).not.toEqual(key(at('front')))
+    const mirrored = at('right').map((p) => ({ ...p, x: WALKER.width - 1 - p.x }))
+    expect(key(at('left'))).toEqual(key(mirrored))
   })
 })

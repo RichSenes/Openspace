@@ -1,5 +1,6 @@
 import { FAN_COSTUMES } from './fanPack'
-import { ACCESSORIES, BODY, COSTUMES, FACES, GESTURES, HAIR_STYLES, HEAD, OUTFITS, type Emotion, type HairStyle } from './sheets/character'
+import { ACCESSORIES, BODY, COSTUMES, FACES, GESTURES, HAIR_STYLES, HEAD, OUTFITS, type Costume, type Emotion, type HairStyle } from './sheets/character'
+import { COSTUME_VIEWS, type CostumeViews } from './sheets/costumeViews'
 import { PROFILE_ACCESSORIES, PROFILE_ARM, PROFILE_BODY, PROFILE_HAIR, PROFILE_HEAD, PROFILE_LEGS, PROFILE_OUTFITS } from './sheets/profile'
 import { LEGS } from './sheets/standing'
 import { pixelsOf, type Pixel, type SpriteDef } from './sprite'
@@ -92,15 +93,41 @@ const memo = (key: string, make: () => SpriteDef) => {
 }
 
 /**
+ * How a costume looks from behind and from the side. A costume the fan pack redraws uses
+ * its own views, and faces the room when it has none: the repository's would not match it.
+ */
+function viewsOf(costume: Costume): CostumeViews | undefined {
+  const fan = FAN_COSTUMES?.[costume]
+  if (!fan) return COSTUME_VIEWS[costume]
+  return fan.back && fan.side ? { back: fan.back, side: fan.side, sleeve: fan.sleeve ?? COSTUME_VIEWS[costume].sleeve } : undefined
+}
+
+/** A costume walking away, or walking across with its near arm swinging. */
+function costumePixels(views: CostumeViews, pose: WalkerPose, person: ReturnType<typeof characterColors>): Pixel[] {
+  if (pose.facing === 'back') return [...pixelsOf(LEGS, pose.step % LEGS.frames.length, person), ...pixelsOf(views.back, 0, person)]
+  const frame = pose.step % PROFILE_LEGS.frames.length
+  const pixels = [
+    ...pixelsOf(PROFILE_LEGS, frame, person),
+    ...pixelsOf(views.side, 0, person),
+    ...pixelsOf(views.sleeve === 'coat' ? COAT_ARM : PROFILE_ARM, frame, person),
+  ]
+  return pose.facing === 'left' ? pixels.map((p) => ({ ...p, x: WALKER.width - 1 - p.x })) : pixels
+}
+
+/**
  * An agent on its feet, in its own 24 by 32 pixels: legs, then body, head, face, hair and
  * what it wears, as at its desk. From the back the face and glasses are hidden; walking
- * across it is seen in profile. Costumes have no back nor profile: they always face the room.
+ * across it is seen in profile. Costumes have their own back and profile.
  */
 export function walkerPixels(look: Appearance, pose: WalkerPose): Pixel[] {
   const person = characterColors(look)
   const legs = pixelsOf(LEGS, pose.step % LEGS.frames.length, person)
   const costume = look.costume && (FAN_COSTUMES?.[look.costume] ?? COSTUMES[look.costume])
-  if (costume) return [...legs, ...pixelsOf(costume.body, 0, person), ...pixelsOf(costume.open, 0, person)]
+  if (costume) {
+    const views = pose.facing === 'front' ? undefined : viewsOf(look.costume!)
+    if (views) return costumePixels(views, pose, person)
+    return [...legs, ...pixelsOf(costume.body, 0, person), ...pixelsOf(costume.open, 0, person)]
+  }
   if (pose.facing === 'left' || pose.facing === 'right') return profilePixels(look, pose.step, pose.facing === 'left')
   const body = look.outfit ? OUTFITS[look.outfit] : BODY
   const accessory = look.accessory && ACCESSORIES[look.accessory]

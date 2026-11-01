@@ -13,6 +13,7 @@ import {
   useTickCheck,
   useTaskDiff,
   useTaskText,
+  useQueueWaits,
 } from '../api/hooks'
 import { defaultMergeTarget, mergeBlocker } from './mergeTarget'
 import { answersFor } from '../activity/activity'
@@ -39,6 +40,7 @@ const when = (iso: string) =>
 
 export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClose }: Props) {
   const toast = useToast()
+  const waits = useQueueWaits().data
   const command = useTaskCommand()
   const approve = useApproveTask()
   const sendBack = useSendBack()
@@ -122,6 +124,12 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
             <dl className="facts">
               <dt>Desk</dt>
               <dd>{desk ? `${desk.roomName} · ${desk.name} (${desk.agentName})` : 'None yet'}</dd>
+              {task.status === 'Queued' && waits?.get(task.id) && (
+                <>
+                  <dt>Waiting</dt>
+                  <dd>{waits.get(task.id)}</dd>
+                </>
+              )}
               {task.reserveModel && (
                 <>
                   <dt>On reserve</dt>

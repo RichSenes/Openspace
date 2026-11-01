@@ -53,6 +53,8 @@ internal sealed class Harness
 
     public GpuArbiter Gpu { get; }
 
+    public Queue.QueueWaits Waits { get; }
+
     public LoopGuard Loops { get; } = new();
 
     public InMemoryRoutines Routines { get; } = new();
@@ -91,6 +93,7 @@ internal sealed class Harness
         Activity = new ActivityBoard(Publisher);
         Context = new ContextBoard(Publisher);
         Interns = new InternBoard(Publisher);
+        Waits = new Queue.QueueWaits(Publisher);
         Office = Office.Open("E Corp", Start);
         Room = Office.OpenRoom("Web", Start);
         Office.UpdateRoomContext(Room.Id, "Never touch the payments module.", Start);
@@ -112,7 +115,7 @@ internal sealed class Harness
     }
 
     public TaskRunner Runner(int seats = 1) => new(
-        new QueueDispatcher(Tasks, Offices, Limits, Gpu, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
+        new QueueDispatcher(Tasks, Offices, Limits, Gpu, Waits, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, Clock, NullLogger<TaskRunner>.Instance);
 
     public Routines.RoutineRunner RoutineRunner() =>

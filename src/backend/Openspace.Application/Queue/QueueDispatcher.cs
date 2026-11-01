@@ -17,22 +17,33 @@ public sealed class QueueDispatcher(
     IOfficeRepository offices,
     EngineLimits limits,
     GpuArbiter gpu,
+    QueueWaits waits,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
     TimeProvider clock)
 {
     /// <returns>The tasks that just started and now need an agent.</returns>
+    /// <remarks>Every queued task that does not start gets the reason it waits, for the board.</remarks>
     public async Task<IReadOnlyList<WorkTaskId>> DispatchAsync(CancellationToken cancellationToken)
     {
         var running = await tasks.ListAsync(null, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false);
-        var freeSeats = options.CurrentValue.Seats - running.Count;
+        var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
+        var seats = options.CurrentValue.Seats;
+        var freeSeats = seats - running.Count;
+        var reasons = new Dictionary<Guid, string>();
+        var seatsTaken = $"Waits for a free seat: {seats} {(seats == 1 ? "agent works" : "agents work")} at a time.";
         if (freeSeats <= 0)
         {
+            foreach (var task in queued)
+            {
+                reasons[task.Id.Value] = seatsTaken;
+            }
+
+            await waits.ReplaceAsync(reasons, cancellationToken).ConfigureAwait(false);
             return [];
         }
 
         var busyDesks = running.Select(t => t.DeskId).OfType<DeskId>().ToHashSet();
-        var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var started = new List<WorkTaskId>();
         var anyPaused = limits.Pauses().Count > 0;
@@ -42,31 +53,44 @@ public sealed class QueueDispatcher(
         {
             if (started.Count == freeSeats)
             {
-                break;
+                reasons[task.Id.Value] = seatsTaken;
+                continue;
             }
 
-            if (task.DeskId is not { } desk || busyDesks.Contains(desk))
+            if (task.DeskId is not { } desk)
             {
                 continue;
             }
 
-            // Work that builds on other tasks waits until they are accepted and merged.
-            if (!await ReadyAsync(task, cancellationToken).ConfigureAwait(false))
+            if (busyDesks.Contains(desk))
             {
+                reasons[task.Id.Value] = "Its desk is busy with another task.";
+                continue;
+            }
+
+            // Work that builds on other tasks waits until they are accepted and merged.
+            if (await BlockerAsync(task, cancellationToken).ConfigureAwait(false) is { } blocker)
+            {
+                reasons[task.Id.Value] = $"Waits for \u201c{blocker.Title}\u201d to be accepted and merged.";
                 continue;
             }
 
             // Desks on an account over its limits keep their tasks queued until it is back,
             // unless the office has a reserve model that can go on with them meanwhile.
-            if ((anyPaused || task.ReserveModel is not null)
-                && !Hand(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk, now))
+            if (anyPaused || task.ReserveModel is not null)
             {
-                continue;
+                var office = await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false);
+                if (!Hand(task, office, desk, now))
+                {
+                    reasons[task.Id.Value] = Paused(office, desk);
+                    continue;
+                }
             }
 
             // Desks on a model of this machine wait for it to be loaded on the graphics card.
             if (gpu.Enabled && !Admitted(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk))
             {
+                reasons[task.Id.Value] = CardTaken(task, await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false), desk);
                 continue;
             }
 
@@ -81,21 +105,54 @@ public sealed class QueueDispatcher(
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        await waits.ReplaceAsync(reasons, cancellationToken).ConfigureAwait(false);
         return started;
     }
 
-    private async Task<bool> ReadyAsync(WorkTask task, CancellationToken cancellationToken)
+    /// <summary>Why a task whose desk is over its limits found no reserve to go on with.</summary>
+    private string Paused(Office office, DeskId desk)
+    {
+        var scope = EngineLimits.ScopeOf(office.Locate(desk).Desk.Agent);
+        var pause = limits.Pauses().FirstOrDefault(p => p.Scope == scope);
+        var account = pause?.Label ?? "Its account";
+        var until = pause is null ? string.Empty : $" until {pause.Until.ToLocalTime():HH:mm}";
+        return office.ReserveModels.Count == 0
+            ? $"{account} is over its limits{until}, and the office has no reserve model: it goes on then."
+            : $"{account} is over its limits{until}, and no reserve model is free: it goes on then.";
+    }
+
+    /// <summary>Why a task on a local model cannot start: the card is lent, the model loads, or another task uses it.</summary>
+    private string CardTaken(WorkTask task, Office office, DeskId desk)
+    {
+        var view = gpu.View();
+        var wanted = AgentSetups.AgentFor(office.Locate(desk).Desk, task).Model;
+        var name = task.ReserveModel is not null ? $"the reserve {wanted}" : wanted ?? "its local model";
+        return view.State switch
+        {
+            GpuState.Lent or GpuState.Yielding when view.Holders.Count > 0 => $"Waits for the graphics card, which {string.Join(", ", view.Holders)} {(view.Holders.Count == 1 ? "has" : "have")}.",
+            GpuState.Loading when view.Model == wanted => $"Waits while {view.ModelName ?? wanted} loads on the graphics card.",
+            GpuState.WaitingForMemory => $"Waits for enough free graphics memory to load {name}.",
+            GpuState.Failed => $"Waits for {name}, which did not load: {view.Detail ?? "see the top bar"}",
+            GpuState.Serving when view.Model == wanted && view.RoutineTurn => $"Waits for {view.ModelName ?? wanted}: routines are using it ({string.Join(", ", view.RoutinesWaiting ?? [])}).",
+            GpuState.Serving when view.Model == wanted => $"Waits for {view.ModelName ?? wanted}: another task is using it.",
+            GpuState.Serving or GpuState.Loading => $"Waits for {name}: {view.ModelName ?? view.Model} is on the graphics card now.",
+            _ => $"Waits for {name} to be loaded on the graphics card.",
+        };
+    }
+
+    /// <summary>The first task this one builds on that is not accepted and merged yet, if any.</summary>
+    private async Task<WorkTask?> BlockerAsync(WorkTask task, CancellationToken cancellationToken)
     {
         foreach (var id in task.DependsOn)
         {
             // A task that no longer exists holds nothing up.
-            if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { IsDoneForOthers: false })
+            if (await tasks.FindAsync(id, cancellationToken).ConfigureAwait(false) is { IsDoneForOthers: false } blocker)
             {
-                return false;
+                return blocker;
             }
         }
 
-        return true;
+        return null;
     }
 
     /// <summary>

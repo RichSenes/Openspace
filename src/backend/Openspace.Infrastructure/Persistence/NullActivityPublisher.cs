@@ -16,4 +16,6 @@ internal sealed class NullActivityPublisher : IActivityPublisher
     public Task InternsChangedAsync(DeskInterns interns, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task GuestsChangedAsync(OfficeGuests guests, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task QueueWaitsChangedAsync(IReadOnlyList<Application.Queue.QueueWait> waits, CancellationToken cancellationToken) => Task.CompletedTask;
 }

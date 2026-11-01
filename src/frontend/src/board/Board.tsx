@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { usePersistentState } from '../usePersistentState'
 import { Check, GitMerge, Hourglass, ListChecks, Plus, Search, Sparkles, TriangleAlert } from 'lucide-react'
-import { useEngines, useEpics, useOfficeTasks } from '../api/hooks'
+import { useEngines, useEpics, useOfficeTasks, useQueueWaits } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { StatusPill } from '../ui/StatusPill'
 import { desksOf } from './deskLookup'
@@ -29,6 +29,7 @@ export function Board({ office, initialTaskId }: Props) {
   const epicTitle = (id: string | null) => epics.data?.find((e) => e.id === id)?.title
   const [openTaskId, setOpenTaskId] = useState<string | undefined>(initialTaskId)
   const engines = useEngines().data
+  const waits = useQueueWaits().data
   const reviewerOn = Boolean(engines?.reviewer)
 
   const desks = useMemo(() => desksOf(office), [office])
@@ -118,12 +119,17 @@ export function Board({ office, initialTaskId }: Props) {
                               ` · ${task.notes.length} ${task.notes.length === 1 ? 'note' : 'notes'}`}
                           </span>
                           {task.round > 1 && <span className="card-meta hint">Round {task.round}</span>}
-                          {(task.status === 'Proposed' || task.status === 'Queued') && waitingFor(task, tasks.data ?? []).length > 0 && (
+                          {task.status === 'Queued' && waits?.get(task.id) && (
+                            <span className="card-review">
+                              <Hourglass size={12} aria-hidden /> {waits.get(task.id)}
+                            </span>
+                          )}
+                          {(task.status === 'Proposed' || (task.status === 'Queued' && !waits?.get(task.id))) && waitingFor(task, tasks.data ?? []).length > 0 && (
                             <span className="card-review">
                               <Hourglass size={12} aria-hidden /> Waits for {waitingFor(task, tasks.data ?? []).map((t) => `“${t.title}”`).join(', ')}
                             </span>
                           )}
-                          {task.status === 'Queued' && pauseOf(engines, desk) && (
+                          {task.status === 'Queued' && !waits?.get(task.id) && pauseOf(engines, desk) && (
                             <span className="card-review">
                               <Hourglass size={12} aria-hidden /> Paused until{' '}
                               {new Date(pauseOf(engines, desk)!.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}:{' '}

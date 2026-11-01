@@ -28,33 +28,42 @@ interface Props {
   link: LinkState
 }
 
+/**
+ * Navigation on one line, and under it a strip of what the accounts and the graphics card
+ * are up to. The strip shows only when one of them has something to say, and wraps on
+ * narrow windows instead of pushing the views out of sight.
+ */
 export function TopBar({ view, onView, link }: Props) {
   return (
-    <header className="topbar">
-      <span className="wordmark pixel">Openspace</span>
-      <nav className="tabs" aria-label="Views">
-        {VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            className="tab"
-            aria-current={view === v.id ? 'page' : undefined}
-            onClick={() => onView(v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
-      </nav>
-      <div className="topbar-end">
-        <NeedsYou />
+    <div className="top">
+      <header className="topbar">
+        <span className="wordmark pixel">Openspace</span>
+        <nav className="tabs" aria-label="Views">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className="tab"
+              aria-current={view === v.id ? 'page' : undefined}
+              onClick={() => onView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </nav>
+        <div className="topbar-end">
+          <NeedsYou />
+          <MuteButton />
+          <span className={`link link-${link}`} title={`Connection to the Openspace server: ${LINK_LABEL[link]}`}>
+            <span className="wide-only">{LINK_LABEL[link]}</span>
+          </span>
+        </div>
+      </header>
+      <div className="statusbar" aria-label="Accounts and graphics card">
         <LimitPauses onOpen={() => onView('board')} />
         <GpuStatus onOpen={() => onView('board')} />
         <ClaudeMeter onOpen={() => onView('settings')} />
-        <MuteButton />
-        <span className={`link link-${link}`} title="Connection to the Openspace server">
-          {LINK_LABEL[link]}
-        </span>
       </div>
-    </header>
+    </div>
   )
 }

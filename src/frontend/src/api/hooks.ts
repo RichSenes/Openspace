@@ -36,6 +36,7 @@ import type {
   MergeOutcome,
   CheckOutcome,
   BackupView,
+  QueueWait,
 } from './types'
 
 export const keys = {
@@ -49,6 +50,7 @@ export const keys = {
   context: ['context'] as const,
   interns: ['interns'] as const,
   guests: ['guests'] as const,
+  queueWaits: ['queue-waits'] as const,
   feed: ['feed'] as const,
   feedOf: (filter: FeedFilter) => ['feed', filter] as const,
   roles: ['roles'] as const,
@@ -282,6 +284,15 @@ export function useFeed(filter: FeedFilter) {
     queryKey: keys.feedOf(filter),
     queryFn: () => request<FeedLine[]>('GET', `/api/feed?${query}`),
     placeholderData: (previous) => previous,
+  })
+}
+
+/** Why each queued task waits, by task id. Kept fresh by SignalR, which writes into this cache. */
+export function useQueueWaits() {
+  return useQuery({
+    queryKey: keys.queueWaits,
+    queryFn: () => request<QueueWait[]>('GET', '/api/queue/waits'),
+    select: (waits) => new Map(waits.map((w) => [w.taskId, w.reason])),
   })
 }
 

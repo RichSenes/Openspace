@@ -12,8 +12,14 @@ export function MuteButton() {
 
   if (!ready && !config.muted) {
     return (
-      <button type="button" className="btn btn-quiet sound-blocked" title="Browsers keep a page quiet until you click it" onClick={unlockAudio}>
-        <VolumeX size={16} aria-hidden /> Click to turn sounds on
+      <button
+        type="button"
+        className="btn btn-quiet sound-blocked"
+        aria-label="Click to turn sounds on"
+        title="Browsers keep a page quiet until you click it"
+        onClick={unlockAudio}
+      >
+        <VolumeX size={16} aria-hidden /> <span className="wide-only">Click to turn sounds on</span>
       </button>
     )
   }

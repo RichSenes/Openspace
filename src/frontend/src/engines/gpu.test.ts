@@ -12,7 +12,7 @@ describe('gpuBadge', () => {
   })
 
   it('names the model working on the card', () => {
-    expect(gpuBadge(view({ state: 'Serving', model: 'local/gemma', modelName: 'Gemma' }))).toMatchObject({ text: 'Gemma on the graphics card', tone: 'calm' })
+    expect(gpuBadge(view({ state: 'Serving', model: 'local/gemma', modelName: 'Gemma' }))).toMatchObject({ text: 'Gemma · idle', tone: 'calm' })
     expect(gpuBadge(view({ state: 'Loading', model: 'local/tiny' }))?.text).toBe('Loading local/tiny…')
   })
 
@@ -30,5 +30,15 @@ describe('gpuBadge', () => {
 
   it('says when a model did not load', () => {
     expect(gpuBadge(view({ state: 'Failed', modelName: 'Gemma', detail: 'The model did not answer: trying again at 10:05.' }))).toMatchObject({ text: 'Gemma did not load', tone: 'trouble' })
+  })
+
+  it('says who uses the model: the office and desk of a task, or a routine, the rest in the tooltip', () => {
+    const one = gpuBadge(view({ state: 'Serving', modelName: 'Gemma', users: ['Karuta · Android: Saved words page'] }))
+    expect(one?.text).toBe('Gemma · Karuta · Android')
+    expect(one?.title).toContain('Used by: Karuta · Android: Saved words page')
+    const routine = gpuBadge(view({ state: 'Serving', modelName: 'Gemma', routineTurn: true, routinesWaiting: ['CV'] }))
+    expect(routine?.text).toBe('Gemma · routine CV')
+    const both = gpuBadge(view({ state: 'Loading', modelName: 'Gemma', users: ['Karuta · UI: Keyboard'], routineTurn: true, routinesWaiting: ['CV'] }))
+    expect(both?.text).toBe('Loading Gemma for Karuta · UI +1…')
   })
 })

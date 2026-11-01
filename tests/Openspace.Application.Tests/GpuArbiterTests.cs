@@ -57,6 +57,28 @@ public class GpuArbiterTests
     }
 
     [Fact]
+    public async Task The_card_says_which_task_is_working_on_the_loaded_model()
+    {
+        await RunningLocalTaskAsync();
+
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal(["E Corp \u00b7 Frontend: Add a logout button"], _h.Gpu.View().Users);
+    }
+
+    [Fact]
+    public async Task A_queued_local_task_says_who_has_the_card()
+    {
+        _h.GpuProbe.Programs.Add("dotnet /apps/image-studio/ImageStudio.dll");
+        var task = await LocalTaskAsync();
+        await _h.Shift().TickAsync(default);
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal("Waits for the graphics card, which Image studio has.", _h.Waits.Snapshot().Single(w => w.TaskId == task.Id.Value).Reason);
+    }
+
+    [Fact]
     public async Task Desks_on_cloud_models_never_wait_for_the_card()
     {
         _h.GpuProbe.Programs.Add("/usr/bin/image-studio --serve");

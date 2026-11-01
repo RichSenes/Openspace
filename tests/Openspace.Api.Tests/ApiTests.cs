@@ -524,10 +524,12 @@ public sealed class ApiTests : IDisposable
 
         var energy = await GetAsync<List<JsonElement>>($"/api/context?officeId={officeId}");
         var interns = await GetAsync<List<JsonElement>>($"/api/interns?officeId={officeId}");
+        var waits = await GetAsync<List<JsonElement>>("/api/queue/waits");
 
         Assert.Empty(activity);
         Assert.Empty(energy);
         Assert.Empty(interns);
+        Assert.Empty(waits);
         Assert.Equal(string.Empty, diff);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, permission.StatusCode);
     }

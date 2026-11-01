@@ -220,7 +220,7 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
             throw new DomainException($"Only a queued task can change model, not a {Status} one.");
         }
 
-        ReserveModel = AgentProfile.ValidModel(model);
+        ReserveModel = AgentProfile.ValidReserve(model);
     }
 
     public void Start(DateTimeOffset now)

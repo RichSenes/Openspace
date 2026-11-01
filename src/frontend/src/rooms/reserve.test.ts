@@ -15,4 +15,11 @@ describe('reserve models', () => {
     expect(unknownModels(['mistral/devstral'], [])).toEqual([])
     expect(unknownModels(['mistral/devstral'], undefined)).toEqual([])
   })
+
+  it('checks claude-code reserves against the Claude Code models', () => {
+    const open = [{ id: 'nvidia/qwen3-coder', name: 'Qwen3 Coder' }]
+    const claude = [{ id: 'sonnet', name: 'Sonnet' }]
+    expect(unknownModels(['claude-code/sonnet', 'claude-code/sonet', 'nvidia/qwen3-coder'], open, claude)).toEqual(['claude-code/sonet'])
+    expect(unknownModels(['claude-code/sonnet'], open, undefined)).toEqual([])
+  })
 })

@@ -508,7 +508,7 @@ function ReserveModelsForm({ office }: { office: OfficeView }) {
   const engines = useEngines()
   const toast = useToast()
   const models = parseReserve(text)
-  const unknown = unknownModels(models, engines.data?.openCodeModels)
+  const unknown = unknownModels(models, engines.data?.openCodeModels, engines.data?.claudeCode ? engines.data.claudeCodeModels : undefined)
 
   if (office.localOnly) {
     return (
@@ -530,15 +530,16 @@ function ReserveModelsForm({ office }: { office: OfficeView }) {
     <form className="stack private-folders" onSubmit={submit}>
       <label className="field">
         <span>
-          Reserve models: one OpenCode provider/model per line, at most {MAX_RESERVE_MODELS}. When a desk's account is over its
-          limits, its tasks go on with the first one that is free, and go back to the desk when its account is. Free tiers may keep
-          and train on what they are sent: use them only for code you would publish.
+          Reserve models: one per line, at most {MAX_RESERVE_MODELS}: an OpenCode provider/model, or Claude Code as
+          claude-code/sonnet. When a desk's account is over its limits, its tasks go on with the first one on another account that
+          is free, and go back to the desk when its account is. Free tiers may keep and train on what they are sent: use them only
+          for code you would publish.
         </span>
-        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'nvidia/qwen3-coder\nmistral/devstral'} />
+        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'nvidia/qwen3-coder\nclaude-code/sonnet'} />
       </label>
       {unknown.length > 0 && (
         <p className="hint">
-          OpenCode does not list {unknown.join(', ')}: check the name, or connect that provider in OpenCode first.
+          Nobody lists {unknown.join(', ')}: check the name, or connect that provider in OpenCode first.
         </p>
       )}
       <div className="row">

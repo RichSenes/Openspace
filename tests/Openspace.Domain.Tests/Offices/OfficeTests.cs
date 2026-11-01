@@ -258,6 +258,21 @@ public class OfficeTests
     }
 
     [Fact]
+    public void A_reserve_can_be_claude_code_with_one_of_its_models()
+    {
+        var office = ECorp();
+
+        office.SetReserveModels(["nvidia/qwen3-coder", " claude-code/sonnet "], Now);
+
+        Assert.Equal(["nvidia/qwen3-coder", "claude-code/sonnet"], office.ReserveModels);
+        Assert.Throws<DomainException>(() => office.SetReserveModels(["claude-code/"], Now));
+        Assert.Throws<DomainException>(() => office.SetReserveModels(["claude-code/not a model"], Now));
+        var agent = AgentProfile.ForReserve("claude-code/sonnet", "build");
+        Assert.Equal((AgentEngine.ClaudeCode, "sonnet"), (agent.Engine, agent.Model));
+        Assert.Equal(AgentEngine.OpenCode, AgentProfile.ForReserve("nvidia/qwen3-coder", "build").Engine);
+    }
+
+    [Fact]
     public void An_office_kept_on_this_machine_sends_nothing_to_reserve_models()
     {
         var local = ECorp();

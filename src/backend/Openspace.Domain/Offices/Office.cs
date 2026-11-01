@@ -166,7 +166,7 @@ public sealed class Office : AggregateRoot<OfficeId>
         var cleaned = new List<string>();
         foreach (var raw in models.Where(m => !string.IsNullOrWhiteSpace(m)))
         {
-            var model = AgentProfile.ValidModel(raw)!;
+            var model = AgentProfile.ValidReserve(raw)!;
             if (!cleaned.Contains(model, StringComparer.Ordinal))
             {
                 cleaned.Add(model);

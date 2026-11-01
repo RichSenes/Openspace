@@ -84,4 +84,32 @@ public class ReserveModelTests
         var (_, setup, _) = _h.Runtime.Prompts[^1];
         Assert.Equal(("frontend-dev", "nvidia/qwen3-coder"), (setup.AgentName, setup.Model));
     }
+
+    [Fact]
+    public async Task An_opencode_desk_over_its_limits_can_go_on_with_claude_code()
+    {
+        await _h.OfficeCommands().ChangeDeskAgentAsync(_h.Office.Id, _h.Desk.Id, AgentEngine.OpenCode, "frontend-dev", "opencode/deepseek-v4.1-flash-free", default);
+        await _h.OfficeCommands().SetReserveModelsAsync(_h.Office.Id, ["opencode/big-pickle", "claude-code/sonnet"], default);
+        var task = _h.Enqueue();
+        await _h.Runner().RunQueueAsync(default);
+        var first = task.Run!.SessionId;
+        await _h.Signals().OutOfLimitsAsync(first, EngineLimits.OpenCodeProvider("opencode"), Harness.Start.AddHours(15), "OpenCode: Free limit reached.", default);
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal((WorkTaskStatus.Running, "claude-code/sonnet"), (task.Status, task.ReserveModel));
+        var (_, setup, _) = _h.Runtime.Prompts[^1];
+        Assert.Equal((AgentEngine.ClaudeCode, "sonnet"), (setup.Engine, setup.Model));
+        Assert.NotEqual(first, task.Run!.SessionId);
+    }
+
+    [Fact]
+    public async Task A_claude_code_desk_skips_a_claude_code_reserve_on_the_same_paused_account()
+    {
+        var task = await PausedOnClaudeAsync("claude-code/opus", "nvidia/qwen3-coder");
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal((WorkTaskStatus.Running, "nvidia/qwen3-coder"), (task.Status, task.ReserveModel));
+    }
 }

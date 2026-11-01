@@ -125,7 +125,7 @@ public sealed class QueueDispatcher(
 
         var reserve = office.ReserveModels.FirstOrDefault(m =>
         {
-            var reserveScope = EngineLimits.ScopeOf(AgentProfile.Create(agent.AgentName, m));
+            var reserveScope = EngineLimits.ScopeOf(AgentProfile.ForReserve(m, agent.AgentName));
             return reserveScope != scope && limits.PausedUntil(reserveScope) is null;
         });
         if (reserve is null)

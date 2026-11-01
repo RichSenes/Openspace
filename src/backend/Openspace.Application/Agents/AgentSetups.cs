@@ -33,8 +33,9 @@ public sealed class AgentSetups(IRoleRepository roles)
     }
 
     /// <summary>
-    /// Who works on the task: the desk's agent, or an OpenCode one on the task's reserve model.
-    /// A Claude Code desk has no OpenCode agent of its own, so it lends its role to OpenCode's.
+    /// Who works on the task: the desk's agent, or one on the task's reserve model, OpenCode's
+    /// or Claude Code. A Claude Code desk has no OpenCode agent of its own, so it lends its
+    /// role to OpenCode's.
     /// </summary>
     public static AgentProfile AgentFor(Desk desk, WorkTask task)
     {
@@ -42,7 +43,7 @@ public sealed class AgentSetups(IRoleRepository roles)
         ArgumentNullException.ThrowIfNull(task);
         return task.ReserveModel is not { } model
             ? desk.Agent
-            : AgentProfile.Create(desk.Agent.Engine == AgentEngine.OpenCode ? desk.Agent.AgentName : ReserveAgent, model);
+            : AgentProfile.ForReserve(model, desk.Agent.Engine == AgentEngine.OpenCode ? desk.Agent.AgentName : ReserveAgent);
     }
 
     private async Task<AgentSetup> SetupAsync(

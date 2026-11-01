@@ -22,7 +22,16 @@ internal sealed partial class GmailMailbox(HttpClient http, IGoogleAccounts acco
     /// <summary>Ids per page: the most Gmail gives without a second call is 500, a hundred keeps answers small.</summary>
     private const int PageSize = 100;
 
+    /// <summary>Tries of one call while Gmail says the per-minute quota is used up: waits add up to about a minute.</summary>
+    private const int MostTries = 6;
+
+    /// <summary>Longest wait before trying a call again.</summary>
+    private static readonly TimeSpan LongestPause = TimeSpan.FromMinutes(1);
+
     private static readonly string[] Inbox = ["INBOX"];
+
+    /// <summary>How a refused call waits before it is tried again; tests make it instant.</summary>
+    internal Func<TimeSpan, CancellationToken, Task> Pause { get; init; } = (wait, cancellationToken) => Task.Delay(wait, cancellationToken);
 
     private readonly Dictionary<string, Dictionary<string, string>> _labels = new(StringComparer.OrdinalIgnoreCase);
 
@@ -171,19 +180,59 @@ internal sealed partial class GmailMailbox(HttpClient http, IGoogleAccounts acco
     private async Task<JsonElement> GetAsync(string account, string path, CancellationToken cancellationToken) =>
         await SendAsync(account, HttpMethod.Get, path, null, cancellationToken).ConfigureAwait(false);
 
+    /// <summary>
+    /// One call to Gmail. Gmail counts every call against a quota per minute and per person;
+    /// a routine reading many conversations in a row can use it up, and then Gmail refuses
+    /// for a while. Such a call waits, longer each time or as long as Gmail says, and is tried
+    /// again; any other refusal fails at once.
+    /// </summary>
     private async Task<JsonElement> SendAsync(string account, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(method, new Uri(options.CurrentValue.GmailUri, $"gmail/v1/users/me/{path}"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await accounts.AccessTokenAsync(account, cancellationToken).ConfigureAwait(false));
-        if (body is not null)
+        for (var attempt = 1; ; attempt++)
         {
-            request.Content = JsonContent.Create(body);
+            using var request = new HttpRequestMessage(method, new Uri(options.CurrentValue.GmailUri, $"gmail/v1/users/me/{path}"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await accounts.AccessTokenAsync(account, cancellationToken).ConfigureAwait(false));
+            if (body is not null)
+            {
+                request.Content = JsonContent.Create(body);
+            }
+
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (attempt < MostTries && await RateLimitedAsync(response, cancellationToken).ConfigureAwait(false))
+            {
+                await Pause(PauseBefore(attempt, response.Headers.RetryAfter), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            await GoogleAccounts.EnsureAsync(response, "Gmail", cancellationToken).ConfigureAwait(false);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return string.IsNullOrWhiteSpace(json) ? default : JsonDocument.Parse(json).RootElement.Clone();
+        }
+    }
+
+    /// <summary>Whether Gmail refused only because too much was asked too fast: 429, or 403 about rate or quota.</summary>
+    private static async Task<bool> RateLimitedAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            return true;
         }
 
-        using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        await GoogleAccounts.EnsureAsync(response, "Gmail", cancellationToken).ConfigureAwait(false);
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        return string.IsNullOrWhiteSpace(json) ? default : JsonDocument.Parse(json).RootElement.Clone();
+        if (response.StatusCode != HttpStatusCode.Forbidden)
+        {
+            return false;
+        }
+
+        var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return text.Contains("rateLimitExceeded", StringComparison.OrdinalIgnoreCase) || text.Contains("Quota exceeded", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>As long as Gmail asks, or 2, 4, 8, 16, 32 seconds, never more than a minute.</summary>
+    internal static TimeSpan PauseBefore(int attempt, RetryConditionHeaderValue? retryAfter)
+    {
+        var asked = retryAfter?.Delta ?? (retryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+        var wait = asked is { } given && given > TimeSpan.Zero ? given : TimeSpan.FromSeconds(Math.Pow(2, attempt));
+        return wait < LongestPause ? wait : LongestPause;
     }
 
     [GeneratedRegex(@"<(style|script|head)\b[^>]*>.*?</\1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]

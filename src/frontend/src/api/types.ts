@@ -74,6 +74,14 @@ export interface GpuView {
   /** Routines are using a local model or waiting for one: programs that claim the card let it go between their jobs. */
   routineTurn: boolean
   routinesWaiting: string[] | null
+  /** The tasks working on the loaded model right now, as "office · desk: title". */
+  users?: string[] | null
+}
+
+/** Why a queued task has not started yet, as the queue saw it on its last round. */
+export interface QueueWait {
+  taskId: string
+  reason: string
 }
 
 /** An account over its usage limits: its desks keep their tasks queued until it resumes. */

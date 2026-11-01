@@ -37,9 +37,10 @@ public enum GpuState
 /// turn is over. Claims keep holding the card during a turn: giving way is the program's choice.
 /// </param>
 /// <param name="RoutinesWaiting">The routines whose turn it is, by name.</param>
+/// <param name="Users">The tasks working on the loaded model right now, as "office · desk: title"; routines are in <paramref name="RoutinesWaiting"/>.</param>
 public sealed record GpuView(
     GpuState State, string? Model, string? ModelName, IReadOnlyList<string> Holders, string? Detail, bool RoutineTurn = false,
-    IReadOnlyList<string>? RoutinesWaiting = null);
+    IReadOnlyList<string>? RoutinesWaiting = null, IReadOnlyList<string>? Users = null);
 
 /// <summary>
 /// Who has the graphics card. Programs listed as holders, and those that claim it through

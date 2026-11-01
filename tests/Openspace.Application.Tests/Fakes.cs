@@ -366,6 +366,14 @@ internal sealed class RecordingPublisher : IActivityPublisher
         Guests.Add(guests);
         return Task.CompletedTask;
     }
+
+    public List<IReadOnlyList<Queue.QueueWait>> Waits { get; } = [];
+
+    public Task QueueWaitsChangedAsync(IReadOnlyList<Queue.QueueWait> waits, CancellationToken cancellationToken)
+    {
+        Waits.Add(waits);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryAuditLog : IAuditLog

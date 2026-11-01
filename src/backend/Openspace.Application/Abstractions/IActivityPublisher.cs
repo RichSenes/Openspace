@@ -1,5 +1,6 @@
 using Openspace.Application.Agents;
 using Openspace.Application.Guests;
+using Openspace.Application.Queue;
 
 namespace Openspace.Application.Abstractions;
 
@@ -19,4 +20,7 @@ public interface IActivityPublisher
 
     /// <summary>A guest came into an office, changed what it does, or left.</summary>
     Task GuestsChangedAsync(OfficeGuests guests, CancellationToken cancellationToken);
+
+    /// <summary>Why queued tasks wait changed: every queued task that waits, with its reason.</summary>
+    Task QueueWaitsChangedAsync(IReadOnlyList<QueueWait> waits, CancellationToken cancellationToken);
 }

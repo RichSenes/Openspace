@@ -23,8 +23,10 @@ public class QueueDispatcherTests
         _bob = _office.AddDesk(room.Id, "Bob", AgentProfile.Create("auditor"), _clock.GetUtcNow());
     }
 
+    private QueueWaits Waits { get; } = new(new RecordingPublisher());
+
     private QueueDispatcher Dispatcher(int seats) =>
-        new(_tasks, new InMemoryOffices(), new Agents.EngineLimits(_clock), new LocalModels.GpuArbiter(new LiveOptions<LocalModels.LocalModelOptions>(() => new()), _clock), _unitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), _clock);
+        new(_tasks, new InMemoryOffices(), new Agents.EngineLimits(_clock), new LocalModels.GpuArbiter(new LiveOptions<LocalModels.LocalModelOptions>(() => new()), _clock), Waits, _unitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), _clock);
 
     private WorkTask Enqueue(Desk desk, string title)
     {
@@ -91,5 +93,20 @@ public class QueueDispatcherTests
         _tasks.Add(WorkTask.Propose(_office, "Not approved yet", null, "angela", _clock.GetUtcNow()));
 
         Assert.Empty(await Dispatcher(seats: 2).DispatchAsync(default));
+    }
+
+    [Fact]
+    public async Task Waiting_tasks_say_what_they_wait_for()
+    {
+        var running = Enqueue(_alice, "Already running");
+        running.Start(_clock.GetUtcNow());
+        var later = Enqueue(_bob, "Builds on it");
+        later.DependOn([running], _clock.GetUtcNow());
+
+        await Dispatcher(seats: 2).DispatchAsync(default);
+        Assert.Equal("Waits for \u201cAlready running\u201d to be accepted and merged.", Waits.Snapshot().Single(w => w.TaskId == later.Id.Value).Reason);
+
+        await Dispatcher(seats: 1).DispatchAsync(default);
+        Assert.Equal("Waits for a free seat: 1 agent works at a time.", Waits.Snapshot().Single(w => w.TaskId == later.Id.Value).Reason);
     }
 }

@@ -112,4 +112,32 @@ public class ReserveModelTests
 
         Assert.Equal((WorkTaskStatus.Running, "nvidia/qwen3-coder"), (task.Status, task.ReserveModel));
     }
+
+    [Fact]
+    public async Task A_task_without_a_free_reserve_says_whose_limits_hold_it_and_until_when()
+    {
+        var task = await PausedOnClaudeAsync();
+
+        await _h.Runner().RunQueueAsync(default);
+
+        var reason = _h.Waits.Snapshot().Single(w => w.TaskId == task.Id.Value).Reason;
+        Assert.StartsWith("Claude account is over its limits until ", reason, StringComparison.Ordinal);
+        Assert.EndsWith("and the office has no reserve model: it goes on then.", reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Queued_tasks_say_why_they_wait_and_drop_out_once_they_start()
+    {
+        var first = _h.Enqueue("Add a logout button");
+        var second = _h.Enqueue("Style the logout button");
+        second.DependOn([first], _h.Clock.GetUtcNow());
+
+        await _h.Runner(seats: 2).RunQueueAsync(default);
+
+        Assert.Equal(WorkTaskStatus.Running, first.Status);
+        var waits = _h.Waits.Snapshot();
+        Assert.DoesNotContain(waits, w => w.TaskId == first.Id.Value);
+        Assert.Equal("Its desk is busy with another task.", waits.Single(w => w.TaskId == second.Id.Value).Reason);
+        Assert.Single(_h.Publisher.Waits);
+    }
 }

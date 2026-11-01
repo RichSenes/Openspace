@@ -23,6 +23,9 @@ public sealed class GpuShift(
     IOptionsMonitor<LocalModelOptions> options,
     TimeProvider clock)
 {
+    /// <summary>The tasks on the local model at the last look, for the top bar.</summary>
+    private List<string> _users = [];
+
     public async Task TickAsync(CancellationToken cancellationToken)
     {
         var settings = options.CurrentValue;
@@ -207,6 +210,7 @@ public sealed class GpuShift(
     {
         var running = await tasks.ListAsync(null, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false);
         var local = new List<WorkTask>();
+        var users = new List<string>();
         var cache = new Dictionary<OfficeId, Office?>();
         foreach (var task in running)
         {
@@ -220,16 +224,18 @@ public sealed class GpuShift(
                 && arbiter.IsLocal(AgentSetups.AgentFor(office.Locate(desk).Desk, task).Model))
             {
                 local.Add(task);
+                users.Add($"{office.Name} \u00b7 {office.Locate(desk).Desk.Name}: {task.Title}");
             }
         }
 
+        _users = users;
         return local;
     }
 
     private void Report(GpuState state, string? id, bool busy, string? detail = null, IReadOnlyList<string>? holders = null)
     {
         var provider = options.CurrentValue.Provider;
-        arbiter.Report(new GpuView(state, id is null ? null : $"{provider}/{id}", id is null ? null : NameOf(id), holders ?? [], detail), busy);
+        arbiter.Report(new GpuView(state, id is null ? null : $"{provider}/{id}", id is null ? null : NameOf(id), holders ?? [], detail, Users: id is null ? [] : _users), busy);
     }
 
     private string NameOf(string id) => options.CurrentValue.Find(id) is { Name.Length: > 0 } model ? model.Name : id;

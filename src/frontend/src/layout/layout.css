@@ -16,6 +16,7 @@
 }
 
 .wordmark {
+  flex: none;
   font-size: 18px;
   color: var(--accent);
 }
@@ -50,10 +51,48 @@
 }
 
 .topbar-end {
+  flex: none;
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Narrow windows keep the views in sight: the sound and connection words become their icons. */
+@media (max-width: 1100px) {
+  .topbar .wide-only {
+    display: none;
+  }
+
+  .topbar {
+    gap: 12px;
+  }
+}
+
+/* What the accounts and the graphics card are up to: under the views, wrapping when narrow. */
+.statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.statusbar:empty {
+  display: none;
+}
+
+.statusbar .claude-meter {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusbar .claude-meter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .link {

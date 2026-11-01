@@ -160,6 +160,44 @@ public sealed class GoogleTests : IDisposable
     }
 
     [Fact]
+    public async Task Gmail_out_of_its_per_minute_quota_is_waited_for_and_asked_again()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var waits = new List<TimeSpan>();
+        var mailbox = new GmailMailbox(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options))
+        {
+            Pause = (wait, _) => { waits.Add(wait); return Task.CompletedTask; },
+        };
+        _google.QuotaRefusals = 2;
+
+        var message = await mailbox.ReadAsync(email, "m1", default);
+
+        Assert.Equal("m1", message.Id);
+        Assert.Equal([TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)], waits);
+    }
+
+    [Fact]
+    public async Task Gmail_still_out_of_quota_after_a_minute_of_waits_fails_with_its_words()
+    {
+        var (accounts, email) = await ConnectedAsync();
+        var mailbox = new GmailMailbox(new HttpClient(_google), accounts, new LiveOptions<GoogleOptions>(_options)) { Pause = (_, _) => Task.CompletedTask };
+        _google.QuotaRefusals = 100;
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => mailbox.ReadAsync(email, "m1", default));
+
+        Assert.Contains("Quota exceeded", error.Message, StringComparison.Ordinal);
+        Assert.Equal(6, _google.Calls.Count(c => c.Path == "/gmail/v1/users/me/messages/m1"));
+    }
+
+    [Fact]
+    public void Gmail_s_own_wait_is_kept_but_never_longer_than_a_minute()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(7), GmailMailbox.PauseBefore(1, new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(7))));
+        Assert.Equal(TimeSpan.FromMinutes(1), GmailMailbox.PauseBefore(1, new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMinutes(5))));
+        Assert.Equal(TimeSpan.FromSeconds(32), GmailMailbox.PauseBefore(5, null));
+    }
+
+    [Fact]
     public async Task Mail_is_read_with_its_headers_text_and_whether_it_went_to_a_list()
     {
         var (accounts, email) = await ConnectedAsync();
@@ -332,12 +370,21 @@ public sealed class GoogleTests : IDisposable
 
         public bool RefuseRefresh { get; set; }
 
+        /// <summary>Gmail calls refused for the per-minute quota before they go through.</summary>
+        public int QuotaRefusals { get; set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var uri = request.RequestUri!;
             var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
             var form = request.Content is FormUrlEncodedContent ? Uri.UnescapeDataString(body) : body;
             Calls.Add((request.Method.Method, uri.AbsolutePath, uri.Query, form, request.Headers.Authorization?.ToString()));
+            if (QuotaRefusals > 0 && uri.AbsolutePath.StartsWith("/gmail/v1/users/me/messages/", StringComparison.Ordinal))
+            {
+                QuotaRefusals--;
+                return Json("""{"error":{"code":403,"message":"Quota exceeded for quota metric 'Queries' and limit 'Units per minute per user'.","errors":[{"reason":"rateLimitExceeded"}]}}""", HttpStatusCode.Forbidden);
+            }
+
             return (uri.AbsolutePath, request.Method.Method) switch
             {
                 ("/token", _) when RefuseRefresh && form.Contains("refresh_token", StringComparison.Ordinal) => Json("""{"error":"invalid_grant"}""", HttpStatusCode.BadRequest),

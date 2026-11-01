@@ -51,6 +51,7 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
+| GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, account over its limits, graphics card taken, no free seat) |
 | GET | `/api/guests?officeId=` | Claude Code sessions started outside Openspace, working in an office's repository now: `{ id, officeId, folder, branch, state, since, lastAt }`; `folder` and `branch` are null in offices with private folders |
 | GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
 | POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
@@ -124,6 +125,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `DeskActivity` | the activity | an agent moves to a new step or action, waits, or stops |
 | `DeskInterns` | the desk's interns | an agent hands work to a helper, the helper comes back, or the agent stops |
 | `OfficeGuests` | an office's guests | a guest comes in, changes what it does, or leaves |
+| `QueueWaits` | every queued task that waits, with its reason | the reason a queued task waits changes, or it starts |
 | `DeskContext` | the energy | an answer changed how full a desk's conversation is, or the engine summarised it |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
@@ -131,9 +133,9 @@ SignalR hub at `/hubs/building`, server to client only:
 | `ReportsChanged` | none | a report was written |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
-domain events after each successful save. `DeskActivity`, `DeskContext`, `DeskInterns` and
-`OfficeGuests` carry the data themselves, because activity, energy, interns and guests are
-not stored.
+domain events after each successful save. `DeskActivity`, `DeskContext`, `DeskInterns`,
+`OfficeGuests` and `QueueWaits` carry the data themselves, because activity, energy, interns,
+guests and the queue's reasons are not stored.
 
 ## Run
 
@@ -388,6 +390,8 @@ The browser goes to Google and comes back to `/api/google/callback` on this comp
 (PKCE; only loopback addresses are accepted). Each account's lasting key is kept in
 `google/<address>.json` in the same folder, readable by the person only; short-lived
 tokens stay in memory. Tests point the folder somewhere empty and Google to a fake.
+Gmail counts calls against a quota per minute and per person: a call refused for it waits
+(as long as Gmail asks, or 2 to 32 seconds) and is tried again, up to six times.
 
 Routines read news through RSS and Atom feeds (no DTDs or external entities: a
 feed that tries to read local files is refused) and print their pages to PDF with
@@ -540,7 +544,9 @@ after `IdleUnload` without any.
 
 `GET /api/gpu` (also in `GET /api/engines` as `gpu`) says who has the card:
 `Off`, `Free`, `Loading`, `Serving`, `WaitingForMemory`, `Yielding`, `Lent` or
-`Failed`, with the model, the holders and a sentence. The top bar shows it. When
+`Failed`, with the model, the holders, a sentence and `users`: the tasks working on the
+loaded model, as "office · desk: title" (routines are in `routinesWaiting`). The strip under
+the top bar shows it, with who uses the model. When
 Openspace stops, it stops the model it started.
 
 ## Claude Code

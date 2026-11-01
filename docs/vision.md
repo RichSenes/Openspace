@@ -110,9 +110,13 @@ Later, in rough order of appearance:
      work in (the folder is on every line of their log), working on laptops with a
      visitor badge. In offices with private folders they stay anonymous. An office
      for Openspace itself shows its own guests.
-  7. Releases and a "new version" notice: published releases on GitHub, a banner
-     with the notes, remind me tomorrow, never an automatic update.
-  8. The README rewritten, and kept up to date after every round from then on.
+  7. ~~Releases~~ Done: a version number, a check of GitHub's releases twice a
+     day, a banner with the notes and "remind me tomorrow", never an automatic
+     update, and `scripts/release` to publish one.
+  8. ~~The README~~ Done: rewritten for whoever downloads Openspace (what it is
+     for, what it needs, the commands in order, screenshots of a made-up office),
+     every project's README brought up to date, and kept so in every commit that
+     changes behaviour.
 
 - ~~**Claude Code.**~~ Done: desks choose their engine, OpenCode with any of its
   models (picked from the list OpenCode gives) or Claude Code with the person's

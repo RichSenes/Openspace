@@ -1,6 +1,25 @@
 # Openspace.Api
 
-ASP.NET Core host. Composes the layers and exposes them to the frontend.
+The ASP.NET Core host. It puts the layers together, applies the database migrations
+at startup, runs the background services, and serves:
+
+- the HTTP API the page uses (and you can script against), under `/api`;
+- the SignalR hub `/hubs/building`, which pushes every change live;
+- the MCP server `/mcp`, the tools agents call to report to Openspace.
+
+This README is the reference: every endpoint, message, tool and setting. For what
+Openspace is and how to start it, see the [main README](../../../README.md).
+
+**Contents:** [Endpoints](#endpoints) · [Tools for agents](#tools-for-agents-mcp) ·
+[Live updates](#live-updates) · [Run](#run) · [Configuration](#configuration) ·
+[Permissions in auto mode](#permissions-in-auto-mode) ·
+[Rounds, checks and tokens](#rounds-checks-and-tokens) · [Routines](#routines) ·
+[Agents going in circles](#agents-going-in-circles) · [Sounds](#sounds) ·
+[Private folders](#private-folders) · [Usage limits](#usage-limits) ·
+[Claude Code](#claude-code) · [Guests](#guests)
+
+Errors come back as problem details: 404 for what does not exist, 422 with a
+readable `detail` (and often a `code`) for what breaks a rule.
 
 ## Endpoints
 
@@ -42,9 +61,11 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | POST | `/api/offices/{id}/merge` | `{ target, taskIds? }`: merge all accepted work not merged yet (or the listed tasks), first accepted first. Returns `[{ taskId, title, result, message }]` with `result` `Merged`, `Conflict`, `Failed` or `NotTried`; uncommitted changes or a missing target stop the round |
 | PUT | `/api/tasks/{id}/dependencies` | `{ taskIds }`: the tasks of the same office this one waits for (10 at most); it starts once each is accepted and merged. `422` for a loop or a task already started |
 | POST | `/api/tasks/{id}/catch-up` | `{ target }`: send accepted work that conflicts back to its desk as a new round. Openspace starts merging the target into the task branch in a fresh working copy; the agent resolves the conflicts |
+| POST | `/api/offices/{id}/merge-branch` | `{ source, target }`: bring one of your branches into another (beta into main, say) with the same safety as task merges. Returns `{ result }`: `UpToDate`, `FastForward` (moved forward, no merge commit) or `Merged`; `422` for conflicts or uncommitted changes |
 | POST | `/api/offices/{id}/push` | `{ branch }`: send one of your branches to its remote (origin when it follows none), after a fetch; `422` `behind-remote` when the remote has commits it lacks. Never forced |
 | POST | `/api/tasks/{id}/pull-request` | `{ target }`: push the accepted work's branch and open a GitHub pull request into the target, with the agent's summary and the checks to try by hand. Returns `{ url }` |
 | POST | `/api/tasks/{id}/pull-request/check` | `{ state }`: how the pull request stands on GitHub. Merged, the work counts as merged and the target here is fast-forwarded when it can be; closed, it can be merged again |
+| PUT | `/api/offices/{id}/reserve-models` | `{ models }`: up to four reserve models, in order: OpenCode's `provider/model`, or `claude-code/` and a Claude model; `422` for an office kept on this machine. See [Reserve models](#reserve-models) |
 | PUT | `/api/offices/{id}/local-only` | `{ localOnly }`: keep the project on this machine; push and pull requests are then refused |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
@@ -70,6 +91,10 @@ ASP.NET Core host. Composes the layers and exposes them to the frontend.
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
+| GET | `/api/gpu` | Who has the graphics card: `{ state, model, modelName, holders, detail, routineTurn, routinesWaiting, users }`. See [Local models](#local-models-and-the-graphics-card) |
+| POST | `/api/gpu/claim` | `{ holder }`: a program takes the card; local work gives way. Renew within `LocalModels:ClaimLease` |
+| DELETE | `/api/gpu/claim/{holder}` | The program gives the card back |
+| POST | `/api/gpu/retry` | Try loading the model again now, after a failure |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel }` |
@@ -220,6 +245,7 @@ clock, some days of the week (every day when none), every week or every few week
 
 | Method | Path | What it does |
 | --- | --- | --- |
+| GET | `/api/routine-kinds` | The kinds of routine, with their name, description and default settings |
 | GET | `/api/offices/{id}/routines` | Routines with their next run and the latest one |
 | POST | `/api/offices/{id}/routines` | `{ name, kind, schedule: { days, at, everyWeeks }, settings? }` |
 | PUT | `/api/routines/{id}` | Change name, schedule or settings (what is left out stays) |

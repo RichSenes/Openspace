@@ -1,71 +1,128 @@
 # Openspace frontend
 
-The pixel-art building and the panels around it.
+The page: the pixel-art building and the panels around it. It talks to the API
+over HTTP and keeps itself up to date through the SignalR hub.
 
 ## Stack
 
-- [Vite](https://vite.dev) + React + TypeScript
-- [PixiJS](https://pixijs.com) v8 for the building, rendered without
-  antialiasing so pixel art stays crisp
-- TanStack Query for server data, refreshed by SignalR messages
-- Fonts bundled locally (Silkscreen, IBM Plex), so it works offline
+- [Vite](https://vite.dev), React 19 and TypeScript (`erasableSyntaxOnly`: no
+  enums, no parameter properties)
+- [PixiJS](https://pixijs.com) 8 for the building, drawn without antialiasing so
+  pixel art stays crisp
+- TanStack Query for server data; SignalR messages write into its cache or say
+  what to fetch again
+- Fonts bundled (Silkscreen, IBM Plex), so it works offline
 - Markdown rendered with marked and sanitised with DOMPurify
-- Sprites (planned): PNG sheets with Aseprite JSON
+- Sprites are TypeScript character matrices, one string per row of pixels: see
+  [docs/sprites.md](../../docs/sprites.md) and
+  [docs/art-style.md](../../docs/art-style.md)
+- Vitest for the logic, oxlint for the rest
 
 ## Structure
 
 ```
 src/
-  agents/     Roles view and role form helpers (tested)
-  activity/   Desk activity and energy: merge and lookup helpers for speech bubbles and batteries (tested)
   api/        Types, fetch client (problem details to readable errors), query hooks
-  realtime/   SignalR connection: refetches what the server says changed
-  layout/     Top bar with views, office sidebar
-  building/   Floor plans and building shapes, walls and doors, room arranging and camera maths (pure, tested), their PixiJS rendering and the Arrange panel
-  board/      Task board, new task dialog, task drawer, board rules (tested)
-  rooms/      Rooms, room context and desks of an office
-  art/        Pixel art: palettes, sprites as character matrices, station composition (tested)
-  lab/        Sprite lab: open the app with ?lab to review every sprite and combination
-  ui/         Toasts, dialog, status pill
+  realtime/   The SignalR connection: merges pushed data, refetches what changed
+  layout/     Top bar, the strip of account and graphics card notices, office sidebar
+  building/   The building: layout and floor plans, walls and doors, camera, minimap,
+              stations, guests, the Arrange panel, agent cards and the activity feed
+  art/        Pixel art: palette, themes, sprites, rooms and scenes, lighting, weather
+              at the windows, walkers in four directions
+  activity/   What desks are doing: bubbles, energy, interns, walks and chats,
+              "needs you"
+  board/      Task board, task drawer, new task, the supervisor, the Merge desk
+  rooms/      Rooms of an office: repository, context, procedure, checks, desks,
+              private folders, reserve models
+  agents/     Roles, their instructions and permissions
+  routines/   Routines, their runs, proposals, the paper's kanji
+  reports/    Reports and changelogs
+  engines/    OpenCode and Claude Code, usage limits, the graphics card
+  settings/   Settings, weather, version, backups, Google accounts
+  sounds/     Built-in sounds, your own files, the rules of when they play
+  release/    The new version banner
+  weather/    Words for the weather
+  lab/        The sprite lab: open the page with ?lab
+  ui/         Toasts, dialogs, status pills
 ```
+
+Pure logic lives in `.ts` files with a `.test.ts` next to them; components stay
+thin.
 
 ## Views
 
-| View | What it shows |
-| --- | --- |
-| Building | The office drawn in pixel art, in its mood (theme): scroll to zoom at the cursor, drag to move, double-click a room to fly into it, Fit to see it all. Every desk shows its agent in its real state (working, reading, waiting for you, queued, done, failed) with signals and speech bubbles; desks stand in rows of four. A battery beside each busy agent shows how much room is left in its conversation (green, yellow, red, and shorter as it empties): tired agents get heavy eyes and yawn, exhausted ones sink into their chair, and when the engine summarises the conversation the agent sips a coffee while the battery charges again. When an agent hands part of its work to a helper (a subagent), an intern appears beside its desk in a puff of smoke, smaller, standing, with a visitor badge and a clipboard, in its agent's colours; it leaves the same way when the helper is back (two at most beside a desk, all of them listed on the agent's card). The Activity panel at the top right follows what happens live in this office, one of its rooms or every office (reads and searches on request), grouped by day in aligned columns; closed it shows the latest line, and a line opens its task on the board of its office. A little map at the top left sketches the whole building (rooms as blocks in their mood's colours, agents as marks shaped by their state, a frame for what the screen shows): press or drag on it to go there, or hide it with Hide map (remembered in this browser). The windows show the real weather of the town set in Settings: clouds, fog, drizzle, rain, snow and storms with flashes. Agents walk to the furniture of their room that fits what they do (shelves, filing cabinets and printers to read, server racks for commands, whiteboards to plan, the coffee machine or the water cooler on a break), never far, and hurry back to their desk when they need you; two who meet stop for a chat with made-up bubbles. Nobody walks while rooms are arranged or when the system asks for reduced motion. Arrange says what each piece of furniture is for. Claude Code sessions started outside Openspace sit in the guest room as guests, at a laptop with a visitor's badge, named after the folder they work in (just "Guest" at the root or in an office with private folders); clicking one says what it does, where and since when. The theme is chosen per office, the lights can be switched off (remembered in this browser) |
-| Board | Ask the supervisor to split a request into proposed tasks, then approve them all at once or one by one; filter by epic. Tasks in columns by status. Click a card for details, live activity, permission answers, the diff of the changes, merging, actions and notes; the Log tab shows the audit log (changes only, or everything) and downloads the Markdown report |
-| Rooms | Set the office repository, open rooms, write their context and required procedure, add and rename desks and give them roles; the OpenCode engine and model sit under Advanced |
-| Reports | Write a report of a day or of an epic in a chosen language, read it rendered, copy it or download it as Markdown |
-| Settings | Permissions, how many agents work at once, who plans and reviews, the Claude account's limits, sounds, the town of the weather at the windows (looked up as you save it, with its weather now), the version running (with a button to look for a new one), backups and Google accounts |
-| Agents | Define roles: description, instructions (with an AI draft to review before using it), preferred model and what the agent may do without asking, including whether a Claude Code agent may call in interns (helpers, off by default) |
+**Building.** The office drawn in pixel art, in its theme, with a mood per room.
+Scroll to zoom, drag to move, double-click a room to fly into it, Fit to see it
+all. Every desk shows its agent in its real state (working, reading, waiting for
+you, queued, done, failed) with signals and speech bubbles; a battery beside busy
+agents shows how full their conversation is, and interns appear in a puff of smoke
+when an agent calls in helpers. Agents walk to the furniture of their room that
+fits what they do (shelves to read, server racks for commands, whiteboards to
+plan, the coffee machine on a break), hurry back when they need you, and stop for
+a chat when they meet. Claude Code sessions started outside Openspace sit in the
+guest room. Windows show the real weather of your town. The minimap in the corner
+sketches the whole building; the Activity panel follows the office live.
+**Arrange** lets you draw rooms and the building by hand: sizes, desks, furniture,
+doors, windows and the building's shape. Nobody walks while you arrange or when
+the system asks for reduced motion.
 
-While agents wait for a permission, "Needs you" cards pop up at the bottom right
-of every view, one per desk, with Allow once and Refuse, and pop out once answered
-(no motion when the system asks for reduced motion).
+**Board.** Tasks in columns by status, searchable, filtered by epic. Ask the
+supervisor to split a request into tasks and approve them. A queued task says why
+it waits. Open a task for its details, live activity, permission answers, diff,
+checks to try by hand, notes and actions; the Log tab shows the audit log and
+downloads its Markdown report. The Merge desk merges accepted work, brings one
+branch into another and pushes.
 
-Under the views, a strip shows what the accounts and the graphics card are up to (a
-provider over its limits, who uses the local model, the Claude account), only when
-there is something to say; it wraps on narrow windows. When a newer release of
-Openspace is out, a banner says so, with what changed, a link to GitHub and "Remind
-me tomorrow" (remembered in this browser for that version): Openspace never updates
-itself. Queued tasks say on the board why they wait.
+**Rooms.** The office's repository, rooms and their context, procedure and check,
+desks with their name, role, engine and model, private folders, reserve models,
+keeping the project on this computer.
 
-Confirmations appear as short toasts at the bottom; errors stay next to the form
-that caused them, with the server's reason.
+**Routines.** Each routine with its schedule, settings, runs and log, what it
+proposes (yes or no), and run now.
+
+**Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
+read them, copy them, download them.
+
+**Agents.** Roles: description, instructions (with an AI draft to review),
+preferred model, and what the agent may do without asking.
+
+**Settings.** Permissions, agents at work at once, who plans and reviews, the
+Claude account's limits, sounds, the weather's town, the version, backups and
+Google accounts.
+
+Across every view:
+
+- Under the views, a strip shows what accounts and the graphics card are up to (a
+  provider over its limits, who uses the local model, the Claude account), only
+  when there is something to say; it wraps on narrow windows, where the sound and
+  connection words become icons.
+- When a newer release is out, a banner says so with what changed, a link and
+  "Remind me tomorrow" (remembered in this browser for that version). Openspace
+  never updates itself.
+- "Needs you" in the top bar lists the agents waiting for your answer.
+- Confirmations are short toasts at the bottom; errors stay next to the form that
+  caused them, with the server's reason.
 
 ## Run
 
 ```bash
-npm install
-npm run dev     # http://localhost:5173, proxies /api and /hubs to the API on 5145
-OPENSPACE_API=http://localhost:5245 npx vite --port 5273   # a second copy against another API
-npm run build
+npm ci
+npm run dev       # http://localhost:5173; /api and /hubs go to the API on 5145
+npm run build     # type-checks, then builds
 npm run lint
-npm test        # Vitest
+npm test          # Vitest
 ```
 
-## Status
+To run a second copy against another API (never leave `OPENSPACE_API` out, or it
+talks to the one on 5145):
 
-Agents run end to end through OpenCode, with live bubbles, review and diff.
-Sprites and the design pass come later.
+```bash
+OPENSPACE_API=http://127.0.0.1:5245 npx vite --port 5273 --strictPort
+```
+
+## Fan pack
+
+`src/art/fanpack/` may hold local redrawings of some props and costumes, copied
+from pictures with `tools/pixelgrid.py`. Git ignores the folder: they are never
+committed, never in screenshots, and the tests always check the repository's own
+drawings.

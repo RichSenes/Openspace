@@ -1,205 +1,203 @@
 # Openspace
 
-A pixel-art control room for [OpenCode](https://opencode.ai) and
-[Claude Code](https://claude.com/claude-code) agents.
+A pixel-art office where AI coding agents work on your projects, and you follow,
+review and merge what they do.
 
-Every project is an office, every area of competence is a room, every agent sits
-at a desk. Walk through the building, see who is working and what they are doing,
-assign tasks, review changes and read reports, instead of scrolling a terminal.
+![An office in Openspace: rooms with their desks and agents, a lounge in the middle, a guest room in the corner](docs/screenshots/building.png)
 
-> **Status:** early but working. Agents run through OpenCode or Claude Code in their own git worktrees, with live speech bubbles, a review by Claude before yours, diffs, and commits on task branches.
+Every project is an **office**, every part of it a **room**, every agent sits at
+a **desk**. You give a desk a task, or ask the supervisor to split a request into
+tasks; agents work on their own copy of the repository, you see what each one is
+doing, read its changes, accept or send them back, and merge. Agents run on
+[OpenCode](https://opencode.ai) (with any of its models, local ones included) or
+on [Claude Code](https://claude.com/claude-code) with your own account.
 
-## Concepts
+> Version 0.9.0. It runs on Linux every day; macOS should work; on Windows use WSL.
 
-| Building | Office | Room | Desk | Role |
-| --- | --- | --- | --- | --- |
-| The whole instance | A project | An area of competence | A seat for an agent, on OpenCode or Claude Code | How that agent works and what it may do alone |
+## What it is for
 
-The full picture, glossary and first-prototype scope are in
-[docs/vision.md](docs/vision.md).
+- **Many agents, one place.** Instead of a terminal per agent, a building where
+  you see at a glance who works, who waits for you, who is done and who failed.
+- **Your code stays yours.** Each task works in its own git worktree and branch;
+  your checkout never moves. Nothing is merged or pushed until you say so.
+- **Safe by default.** Roles say what each agent may do alone. Openspace answers
+  harmless requests itself and asks you only about risky ones (pushing,
+  deploying, touching keys). Folders you mark private are refused to every agent.
+- **Less babysitting.** A queue, task dependencies, a review by Claude before
+  yours, checks after merging, reserve models when an account runs out, agents
+  stopped and restarted when they go in circles.
+- **Routines.** Recurring jobs for your own life: a morning paper, mail sorting,
+  job offers, dependency checks, delivered to Telegram and never acting on what
+  cannot be undone without your yes.
 
-## Repository layout
+![The board: proposed, queued, running, in review, failed and done tasks](docs/screenshots/board.png)
 
-```
-docs/                          Vision, design notes and the sprite format (sprites.md)
-src/backend/
-  Openspace.Domain/            Business model, no dependencies
-  Openspace.Application/       Use cases and ports
-  Openspace.Infrastructure/    OpenCode, MCP, git and SQLite adapters
-  Openspace.Api/               ASP.NET Core host
-src/frontend/                  React + PixiJS building
-tests/                         Architecture and domain tests
-tools/                         Helper scripts (pixelgrid.py: pictures to fan pack sprites)
-```
+## What you need
 
-Each project has its own README with detailed specifications.
-
-## How a task flows
-
-1. You create a task for a desk, or ask the supervisor: it reads the project and
-   splits a larger request into tasks proposed for the right desks, which you
-   approve.
-2. When a seat is free, Openspace creates a git worktree on a new
-   `openspace/...` branch and opens an OpenCode session there, briefing the agent
-   with the room's rules, the task and the team's notes.
-3. While it works, the agent's todo list and tool calls become speech bubbles,
-   and a battery beside it shows how much room is left in its conversation:
-   it gets tired as the battery runs down and has a coffee when the engine
-   summarises the conversation. Helpers it calls in (subagents) stand beside
-   its desk as interns; Claude Code agents call them in only if their role
-   allows it.
-   Through Openspace's own MCP tools it can also leave notes on the task,
-   announce what it is doing and re-read its brief.
-   If it asks for a permission, Openspace answers on its own in auto mode
-   and the desk waits for your answer only for risky actions, such as
-   pushing, deploying or touching secrets.
-4. When it stops, the task goes to review with the agent's summary as a note,
-   the diff of its changes, the checks to try by hand and the tokens it spent.
-   Claude Code reviews it first when it is there.
-5. Accept commits the work on the task branch. Send back resumes the same
-   session with your feedback, the review, or both: a new round. Discard
-   throws it all away.
-6. If the room has a required procedure (for example "back up every file before
-   changing it"), the agent reports each step with evidence, and the work does
-   not reach review until all of them are done.
-7. Every step, file change, command (with its output), permission and note is
-   kept in the task's audit log, and can be downloaded as a Markdown report.
-   The Activity panel in the building follows those lines live, for an office,
-   a room or every office at once. A little map in the corner shows the whole
-   building with every agent as a mark for its state; press it to go there.
-   The windows show the real weather of your town (set in Settings), from
-   Open-Meteo: no key, only the town leaves your computer. Agents get up now
-   and then: to a shelf, a filing cabinet or a printer while they read, to a
-   server rack while they run commands, to a whiteboard to plan, to the coffee
-   when they have nothing to do, and back to their desk at once when they need
-   you. Colleagues who meet stop for a chat. Claude Code sessions you start
-   yourself in a terminal show up as guests, in the guest room of the office
-   whose repository they work in, at a laptop with a visitor's badge: Openspace
-   reads only the folder, branch and time from their logs, never what was said.
-8. Reports of a day or of an epic are written from the audit log in the
-   language you choose, ready to copy into an email or a chat.
-9. Accepted work is merged into the branch you choose, one task at a time or
-   all at once from the Merge desk, in the order it was accepted. Your checkout
-   never moves, and nothing is touched if you have uncommitted changes. Work
-   that conflicts goes back to its agent, which resolves the conflict in its own
-   working copy; accept it again and it merges cleanly. The same desk brings a
-   whole branch into another (beta into main, say), moving it forward when it
-   can, with the same safety, and pushes any branch even with no task waiting.
-   After merging, each room's check command (`dotnet test`, `npm test`…) runs
-   on the merged branch in a throwaway copy, and says what broke. From there you
-   push the branch, never forced, or open a GitHub pull request for a task
-   instead of merging it here; an office can be kept on this machine, and then
-   it is never pushed.
-10. A changelog of what was accepted since the previous one is written for the
-    people who use the product, in plain words and in the language you choose.
-11. Each room can have its own mood, whatever the office's theme: a bright
-    studio, a dark room where only the screens are lit, a bare town hall office.
-12. Claude Code desks pause by themselves while the Claude account is over its
-    usage limits, and pick up where they left off once it resets.
-13. The database is copied once a day (Settings → Backups); restore a copy with
-    `scripts/openspace restore <file>`.
-14. An office can list private folders (photos, models, personal documents):
-    no agent of it may open, read, search or change them. Openspace and both
-    engines refuse them, and every agent is told so.
-15. A task can wait for others: the supervisor says which steps need earlier
-    ones (an analysis before the fix), and you can change it on the task. It
-    stays in the queue until those are accepted and merged, and its agent is
-    told what they did.
-16. Sounds tell you when an agent needs you, asks you something, finishes or
-    fails, chosen per moment and per room or desk, built in or your own files
-    (kept out of git). One button in the top bar mutes them.
-17. An office can name reserve models (free cloud tiers, or Claude Code as
-    `claude-code/sonnet`): while a desk's
-    account is over its limits, its tasks go on with the first reserve that
-    still has room, and go back to the desk once its account resets. Meant for
-    public code: an office kept on this machine has none.
-18. Desks can run on models of this machine (a llama.cpp server, say), which
-    Openspace loads on the graphics card when a desk needs one and unloads when
-    nobody uses it. Programs that come first (an image generator, a trainer) get
-    the card as soon as they run or claim it: local tasks finish or go back to
-    the queue, and resume once the card is free again.
-19. An agent going in circles (the same failure again and again, or a
-    conversation that keeps filling up) is stopped and starts over in a fresh
-    conversation on the work done so far; if it keeps looping its work goes to
-    review as it is. Stop and review does the same by hand, without losing work.
-20. Offices have routines: recurring jobs that run on their own schedule (a time
-    of day, some days of the week, every few weeks), log what they do, remember
-    what they already met so nothing comes back twice, and propose: nothing
-    touches your things until you approve; what can be undone they do on their
-    own and log. They deliver to a Telegram group. The first kind is a morning
-    paper: news filtered and written up by local models, as a numbered PDF.
-
-## Ground rules
-
-- Code, comments and docs are in English.
-- No personal or company data: examples and tests use made-up names.
-- No keys or secrets in the repository: configuration comes from environment
-  variables or ignored local files.
-
-## Requirements
-
-- [OpenCode](https://opencode.ai) running in server mode (`opencode serve`)
-- Optionally [Claude Code](https://claude.com/claude-code), signed in: when it is
-  installed it plans, drafts and reviews finished work, and desks can run on it.
-  It uses the account it is signed in with and that account's limits; Openspace
-  never needs an API key for it
-- .NET SDK 10
-- Node.js 22 or later
+| | What for |
+| --- | --- |
+| [git](https://git-scm.com) | Openspace works on git repositories |
+| [.NET SDK 10](https://dotnet.microsoft.com/download) | The API |
+| [Node.js 22](https://nodejs.org) or later | The page, and OpenCode |
+| [OpenCode](https://opencode.ai), with a model provider | The agents |
+| [Claude Code](https://claude.com/claude-code), signed in (optional) | Desks on Claude, plans and reviews by Claude; it uses your account and its limits, never an API key of Openspace |
+| [GitHub CLI](https://cli.github.com), signed in (optional) | Pull requests and pushes |
+| Firefox and geckodriver (optional) | PDF pages of the routines |
+| An NVIDIA card and a llama.cpp server (optional) | Models on your own computer |
 
 ## Getting started
 
-One command starts OpenCode, the API and the page, each in the background with
-its log, and opens nothing it finds already running:
-
 ```bash
-scripts/openspace start          # then open http://localhost:5173
-scripts/openspace status
-scripts/openspace restart api    # after an update: rebuilds and restarts the API only
-scripts/openspace logs api
-scripts/openspace stop
-scripts/openspace kanji-data     # once, for the paper's kanji of the day: its dictionaries
+# 1. The tools (once). OpenCode, and optionally Claude Code:
+npm install -g opencode-ai
+opencode auth login                  # connect a model provider (OpenCode's free models need none)
+npm install -g @anthropic-ai/claude-code && claude    # optional: sign in once
+
+# 2. Openspace
+git clone https://github.com/RichSenes/Openspace.git
+cd Openspace
+
+# 3. Start OpenCode, the API and the page, each in the background
+scripts/openspace start
 ```
 
-Routines that work on mail (and later the calendar and tasks) need a Google
-account: put your own OAuth client (a desktop app of your Google Cloud project) in
-`~/.config/openspace/google-client.json`, then connect the account in Settings,
-under Google accounts. Keys stay on your computer; no routine can send mail.
+Then open <http://localhost:5173>. The first start builds the API and installs the
+page's packages, which takes a minute; the database is created on its own.
+
+### Your first office
+
+1. **New office** in the sidebar, with the name of your project.
+2. In **Rooms**, set the office's repository: the folder of a git repository on
+   your computer (Openspace can initialise one).
+3. Open a room for a part of the project ("Web", "API"), write what it is about
+   in its context, and add a desk: a name, the OpenCode agent (`build` is
+   OpenCode's own) and a model, or Claude Code.
+4. Optionally, in **Agents**, define a role (what the agent is, its rules, what it
+   may do without asking) and give it to the desk.
+5. In **Board**, **New task** for the desk, or **Ask the supervisor** to split a
+   request into tasks, then approve them.
+6. Watch it in **Building**. When the task is in review, open it on the board:
+   read the diff and the agent's summary, then **Accept** or **Send back** with a
+   note. Accepted work goes into your branch with **Merge** (one task, or all of
+   them at the Merge desk).
+
+![Close up: desks with their agents, one waiting in the queue, one with a problem](docs/screenshots/rooms.png)
+
+### Every day
+
+```bash
+scripts/openspace status           # what is running
+scripts/openspace logs api         # follow a log (api, web or opencode)
+scripts/openspace restart api      # after changing the code: rebuild and restart the API
+scripts/openspace stop
+scripts/openspace restore FILE     # put a database backup back
+scripts/openspace kanji-data       # once, only for the morning paper's kanji of the day
+```
+
+Logs and process ids live in `~/.local/state/openspace`. Ports change with
+`OPENSPACE_API_PORT` (5145), `OPENSPACE_WEB_PORT` (5173) and
+`OPENSPACE_OPENCODE_PORT` (4096). Settings you change in the page are kept in
+`openspace.settings.json` next to the API; everything else is in
+[the API's configuration](src/backend/Openspace.Api/README.md#configuration).
 
 ### Updates
 
 Openspace never updates itself. Twice a day it looks at the releases published on
-GitHub for the repository it was cloned from, and when a newer one is out a banner
-says so, with what changed and a "remind me tomorrow". Settings shows the version
-running. To update: `git pull`, then `scripts/openspace restart`.
-
-To publish a version (for whoever maintains the repository): write what changed in
-a Markdown file, then `scripts/release 0.10.0 notes.md` from a clean `main`. It sets
-the number in `Directory.Build.props` and the page's `package.json`, commits, tags
-`v0.10.0`, pushes and opens the GitHub release with those notes.
-
-Logs and process ids live in `~/.local/state/openspace`. Ports change with
-`OPENSPACE_API_PORT`, `OPENSPACE_WEB_PORT` and `OPENSPACE_OPENCODE_PORT`.
-
-### By hand
-
-Start OpenCode in server mode (any folder will do: Openspace tells it which
-folder each task works in):
+GitHub for the repository it was cloned from; when a newer one is out, a banner
+says what changed, with "remind me tomorrow". To update:
 
 ```bash
-opencode serve --port 4096
+git pull
+scripts/openspace restart
 ```
 
-Then Openspace:
+## How it works
+
+1. **A task starts** when a seat is free (`Queue:Seats`, one by default) and its
+   desk is idle. Openspace makes a git worktree on an `openspace/...` branch and
+   briefs the agent: the room's context and rules, the task, the notes of the
+   team, what earlier tasks it builds on did.
+2. **While it works**, its steps become speech bubbles, a battery shows how full
+   its conversation is, helpers it calls in stand beside it as interns, and it
+   walks to the furniture of its room (shelves to read, server racks to run
+   commands, the coffee machine on a break). Permissions are answered by
+   Openspace or wait for you behind the **needs you** button.
+3. **When it stops**, the task goes to review with the agent's summary, the diff,
+   the checks you should try by hand and the tokens it spent. Claude reviews it
+   first when it is installed. Rooms can require a procedure whose steps the
+   agent reports with evidence before review.
+4. **You decide**: accept (committed on the task branch), send back for another
+   round, or discard. Accepted work merges into the branch you choose, in a
+   throwaway copy when it is not checked out; conflicts go back to the agent.
+   Each room's check command runs on the merged branch. Push, or open a pull
+   request instead.
+5. **Everything is logged**: steps, file changes, commands with their output,
+   permissions, notes. Reports of a day or of an epic, and a changelog for the
+   people using the product, are written from that log in your language.
+
+More of what it does, in short:
+
+- Rooms drawn by hand or laid out on their own, moods per room, doors, windows
+  with your town's real weather, a minimap and a live activity feed.
+- Claude Code sessions you start yourself in a terminal show up as guests, in the
+  guest room of the office whose repository they work in.
+- Usage limits: desks pause while their account is over its limits, or go on
+  with the office's reserve models; the board says why each queued task waits.
+- Local models are loaded on the graphics card when a desk needs one and give way
+  to the programs that come first (an image generator, a trainer).
+- Sounds for the moments that matter, a daily database backup, private folders,
+  offices kept on this computer only.
+
+## Repository layout
+
+```
+docs/                        Vision and plans, art style, sprite format, screenshots
+scripts/openspace            Start, stop, restart, logs, restore, kanji data
+scripts/release              Publish a version
+src/backend/
+  Openspace.Domain/          The business model, no dependencies
+  Openspace.Application/     Use cases, ports, the queue, routines
+  Openspace.Infrastructure/  OpenCode, Claude Code, git, SQLite, Google, Telegram, local models
+  Openspace.Api/             ASP.NET Core host: HTTP, SignalR, MCP tools for agents
+src/frontend/                React + PixiJS: the building and the panels
+tests/                       Architecture, domain, application, infrastructure and API tests
+tools/                       Helper scripts (pixelgrid.py: pictures to sprites)
+```
+
+Each project has its own README:
+[Domain](src/backend/Openspace.Domain/README.md) ·
+[Application](src/backend/Openspace.Application/README.md) ·
+[Infrastructure](src/backend/Openspace.Infrastructure/README.md) ·
+[API](src/backend/Openspace.Api/README.md) (endpoints, configuration, routines) ·
+[Frontend](src/frontend/README.md) ·
+[Tests](tests/README.md).
+The plan is in [docs/vision.md](docs/vision.md), the pixel art rules in
+[docs/art-style.md](docs/art-style.md).
+
+## Development
 
 ```bash
-dotnet build && dotnet test
-dotnet run --project src/backend/Openspace.Api     # API on http://localhost:5145
+dotnet build && dotnet test                         # backend
+cd src/frontend && npm ci && npm run build && npm run lint && npm test   # page
+
+# A second copy next to the one you use, with its own database
+ConnectionStrings__Openspace="Data Source=/tmp/try/test.db" Settings__Path=/tmp/try/settings.json \
+  Queue__Enabled=false dotnet run --project src/backend/Openspace.Api --urls http://127.0.0.1:5245
+OPENSPACE_API=http://127.0.0.1:5245 npx vite --port 5273   # in src/frontend
 ```
 
-In a second terminal:
+Open the page with `?lab` for the sprite lab: every sprite, pose and animation.
 
-```bash
-cd src/frontend
-npm install
-npm run dev                                         # open http://localhost:5173
-```
+To publish a version, write what changed in a Markdown file, then from a clean
+`main`: `scripts/release 0.10.0 notes.md`. It sets the number in
+`Directory.Build.props` and the page's `package.json`, commits, tags, pushes and
+opens the GitHub release.
+
+### Ground rules
+
+- Code, comments and docs are in English.
+- No personal or company data: examples, tests and screenshots use made-up names.
+- No keys or secrets in the repository: they come from environment variables or
+  files outside it.
+- Every change of behaviour comes with tests, and with the README of what it
+  touches, in the same commit.

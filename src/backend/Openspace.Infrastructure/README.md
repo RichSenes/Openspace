@@ -1,47 +1,67 @@
 # Openspace.Infrastructure
 
-Adapters that connect the application to the outside world.
-
-## Planned adapters
-
-| Port | Adapter |
-| --- | --- |
-| Agent runtime | `OpenCode/OpenCodeRuntime`: HTTP client for `opencode serve` (done) |
-| Agent signals | `OpenCode/OpenCodeEventListener` + `OpenCodeEventTranslator`: global event stream to progress, permission, finished, failed (done) |
-| Workspaces | `Git/GitWorkspaceManager`: one git worktree per task (done) |
-| Queue | `Hosting/QueueRunnerService`: recovers at startup, fills seats every few seconds (done) |
-| Routines | `Persistence/RoutineRepository` + `Configurations/RoutineConfiguration` (schedule stored as JSON), `Hosting/RoutineRunnerService` runs them every few seconds, off with the queue in tests (done) |
-| Graphics card | `LocalModels/LocalModelServer` starts and stops the local model server, `LocalModels/GpuProbe` reads the card's memory and the running programs, `Hosting/GpuShiftService` runs `GpuShift` every few seconds and writes the OpenCode provider (done) |
-| Persistence | SQLite via EF Core (done) |
-| Agent tools | `OpenCodeRuntime.ConnectToolsAsync`: registers the API's MCP server in OpenCode per worktree (done; the server itself lives in the API) |
+The adapters that connect Openspace to the outside world: the agent engines, git,
+the database, Google, Telegram, the graphics card, public web services. Each one
+implements a port of `Openspace.Application` (see the table there).
 
 ## Rules
 
-- Implements interfaces declared in `Openspace.Application`.
-- Never referenced by `Openspace.Domain` or `Openspace.Application`.
-- Secrets (for example model provider keys) are never stored here: OpenCode
-  owns its own provider configuration.
+- Implements interfaces declared in `Openspace.Application`; never referenced by
+  `Openspace.Domain` or `Openspace.Application`.
+- No secrets here or in the database: OpenCode and Claude Code keep their own
+  sign-ins; Google keys and Telegram tokens are files in the person's own folder
+  (`~/.config/openspace`), readable by them only.
+- Everything that reaches a real service has a fake in the tests.
+
+## Adapters
+
+| Folder | What it does |
+| --- | --- |
+| `OpenCode/` | `OpenCodeRuntime` (HTTP client for `opencode serve`), `OpenCodeEventListener` and `OpenCodeEventTranslator` (its event stream to agent signals), `OpenCodeStatusSweep` (sessions already retrying), `OpenCodeContextWindows` (how big each model's conversation can be) |
+| `ClaudeCode/` | `ClaudeCodeRuntime` (`claude -p` in the task's working copy, following its stream, resuming the same conversation), `ClaudeCodeEvents`, `ClaudeCodePermissions` (the role's tools, the rest asked through Openspace), `ClaudeCodeUsage` (the account's limits), `AgentRuntimeRouter` (each session to its engine) |
+| `Git/` | `GitWorkspaceManager` (a worktree per task, diffs, commits, merges), `GitCli`, `GitHubPullRequests` (through `gh`) |
+| `Checks/` | `ShellCheckRunner`: a room's check command in a throwaway copy, with a timeout |
+| `Persistence/` | EF Core on SQLite: the repositories, the audit log, migrations, `SqliteBackups` |
+| `LocalModels/` | `LocalModelServer` (starts and stops the model's server), `LlamaServerApi`, `GpuProbe` (graphics memory and running programs), `OpenCodeLocalProvider` (the provider OpenCode reads), `DeciderClient` (yes/no questions on the processor) |
+| `Guests/` | `ClaudeSessionLogs`: the end of Claude Code's own session logs; only the folder, branch, time, how it was started and tool names are kept |
+| `Google/` | `GoogleAccounts` (OAuth on this computer), `GmailMailbox` (read, label, archive, draft; never send), `GoogleAgenda` (calendar and tasks) |
+| `Telegram/` | `TelegramOutbox`: what routines make, to the person's group |
+| `Routines/` | `FeedReader` (RSS and Atom, no DTDs), `WebImages`, `FirefoxPdfPrinter` (HTML to PDF with a headless Firefox), `KanjiBook`, `JapanDevBoard` and `CompanyBoards` (job offers) |
+| `Upkeep/` | Dependency files of every kind, OSV advisories, package registries, toolchains, system packages, unpushed work |
+| `Weather/` | `OpenMeteo`: town lookup and current weather, no key |
+| `Releases/` | `GitHubReleases`: the latest release on GitHub's public API, no key |
+| `Hosting/` | The background services: queue, reviews, routines, graphics card, guests, backups, releases |
+
+### What leaves the computer
+
+Only what each feature needs: prompts to the model providers you chose in
+OpenCode or Claude Code; the town's name and position to Open-Meteo; package names
+to OSV and the registries; feed and job board requests; Google and Telegram calls
+of your own accounts; GitHub through `gh` when you push or open a pull request,
+and the release check. Requests that are not yours go out under an honest name
+(`Openspace/1.0`).
 
 ## Persistence
 
-EF Core on SQLite.
+EF Core on SQLite, one file (`ConnectionStrings:Openspace`).
 
 | Table | Content |
 | --- | --- |
-| `Offices` | Offices |
-| `Roles` | Roles, with their three permissions as text columns |
-| `Rooms` | Rooms, owned by an office |
-| `Desks` | Desks with their agent profile, owned by a room |
-| `WorkTasks` | Tasks; status stored as text |
-| `TaskNotes` | Notes, owned by a task |
+| `Offices`, `Rooms`, `Desks` | Offices with their rooms and desks (agent, role, look, spot) |
+| `Furniture`, `CommonFurniture`, `FloorCuts` | What stands in rooms and on the common floor, and the building's shape |
+| `Roles` | Roles, with their permissions as text columns |
+| `WorkTasks`, `TaskNotes`, `TaskProcedureSteps`, `TaskManualChecks`, `TaskRoundUsage` | Tasks with their notes, procedure, checks to try by hand and tokens per round |
 | `AuditEntries` | The audit log: one row per thing that happened, numbered in recording order |
+| `Epics`, `Reports` | Requests split by the supervisor, and the reports written |
+| `Routines`, `RoutineRuns`, `Proposals`, `SeenItems` | Routines, their runs, what they propose and what they already met |
 
-- Rooms, desks and notes are mapped as owned entities, so they are always loaded
-  and saved with their aggregate.
-- Strongly typed ids are stored as GUIDs; `DateTimeOffset` as a sortable 64-bit
-  number, because SQLite cannot compare dates natively.
-- The schema evolves through migrations in `Persistence/Migrations`. The API
-  applies them at startup.
+- Rooms, desks, notes and the rest are owned entities, always loaded and saved
+  with their aggregate.
+- Strongly typed ids are stored as GUIDs; enums as text; `DateTimeOffset` as a
+  sortable 64-bit number, because SQLite cannot compare dates natively.
+- The schema evolves through migrations in `Persistence/Migrations`; the API
+  applies them at startup. A copy of the database is taken every day
+  (`Backups:*`).
 
 ### Adding a migration
 
@@ -118,6 +138,12 @@ Each task gets `git worktree add -b openspace/<title>-<key>` from the repository
   contained in the target.
 - Discard: remove worktree and branch.
 
-## Status
+## Claude Code
 
-Persistence, OpenCode, workspaces, queue and agent tools are done.
+Each prompt runs `claude -p` in the task's working copy with `--restricted`: the
+person's own Claude Code settings never apply, only the role's tools. Reading is
+always allowed; editing, commands and the web follow the role. Whatever the role
+does not allow outright goes through the `permission` tool of Openspace's MCP
+server and waits for the person. Its stream becomes the same agent signals as
+OpenCode's; later prompts resume the same conversation. It uses the account
+Claude Code is signed in with, and that account's limits.

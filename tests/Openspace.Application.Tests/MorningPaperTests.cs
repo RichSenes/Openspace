@@ -28,10 +28,10 @@ public sealed class MorningPaperTests : IDisposable
 
     private MorningPaper Paper() => new(_chat, _decider, _feeds, _printer, _images, _kanji);
 
-    private Routine Create(int perSection = 2, string? sections = null, string goodNews = "[]", string kanji = "{}", string language = "English")
+    private Routine Create(int perSection = 2, string? sections = null, string goodNews = "[]", string kanji = "{}", string language = "English", string extra = "")
     {
         var settings = $$"""
-            {"title":"Daily Bugle","subtitle":"デイリー","language":"{{language}}","folder":{{JsonSerializer.Serialize(_folder)}},"kanji":{{kanji}},
+            {{{extra}}"title":"Daily Bugle","subtitle":"デイリー","language":"{{language}}","folder":{{JsonSerializer.Serialize(_folder)}},"kanji":{{kanji}},
              "reader":"Likes cats and trains.","rules":["Be kind."],"perSection":{{perSection}},"goodNews":{{goodNews}},
              "sections":{{sections ?? """[{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"},{"name":"Courier","url":"https://courier.example/feed"}]}]"""}}}
             """;
@@ -167,6 +167,65 @@ public sealed class MorningPaperTests : IDisposable
         var opener = html[html.IndexOf("<div class=\"opener\"><h2>City</h2>", StringComparison.Ordinal)..];
         Assert.Matches("^<div class=\"opener\"><h2>City</h2>\\s*<article class=\"first\"><h3>About", opener);
         Assert.Contains("<p class=\"kicker\">Front page</p>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_reader_s_priorities_open_the_paper_before_a_bigger_story()
+    {
+        var routine = Create(perSection: 2, extra: "\"priorities\":[\"rents and the cost of living\"],");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Summit talks resume in a far capital"), Item("Gazette", "Tenants protest as rents climb")];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var front = html[html.IndexOf("<p class=\"kicker\">Front page</p>", StringComparison.Ordinal)..];
+        Assert.StartsWith("<p class=\"kicker\">Front page</p>", front, StringComparison.Ordinal);
+        Assert.Contains("About Tenants protest as rents climb", front[..front.IndexOf("</article>", StringComparison.Ordinal)], StringComparison.Ordinal);
+        Assert.Contains("rents and the cost of living", _decider.Questions[0]["priority"].Instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Topics_to_avoid_are_never_printed_not_even_as_good_news()
+    {
+        var routine = Create(goodNews: """["City"]""", extra: "\"avoid\":[\"television shows and celebrities\"],");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Dance show star wins the final")];
+
+        await RunAsync(routine);
+
+        Assert.DoesNotContain("Dance show", string.Join("\n", _chat.Prompts), StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"good\"", Html(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_section_with_a_condition_prints_only_what_meets_it_in_its_own_style()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","only":"it happened in the town","style":"Tease the local team kindly.",
+              "feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Abroad: tram fares fall in a far town"), Item("Gazette", "Tram line opens")];
+
+        await RunAsync(routine);
+
+        var prompts = string.Join("\n", _chat.Prompts);
+        Assert.DoesNotContain("Abroad", prompts, StringComparison.Ordinal);
+        Assert.Contains("For this section: Tease the local team kindly.", prompts, StringComparison.Ordinal);
+        Assert.Equal("Does it meet this condition: it happened in the town?", _decider.Questions[0]["fits"].Instructions);
+    }
+
+    [Fact]
+    public void Items_with_the_section_s_keywords_make_the_shortlist_before_newer_ones()
+    {
+        var section = new PaperSettings.Section("Italy", "Italy.", [], Keywords: ["scioper", "caro vita"]);
+        var items = Enumerable.Range(1, 14).Select(i => Item("Wire", $"Wire story {i}", hoursAgo: i)).ToList();
+        items.Add(Item("Union", "Lo sciopero generale di domani", hoursAgo: 20));
+        items.Add(Item("Daily", "Families and the cost", hoursAgo: 21, summary: "Il caro vita pesa sulle famiglie."));
+
+        var shortlist = MorningPaper.Shortlist(items, section);
+
+        Assert.Equal(12, shortlist.Count);
+        Assert.Equal(["Lo sciopero generale di domani", "Families and the cost"], shortlist.Take(2).Select(i => i.Title));
+        Assert.Equal(12, MorningPaper.Shortlist(items, section with { Keywords = null }).Count(i => i.Source == "Wire"));
     }
 
     [Fact]
@@ -388,19 +447,38 @@ public sealed class MorningPaperTests : IDisposable
     {
         public int Asked { get; private set; }
 
+        public List<IReadOnlyDictionary<string, DecisionQuestion>> Questions { get; } = [];
+
         public bool Available => true;
 
         public Task<IReadOnlyDictionary<string, Decision>> DecideAsync(string state, IReadOnlyDictionary<string, DecisionQuestion> questions, CancellationToken cancellationToken)
         {
             Asked++;
             bool Has(string word) => state.Contains(word, StringComparison.OrdinalIgnoreCase);
-            return Task.FromResult<IReadOnlyDictionary<string, Decision>>(new Dictionary<string, Decision>
+            Questions.Add(questions);
+            var answers = new Dictionary<string, Decision>
             {
                 ["news"] = new(Has("Opinion") ? "false" : "true", 0.9, false),
-                ["importance"] = new(Has("strike") ? "high" : "low", 0.9, false),
-                ["interest"] = new(Has("Cat") || Has("Tram") || Has("strike") || Has("bridge") ? "true" : "false", 0.9, false),
-                ["hopeful"] = new(Has("reopens") ? "true" : "false", 0.9, false),
-            });
+                ["importance"] = new(Has("strike") || Has("Summit") ? "high" : Has("reopens") || Has("protest") || Has("wins") ? "medium" : "low", 0.9, false),
+                ["interest"] = new(Has("Cat") || Has("Tram") || Has("strike") || Has("bridge") || Has("protest") ? "true" : "false", 0.9, false),
+                ["hopeful"] = new(Has("reopens") || Has("wins") ? "true" : "false", 0.9, false),
+            };
+            if (questions.ContainsKey("priority"))
+            {
+                answers["priority"] = new(Has("protest") || Has("rent") ? "true" : "false", 0.9, false);
+            }
+
+            if (questions.ContainsKey("avoid"))
+            {
+                answers["avoid"] = new(Has("show") ? "true" : "false", 0.9, false);
+            }
+
+            if (questions.ContainsKey("fits"))
+            {
+                answers["fits"] = new(Has("Abroad") ? "false" : "true", 0.9, false);
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<string, Decision>>(answers);
         }
     }
 

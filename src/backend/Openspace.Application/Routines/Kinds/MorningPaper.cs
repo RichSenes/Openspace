@@ -38,12 +38,18 @@ public sealed partial class MorningPaper(
             "Keep facts apart from opinions, and never add facts that are not in the items.",
             "Plain words, short sentences, no jargon. A light joke now and then, never about tragedies."
           ],
+          "priorities": [],
+          "avoid": [],
           "hoursBack": 24,
           "perSection": 4,
           "goodNews": ["World"],
           "kanji": { "enabled": false, "fromGrade": 1 },
           "sections": [
-            { "name": "World", "about": "What happened in the world.", "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ] }
+            {
+              "name": "World", "about": "What happened in the world.",
+              "only": "", "keywords": [], "style": "",
+              "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ]
+            }
           ]
         }
         """;
@@ -65,7 +71,7 @@ public sealed partial class MorningPaper(
         foreach (var section in settings.Sections)
         {
             var fresh = await GatherAsync(context, section, since, pool, cancellationToken).ConfigureAwait(false);
-            pool.AddRange(fresh.OrderByDescending(i => i.Published).Take(Candidates).Select(i => new Candidate(i, section)));
+            pool.AddRange(Shortlist(fresh, section).Select(i => new Candidate(i, section)));
         }
 
         if (pool.Count == 0)
@@ -76,12 +82,21 @@ public sealed partial class MorningPaper(
         Relate(pool);
         await JudgeAsync(context, settings, pool, cancellationToken).ConfigureAwait(false);
 
-        var news = pool.Where(c => c.Judgement.News >= 0.5).ToList();
-        var lead = news.OrderByDescending(c => c.Score).FirstOrDefault()
-            ?? pool.OrderByDescending(c => c.Related.Count).ThenByDescending(c => c.Item.Published).First();
+        // Never printed: what the reader asked to avoid, and items that do not belong to their section.
+        var printable = pool.Where(c => c.Judgement.Avoid < 0.6 && c.Judgement.Fits >= 0.4).ToList();
+        if (printable.Count == 0)
+        {
+            return "Nothing new to print today.";
+        }
+
+        var news = printable.Where(c => c.Judgement.News >= 0.5).ToList();
+        var lead = news.OrderByDescending(c => c.LeadScore).FirstOrDefault()
+            ?? printable.OrderByDescending(c => c.Related.Count).ThenByDescending(c => c.Item.Published).First();
         var used = new HashSet<Candidate>(lead.Related.Append(lead));
-        var good = news.Where(c => !used.Contains(c) && c.Judgement.Hopeful >= 0.6 && settings.GoodNewsFrom(c.Section))
-            .OrderByDescending(c => c.Judgement.Hopeful * c.Judgement.News).FirstOrDefault();
+
+        // Good news is about something that matters, not just something pleasant.
+        var good = news.Where(c => !used.Contains(c) && c.Judgement.Hopeful >= 0.6 && c.Judgement.Importance >= 0.5 && settings.GoodNewsFrom(c.Section))
+            .OrderByDescending(c => c.Judgement.Hopeful * c.Judgement.News * (0.5 + c.Judgement.Importance)).FirstOrDefault();
         if (good is not null)
         {
             used.UnionWith(good.Related.Append(good));
@@ -94,8 +109,8 @@ public sealed partial class MorningPaper(
         foreach (var section in settings.Sections)
         {
             var chosen = new List<Candidate>();
-            foreach (var candidate in pool
-                         .Where(c => c.Section == section && !used.Contains(c) && c.Judgement.News >= 0.5 && c.Judgement.Interest >= 0.35)
+            foreach (var candidate in printable
+                         .Where(c => c.Section == section && !used.Contains(c) && c.Judgement.News >= 0.5 && (c.Judgement.Interest >= 0.35 || c.Judgement.Priority >= 0.6))
                          .OrderByDescending(c => c.Score))
             {
                 if (chosen.Count == settings.PerSection)
@@ -197,6 +212,20 @@ public sealed partial class MorningPaper(
         return fresh;
     }
 
+    /// <summary>
+    /// The items of a section the decider weighs: those mentioning one of the section's
+    /// keywords first, so that what the reader looks for is never crowded out by the
+    /// newest wire stories, then the newest.
+    /// </summary>
+    public static List<FeedItem> Shortlist(IEnumerable<FeedItem> fresh, PaperSettings.Section section) =>
+        [.. fresh.OrderByDescending(i => Mentions(i, section.Keywords)).ThenByDescending(i => i.Published).Take(Candidates)];
+
+    /// <summary>Whether the title or summary contains one of the keywords, as words or the start of words.</summary>
+    public static bool Mentions(FeedItem item, IReadOnlyList<string>? keywords) =>
+        keywords is { Count: > 0 }
+        && $"{item.Title} {item.Summary}".ToLowerInvariant() is var text
+        && keywords.Any(k => !string.IsNullOrWhiteSpace(k) && text.Contains(k.Trim().ToLowerInvariant(), StringComparison.Ordinal));
+
     /// <summary>Links each item to the others telling the same story, by the words their titles share.</summary>
     private static void Relate(List<Candidate> pool)
     {
@@ -231,15 +260,6 @@ public sealed partial class MorningPaper(
             return;
         }
 
-        var questions = new Dictionary<string, DecisionQuestion>
-        {
-            ["news"] = new("boolean", "Is this a news report about something new that happened in the last day or two? Opinions, interviews, analyses, reviews, events announced long ahead and plain statements of how things are do not count."),
-            ["importance"] = new("choice", "How important is this news today, for the people of the country or of the world it concerns?",
-                [new("high", "Many people talk about it or are touched by it today."), new("medium", "It matters to some people."), new("low", "A curiosity or a niche fact.")]),
-            ["interest"] = new("boolean", $"Would this reader want to read it? The reader: {settings.Reader}"),
-            ["hopeful"] = new("boolean", "Is this good news: something positive, a solution, a step forward, a reason for hope?"),
-        };
-
         var judged = 0;
         foreach (var candidate in pool)
         {
@@ -247,8 +267,13 @@ public sealed partial class MorningPaper(
             try
             {
                 var answers = await decider.DecideAsync(
-                    $"{candidate.Item.Source}, section {candidate.Section.Name}: {candidate.Item.Title}\n\n{candidate.Item.Summary}", questions, cancellationToken).ConfigureAwait(false);
-                candidate.Judgement = new Judgement(Yes(answers, "news"), Importance(answers), Yes(answers, "interest"), Yes(answers, "hopeful"));
+                    $"{candidate.Item.Source}, section {candidate.Section.Name}: {candidate.Item.Title}\n\n{candidate.Item.Summary}",
+                    Questions(settings, candidate.Section), cancellationToken).ConfigureAwait(false);
+                candidate.Judgement = new Judgement(
+                    Yes(answers, "news"), Importance(answers), Yes(answers, "interest"), Yes(answers, "hopeful"),
+                    answers.ContainsKey("priority") ? Yes(answers, "priority") : 0.5,
+                    answers.ContainsKey("avoid") ? Yes(answers, "avoid") : 0,
+                    answers.ContainsKey("fits") ? Yes(answers, "fits") : 1);
                 judged++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -259,6 +284,41 @@ public sealed partial class MorningPaper(
         }
 
         context.Write($"Judged {judged} of {pool.Count} items.");
+    }
+
+    /// <summary>
+    /// What the decider is asked about an item: always whether it is news, how much it
+    /// matters, whether the reader cares and whether it is good news; then, when the
+    /// settings say so, whether it is about the reader's priorities, about something to
+    /// avoid, and whether it belongs to its section at all.
+    /// </summary>
+    public static Dictionary<string, DecisionQuestion> Questions(PaperSettings settings, PaperSettings.Section section)
+    {
+        var questions = new Dictionary<string, DecisionQuestion>
+        {
+            ["news"] = new("boolean", "Is this a news report about something new that happened in the last day or two? Opinions, interviews, analyses, reviews, events announced long ahead and plain statements of how things are do not count."),
+            ["importance"] = new("choice", "How important is this news today, for the people of the country or of the world it concerns?",
+                [new("high", "Many people talk about it or are touched by it today."), new("medium", "It matters to some people."), new("low", "A curiosity or a niche fact.")]),
+            ["interest"] = new("boolean", $"Would this reader want to read it? The reader: {settings.Reader}"),
+            ["hopeful"] = new("boolean", "Is this good news about something that matters: a solution, a step forward, rights won, help given, a reason for hope? Entertainment, shows and celebrities do not count."),
+        };
+        var priorities = (settings.Priorities ?? []).Concat(section.Focus ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+        if (priorities.Count > 0)
+        {
+            questions["priority"] = new("boolean", $"Is it mainly about one of these topics: {string.Join("; ", priorities)}?");
+        }
+
+        if (settings.Avoid is { Count: > 0 } avoid)
+        {
+            questions["avoid"] = new("boolean", $"Is it mainly about one of these topics: {string.Join("; ", avoid)}?");
+        }
+
+        if (!string.IsNullOrWhiteSpace(section.Only))
+        {
+            questions["fits"] = new("boolean", $"Does it meet this condition: {section.Only}?");
+        }
+
+        return questions;
     }
 
     private static double Yes(IReadOnlyDictionary<string, Decision> answers, string key) =>
@@ -302,7 +362,8 @@ public sealed partial class MorningPaper(
         RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> items, CancellationToken cancellationToken) =>
         WriteAsync(
             context, settings, items, $"the section {section.Name} ({section.About})",
-            "Write one short article per story (items about the same fact make one article), each with a headline and two to four sentences.",
+            "Write one short article per story (items about the same fact make one article), each with a headline and two to four sentences."
+            + (string.IsNullOrWhiteSpace(section.Style) ? string.Empty : $" For this section: {section.Style.Trim()}"),
             settings.PerSection, cancellationToken);
 
     private async Task<List<PaperArticle>> WriteAsync(
@@ -545,7 +606,10 @@ public sealed partial class MorningPaper(
     private sealed record ArticlesAnswer(List<PaperArticle>? Articles);
 
     /// <summary>What the decider said about an item, each from 0 to 1.</summary>
-    private sealed record Judgement(double News, double Importance, double Interest, double Hopeful)
+    /// <param name="Priority">About the reader's priorities, or the section's focus; 0.5 when not asked.</param>
+    /// <param name="Avoid">About a topic the reader never wants; 0 when not asked.</param>
+    /// <param name="Fits">Meets the section's condition; 1 when it has none.</param>
+    private sealed record Judgement(double News, double Importance, double Interest, double Hopeful, double Priority = 0.5, double Avoid = 0, double Fits = 1)
     {
         public static readonly Judgement Unknown = new(0.6, 0.5, 0.5, 0);
     }
@@ -561,8 +625,13 @@ public sealed partial class MorningPaper(
 
         public Judgement Judgement { get; set; } = Judgement.Unknown;
 
-        /// <summary>How much it deserves a place: importance first, then the reader's interest, then how many outlets carry it.</summary>
-        public double Score => (Judgement.Importance * 0.45) + (Judgement.Interest * 0.35) + (Math.Min(Related.Count, 3) / 3.0 * 0.2);
+        /// <summary>How much it deserves a place in its section: importance, the reader's priorities and interest, how many outlets carry it.</summary>
+        public double Score => (Judgement.Importance * 0.35) + (Judgement.Priority * 0.25) + (Judgement.Interest * 0.25) + (Coverage * 0.15);
+
+        /// <summary>How much it deserves to open the paper: the reader's priorities weigh most, then importance.</summary>
+        public double LeadScore => (Judgement.Priority * 0.4) + (Judgement.Importance * 0.3) + (Judgement.Interest * 0.15) + (Coverage * 0.15);
+
+        private double Coverage => Math.Min(Related.Count, 3) / 3.0;
     }
 }
 
@@ -588,7 +657,7 @@ public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Artic
 public sealed record PaperSettings(
     string Title, string Subtitle, string Language, string Model, string Folder, string Reader,
     IReadOnlyList<string> Rules, int HoursBack, int PerSection, IReadOnlyList<PaperSettings.Section> Sections,
-    IReadOnlyList<string>? GoodNews = null)
+    IReadOnlyList<string>? GoodNews = null, IReadOnlyList<string>? Priorities = null, IReadOnlyList<string>? Avoid = null)
 {
     /// <summary>Whether the good news of the day may come from this section: from any, unless some are named.</summary>
     public bool GoodNewsFrom(Section section) =>
@@ -596,7 +665,13 @@ public sealed record PaperSettings(
 
     public sealed record Feed(string Name, string Url);
 
-    public sealed record Section(string Name, string About, IReadOnlyList<Feed> Feeds);
+    /// <param name="Only">A condition every item must meet to be printed here, such as "it happened in Italy"; empty for none.</param>
+    /// <param name="Focus">Topics this section looks out for, on top of the reader's priorities.</param>
+    /// <param name="Keywords">Words, or starts of words, that put an item on the shortlist before newer ones.</param>
+    /// <param name="Style">How to write this section, on top of the paper's rules.</param>
+    public sealed record Section(
+        string Name, string About, IReadOnlyList<Feed> Feeds,
+        string? Only = null, IReadOnlyList<string>? Focus = null, IReadOnlyList<string>? Keywords = null, string? Style = null);
 
     public static PaperSettings Read(JsonElement json)
     {
@@ -615,6 +690,8 @@ public sealed record PaperSettings(
             Folder = string.IsNullOrWhiteSpace(read.Folder) ? "~/Documents/Morning paper" : read.Folder.Trim(),
             Reader = read.Reader?.Trim() ?? string.Empty,
             Rules = read.Rules ?? [],
+            Priorities = [.. (read.Priorities ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())],
+            Avoid = [.. (read.Avoid ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())],
             HoursBack = read.HoursBack is > 0 and <= 24 * 7 ? read.HoursBack : 24,
             PerSection = read.PerSection is > 0 and <= 10 ? read.PerSection : 4,
             Sections = [.. read.Sections.Where(s => s.Feeds is { Count: > 0 })],

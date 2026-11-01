@@ -260,6 +260,16 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   with a short note. The page is printed to PDF, numbered from the highest number
   kept in `folder`, saved with its HTML, and delivered through `channel`. A feed
   that fails is logged and skipped.
+  - `priorities`: topics the reader cares about most. The front page goes to the story
+    that is most about them, then the most important; in sections they count as much
+    as the reader's interest. Each section can add its own `focus`.
+  - `avoid`: topics never printed anywhere, good news included.
+  - In each section, `only` is a condition every item must meet to be printed there
+    ("it happened in Italy"), `keywords` are words or starts of words that put an item
+    among the twelve the decider weighs before newer ones, and `style` says how to
+    write that section on top of `rules`.
+  - The good news of the day comes from the sections in `goodNews`, and must matter
+    (medium importance at least): shows and celebrities do not count.
 - **Kanji of the day**, in the paper when its settings say `"kanji": { "enabled":
   true, "fromGrade": 1 }`: one kanji a day of the common use list, by school year
   and the most common first, never one explained before or one the person knows.

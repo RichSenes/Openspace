@@ -6,7 +6,7 @@ namespace Openspace.Application.Offices;
 /// <param name="Furniture">The furniture of the common floor, in pixels from the building's corner.</param>
 /// <param name="PrivatePaths">Folders no agent of the office may touch in any way.</param>
 /// <param name="LocalOnly">The project stays on this machine: no push, no pull request.</param>
-/// <param name="ReserveModels">OpenCode models that go on with tasks while their desk's account is over its limits, in order.</param>
+/// <param name="ReserveModels">Models that go on with tasks while their desk's account is over its limits, in order: OpenCode's <c>provider/model</c> or <c>claude-code/</c> and a Claude model.</param>
 /// <param name="Cuts">The pieces cut out of the building's rectangle, in tiles from its corner.</param>
 public sealed record OfficeView(
     Guid Id,

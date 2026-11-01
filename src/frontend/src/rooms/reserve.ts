@@ -13,9 +13,17 @@ export function parseReserve(text: string): string[] {
   return models
 }
 
-/** The models OpenCode does not list: a typo, or a provider not connected yet. */
-export function unknownModels(models: string[], known: ModelOption[] | undefined): string[] {
-  if (!known || known.length === 0) return []
-  const ids = new Set(known.map((m) => m.id))
-  return models.filter((m) => !ids.has(m))
+/** How a reserve on Claude Code is written, before its model: claude-code/sonnet. */
+export const CLAUDE_RESERVE = 'claude-code/'
+
+/**
+ * The models nobody lists: a typo, or a provider not connected yet. OpenCode's are checked
+ * against OpenCode's list, Claude Code's (claude-code/sonnet) against Claude Code's.
+ */
+export function unknownModels(models: string[], openCode: ModelOption[] | undefined, claude?: ModelOption[]): string[] {
+  const known = (list: ModelOption[] | undefined) => (list && list.length > 0 ? new Set(list.map((m) => m.id)) : undefined)
+  const [open, code] = [known(openCode), known(claude)]
+  return models.filter((m) =>
+    m.startsWith(CLAUDE_RESERVE) ? code !== undefined && !code.has(m.slice(CLAUDE_RESERVE.length)) : open !== undefined && !open.has(m),
+  )
 }

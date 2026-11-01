@@ -458,13 +458,16 @@ now" in Settings ends Claude's pause early once the account answers again.
 
 ### Reserve models
 
-An office can list up to four OpenCode models as reserves
+An office can list up to four reserves
 (`PUT /api/offices/{id}/reserve-models` with `{ "models": ["provider/model"] }`,
-or Rooms). When a queued task's desk is paused, the queue hands it to the first
+or Rooms): OpenCode models, or Claude Code written as `claude-code/` and one of its
+models (`claude-code/sonnet`). A reserve on the same account as the paused desk is
+skipped: OpenCode's free models share one limit, so one cannot stand in for another. When a queued task's desk is paused, the queue hands it to the first
 reserve whose own provider is neither paused nor the desk's, writes a note on the
 task and shows the model in its `reserveModel`. An OpenCode desk keeps its agent
 with the reserve model; a Claude Code desk lends its role, instructions and
-private folders to OpenCode's `build` agent, which takes over the session. A
+private folders to OpenCode's `build` agent, which takes over the session. A Claude Code reserve takes over in a new Claude Code session,
+with the desk's role, instructions and private folders. A
 reserve over its limits hands over to the next one; once the desk's account is
 back, the task returns to it the next time it is queued. Free tiers may keep what
 they are sent, so an office kept on this machine (`localOnly`) cannot have

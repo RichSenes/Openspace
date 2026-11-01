@@ -44,6 +44,35 @@ public sealed partial record AgentProfile
         return new AgentProfile(name, engine == AgentEngine.ClaudeCode ? ValidClaudeModel(model) : ValidModel(model), engine);
     }
 
+    /// <summary>How a reserve on Claude Code is written, before its model: <c>claude-code/sonnet</c>.</summary>
+    public const string ClaudeReserve = "claude-code/";
+
+    /// <summary>
+    /// A trimmed reserve model, or null when none is given: OpenCode's <c>provider/model</c>,
+    /// or Claude Code's <c>claude-code/</c> followed by one of its models.
+    /// </summary>
+    public static string? ValidReserve(string? reserve)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(reserve) ? null : reserve.Trim();
+        if (trimmed is null || !trimmed.StartsWith(ClaudeReserve, StringComparison.Ordinal))
+        {
+            return ValidModel(trimmed);
+        }
+
+        return ValidClaudeModel(trimmed[ClaudeReserve.Length..]) is { } model
+            ? ClaudeReserve + model
+            : throw new DomainException($"Reserve '{trimmed}' needs a Claude model after {ClaudeReserve}, such as {ClaudeReserve}sonnet.");
+    }
+
+    /// <summary>The agent a reserve model runs as: Claude Code for <c>claude-code/</c> ones, OpenCode's agent otherwise.</summary>
+    public static AgentProfile ForReserve(string reserve, string agentName)
+    {
+        var valid = ValidReserve(reserve) ?? throw new DomainException("A reserve model is needed.");
+        return valid.StartsWith(ClaudeReserve, StringComparison.Ordinal)
+            ? Create(agentName, valid[ClaudeReserve.Length..], AgentEngine.ClaudeCode)
+            : Create(agentName, valid);
+    }
+
     /// <summary>A trimmed Claude Code model name or alias, or null when none is given.</summary>
     internal static string? ValidClaudeModel(string? model)
     {

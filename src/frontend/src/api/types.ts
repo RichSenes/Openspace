@@ -256,6 +256,8 @@ export interface SettingsView {
   claudeReviews: boolean
   reviewModel: string | null
   draftModel: string | null
+  /** OpenCode model that reviews finished work when Claude Code does not; null for no review. */
+  openCodeReviewModel?: string | null
 }
 
 export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Procedure' | 'Other'

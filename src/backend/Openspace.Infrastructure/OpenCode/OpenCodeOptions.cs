@@ -13,6 +13,12 @@ public sealed class OpenCodeOptions
     /// <summary>Model used for drafts and supervisor plans; null means OpenCode's default.</summary>
     public string? DraftModel { get; set; }
 
+    /// <summary>
+    /// Model that reviews finished work when Claude Code does not; none means no review by
+    /// OpenCode. A model of a company subscription (such as GitHub Copilot's) fits here.
+    /// </summary>
+    public string? ReviewModel { get; set; }
+
     /// <summary>Follow the server's event stream. Off in tests.</summary>
     public bool ListenToEvents { get; set; } = true;
 }

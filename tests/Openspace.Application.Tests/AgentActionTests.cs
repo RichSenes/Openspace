@@ -81,6 +81,41 @@ public class AgentActionTests
         Assert.Null(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.Fetch, "https://example.org/docs"), Workspace));
     }
 
+    private const string WindowsWorkspace = @"C:\Users\darlene\openspace\worktrees\a1b2c3d4e5";
+
+    [Theory]
+    [InlineData(@"type C:\Users\darlene\openspace\worktrees\a1b2c3d4e5\README.md")]
+    [InlineData(@"dir c:/users/DARLENE/openspace/worktrees/a1b2c3d4e5/src")]
+    [InlineData("dotnet test")]
+    public void On_windows_work_inside_the_copy_needs_nobody_whatever_the_slashes_or_case(string command)
+    {
+        Assert.Null(PermissionPolicy.NeedsPerson(Run(command), WindowsWorkspace));
+        Assert.Null(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.Edit, @"c:\users\darlene\openspace\worktrees\a1b2c3d4e5\src\App.cs"), WindowsWorkspace));
+        Assert.Null(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.Edit, "C:/Users/darlene/openspace/worktrees/a1b2c3d4e5/src/App.cs"), WindowsWorkspace));
+    }
+
+    [Theory]
+    [InlineData(@"type D:\Company\payroll.xlsx")]
+    [InlineData(@"cd C:\Users\darlene\repos\shop && git status")]
+    [InlineData(@"dir %USERPROFILE%\Documents")]
+    [InlineData(@"Get-ChildItem $env:USERPROFILE")]
+    public void On_windows_reaching_outside_the_copy_still_needs_a_person(string command)
+    {
+        Assert.Contains("outside", PermissionPolicy.NeedsPerson(Run(command), WindowsWorkspace), StringComparison.Ordinal);
+        Assert.NotNull(PermissionPolicy.NeedsPerson(new AgentAction(ActionKind.Edit, @"C:\Users\darlene\repos\shop\App.cs"), WindowsWorkspace));
+        Assert.Contains("climbs above", PermissionPolicy.NeedsPerson(Run(@"type ..\..\secrets.txt"), WindowsWorkspace, guarded: true), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_windows_private_folder_is_found_with_either_slash_and_in_any_case()
+    {
+        string[] folders = [@"C:\Users\darlene\Pictures"];
+
+        Assert.Equal(folders[0], PermissionPolicy.PrivateFolder(Run(@"dir c:\users\darlene\pictures\holiday"), folders));
+        Assert.Equal(folders[0], PermissionPolicy.PrivateFolder(new AgentAction(ActionKind.OutsideFolder, "C:/Users/darlene/Pictures/a.png"), folders));
+        Assert.Null(PermissionPolicy.PrivateFolder(Run(@"dir C:\Users\darlene\Music"), folders));
+    }
+
     [Theory]
     [InlineData("cat ../../media/library/prompts.db")]
     [InlineData("cd .. && ls")]

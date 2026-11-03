@@ -9,7 +9,8 @@ namespace Openspace.Infrastructure.ClaudeCode;
 
 /// <summary>
 /// Sends each call to the engine it belongs to: a desk's own engine for its sessions,
-/// Claude Code for plans, drafts and reviews when it is there, OpenCode otherwise.
+/// Claude Code for plans, drafts and reviews when it is there, OpenCode otherwise (reviews
+/// only when a review model is set for it).
 /// </summary>
 internal sealed partial class AgentRuntimeRouter(
     OpenCodeRuntime openCode,
@@ -90,9 +91,10 @@ internal sealed partial class AgentRuntimeRouter(
     public async Task<string?> ReviewAsync(
         string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
     {
+        // Claude Code reviews when it is there and asked to; else OpenCode, when a review model is set.
         if (!options.CurrentValue.Review || !await claude.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
-            return null;
+            return await openCode.ReviewAsync(folder, instructions, text, jsonSchema, privatePaths, cancellationToken).ConfigureAwait(false);
         }
 
         return await claude.AskAsync(folder, instructions, text, jsonSchema, ReviewTools, ReviewAllowed, ClaudeCodeOptions.ModelOrDefault(options.CurrentValue.ReviewModel), cancellationToken, privatePaths)

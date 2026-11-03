@@ -143,17 +143,17 @@ export function Board({ office, initialTaskId }: Props) {
                           )}
                           {verdict === 'reviewing' && (
                             <span className="card-review">
-                              <Hourglass size={12} aria-hidden /> Claude is reviewing…
+                              <Hourglass size={12} aria-hidden /> Being reviewed…
                             </span>
                           )}
                           {verdict === 'ok' && (
                             <span className="card-review card-review-ok">
-                              <Check size={12} aria-hidden /> Claude: ready to accept
+                              <Check size={12} aria-hidden /> Review: ready to accept
                             </span>
                           )}
                           {verdict === 'changes' && (
                             <span className="card-review card-review-changes">
-                              <TriangleAlert size={12} aria-hidden /> Claude: changes suggested
+                              <TriangleAlert size={12} aria-hidden /> Review: changes suggested
                             </span>
                           )}
                           {checks.total > 0 && (task.status === 'Review' || task.status === 'Done') && (

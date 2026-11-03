@@ -67,6 +67,43 @@ internal sealed class OpenCodeRuntime(
         using var schema = JsonDocument.Parse(jsonSchema);
         var format = new { type = "json_schema", schema = schema.RootElement, retryCount = 2 };
         using var reply = await AskReadOnlyAsync(folder, "Openspace plan", instructions, text, format, cancellationToken, privatePaths).ConfigureAwait(false);
+        return Structured(reply, "plan");
+    }
+
+    /// <summary>
+    /// A review of finished work by <see cref="OpenCodeOptions.ReviewModel"/>, in a session that
+    /// may read the working copy but runs nothing: the changes travel with the question, as
+    /// git shows them. Null when no review model is set.
+    /// </summary>
+    public async Task<string?> ReviewAsync(
+        string folder, string instructions, string text, string jsonSchema, IReadOnlyList<string> privatePaths, CancellationToken cancellationToken)
+    {
+        if (options.CurrentValue.ReviewModel is not { Length: > 0 } model)
+        {
+            return null;
+        }
+
+        var changes = await ChangesAsync(folder, cancellationToken).ConfigureAwait(false);
+        var question = $"{text}\n\nYou cannot run commands here: these are the changes, as git diff HEAD shows them, new files included.\n\n```diff\n{changes}\n```";
+        using var schema = JsonDocument.Parse(jsonSchema);
+        var format = new { type = "json_schema", schema = schema.RootElement, retryCount = 2 };
+        using var reply = await AskReadOnlyAsync(folder, "Openspace review", instructions, question, format, cancellationToken, privatePaths, model).ConfigureAwait(false);
+        return Structured(reply, "review");
+    }
+
+    /// <summary>Most of a diff a review is sent: enough for a task's work, never a whole repository.</summary>
+    internal const int MostChanges = 60_000;
+
+    /// <summary>What the agent changed in its working copy, new files included, cut when very long.</summary>
+    private static async Task<string> ChangesAsync(string folder, CancellationToken cancellationToken)
+    {
+        await Git.GitCli.RunAsync(folder, cancellationToken, "add", "--intent-to-add", "--all").ConfigureAwait(false);
+        var diff = await Git.GitCli.RunAsync(folder, cancellationToken, "diff", "HEAD").ConfigureAwait(false);
+        return diff.Length <= MostChanges ? diff : $"{diff[..MostChanges]}\n[… the rest of the diff is left out: read the files you need]";
+    }
+
+    private static string Structured(JsonDocument reply, string what)
+    {
         var info = reply.RootElement.GetProperty("info");
         if (info.TryGetProperty("structured", out var structured) && structured.ValueKind == JsonValueKind.Object)
         {
@@ -76,7 +113,7 @@ internal sealed class OpenCodeRuntime(
         var error = info.TryGetProperty("error", out var e) && e.TryGetProperty("data", out var data) && data.TryGetProperty("message", out var m)
             ? m.GetString()
             : "no structured answer";
-        throw new InvalidOperationException($"The model did not return a plan ({error}).");
+        throw new InvalidOperationException($"The model did not return a {what} ({error}).");
     }
 
     /// <summary>
@@ -84,7 +121,8 @@ internal sealed class OpenCodeRuntime(
     /// or use the web. The session is deleted afterwards.
     /// </summary>
     private async Task<JsonDocument> AskReadOnlyAsync(
-        string folder, string title, string instructions, string text, object? format, CancellationToken cancellationToken, IReadOnlyList<string>? privatePaths = null)
+        string folder, string title, string instructions, string text, object? format, CancellationToken cancellationToken,
+        IReadOnlyList<string>? privatePaths = null, string? model = null)
     {
         var sessionId = await CreateSessionAsync(
             folder,
@@ -93,7 +131,7 @@ internal sealed class OpenCodeRuntime(
             cancellationToken).ConfigureAwait(false);
         try
         {
-            var model = options.CurrentValue.DraftModel;
+            model ??= options.CurrentValue.DraftModel;
             var body = Message("plan", string.IsNullOrWhiteSpace(model) ? null : model, instructions, text);
             if (format is not null)
             {

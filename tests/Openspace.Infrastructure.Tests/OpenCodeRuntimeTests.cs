@@ -24,11 +24,11 @@ public class OpenCodeRuntimeTests
         }
     }
 
-    private static (OpenCodeRuntime Runtime, FakeServer Server) Create(Func<HttpRequestMessage, (HttpStatusCode, string)> answer)
+    private static (OpenCodeRuntime Runtime, FakeServer Server) Create(Func<HttpRequestMessage, (HttpStatusCode, string)> answer, string? reviewModel = null)
     {
         var server = new FakeServer(answer);
         var http = new HttpClient(server) { BaseAddress = new Uri("http://opencode.test/") };
-        var options = new LiveOptions<OpenCodeOptions>(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp") });
+        var options = new LiveOptions<OpenCodeOptions>(new OpenCodeOptions { ToolsUrl = new Uri("http://openspace.test/mcp"), ReviewModel = reviewModel });
         var workspaces = Microsoft.Extensions.Options.Options.Create(new Git.WorkspaceOptions { Root = Path.Combine(Path.GetTempPath(), "openspace-runtime-tests") });
         return (new OpenCodeRuntime(http, options, workspaces), server);
     }
@@ -249,5 +249,53 @@ public class OpenCodeRuntimeTests
             runtime.PlanAsync("/srv/repos/e-corp", "Split it.", "Request", """{"type":"object"}""", [], default));
 
         Assert.Contains("schema mismatch", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_review_by_an_opencode_model_reads_the_changes_it_cannot_run_git_for()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"openspace-review-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            await Git.GitCli.RunAsync(folder, default, "init", "--quiet");
+            await File.WriteAllTextAsync(Path.Combine(folder, "readme.md"), "Old line\n");
+            await Git.GitCli.RunAsync(folder, default, "add", "--all");
+            await Git.GitCli.RunAsync(folder, default, "-c", "user.name=Angela Moss", "-c", "user.email=angela@example.invalid", "commit", "--quiet", "--message", "Start");
+            await File.WriteAllTextAsync(Path.Combine(folder, "readme.md"), "New line\n");
+            await File.WriteAllTextAsync(Path.Combine(folder, "added.txt"), "A brand new file\n");
+            var (runtime, server) = Create(
+                r => r.RequestUri!.AbsolutePath switch
+                {
+                    "/session" => (HttpStatusCode.OK, """{"id":"ses_review"}"""),
+                    "/session/ses_review/message" => (HttpStatusCode.OK, """{"info":{"role":"assistant","structured":{"verdict":"ok","summary":"Fine.","findings":[]}},"parts":[]}"""),
+                    _ => (HttpStatusCode.OK, "true"),
+                },
+                reviewModel: "github-copilot/claude-sonnet");
+
+            var json = await runtime.ReviewAsync(folder, "Review it.", "Task: update the readme", """{"type":"object"}""", [], default);
+
+            Assert.Equal("""{"verdict":"ok","summary":"Fine.","findings":[]}""", json);
+            using var body = JsonDocument.Parse(server.Requests[1].Body!);
+            var root = body.RootElement;
+            Assert.Equal(("github-copilot", "claude-sonnet"), (root.GetProperty("model").GetProperty("providerID").GetString(), root.GetProperty("model").GetProperty("modelID").GetString()));
+            var question = root.GetProperty("parts")[0].GetProperty("text").GetString();
+            Assert.Contains("+New line", question, StringComparison.Ordinal);
+            Assert.Contains("+A brand new file", question, StringComparison.Ordinal);
+            Assert.Contains("\"deny\"", server.Requests[0].Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Without_a_review_model_opencode_reviews_nothing()
+    {
+        var (runtime, server) = Create(_ => (HttpStatusCode.OK, "true"));
+
+        Assert.Null(await runtime.ReviewAsync("/srv/worktrees/abc", "Review it.", "Task", """{"type":"object"}""", [], default));
+        Assert.Empty(server.Requests);
     }
 }

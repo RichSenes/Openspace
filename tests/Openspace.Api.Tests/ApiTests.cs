@@ -626,19 +626,20 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(["Back up first", "Log the change"], office.GetProperty("rooms")[0].GetProperty("procedure").EnumerateArray().Select(s => s.GetString()));
     }
 
-    private sealed record Settings(string Autonomy, int Seats, bool ClaudeSupervises, string? SupervisorModel, bool ClaudeReviews, string? ReviewModel, string? DraftModel);
+    private sealed record Settings(string Autonomy, int Seats, bool ClaudeSupervises, string? SupervisorModel, bool ClaudeReviews, string? ReviewModel, string? DraftModel, string? OpenCodeReviewModel = null);
 
     [Fact]
     public async Task Settings_changed_in_Openspace_apply_at_once_and_are_kept_in_a_file()
     {
         var before = await GetAsync<Settings>("/api/settings");
 
-        var put = await _http.PutAsJsonAsync("/api/settings", before with { Autonomy = "Ask", Seats = 3, SupervisorModel = " opus ", DraftModel = "" });
+        var put = await _http.PutAsJsonAsync("/api/settings", before with { Autonomy = "Ask", Seats = 3, SupervisorModel = " opus ", DraftModel = "", OpenCodeReviewModel = " github-copilot/claude-sonnet " });
         put.EnsureSuccessStatusCode();
         var after = await GetAsync<Settings>("/api/settings");
 
         Assert.Equal("Auto", before.Autonomy);
         Assert.Equal(("Ask", 3, "opus", (string?)null), (after.Autonomy, after.Seats, after.SupervisorModel, after.DraftModel));
+        Assert.Equal("github-copilot/claude-sonnet", after.OpenCodeReviewModel);
         Assert.Contains("\"Seats\": 3", await File.ReadAllTextAsync(_app.SettingsPath), StringComparison.Ordinal);
     }
 

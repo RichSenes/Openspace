@@ -21,8 +21,8 @@ public sealed partial class TaskReviewer(
     TimeProvider clock,
     ILogger<TaskReviewer> logger)
 {
-    /// <summary>How the reviewer signs its notes.</summary>
-    public const string Name = "Claude review";
+    /// <summary>How the reviewer signs its notes, whichever engine reads the work.</summary>
+    public const string Name = "Review";
 
     private const string Instructions = """
         You review the work of an AI agent before a person accepts it. You may read files and run
@@ -93,7 +93,7 @@ public sealed partial class TaskReviewer(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogReviewFailed(logger, ex, taskId.Value);
-            await NoteAsync(taskId, NoteAuthor.System, $"The review by Claude could not run ({ex.Message}). The work is ready for you anyway.", cancellationToken)
+            await NoteAsync(taskId, NoteAuthor.System, $"The review could not run ({ex.Message}). The work is ready for you anyway.", cancellationToken)
                 .ConfigureAwait(false);
             return;
         }

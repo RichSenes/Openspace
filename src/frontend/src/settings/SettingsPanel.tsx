@@ -109,6 +109,21 @@ function SettingsForm({ saved }: { saved: SettingsView }) {
     </label>
   )
 
+  const openCodeModel = (value: string | null, onChange: (model: string | null) => void, label: string, none: string) => (
+    <label className="field">
+      <span>{label}</span>
+      <select className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">{none}</option>
+        {value && !engines?.openCodeModels.some((m) => m.id === value) && <option value={value}>{value} (not listed now)</option>}
+        {engines?.openCodeModels.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+
   return (
     <form className="settings-form" onSubmit={submit}>
       <fieldset className="settings-card">
@@ -150,7 +165,7 @@ function SettingsForm({ saved }: { saved: SettingsView }) {
         <legend>
           <h2>Supervisor and reviewer</h2>
         </legend>
-        {!claude && <p className="hint">Claude Code is not on this machine: OpenCode plans, and nobody reviews before you.</p>}
+        {!claude && <p className="hint">Claude Code is not on this machine: OpenCode plans, and reviews when you choose a model for it below.</p>}
         <label className="choice">
           <input type="checkbox" checked={form.claudeSupervises} disabled={!claude} onChange={(e) => set({ claudeSupervises: e.target.checked })} />
           <span>
@@ -167,20 +182,17 @@ function SettingsForm({ saved }: { saved: SettingsView }) {
           </span>
         </label>
         {claudeModel(form.reviewModel, (reviewModel) => set({ reviewModel }), 'Model for reviews')}
-        <label className="field">
-          <span>OpenCode model for plans and drafts, when Claude Code does not make them</span>
-          <select className="input" value={form.draftModel ?? ''} onChange={(e) => set({ draftModel: e.target.value || null })}>
-            <option value="">OpenCode&apos;s default</option>
-            {form.draftModel && !engines?.openCodeModels.some((m) => m.id === form.draftModel) && (
-              <option value={form.draftModel}>{form.draftModel} (not listed now)</option>
-            )}
-            {engines?.openCodeModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {openCodeModel(form.draftModel ?? null, (draftModel) => set({ draftModel }), 'OpenCode model for plans and drafts, when Claude Code does not make them', "OpenCode's default")}
+        {openCodeModel(
+          form.openCodeReviewModel ?? null,
+          (openCodeReviewModel) => set({ openCodeReviewModel }),
+          'OpenCode model for reviews, when Claude Code does not review',
+          'No review by OpenCode',
+        )}
+        <p className="hint">
+          With a model of your company&apos;s subscription (GitHub Copilot&apos;s, say, once signed in to it in OpenCode), plans and reviews stay
+          on what your company allows. An OpenCode reviewer reads the changes and the files, and runs nothing.
+        </p>
       </fieldset>
 
       {save.error && <p className="error">{save.error.message}</p>}

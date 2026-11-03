@@ -188,7 +188,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
             )}
 
             {reviewVerdictOf(task, reviewerOn) === 'reviewing' && (
-              <p className="hint">Claude is reviewing this work: its verdict shows up in the notes in a few minutes.</p>
+              <p className="hint">The reviewer is reading this work: its verdict shows up in the notes in a few minutes.</p>
             )}
 
             <BuildsOn task={task} tasks={tasks} />
@@ -428,10 +428,10 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
                 className="btn"
                 disabled={sendBack.isPending}
                 onClick={() =>
-                  sendBack.mutate({ taskId: task.id, text: null, withReview: true }, { onSuccess: () => toast("Sent back with Claude's review") })
+                  sendBack.mutate({ taskId: task.id, text: null, withReview: true }, { onSuccess: () => toast('Sent back with the review') })
                 }
               >
-                Send back with Claude&apos;s review
+                Send back with the review
               </button>
             )}
             {actions.includes('send-back') && !writingFeedback && (
@@ -480,7 +480,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
               {review && (
                 <label className="check-row">
                   <input type="checkbox" checked={withReview} onChange={(e) => setWithReview(e.target.checked)} />
-                  <span>Send Claude&apos;s review along, after what you write</span>
+                  <span>Send the review along, after what you write</span>
                 </label>
               )}
               <div className="row">

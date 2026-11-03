@@ -39,7 +39,8 @@ public static partial class PermissionPolicy
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(privatePaths);
-        return privatePaths.FirstOrDefault(p => action.Target.Contains(p, StringComparison.Ordinal));
+        var target = Slashes(action.Target);
+        return privatePaths.FirstOrDefault(p => target.Contains(Slashes(p), Comparison(p)));
     }
 
     /// <param name="guarded">
@@ -71,7 +72,7 @@ public static partial class PermissionPolicy
             return "it touches a file that may hold secrets";
         }
 
-        return Path.IsPathRooted(path) && !Inside(path, workspacePath) ? "it changes a file outside the task's working copy" : null;
+        return Rooted(path) && !Inside(path, workspacePath) ? "it changes a file outside the task's working copy" : null;
     }
 
     private static string? CommandRisk(string command, string workspacePath)
@@ -82,7 +83,8 @@ public static partial class PermissionPolicy
         }
 
         if (HomePattern().IsMatch(command)
-            || AbsolutePathPattern().Matches(command).Any(m => !Inside(m.Value, workspacePath) && !HarmlessRoots.Any(r => m.Value.StartsWith(r, StringComparison.Ordinal))))
+            || AbsolutePathPattern().Matches(command).Any(m => !Inside(m.Value, workspacePath) && !HarmlessRoots.Any(r => m.Value.StartsWith(r, StringComparison.Ordinal)))
+            || WindowsPathPattern().Matches(command).Any(m => !Inside(m.Value, workspacePath)))
         {
             return "it reaches outside the task's working copy";
         }
@@ -128,25 +130,45 @@ public static partial class PermissionPolicy
         return null;
     }
 
+    /// <summary>
+    /// Whether a path lies in the working copy. Windows paths (with a drive letter) are read
+    /// with either slash and in any case, as Windows reads them.
+    /// </summary>
     private static bool Inside(string path, string workspacePath)
     {
-        var root = workspacePath.TrimEnd('/') + "/";
-        return path.StartsWith(root, StringComparison.Ordinal) || path == workspacePath.TrimEnd('/');
+        var (file, folder) = (Slashes(path), Slashes(workspacePath).TrimEnd('/'));
+        var comparison = Comparison(workspacePath);
+        return file.StartsWith(folder + "/", comparison) || string.Equals(file, folder, comparison);
     }
 
+    /// <summary>An absolute path on Linux or macOS, or on Windows (a drive letter, or a network share).</summary>
+    private static bool Rooted(string path) => path.StartsWith('/') || DrivePattern().IsMatch(path) || path.StartsWith(@"\\", StringComparison.Ordinal);
+
+    private static string Slashes(string path) => path.Replace('\\', '/');
+
+    private static StringComparison Comparison(string path) =>
+        DrivePattern().IsMatch(path) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    [GeneratedRegex(@"^[A-Za-z]:[\\/]")]
+    private static partial Regex DrivePattern();
+
     /// <summary>Environment files (not their examples), keys, keystores and credentials.</summary>
-    [GeneratedRegex(@"(^|[\s'""=/])\.\.(/|\s|$)")]
+    [GeneratedRegex(@"(^|[\s'""=/\\])\.\.([/\\]|\s|$)")]
     private static partial Regex ParentPathPattern();
 
     [GeneratedRegex(@"(^|[\s/'""=])\.env(\.(?!example|sample|template)[\w-]+)?($|[\s'""])|\.pem\b|\.p12\b|\.keystore\b|\.jks\b|id_rsa|id_ed25519|\.ssh/|credentials\.json|\.npmrc\b|\.netrc\b", RegexOptions.IgnoreCase)]
     private static partial Regex SecretPattern();
 
-    [GeneratedRegex(@"(^|[\s='""])(~|\$HOME|\$\{HOME\})(/|\s|$)")]
+    [GeneratedRegex(@"(^|[\s='""])(~|\$HOME|\$\{HOME\})(/|\s|$)|%USERPROFILE%|%HOMEPATH%|\$env:USERPROFILE|\$HOME\\", RegexOptions.IgnoreCase)]
     private static partial Regex HomePattern();
 
     /// <summary>Absolute paths: after a space, a quote or an equals sign, so "a/b" and "2>/dev/null" read right.</summary>
     [GeneratedRegex(@"(?<=(^|[\s'""=>]))/[^\s'""|;&)]+")]
     private static partial Regex AbsolutePathPattern();
+
+    /// <summary>Windows absolute paths in a command: a drive letter and a slash of either kind.</summary>
+    [GeneratedRegex(@"(?<=(^|[\s'""=>]))[A-Za-z]:[\\/][^\s'""|;&)]*")]
+    private static partial Regex WindowsPathPattern();
 
     [GeneratedRegex(@"(curl|wget)[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b")]
     private static partial Regex WebPipePattern();

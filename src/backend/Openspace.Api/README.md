@@ -205,6 +205,7 @@ On startup it applies pending database migrations.
 | `OpenCode:BaseUrl` | `http://127.0.0.1:4096` | Where `opencode serve` listens |
 | `OpenCode:ListenToEvents` | `true` | Follow the OpenCode event stream |
 | `OpenCode:DraftModel` | none | Model for AI drafts and supervisor plans when OpenCode makes them; none means OpenCode's default |
+| `OpenCode:ReviewModel` | none | Model that reviews finished work when Claude Code does not (not installed, or `ClaudeCode:Review` off), such as a model of a company's GitHub Copilot; none means no review by OpenCode. It reads the working copy in a session that runs nothing, with the changes (`git diff HEAD`, at most 60,000 characters) in its question |
 | `ClaudeCode:Enabled` | `true` | Use Claude Code where it is installed: desks may run on it, and it supervises and reviews |
 | `ClaudeCode:Command` | `claude` | The Claude Code command; it runs with the account it is signed in with, never with an API key of Openspace |
 | `ClaudeCode:Supervise` | `true` | Claude Code plans and drafts; when it fails (limits reached, say) OpenCode does it |

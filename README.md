@@ -12,7 +12,8 @@ doing, read its changes, accept or send them back, and merge. Agents run on
 [OpenCode](https://opencode.ai) (with any of its models, local ones included) or
 on [Claude Code](https://claude.com/claude-code) with your own account.
 
-> Version 0.9.0. It runs on Linux every day; macOS should work; on Windows use WSL.
+> Version 0.9.0. It runs on Linux every day; macOS should work. On Windows it runs in
+> WSL like on Linux, or natively with a PowerShell script (see [Windows](#windows)).
 
 ## What it is for
 
@@ -40,7 +41,7 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
 | [.NET SDK 10](https://dotnet.microsoft.com/download) | The API |
 | [Node.js 22](https://nodejs.org) or later | The page, and OpenCode |
 | [OpenCode](https://opencode.ai), with a model provider | The agents |
-| [Claude Code](https://claude.com/claude-code), signed in (optional) | Desks on Claude, plans and reviews by Claude; it uses your account and its limits, never an API key of Openspace |
+| [Claude Code](https://claude.com/claude-code), signed in (optional) | Desks on Claude, plans and reviews by Claude; it uses your account and its limits, never an API key of Openspace. Without it, OpenCode plans and, with a model chosen for it, reviews |
 | [GitHub CLI](https://cli.github.com), signed in (optional) | Pull requests and pushes |
 | Firefox and geckodriver (optional) | PDF pages of the routines |
 | An NVIDIA card and a llama.cpp server (optional) | Models on your own computer |
@@ -63,6 +64,42 @@ scripts/openspace start
 
 Then open <http://localhost:5173>. The first start builds the API and installs the
 page's packages, which takes a minute; the database is created on its own.
+
+### Windows
+
+The simplest way is WSL (`wsl --install`, then the steps above inside Ubuntu, with
+your repositories inside WSL too): everything works as on Linux and the page opens in
+the Windows browser. Natively, install the same tools for Windows, then in
+PowerShell:
+
+```powershell
+git clone https://github.com/RichSenes/Openspace.git
+cd Openspace
+scripts\openspace.ps1 start      # also stop, restart api, status, logs api
+```
+
+If PowerShell refuses scripts, run it as
+`powershell -ExecutionPolicy Bypass -File scripts\openspace.ps1 start`. Logs live in
+`%LOCALAPPDATA%\openspace\logs`. Native Windows is newer and less tried than Linux:
+permissions in auto mode read Windows paths (drive letters, either slash, any case),
+room checks run with `cmd.exe`, and local models on the graphics card are for Linux
+only.
+
+### With a company subscription
+
+Openspace only uses the models OpenCode knows, so what your company allows decides
+everything:
+
+- **GitHub Copilot**: `opencode auth login`, choose GitHub Copilot and sign in with
+  your work account; its models appear as `github-copilot/...` for desks, plans and
+  reviews. Your organisation's Copilot policy must allow them.
+- **A company model** (an OpenAI-compatible endpoint): add it as a provider in
+  OpenCode's configuration, with its key in an environment variable, and give it a
+  `limit.context` so Openspace knows how big its conversation can be.
+- **Without Claude Code**, choose in Settings → Supervisor and reviewer the OpenCode
+  model that plans and the one that reviews finished work before you.
+- Keep Openspace's own outside calls off if you want none: `Releases:Enabled=false`,
+  and no town for the weather.
 
 ### Your first office
 
@@ -123,8 +160,8 @@ scripts/openspace restart
    commands, the coffee machine on a break). Permissions are answered by
    Openspace or wait for you behind the **needs you** button.
 3. **When it stops**, the task goes to review with the agent's summary, the diff,
-   the checks you should try by hand and the tokens it spent. Claude reviews it
-   first when it is installed. Rooms can require a procedure whose steps the
+   the checks you should try by hand and the tokens it spent. A reviewer reads it
+   first: Claude Code when it is installed, or an OpenCode model you choose. Rooms can require a procedure whose steps the
    agent reports with evidence before review.
 4. **You decide**: accept (committed on the task branch), send back for another
    round, or discard. Accepted work merges into the branch you choose, in a
@@ -152,7 +189,7 @@ More of what it does, in short:
 
 ```
 docs/                        Vision and plans, art style, sprite format, screenshots
-scripts/openspace            Start, stop, restart, logs, restore, kanji data
+scripts/openspace            Start, stop, restart, logs, restore, kanji data (openspace.ps1 on Windows)
 scripts/release              Publish a version
 src/backend/
   Openspace.Domain/          The business model, no dependencies

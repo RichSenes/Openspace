@@ -86,8 +86,8 @@ read them, copy them, download them.
 **Agents.** Roles: description, instructions (with an AI draft to review),
 preferred model, and what the agent may do without asking.
 
-**Settings.** Permissions, agents at work at once, who plans and reviews, the
-Claude account's limits, sounds, the weather's town, the version, backups and
+**Settings.** Permissions, agents at work at once, who plans and reviews (Claude
+Code, or OpenCode models chosen for plans and for reviews), the Claude account's limits, sounds, the weather's town, the version, backups and
 Google accounts.
 
 Across every view:

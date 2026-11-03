@@ -13,6 +13,7 @@ namespace Openspace.Api.Settings;
 
 /// <param name="SupervisorModel">Claude model for plans and drafts; empty for Claude Code's default.</param>
 /// <param name="DraftModel">OpenCode model for plans and drafts when Claude Code does not make them.</param>
+/// <param name="OpenCodeReviewModel">OpenCode model that reviews finished work when Claude Code does not; none for no review.</param>
 public sealed record SettingsView(
     Autonomy Autonomy,
     int Seats,
@@ -20,7 +21,8 @@ public sealed record SettingsView(
     string? SupervisorModel,
     bool ClaudeReviews,
     string? ReviewModel,
-    string? DraftModel);
+    string? DraftModel,
+    string? OpenCodeReviewModel = null);
 
 /// <summary>
 /// What a person changes from Openspace itself. Changes are written to a settings file that
@@ -57,7 +59,8 @@ internal static class SettingsEndpoints
             ClaudeCodeOptions.ModelOrDefault(claude.CurrentValue.SupervisorModel),
             claude.CurrentValue.Review,
             ClaudeCodeOptions.ModelOrDefault(claude.CurrentValue.ReviewModel),
-            string.IsNullOrWhiteSpace(openCode.CurrentValue.DraftModel) ? null : openCode.CurrentValue.DraftModel);
+            string.IsNullOrWhiteSpace(openCode.CurrentValue.DraftModel) ? null : openCode.CurrentValue.DraftModel,
+            string.IsNullOrWhiteSpace(openCode.CurrentValue.ReviewModel) ? null : openCode.CurrentValue.ReviewModel);
 
     private static SettingsView Validate(SettingsView request)
     {
@@ -77,6 +80,7 @@ internal static class SettingsEndpoints
             SupervisorModel = AgentProfile.Create("settings", request.SupervisorModel, AgentEngine.ClaudeCode).Model,
             ReviewModel = AgentProfile.Create("settings", request.ReviewModel, AgentEngine.ClaudeCode).Model,
             DraftModel = AgentProfile.Create("settings", request.DraftModel).Model,
+            OpenCodeReviewModel = AgentProfile.Create("settings", request.OpenCodeReviewModel).Model,
         };
     }
 
@@ -90,7 +94,9 @@ internal static class SettingsEndpoints
         claude["SupervisorModel"] = settings.SupervisorModel ?? string.Empty;
         claude["Review"] = settings.ClaudeReviews;
         claude["ReviewModel"] = settings.ReviewModel ?? string.Empty;
-        section(OpenCodeOptions.SectionName)["DraftModel"] = settings.DraftModel ?? string.Empty;
+        var openCode = section(OpenCodeOptions.SectionName);
+        openCode["DraftModel"] = settings.DraftModel ?? string.Empty;
+        openCode["ReviewModel"] = settings.OpenCodeReviewModel ?? string.Empty;
     });
 
     /// <summary>Changes some sections of the settings file, keeping the rest, and swaps the file in whole.</summary>

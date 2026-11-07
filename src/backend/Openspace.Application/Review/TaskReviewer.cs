@@ -29,6 +29,9 @@ public sealed partial class TaskReviewer(
     /// <summary>The start of the note left when a review fails for good; the page reads it.</summary>
     public const string FailedNote = "The review could not run";
 
+    /// <summary>The start of the note left when a person asks for the review again; the page reads it.</summary>
+    public const string AskedNote = "The review was asked again";
+
     /// <summary>The start of the note left when a review waits for the account's limits to reset.</summary>
     public const string WaitingNote = "The review waits for the reviewer's account";
 
@@ -101,6 +104,7 @@ public sealed partial class TaskReviewer(
         }
 
         (pending ?? throw new InvalidOperationException("Reviews are not running here.")).Enqueue(taskId);
+        await NoteAsync(taskId, NoteAuthor.System, $"{AskedNote}: the reviewer reads the work in a few minutes.", cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

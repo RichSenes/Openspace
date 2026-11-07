@@ -1,3 +1,4 @@
+using Openspace.Application.Roles;
 using Openspace.Domain.Roles;
 
 namespace Openspace.Application.Tests;
@@ -69,5 +70,18 @@ public class RoleCommandsTests
         var error = await Assert.ThrowsAsync<RejectedException>(() => _h.RoleCommands().DraftInstructionsAsync("Tester", " ", default));
 
         Assert.Equal("empty-text", error.Code);
+    }
+
+    [Fact]
+    public async Task A_role_names_its_skills_and_can_give_them_all_back()
+    {
+        var id = await _h.RoleCommands().DefineAsync("Auditor", null, null, null, RolePermissions.Default, default);
+
+        await _h.RoleCommands().UseSkillsAsync(id, ["security-audit", "tdd"], default);
+        var named = RoleView.From(Assert.Single(_h.Roles.Items)).Skills;
+        await _h.RoleCommands().UseSkillsAsync(id, null, default);
+
+        Assert.Equal(["security-audit", "tdd"], named);
+        Assert.Null(RoleView.From(Assert.Single(_h.Roles.Items)).Skills);
     }
 }

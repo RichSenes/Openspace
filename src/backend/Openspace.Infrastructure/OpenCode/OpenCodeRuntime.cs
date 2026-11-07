@@ -11,7 +11,7 @@ namespace Openspace.Infrastructure.OpenCode;
 /// is about, so one server serves every task's working copy.
 /// </summary>
 internal sealed class OpenCodeRuntime(
-    HttpClient http, IOptionsMonitor<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces)
+    HttpClient http, IOptionsMonitor<OpenCodeOptions> options, IOptions<Git.WorkspaceOptions> workspaces, Skills.SkillCatalog? skills = null)
 {
     public async Task<bool> HasAgentAsync(string agentName, string workspacePath, CancellationToken cancellationToken)
     {
@@ -24,7 +24,7 @@ internal sealed class OpenCodeRuntime(
         string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(setup);
-        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions, setup.PrivatePaths ?? []) };
+        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions, setup.PrivatePaths ?? [], skills?.Folder, setup.Skills, setup.OutputFolder) };
 
         using var response = await http
             .PostAsJsonAsync(In("session", workspacePath), body, cancellationToken)
@@ -298,7 +298,15 @@ internal sealed class OpenCodeRuntime(
     /// Read-only sessions (all denied) may not leave it at all.
     /// </summary>
     /// <summary>What an agent may touch, in OpenCode's terms. Later rules win, so private folders come last.</summary>
-    internal static object[] Rules(RolePermissions? permissions, IReadOnlyList<string> privatePaths)
+    /// <param name="skillsFolder">The installed skills, readable by every agent, never writable.</param>
+    /// <param name="skills">The skills the agent may load; null for all of them.</param>
+    /// <param name="outputFolder">A folder outside its copy the agent may also write in.</param>
+    internal static object[] Rules(
+        RolePermissions? permissions,
+        IReadOnlyList<string> privatePaths,
+        string? skillsFolder = null,
+        IReadOnlyList<string>? skills = null,
+        string? outputFolder = null)
     {
         var outside = permissions is { Edit: PermissionLevel.Deny, Bash: PermissionLevel.Deny, Web: PermissionLevel.Deny } ? "deny" : "ask";
         var rules = new List<object> { new { permission = "external_directory", pattern = "*", action = outside } };
@@ -307,6 +315,24 @@ internal sealed class OpenCodeRuntime(
             rules.Add(new { permission = "edit", pattern = "*", action = Action(permissions.Edit) });
             rules.Add(new { permission = "bash", pattern = "*", action = Action(permissions.Bash) });
             rules.Add(new { permission = "webfetch", pattern = "*", action = Action(permissions.Web) });
+        }
+
+        if (skills is not null)
+        {
+            rules.Add(new { permission = "skill", pattern = "*", action = "deny" });
+            rules.AddRange(skills.Select(name => (object)new { permission = "skill", pattern = name, action = "allow" }));
+        }
+
+        if (skillsFolder is not null)
+        {
+            // A loaded skill's other files are read from its folder, outside the copy.
+            rules.Add(new { permission = "external_directory", pattern = $"{skillsFolder}/*", action = "allow" });
+            rules.Add(new { permission = "edit", pattern = $"{skillsFolder}/*", action = "deny" });
+        }
+
+        if (outputFolder is not null)
+        {
+            rules.Add(new { permission = "external_directory", pattern = $"{outputFolder}/*", action = "allow" });
         }
 
         foreach (var folder in privatePaths)

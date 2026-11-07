@@ -27,6 +27,9 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
 - **Less babysitting.** A queue, task dependencies, a review by Claude before
   yours, checks after merging, reserve models when an account runs out, agents
   stopped and restarted when they go in circles.
+- **Security audits.** A Security desk in each office reads the code for real
+  holes with Cloudflare's security-audit skill, has every finding disproved by a
+  fresh helper, and never changes the code: confirmed findings become fix tasks.
 - **Routines.** Recurring jobs for your own life: a morning paper, mail sorting,
   job offers, dependency checks, delivered to Telegram and never acting on what
   cannot be undone without your yes.
@@ -182,6 +185,12 @@ More of what it does, in short:
   with the office's reserve models; the board says why each queued task waits.
 - Local models are loaded on the graphics card when a desk needs one and give way
   to the programs that come first (an image generator, a trainer).
+- Skills (written guides such as `security-audit` or `tdd`, installed in
+  `~/.claude/skills`) are handed to every desk, read-only: all of them, or only
+  those a role names. OpenCode desks read the same folder.
+- Security audits keep their records outside the repository
+  (`~/.local/share/openspace/security-audits/<office>/run-N`), so each run builds
+  on the last; the Security view lists the runs, the report and the findings.
 - Sounds for the moments that matter, a daily database backup, private folders,
   offices kept on this computer only.
 

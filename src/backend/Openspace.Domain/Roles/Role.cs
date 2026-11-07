@@ -37,6 +37,10 @@ public sealed class Role : AggregateRoot<RoleId>
     internal const int MaxNameLength = 80;
     private const int MaxDescriptionLength = 300;
     private const int MaxInstructionsLength = 20_000;
+    private const int MaxSkills = 60;
+    private const int MaxSkillNameLength = 64;
+
+    private List<string> _skills = [];
 
     // Used by persistence, which sets Permissions right after construction.
     private Role(RoleId id, string name, string description, string instructions, string? model)
@@ -67,6 +71,12 @@ public sealed class Role : AggregateRoot<RoleId>
 
     public RolePermissions Permissions { get; private set; }
 
+    /// <summary>Whether the role names its skills; when it does not, its agents get every skill there is.</summary>
+    public bool SkillsChosen { get; private set; }
+
+    /// <summary>The skills its agents may load, by name; null when the role leaves them all.</summary>
+    public IReadOnlyList<string>? Skills => SkillsChosen ? _skills.AsReadOnly() : null;
+
     public static Role Define(
         string name, string? description, string? instructions, string? model, RolePermissions permissions, DateTimeOffset now)
     {
@@ -80,6 +90,38 @@ public sealed class Role : AggregateRoot<RoleId>
         string name, string? description, string? instructions, string? model, RolePermissions permissions, DateTimeOffset now)
     {
         Apply(name, description, instructions, model, permissions);
+        Raise(new RoleChanged(Id, now));
+    }
+
+    /// <summary>
+    /// Limits the role's agents to the named skills, or gives them every skill again with null.
+    /// An empty list gives them none.
+    /// </summary>
+    public void UseSkills(IEnumerable<string>? skills, DateTimeOffset now)
+    {
+        if (skills is null)
+        {
+            SkillsChosen = false;
+            _skills = [];
+        }
+        else
+        {
+            var names = skills.Select(s => s?.Trim() ?? string.Empty).ToList();
+            if (names.Any(n => n.Length == 0 || n.Length > MaxSkillNameLength || n.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or ':'))))
+            {
+                throw new DomainException("A skill name is made of letters, digits, '-', '_', '.' or ':', at most 64 of them.");
+            }
+
+            var distinct = names.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            if (distinct.Count > MaxSkills)
+            {
+                throw new DomainException($"A role can name at most {MaxSkills} skills.");
+            }
+
+            SkillsChosen = true;
+            _skills = distinct;
+        }
+
         Raise(new RoleChanged(Id, now));
     }
 

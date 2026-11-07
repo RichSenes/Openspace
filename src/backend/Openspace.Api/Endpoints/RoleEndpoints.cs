@@ -21,6 +21,9 @@ internal static class RoleEndpoints
 
     public sealed record DraftRequest(string Name, string Description);
 
+    /// <param name="Skills">The skills the role's agents may load; null gives them every one.</param>
+    public sealed record SkillsRequest(IReadOnlyList<string>? Skills);
+
     public static void MapRoleEndpoints(this IEndpointRouteBuilder app)
     {
         var roles = app.MapGroup("/api/roles").WithTags("Roles");
@@ -44,6 +47,15 @@ internal static class RoleEndpoints
             await commands.DeleteAsync(new RoleId(roleId), ct);
             return Results.NoContent();
         });
+
+        roles.MapPut("/{roleId:guid}/skills", async (Guid roleId, SkillsRequest r, RoleCommands commands, CancellationToken ct) =>
+        {
+            await commands.UseSkillsAsync(new RoleId(roleId), r.Skills, ct);
+            return Results.NoContent();
+        });
+
+        app.MapGet("/api/skills", (Application.Abstractions.ISkillCatalog catalog) =>
+            new { folder = catalog.Folder, skills = catalog.List() }).WithTags("Roles");
 
         roles.MapPost("/draft", async (DraftRequest r, RoleCommands commands, CancellationToken ct) =>
             Results.Ok(new { instructions = await commands.DraftInstructionsAsync(r.Name, r.Description, ct) }));

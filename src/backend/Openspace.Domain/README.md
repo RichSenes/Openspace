@@ -77,8 +77,14 @@ A reusable kind of agent: a unique name, a one-line description, instructions
 (the agent's system instructions in every session), an optional preferred model,
 and permissions for changing files, running commands, using the web and calling in
 helpers, each `Allow`, `Ask` or `Deny`. A role cannot be deleted while desks use it.
+It may also name the skills its agents load (`UseSkills`): left unnamed, they get every
+installed skill; an empty list gives them none.
 
 ## WorkTask
+
+A task may carry an output folder (`WriteOutputTo`, a full path, set before its agent
+starts): somewhere outside its copy the agent may also write in, such as a security
+audit's run folder.
 
 "Task" in the glossary; `WorkTask` in code, so it never clashes with
 `System.Threading.Tasks.Task`. Its own aggregate, referencing its office, desk and

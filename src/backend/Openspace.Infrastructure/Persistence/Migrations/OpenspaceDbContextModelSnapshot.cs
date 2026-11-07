@@ -15,7 +15,7 @@ namespace Openspace.Infrastructure.Persistence.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("Openspace.Domain.Offices.Office", b =>
                 {
@@ -124,6 +124,14 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("SkillsChosen")
+                        .HasColumnType("INTEGER");
+
+                    b.PrimitiveCollection<string>("_skills")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Skills");
 
                     b.HasKey("Id");
 
@@ -404,6 +412,10 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OutputFolder")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("ProcedureReminders")

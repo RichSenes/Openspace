@@ -22,6 +22,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     /// <summary>Sounds uploaded through the API land here, never in the project folder.</summary>
     public string SoundsFolder { get; } = Path.Combine(Path.GetTempPath(), $"openspace-sounds-{Guid.NewGuid():N}");
 
+    /// <summary>Security audits started through the API keep their records here, never in the person's folder.</summary>
+    public string AuditsFolder { get; } = Path.Combine(Path.GetTempPath(), $"openspace-audits-{Guid.NewGuid():N}");
+
     private SqliteConnection KeepAlive()
     {
         _keepAlive ??= new SqliteConnection(_connectionString);
@@ -64,6 +67,11 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
             ["Kanji:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-kanji-{Guid.NewGuid():N}"),
             ["Google:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-google-{Guid.NewGuid():N}"),
             ["Operator:Name"] = "elliot",
+
+            // Never the person's skills or audit records.
+            ["Skills:Folder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-skills-{Guid.NewGuid():N}"),
+            ["Skills:PluginsFolder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-plugins-{Guid.NewGuid():N}"),
+            ["SecurityAudits:Folder"] = AuditsFolder,
             ["Queue:Enabled"] = "false",
 
             // Never the person's own Claude Code sessions: no guests are looked for.
@@ -97,6 +105,11 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         {
             _keepAlive?.Dispose();
             File.Delete(SettingsPath);
+            if (Directory.Exists(AuditsFolder))
+            {
+                Directory.Delete(AuditsFolder, recursive: true);
+            }
+
             if (Directory.Exists(SoundsFolder))
             {
                 Directory.Delete(SoundsFolder, recursive: true);

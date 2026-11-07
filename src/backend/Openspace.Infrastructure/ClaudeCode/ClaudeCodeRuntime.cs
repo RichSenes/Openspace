@@ -10,6 +10,7 @@ using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
 using Openspace.Domain.Roles;
 using Openspace.Infrastructure.OpenCode;
+using Openspace.Infrastructure.Skills;
 
 namespace Openspace.Infrastructure.ClaudeCode;
 
@@ -27,7 +28,8 @@ internal sealed partial class ClaudeCodeRuntime(
     ClaudeCodeUsage usage,
     IServiceScopeFactory scopes,
     ILogger<ClaudeCodeRuntime> logger,
-    Func<AgentSignal, Task>? dispatch = null) : IDisposable
+    Func<AgentSignal, Task>? dispatch = null,
+    SkillCatalog? skills = null) : IDisposable
 {
     /// <summary>Where signals go: the application, or a test.</summary>
     private readonly Func<AgentSignal, Task> _dispatch = dispatch ?? (signal => AgentSignalDispatch.DispatchAsync(scopes, signal, logger, CancellationToken.None));
@@ -144,13 +146,21 @@ internal sealed partial class ClaudeCodeRuntime(
     internal List<string> SessionArguments(string sessionId, bool resume, AgentSetup setup, string workspacePath)
     {
         var (tools, allowed) = Tools(setup.Permissions);
+        var access = skills?.For(setup.Skills);
+        if (access is not null)
+        {
+            tools.Add(SkillTool);
+            allowed.Add(SkillTool);
+        }
+
         var args = new List<string> { "-p", "--output-format", "stream-json", "--verbose", "--restricted", "--permission-mode", "manual" };
         args.Add("--tools");
         args.AddRange(tools);
         args.Add("--allowedTools");
         args.AddRange(allowed);
         args.AddRange(["--permission-prompt-tool", PermissionTool, "--strict-mcp-config", "--mcp-config", McpConfig(workspacePath)]);
-        args.AddRange(Forbidden(setup.PrivatePaths ?? []));
+        args.AddRange(Folders(access, setup.OutputFolder));
+        args.AddRange(Forbidden(setup.PrivatePaths ?? [], access?.ReadFolders ?? []));
         if (setup.Model is { } model)
         {
             args.AddRange(["--model", model]);
@@ -169,9 +179,10 @@ internal sealed partial class ClaudeCodeRuntime(
     /// Deny rules for private folders: reading (which covers searching), editing and any command
     /// naming them. Claude Code applies deny rules before anything allowed.
     /// </summary>
-    internal static List<string> Forbidden(IReadOnlyList<string> privatePaths)
+    internal static List<string> Forbidden(IReadOnlyList<string> privatePaths, IReadOnlyList<string>? readOnly = null)
     {
-        if (privatePaths.Count == 0)
+        readOnly ??= [];
+        if (privatePaths.Count == 0 && readOnly.Count == 0)
         {
             return [];
         }
@@ -183,7 +194,37 @@ internal sealed partial class ClaudeCodeRuntime(
             rules.AddRange([$"Read(/{folder}/**)", $"Edit(/{folder}/**)", $"Bash(*{folder}*)"]);
         }
 
+        foreach (var folder in readOnly)
+        {
+            rules.AddRange([$"Edit(/{folder}/**)", $"Write(/{folder}/**)", $"NotebookEdit(/{folder}/**)"]);
+        }
+
         return rules;
+    }
+
+    /// <summary>Claude Code's tool that loads a skill.</summary>
+    public const string SkillTool = "Skill";
+
+    /// <summary>
+    /// The folders beyond its copy a restricted agent may use: the skills plugin and the
+    /// skills' own folder, to read, and the task's output folder, to write in.
+    /// </summary>
+    internal static List<string> Folders(SkillAccess? access, string? outputFolder)
+    {
+        List<string> args = [];
+        if (access is not null)
+        {
+            args.AddRange(["--plugin-dir", access.PluginFolder]);
+        }
+
+        List<string> dirs = [.. access?.ReadFolders ?? [], .. outputFolder is null ? [] : new[] { outputFolder }];
+        if (dirs.Count > 0)
+        {
+            args.Add("--add-dir");
+            args.AddRange(dirs);
+        }
+
+        return args;
     }
 
     /// <summary>

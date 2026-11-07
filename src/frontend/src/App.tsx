@@ -11,6 +11,7 @@ import { ReportsPanel } from './reports/ReportsPanel'
 import { SettingsPanel } from './settings/SettingsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
 import { RoutinesPanel } from './routines/RoutinesPanel'
+import { SecurityPanel } from './security/SecurityPanel'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
 
@@ -63,6 +64,8 @@ export default function App() {
             <RoutinesPanel key={office.id} office={office} />
           ) : view === 'reports' ? (
             <ReportsPanel key={office.id} office={office} />
+          ) : view === 'security' ? (
+            <SecurityPanel key={office.id} office={office} />
           ) : (
             <BuildingView
               office={office}

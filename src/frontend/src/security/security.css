@@ -1,0 +1,96 @@
+.security-start {
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+}
+
+.security-profile-hint {
+  align-self: center;
+  margin: 0;
+}
+
+.security-busy,
+.security-start .error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.security-severities {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.findings {
+  display: grid;
+  gap: 10px;
+}
+
+.findings h2 {
+  font-size: 16px;
+}
+
+.findings > summary {
+  cursor: pointer;
+  color: var(--mute);
+}
+
+.finding {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  min-width: 0;
+}
+
+.finding p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.finding-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.finding-where {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--mute);
+  overflow-wrap: anywhere;
+}
+
+/* The severity is a word first; the colour only repeats it. */
+.finding-severity {
+  font-family: var(--pixel);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.severity-critical,
+.severity-high {
+  color: var(--danger);
+}
+
+.severity-medium {
+  color: var(--st-review);
+}
+
+.severity-low,
+.severity-informational {
+  color: var(--mute);
+}
+
+@media (max-width: 760px) {
+  .security-start {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -23,7 +23,8 @@ ports, which `Openspace.Infrastructure` implements.
 | Folder | What it holds |
 | --- | --- |
 | `Offices/` | `OfficeCommands` (offices, rooms, desks, layouts, floor plans, private folders, reserve models), `OfficeQueries` (views and branches) |
-| `Roles/` | `RoleCommands` (define, change, delete, draft instructions with AI), `RoleQueries` |
+| `Roles/` | `RoleCommands` (define, change, delete, draft instructions with AI, choose skills), `RoleQueries` |
+| `Security/` | `SecurityAudits`: the Security desk and role, audits as tasks with a run folder, runs, reports and findings, fixes proposed as tasks |
 | `Work/` | `WorkTaskCommands` (the life of a task: assign, approve, accept, send back, merge, catch up, pull requests, notes, dependencies), `WorkTaskQueries`, `Supervisor` (splits a request into proposed tasks), `EpicQueries`, `FeedQueries` (the activity feed), `UsageQueries` (tokens per desk), `AuditTrail` and `TaskReport` (the log and its Markdown report) |
 | `Queue/` | `QueueDispatcher` (who starts now), `QueueWaits` (why the others wait), `QueueOptions` |
 | `Agents/` | `TaskRunner` (worktree, session and brief for each started task), `Briefing`, `AgentSetups` (engine, model, role and private folders of a desk's agent, or of a reserve), `AgentSignals` (what agents report: progress, tools, permissions, the end), `PermissionPolicy` and `PermissionRequests` (auto mode), `LoopGuard` (agents going in circles), `EngineLimits` (accounts over their limits), and the boards `ActivityBoard`, `ContextBoard` (energy), `InternBoard` |
@@ -92,7 +93,10 @@ Settings of each kind are described in the
 | `IDependencyReader`, `IAdvisories`, `IPackageRegistry`, `IToolchains`, `ISystemUpdates`, `IRepositoryStates` | The maintenance adapters in `Upkeep/` |
 | `IWeatherSource` | `OpenMeteo` |
 | `IReleaseSource` | `GitHubReleases` |
+| `ISkillCatalog` | `SkillCatalog`: the installed skills, and the plugin that hands them to Claude Code |
+| `ISecurityAuditRecords` | `SecurityAuditRecords`: the run folders of security audits |
 
 `AgentSetup` is what decides how an agent behaves in a session: its engine, agent
 and model (the desk's, the role's, or the task's reserve), the role's instructions
-and permissions, and the office's private folders.
+and permissions, the role's skills, the office's private folders, and the task's output
+folder.

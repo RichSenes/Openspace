@@ -18,7 +18,7 @@ public sealed class AgentSetups(IRoleRepository roles)
     public Task<AgentSetup> ForDeskAsync(Desk desk, CancellationToken cancellationToken, IReadOnlyList<string>? privatePaths = null)
     {
         ArgumentNullException.ThrowIfNull(desk);
-        return SetupAsync(desk, desk.Agent, privatePaths, cancellationToken);
+        return SetupAsync(desk, desk.Agent, privatePaths, null, cancellationToken);
     }
 
     /// <summary>
@@ -29,7 +29,7 @@ public sealed class AgentSetups(IRoleRepository roles)
     {
         ArgumentNullException.ThrowIfNull(desk);
         ArgumentNullException.ThrowIfNull(task);
-        return SetupAsync(desk, AgentFor(desk, task), privatePaths, cancellationToken);
+        return SetupAsync(desk, AgentFor(desk, task), privatePaths, task.OutputFolder, cancellationToken);
     }
 
     /// <summary>
@@ -47,7 +47,7 @@ public sealed class AgentSetups(IRoleRepository roles)
     }
 
     private async Task<AgentSetup> SetupAsync(
-        Desk desk, AgentProfile agent, IReadOnlyList<string>? privatePaths, CancellationToken cancellationToken)
+        Desk desk, AgentProfile agent, IReadOnlyList<string>? privatePaths, string? outputFolder, CancellationToken cancellationToken)
     {
         var role = desk.RoleId is { } id ? await roles.FindAsync(id, cancellationToken).ConfigureAwait(false) : null;
         return new AgentSetup(
@@ -56,6 +56,8 @@ public sealed class AgentSetups(IRoleRepository roles)
             string.IsNullOrEmpty(role?.Instructions) ? null : role.Instructions,
             role?.Permissions,
             agent.Engine,
-            privatePaths);
+            privatePaths,
+            role?.Skills,
+            outputFolder);
     }
 }

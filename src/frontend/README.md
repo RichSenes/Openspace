@@ -37,6 +37,7 @@ src/
   agents/     Roles, their instructions and permissions
   routines/   Routines, their runs, proposals, the paper's kanji
   reports/    Reports and changelogs
+  security/   Security audits: runs, reports, findings, fixes
   engines/    OpenCode and Claude Code, usage limits, the graphics card
   settings/   Settings, weather, version, backups, Google accounts
   sounds/     Built-in sounds, your own files, the rules of when they play
@@ -83,8 +84,13 @@ proposes (yes or no), and run now.
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
 read them, copy them, download them.
 
+**Security.** The office's security audits: add a Security desk, start an audit (quick,
+standard or deep), follow its runs, read the report and the findings (confirmed worst
+first, those to verify, the rejected), and propose a fix task for a confirmed one.
+
 **Agents.** Roles: description, instructions (with an AI draft to review),
-preferred model, and what the agent may do without asking.
+preferred model, what the agent may do without asking, and which installed skills it
+may load (all of them, or the ones ticked).
 
 **Settings.** Permissions, agents at work at once, who plans and reviews (Claude
 Code, or OpenCode models chosen for plans and for reviews), the Claude account's limits, sounds, the weather's town, the version, backups and

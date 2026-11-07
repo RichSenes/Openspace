@@ -21,6 +21,7 @@ export const EMPTY_ROLE: RoleInput = {
   bash: 'Allow',
   web: 'Allow',
   helpers: 'Deny',
+  skills: null,
 }
 
 export function formFrom(role: RoleView | undefined): RoleInput {
@@ -45,4 +46,16 @@ export function permissionSummary(role: Pick<RoleView, 'edit' | 'bash' | 'web'> 
   )
   const helpers = role.helpers === 'Allow' ? ['Can call in interns'] : []
   return limits.length === 0 ? ['Works freely', ...helpers].join(' · ') : [...limits, ...helpers].join(' · ')
+}
+
+/** "Every installed skill", or how many the role names. */
+export function skillsSummary(skills: string[] | null): string {
+  if (skills === null) return 'Every installed skill'
+  if (skills.length === 0) return 'No skills'
+  return skills.length === 1 ? `Skill: ${skills[0]}` : `${skills.length} skills`
+}
+
+/** Adds or removes one skill from the role's list, keeping it sorted. */
+export function toggleSkill(skills: string[], name: string): string[] {
+  return skills.includes(name) ? skills.filter((s) => s !== name) : [...skills, name].sort()
 }

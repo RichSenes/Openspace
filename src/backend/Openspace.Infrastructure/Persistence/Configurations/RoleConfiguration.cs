@@ -23,5 +23,8 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             p.Property(x => x.Helpers).HasColumnName("CanDelegate").HasConversion<string>();
         });
         builder.Navigation(r => r.Permissions).IsRequired();
+        builder.Property(r => r.SkillsChosen);
+        builder.Ignore(r => r.Skills);
+        builder.PrimitiveCollection<List<string>>("_skills").HasColumnName("Skills");
     }
 }

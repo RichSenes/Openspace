@@ -58,7 +58,7 @@ public sealed class SecurityAudits(
 
     /// <summary>Starts an audit at the office's auditor desk, or at the one named.</summary>
     public async Task<WorkTaskId> StartAsync(
-        OfficeId officeId, DeskId? deskId, SecurityAuditProfile profile, string requestedBy, CancellationToken cancellationToken)
+        OfficeId officeId, DeskId? deskId, SecurityAuditProfile profile, string requestedBy, CancellationToken cancellationToken, string? language = null)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         if (office.RepositoryPath is null)
@@ -74,7 +74,7 @@ public sealed class SecurityAudits(
         var now = clock.GetUtcNow();
         var title = $"Security audit ({profile.ToString().ToLowerInvariant()})";
         var folder = records.Open(Project(office), now);
-        var task = WorkTask.Assign(office, desk.Id, title, Brief(office, profile, folder), requestedBy, now);
+        var task = WorkTask.Assign(office, desk.Id, title, Brief(office, profile, folder, Language(language)), requestedBy, now);
         task.WriteOutputTo(folder);
         records.Link(folder, task.Id.Value);
         tasks.Add(task);
@@ -191,7 +191,14 @@ public sealed class SecurityAudits(
         return safe.Length > 0 ? safe : office.Id.Value.ToString("N", CultureInfo.InvariantCulture)[..8];
     }
 
-    internal static string Brief(Office office, SecurityAuditProfile profile, string folder) => $"""
+    /// <summary>A language name such as Italian, or English when none is given.</summary>
+    public static string Language(string? language)
+    {
+        var name = language?.Trim() ?? string.Empty;
+        return name.Length is > 0 and <= 30 && name.All(c => char.IsLetter(c) || c is ' ' or '-') ? name : "English";
+    }
+
+    internal static string Brief(Office office, SecurityAuditProfile profile, string folder, string language = "English") => $"""
         Run a full security audit of this repository ({office.Name}) with the security-audit skill. Load the skill first.
 
         - Profile: {profile.ToString().ToLowerInvariant()}.
@@ -200,6 +207,8 @@ public sealed class SecurityAudits(
         - Look at the earlier runs next to it ({Path.GetDirectoryName(folder)}) as the skill's prior runs.
         - Do not change any file of the repository: fixes are separate tasks.
         - Source and local checks only: no deployed sites, no external services, no real accounts.
+        - Write for a person in {language}: REPORT.md, FINDINGS-DETAIL.md, NEEDS-VALIDATION.md, your notes, and the title, description and remediation strategy of every finding. Keep code, paths, identifiers, JSON field names and verdict values as they are.
+        - Write plainly: short paragraphs of two or three sentences, one idea per bullet, a blank line between blocks, lists instead of wide tables. Open REPORT.md with what to do first, in a few lines, before the details.
         """;
 
     internal static string FixBrief(SecurityFinding finding, int run)

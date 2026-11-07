@@ -7,7 +7,8 @@ namespace Openspace.Api.Endpoints;
 internal static class SecurityAuditEndpoints
 {
     /// <param name="DeskId">The desk to run it at; the office's auditor desk when left out.</param>
-    public sealed record StartRequest(Guid? DeskId, SecurityAuditProfile Profile = SecurityAuditProfile.Quick);
+    /// <param name="Language">The language its report and findings are written in, such as Italian; English when left out.</param>
+    public sealed record StartRequest(Guid? DeskId, SecurityAuditProfile Profile = SecurityAuditProfile.Quick, string? Language = null);
 
     /// <param name="Model">The Claude model of the new Auditor desk; sonnet when left out.</param>
     public sealed record DeskRequest(string? Model);
@@ -21,7 +22,7 @@ internal static class SecurityAuditEndpoints
 
         audits.MapPost("/", async (Guid officeId, StartRequest r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
         {
-            var id = await security.StartAsync(new OfficeId(officeId), r.DeskId is { } desk ? new DeskId(desk) : null, r.Profile, me.Value.Name, ct);
+            var id = await security.StartAsync(new OfficeId(officeId), r.DeskId is { } desk ? new DeskId(desk) : null, r.Profile, me.Value.Name, ct, r.Language);
             return Results.Created($"/api/tasks/{id.Value}", new { taskId = id.Value });
         });
 

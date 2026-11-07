@@ -1,5 +1,9 @@
 .security-start {
-  grid-template-columns: 180px minmax(0, 1fr) auto;
+  grid-template-columns: 160px 160px minmax(0, 1fr) auto;
+}
+
+.security-report > .markdown {
+  margin-top: 12px;
 }
 
 .security-profile-hint {

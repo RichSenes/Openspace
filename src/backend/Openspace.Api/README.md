@@ -91,7 +91,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | PUT | `/api/roles/{id}/skills` | `{ skills }`: the skills the role's agents may load, by name; `null` gives them every installed skill, `[]` none |
 | GET | `/api/skills` | `{ folder, skills: [{ name, description }] }`: the installed skills, read from their SKILL.md |
 | POST | `/api/offices/{id}/security-desk` | `{ model? }` → `{ deskId }`: a Security room with an Auditor desk on Claude Code (sonnet unless named) and the shared Security auditor role; the existing desk when there is one |
-| POST | `/api/offices/{id}/security-audits` | `{ deskId?, profile? }` (`Quick`, `Standard` or `Deep`; quick by default) → `{ taskId }`: queues an audit at the office's auditor desk with a new run folder. `422` with code `no-repository` or `no-auditor` |
+| POST | `/api/offices/{id}/security-audits` | `{ deskId?, profile?, language? }` (`Quick`, `Standard` or `Deep`, quick by default; the language its report and findings are written in, English by default) → `{ taskId }`: queues an audit at the office's auditor desk with a new run folder. `422` with code `no-repository` or `no-auditor` |
 | GET | `/api/offices/{id}/security-audits` | The office's runs, newest first: `[{ run: { number, startedAt, taskId, profile, sourceRef, confirmed, needsValidation, rejected, severities, hasReport }, status, deskName }]` |
 | GET | `/api/offices/{id}/security-audits/{run}/report` | The run's REPORT.md as Markdown; `404` while it has none |
 | GET | `/api/offices/{id}/security-audits/{run}/findings` | `[{ fingerprint, verdict, title, description, severity, location, remediation }]` |

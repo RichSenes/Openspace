@@ -833,8 +833,8 @@ export function useAddSecurityDesk(officeId: string) {
 export function useStartSecurityAudit(officeId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (profile: SecurityAuditProfile) =>
-      request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits`, { profile }),
+    mutationFn: (input: { profile: SecurityAuditProfile; language: string }) =>
+      request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits`, input),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.securityAudits(officeId) })
       void client.invalidateQueries({ queryKey: keys.tasks })

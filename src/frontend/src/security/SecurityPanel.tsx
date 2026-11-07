@@ -11,6 +11,8 @@ import {
 } from '../api/hooks'
 import type { OfficeView, SecurityAuditProfile, SecurityAuditView, SecurityFindingView } from '../api/types'
 import { Markdown } from '../reports/Markdown'
+import { LANGUAGES, type LanguageName } from '../reports/period'
+import { usePersistentState } from '../usePersistentState'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
 import { auditorDesks, groupFindings, PROFILES, runSummary, severitySummary } from './securityRules'
@@ -30,6 +32,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
   const start = useStartSecurityAudit(office.id)
   const toast = useToast()
   const [profile, setProfile] = useState<SecurityAuditProfile>('Quick')
+  const [language, setLanguage] = usePersistentState<LanguageName>('openspace.report-language', 'Italian')
   const [openRun, setOpenRun] = useState<number>()
   const auditors = auditorDesks(office, roles.data)
   const open = audits.data?.find((a) => a.run.number === openRun) ?? audits.data?.[0]
@@ -72,7 +75,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
           className="report-forms security-start"
           onSubmit={(e) => {
             e.preventDefault()
-            start.mutate(profile, {
+            start.mutate({ profile, language }, {
               onSuccess: () => {
                 setOpenRun(undefined)
                 toast('Audit started: the auditor takes it from the queue')
@@ -86,6 +89,16 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
               {PROFILES.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Written in</span>
+            <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as LanguageName)}>
+              {LANGUAGES.map((l) => (
+                <option key={l.name} value={l.name}>
+                  {l.label}
                 </option>
               ))}
             </select>
@@ -194,10 +207,10 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
       )}
 
       {report.data && (
-        <section aria-label="Report">
-          <h2>Report</h2>
+        <details className="findings security-report">
+          <summary>The full report, as the auditor wrote it</summary>
           <Markdown text={report.data} />
-        </section>
+        </details>
       )}
     </article>
   )

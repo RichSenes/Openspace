@@ -116,6 +116,46 @@
   color: var(--accent);
 }
 
+.markdown p,
+.markdown li {
+  margin: 0.5em 0;
+}
+
+/* Wide tables scroll on their own instead of squeezing the text or the page. */
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.markdown th,
+.markdown td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  min-width: 120px;
+}
+
+.markdown th {
+  background: var(--raised);
+}
+
+.markdown pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.markdown pre code {
+  padding: 0;
+  background: none;
+}
+
 @media (max-width: 900px) {
   .report-forms,
   .report-form,

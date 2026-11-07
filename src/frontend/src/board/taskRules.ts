@@ -85,6 +85,7 @@ export type ReviewVerdict = 'ok' | 'changes' | 'reviewing' | 'waiting' | 'failed
 /** How the API starts its notes about reviews that did not happen (TaskReviewer). */
 export const REVIEW_FAILED_NOTE = 'The review could not run'
 export const REVIEW_WAITING_NOTE = "The review waits for the reviewer's account"
+export const REVIEW_ASKED_NOTE = 'The review was asked again'
 
 /**
  * What the reviewer said about the work as it is now: its note written since the work last
@@ -98,7 +99,16 @@ export function reviewVerdictOf(task: WorkTaskView, reviewerOn = false, now = Da
   if (latest) return latest.text.startsWith('OK') ? 'ok' : 'changes'
   const latestSystem = [...task.notes]
     .reverse()
-    .find((n) => n.authorKind === 'System' && timeOf(n.writtenAt) >= since && (n.text.startsWith(REVIEW_FAILED_NOTE) || n.text.startsWith(REVIEW_WAITING_NOTE)))
+    .find(
+      (n) =>
+        n.authorKind === 'System' &&
+        timeOf(n.writtenAt) >= since &&
+        [REVIEW_FAILED_NOTE, REVIEW_WAITING_NOTE, REVIEW_ASKED_NOTE].some((start) => n.text.startsWith(start)),
+    )
+  if (latestSystem?.text.startsWith(REVIEW_ASKED_NOTE)) {
+    // Asked again by a person: under way from that moment, with the usual patience.
+    return now - timeOf(latestSystem.writtenAt) < REVIEW_PATIENCE_MS ? 'reviewing' : undefined
+  }
   if (latestSystem) return latestSystem.text.startsWith(REVIEW_WAITING_NOTE) ? 'waiting' : 'failed'
   return reviewerOn && now - since < REVIEW_PATIENCE_MS ? 'reviewing' : undefined
 }

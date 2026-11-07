@@ -129,6 +129,7 @@ public class ReviewTests
         var other = _h.Enqueue("Still queued");
 
         Assert.Equal(1, recovered);
+        Assert.StartsWith(Review.TaskReviewer.AskedNote, task.Notes[^1].Text, StringComparison.Ordinal);
         await Assert.ThrowsAsync<RejectedException>(() => _h.Reviewer().RequestAsync(other.Id, default));
     }
 

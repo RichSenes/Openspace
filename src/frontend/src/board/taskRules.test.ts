@@ -83,6 +83,14 @@ describe('reviewVerdictOf', () => {
     expect(reviewVerdictOf({ ...reviewed, notes: [...reviewed.notes, note('Reviewer', 'OK: ready to accept.')] })).toBe('ok')
   })
 
+  it('shows a review asked again as under way', () => {
+    const asked = {
+      ...task('Logout', 'Review'),
+      notes: [note('System', 'The review could not run (no model).'), note('System', 'The review was asked again: the reviewer reads the work in a few minutes.')],
+    }
+    expect(reviewVerdictOf(asked, true, timeOf('2015-06-24T09:05:00Z'))).toBe('reviewing')
+  })
+
   it('tells a review that waits for the account from one that failed', () => {
     const waiting = { ...task('Logout', 'Review'), notes: [note('System', "The review waits for the reviewer's account (You've hit your 5-hour limit): it tries again")] }
     const failed = { ...task('Logout', 'Review'), notes: [note('System', 'The review could not run (no model). The work is ready for you anyway.')] }

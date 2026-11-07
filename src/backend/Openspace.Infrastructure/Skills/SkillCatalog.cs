@@ -24,6 +24,14 @@ internal sealed class SkillCatalog(IOptionsMonitor<SkillsOptions> options) : ISk
 
     public string? Folder => Existing(options.CurrentValue.Folder);
 
+    /// <summary>
+    /// The folders an agent may read skills from: the skills, and the plugins of links, which a
+    /// Claude Code agent names when it hands work on to OpenCode or to its helpers.
+    /// </summary>
+    public IReadOnlyList<string> ReadFolders => Folder is { } folder
+        ? [folder, Path.TrimEndingDirectorySeparator(Path.GetFullPath(Expand(options.CurrentValue.PluginsFolder)))]
+        : [];
+
     public IReadOnlyList<SkillInfo> List()
     {
         if (Folder is not { } folder)

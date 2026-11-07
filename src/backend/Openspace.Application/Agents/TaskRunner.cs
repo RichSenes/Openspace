@@ -137,7 +137,8 @@ public sealed partial class TaskRunner(
         try
         {
             var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
-            foreach (var permission in pending.Where(p => p.SessionId == task.Run.SessionId))
+            // Helpers' requests too: every session in the task's copy is the agent's or a helper's.
+            foreach (var permission in pending)
             {
                 await signals.PermissionAskedAsync(task.Run.SessionId, permission.Id, permission.Action, cancellationToken).ConfigureAwait(false);
                 if (activity.ForTask(task.Id.Value) is { Kind: ActivityKind.Waiting })

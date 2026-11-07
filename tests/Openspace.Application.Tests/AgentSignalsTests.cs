@@ -387,4 +387,18 @@ public class AgentSignalsTests
         await _h.Reviewer().ReviewAsync(task.Id, default);
         Assert.Equal([Private], Assert.Single(_h.Runtime.PrivatePathsSeen));
     }
+
+    [Fact]
+    public async Task A_helper_request_waiting_in_the_same_copy_is_shown_after_an_answer()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", Fakes.Run("npx wrangler deploy"), default);
+        _h.Runtime.Pending.Add(new Abstractions.PermissionRequest("per_2", "ses_helper", Fakes.Run("git push origin main")));
+
+        await _h.Commands().ReplyToPermissionAsync(task.Id, allow: false, default);
+
+        var activity = _h.Activity.ForTask(task.Id.Value);
+        Assert.Equal((ActivityKind.Waiting, "per_2"), (activity?.Kind, activity?.PermissionId));
+    }
 }

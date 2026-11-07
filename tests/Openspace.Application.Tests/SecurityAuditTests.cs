@@ -11,7 +11,14 @@ public class SecurityAuditTests
     private readonly Harness _h = new();
     private readonly FakeAuditRecords _records = new();
 
-    private SecurityAudits Audits() => new(_h.Offices, _h.Roles, _h.Tasks, _records, _h.UnitOfWork, _h.Clock);
+    private SecurityAudits Audits(bool withSupervisor = false) =>
+        new(_h.Offices, _h.Roles, _h.Tasks, _records, _h.UnitOfWork, _h.Clock, withSupervisor ? _h.Supervisor() : null);
+
+    private static string Plan(params (string Title, string Desk)[] tasks) => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        title = "Security fixes",
+        tasks = tasks.Select(t => new { title = t.Title, description = $"Do: {t.Title}", desk = t.Desk }),
+    });
 
     [Fact]
     public async Task A_security_desk_comes_with_its_room_and_a_role_that_names_the_skill_and_lets_it_use_helpers()
@@ -81,18 +88,63 @@ public class SecurityAuditTests
         _records.Found.Add(new SecurityFinding("fp-2", "needs_validation", "Prompt injection in summarizer", "Maybe.", null, null, null));
         _records.Found.Add(new SecurityFinding("fp-3", "rejected", "Token reuse after logout", "No.", null, null, null));
 
-        var id = await Audits().ProposeFixAsync(_h.Office.Id, 1, "fp-1", "elliot", default);
+        var first = await Audits().ProposeFixAsync(_h.Office.Id, 1, "fp-1", "elliot", default);
         await Audits().ProposeFixAsync(_h.Office.Id, 1, "fp-2", "elliot", default);
         var refused = await Assert.ThrowsAsync<RejectedException>(() => Audits().ProposeFixAsync(_h.Office.Id, 1, "fp-3", "elliot", default));
 
-        var task = _h.Tasks.Items.Single(t => t.Id == id);
-        var verify = _h.Tasks.Items.Single(t => t.Id != id);
+        Assert.Equal((1, false), (first.Tasks, first.ByTheSupervisor));
+        var task = _h.Tasks.Items[0];
+        var verify = _h.Tasks.Items[1];
         Assert.Equal((WorkTaskStatus.Proposed, "Fix: Invoices readable across users"), (task.Status, task.Title));
         Assert.Contains("src/api/invoices.ts:42", task.Description, StringComparison.Ordinal);
         Assert.Contains("Suggested fix: Check the owner.", task.Description, StringComparison.Ordinal);
         Assert.Equal("Verify and fix: Prompt injection in summarizer", verify.Title);
         Assert.Contains("First write a test that shows the hole", verify.Description, StringComparison.Ordinal);
         Assert.Equal("finding-rejected", refused.Code);
+    }
+
+    [Fact]
+    public async Task The_supervisor_turns_the_open_findings_into_tasks_at_desks_never_the_auditor_and_only_once()
+    {
+        await Audits().AddDeskAsync(_h.Office.Id, null, default);
+        _records.Found.Add(new SecurityFinding("fp-1", "confirmed", "Open redirect", "Backslash passes.", "low", "lib/return-path.ts:11", "Parse it."));
+        _records.Found.Add(new SecurityFinding("fp-2", "needs_validation", "Premium written by the client", "Maybe.", null, "SyncEngine.cs:582", null));
+        _records.Found.Add(new SecurityFinding("fp-3", "rejected", "Route extra", "No.", null, null, null));
+        _h.Runtime.Plan = Plan(("Fix the open redirect", "Frontend"), ("Verify the premium row", "Frontend"));
+
+        var handed = await Audits(withSupervisor: true).HandToSupervisorAsync(_h.Office.Id, 1, "elliot", default, "Italian");
+        var again = await Audits(withSupervisor: true).HandToSupervisorAsync(_h.Office.Id, 1, "elliot", default, "Italian");
+
+        Assert.Equal((2, true), (handed.Tasks, handed.ByTheSupervisor));
+        Assert.All(_h.Tasks.Items, t => Assert.Equal((WorkTaskStatus.Proposed, (DeskId?)_h.Desk.Id), (t.Status, t.DeskId)));
+        Assert.Equal(["fp-1", "fp-2"], _records.Handed);
+        Assert.Equal(0, again.Tasks);
+        Assert.True(_records.HandedAll);
+        var request = SecurityAudits.SupervisorRequest([.. _records.Found.Take(2)], 1, "Italian");
+        Assert.Contains("Never give a task to the Auditor desk", request, StringComparison.Ordinal);
+        Assert.Contains("Write titles and descriptions in Italian", request, StringComparison.Ordinal);
+        Assert.Contains("First write a test that shows the hole", request, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_finished_audit_started_with_a_hand_off_goes_to_the_supervisor_by_itself_once()
+    {
+        await Audits().AddDeskAsync(_h.Office.Id, null, default);
+        await Audits().StartAsync(_h.Office.Id, null, SecurityAuditProfile.Quick, "elliot", default, "Italian", handOff: true);
+        _records.Found.Add(new SecurityFinding("fp-1", "confirmed", "Open redirect", "Backslash passes.", "low", null, null));
+        _h.Runtime.Plan = Plan(("Fix the open redirect", "Frontend"));
+        var audit = _h.Tasks.Items[0];
+
+        var early = await Audits(withSupervisor: true).HandFinishedAsync(default);
+        audit.Start(Harness.Start);
+        audit.SubmitForReview(Harness.Start);
+        _records.Runs[0] = _records.Runs[0] with { HasReport = true };
+        var done = await Audits(withSupervisor: true).HandFinishedAsync(default);
+        var later = await Audits(withSupervisor: true).HandFinishedAsync(default);
+
+        Assert.Equal((0, 1, 0), (early, done, later));
+        Assert.Equal(2, _h.Tasks.Items.Count);
+        Assert.Contains("Write titles and descriptions in Italian", _h.Runtime.PlanRequests[^1].Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -133,6 +185,10 @@ public class SecurityAuditTests
 
         public Dictionary<string, Guid> Links { get; } = [];
 
+        public List<string> Handed { get; } = [];
+
+        public bool HandedAll { get; private set; }
+
         public string Open(string project, DateTimeOffset now)
         {
             var number = Runs.Count + 1;
@@ -140,12 +196,31 @@ public class SecurityAuditTests
             return $"/audits/{project}/run-{number}";
         }
 
-        public void Link(string folder, Guid taskId)
+        public void Link(string folder, Guid taskId, bool handOff = false)
         {
             Links[folder] = taskId;
             var number = int.Parse(folder[(folder.LastIndexOf('-') + 1)..], System.Globalization.CultureInfo.InvariantCulture);
             var i = Runs.FindIndex(r => r.Number == number);
-            Runs[i] = Runs[i] with { TaskId = taskId };
+            Runs[i] = Runs[i] with { TaskId = taskId, HandOff = handOff };
+        }
+
+        public void MarkHanded(string project, int run, IEnumerable<string> fingerprints, bool all)
+        {
+            Handed.AddRange(fingerprints);
+            HandedAll |= all;
+            var i = Runs.FindIndex(r => r.Number == run);
+            if (i >= 0 && all)
+            {
+                Runs[i] = Runs[i] with { HandedOff = true };
+            }
+
+            for (var f = 0; f < Found.Count; f++)
+            {
+                if (Handed.Contains(Found[f].Fingerprint))
+                {
+                    Found[f] = Found[f] with { Handed = true };
+                }
+            }
         }
 
         public IReadOnlyList<SecurityAuditRun> List(string project) => Runs;

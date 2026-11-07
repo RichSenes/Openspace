@@ -3,6 +3,7 @@ using System.Text;
 using Openspace.Application.Abstractions;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Roles;
+using Openspace.Application.Work;
 using Openspace.Domain.Work;
 
 namespace Openspace.Application.Security;
@@ -14,6 +15,9 @@ public enum SecurityAuditProfile
     Standard,
     Deep,
 }
+
+/// <summary>What became of findings handed over: how many tasks, under which epic, planned by the supervisor or not.</summary>
+public sealed record SecurityHandOff(int Tasks, Guid? EpicId, bool ByTheSupervisor);
 
 /// <summary>A run of an office's audits, with the task that runs it.</summary>
 public sealed record SecurityAuditView(SecurityAuditRun Run, WorkTaskStatus? Status, string? DeskName);
@@ -29,7 +33,8 @@ public sealed class SecurityAudits(
     IWorkTaskRepository tasks,
     ISecurityAuditRecords records,
     IUnitOfWork unitOfWork,
-    TimeProvider clock)
+    TimeProvider clock,
+    Supervisor? supervisor = null)
 {
     /// <summary>The skill an auditor's role names.</summary>
     public const string Skill = "security-audit";
@@ -56,9 +61,12 @@ public sealed class SecurityAudits(
         - Finish with a short note: how many findings are confirmed, how many need validation, how many were rejected, and the path of REPORT.md.
         """;
 
-    /// <summary>Starts an audit at the office's auditor desk, or at the one named.</summary>
+    /// <summary>
+    /// Starts an audit at the office's auditor desk, or at the one named. With
+    /// <paramref name="handOff"/> its findings go to the supervisor once it finishes.
+    /// </summary>
     public async Task<WorkTaskId> StartAsync(
-        OfficeId officeId, DeskId? deskId, SecurityAuditProfile profile, string requestedBy, CancellationToken cancellationToken, string? language = null)
+        OfficeId officeId, DeskId? deskId, SecurityAuditProfile profile, string requestedBy, CancellationToken cancellationToken, string? language = null, bool handOff = false)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         if (office.RepositoryPath is null)
@@ -76,7 +84,7 @@ public sealed class SecurityAudits(
         var folder = records.Open(Project(office), now);
         var task = WorkTask.Assign(office, desk.Id, title, Brief(office, profile, folder, Language(language)), requestedBy, now);
         task.WriteOutputTo(folder);
-        records.Link(folder, task.Id.Value);
+        records.Link(folder, task.Id.Value, handOff);
         tasks.Add(task);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return task.Id;
@@ -145,12 +153,9 @@ public sealed class SecurityAudits(
         return records.Findings(Project(office), run);
     }
 
-    /// <summary>
-    /// Proposes a task to fix a finding: a person picks its desk and approves it. A finding
-    /// still to verify is proven by a test first, and left alone when the test shows nothing.
-    /// </summary>
-    public async Task<WorkTaskId> ProposeFixAsync(
-        OfficeId officeId, int run, string fingerprint, string requestedBy, CancellationToken cancellationToken)
+    /// <summary>Hands one finding to the supervisor to fix: see <see cref="HandToSupervisorAsync"/>.</summary>
+    public async Task<SecurityHandOff> ProposeFixAsync(
+        OfficeId officeId, int run, string fingerprint, string requestedBy, CancellationToken cancellationToken, string? language = null)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         var finding = records.Findings(Project(office), run).FirstOrDefault(f => f.Fingerprint == fingerprint)
@@ -160,11 +165,109 @@ public sealed class SecurityAudits(
             throw new RejectedException("finding-rejected", "A rejected finding was disproved: there is nothing to fix.");
         }
 
-        var verb = finding.Verdict == "confirmed" ? "Fix" : "Verify and fix";
-        var task = WorkTask.Propose(office, Shorten($"{verb}: {finding.Title}", 120), FixBrief(finding, run), requestedBy, clock.GetUtcNow());
-        tasks.Add(task);
+        return await HandAsync(office, run, [finding], all: false, requestedBy, language, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Hands the run's open findings (confirmed or still to verify, and not handed yet) to the
+    /// office's supervisor, who turns them into proposed tasks already at the desks that work
+    /// on that code, under one epic. Without a supervisor that can plan, each becomes a
+    /// proposed task without a desk.
+    /// </summary>
+    public async Task<SecurityHandOff> HandToSupervisorAsync(
+        OfficeId officeId, int run, string requestedBy, CancellationToken cancellationToken, string? language = null)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        var open = records.Findings(Project(office), run).Where(f => !f.Handed && f.Verdict is "confirmed" or "needs_validation").ToList();
+        return await HandAsync(office, run, open, all: true, requestedBy, language, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Hands over the findings of every finished run that asked for it and was not handed yet:
+    /// what Openspace does on its own after an audit. Returns how many runs it handed.
+    /// </summary>
+    public async Task<int> HandFinishedAsync(CancellationToken cancellationToken)
+    {
+        var handed = 0;
+        foreach (var office in await offices.ListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            foreach (var run in records.List(Project(office)).Where(r => r.HandOff && !r.HandedOff && r.HasReport && r.TaskId is not null).ToList())
+            {
+                var task = await tasks.FindAsync(new WorkTaskId(run.TaskId!.Value), cancellationToken).ConfigureAwait(false);
+                if (task?.Status is WorkTaskStatus.Review or WorkTaskStatus.Done)
+                {
+                    await HandToSupervisorAsync(office.Id, run.Number, task.RequestedBy, cancellationToken, LanguageOf(task)).ConfigureAwait(false);
+                    handed++;
+                }
+            }
+        }
+
+        return handed;
+    }
+
+    private async Task<SecurityHandOff> HandAsync(
+        Office office, int run, List<SecurityFinding> findings, bool all, string requestedBy, string? language, CancellationToken cancellationToken)
+    {
+        if (findings.Count == 0)
+        {
+            records.MarkHanded(Project(office), run, [], all);
+            return new SecurityHandOff(0, null, true);
+        }
+
+        var lang = Language(language);
+        if (supervisor is not null)
+        {
+            try
+            {
+                var plan = await supervisor.PlanAsync(office.Id, SupervisorRequest(findings, run, lang), requestedBy, cancellationToken).ConfigureAwait(false);
+                records.MarkHanded(Project(office), run, findings.Select(f => f.Fingerprint), all);
+                return new SecurityHandOff(plan.Tasks.Count, plan.Epic.Id, true);
+            }
+            catch (RejectedException)
+            {
+                // No desks to share them among, or a plan that could not be made: one task each.
+            }
+        }
+
+        foreach (var finding in findings)
+        {
+            var verb = finding.Verdict == "confirmed" ? "Fix" : "Verify and fix";
+            tasks.Add(WorkTask.Propose(office, Shorten($"{verb}: {finding.Title}", 120), FixBrief(finding, run), requestedBy, clock.GetUtcNow()));
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return task.Id;
+        records.MarkHanded(Project(office), run, findings.Select(f => f.Fingerprint), all);
+        return new SecurityHandOff(findings.Count, null, false);
+    }
+
+    /// <summary>What the supervisor is asked: one task per finding, at the desk of that code, never the auditor's.</summary>
+    public static string SupervisorRequest(IReadOnlyList<SecurityFinding> findings, int run, string language)
+    {
+        var text = new StringBuilder();
+        text.AppendLine(CultureInfo.InvariantCulture, $"Security findings from audit run {run}, to fix. Make one task for each finding, for the desk that works on the code it names; join two findings in one task only when they touch the same code. Never give a task to the {DeskName} desk: it only audits. Put each finding's instructions in its task word for word. Write titles and descriptions in {language}.");
+        foreach (var (finding, i) in findings.Select((f, i) => (f, i + 1)))
+        {
+            text.AppendLine();
+            text.AppendLine(CultureInfo.InvariantCulture, $"## Finding {i}: {finding.Title}");
+            text.AppendLine(FixBrief(finding, run));
+        }
+
+        return text.ToString().Trim();
+    }
+
+    /// <summary>The language an audit task was asked to write in, from its brief.</summary>
+    private static string? LanguageOf(WorkTask task)
+    {
+        const string Marker = "- Write for a person in ";
+        var at = task.Description.IndexOf(Marker, StringComparison.Ordinal);
+        if (at < 0)
+        {
+            return null;
+        }
+
+        var rest = task.Description[(at + Marker.Length)..];
+        var end = rest.IndexOf(':', StringComparison.Ordinal);
+        return end > 0 ? rest[..end] : null;
     }
 
     /// <summary>The office's desks whose role names the security-audit skill.</summary>

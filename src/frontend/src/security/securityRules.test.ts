@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OfficeView, RoleView, SecurityAuditView, SecurityFindingView } from '../api/types'
-import { auditorDesks, groupFindings, runSummary, severitySummary } from './securityRules'
+import { auditorDesks, groupFindings, handOffMessage, openFindings, runSummary, severitySummary } from './securityRules'
 
 const run = (over: Partial<SecurityAuditView['run']> = {}): SecurityAuditView['run'] => ({
   number: 1,
@@ -13,6 +13,8 @@ const run = (over: Partial<SecurityAuditView['run']> = {}): SecurityAuditView['r
   rejected: 0,
   severities: {},
   hasReport: false,
+  handOff: false,
+  handedOff: false,
   ...over,
 })
 
@@ -47,6 +49,7 @@ describe('groupFindings', () => {
     severity,
     location: null,
     remediation: null,
+    handed: false,
   })
 
   it('puts confirmed findings worst first, apart from the rest', () => {
@@ -72,5 +75,24 @@ describe('auditorDesks', () => {
 
     expect(auditorDesks(office, roles).map((d) => d.id)).toEqual(['d1'])
     expect(auditorDesks(office, undefined)).toEqual([])
+  })
+})
+
+describe('hand-off', () => {
+  it('says where the tasks went', () => {
+    expect(handOffMessage({ tasks: 2, byTheSupervisor: true })).toBe('The supervisor proposed 2 tasks at the desks: approve them on the Board')
+    expect(handOffMessage({ tasks: 1, byTheSupervisor: false })).toBe('The supervisor could not plan: 1 task proposed without a desk, choose one on the Board')
+    expect(handOffMessage({ tasks: 0, byTheSupervisor: true })).toContain('Nothing left to hand over')
+  })
+
+  it('keeps only the findings still to hand over', () => {
+    const base = { title: '', description: '', severity: null, location: null, remediation: null }
+    const findings = [
+      { ...base, fingerprint: 'a', verdict: 'confirmed', handed: false },
+      { ...base, fingerprint: 'b', verdict: 'needs_validation', handed: true },
+      { ...base, fingerprint: 'c', verdict: 'rejected', handed: false },
+      { ...base, fingerprint: 'd', verdict: 'needs_validation', handed: false },
+    ]
+    expect(openFindings(findings).map((f) => f.fingerprint)).toEqual(['a', 'd'])
   })
 })

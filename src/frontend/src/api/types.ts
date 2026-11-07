@@ -412,6 +412,17 @@ export interface SecurityAuditRunView {
   /** Confirmed findings by overall severity. */
   severities: Partial<Record<FindingSeverity, number>>
   hasReport: boolean
+  /** Whether its findings go to the supervisor on their own once it finishes. */
+  handOff: boolean
+  /** Whether its open findings were all handed to the supervisor. */
+  handedOff: boolean
+}
+
+/** What became of findings handed over: tasks made, by the supervisor at desks or without one. */
+export interface SecurityHandOffView {
+  tasks: number
+  epicId: string | null
+  byTheSupervisor: boolean
 }
 
 export interface SecurityAuditView {
@@ -429,6 +440,8 @@ export interface SecurityFindingView {
   severity: FindingSeverity | null
   location: string | null
   remediation: string | null
+  /** Already handed to the supervisor to fix. */
+  handed: boolean
 }
 
 export interface EpicView {

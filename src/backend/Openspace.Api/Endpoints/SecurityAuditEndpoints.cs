@@ -8,7 +8,11 @@ internal static class SecurityAuditEndpoints
 {
     /// <param name="DeskId">The desk to run it at; the office's auditor desk when left out.</param>
     /// <param name="Language">The language its report and findings are written in, such as Italian; English when left out.</param>
-    public sealed record StartRequest(Guid? DeskId, SecurityAuditProfile Profile = SecurityAuditProfile.Quick, string? Language = null);
+    /// <param name="HandOff">Whether its findings go to the supervisor on their own once it finishes.</param>
+    public sealed record StartRequest(Guid? DeskId, SecurityAuditProfile Profile = SecurityAuditProfile.Quick, string? Language = null, bool HandOff = true);
+
+    /// <param name="Language">The language of the tasks' titles and descriptions; English when left out.</param>
+    public sealed record HandOffRequest(string? Language);
 
     /// <param name="Model">The Claude model of the new Auditor desk; sonnet when left out.</param>
     public sealed record DeskRequest(string? Model);
@@ -22,7 +26,7 @@ internal static class SecurityAuditEndpoints
 
         audits.MapPost("/", async (Guid officeId, StartRequest r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
         {
-            var id = await security.StartAsync(new OfficeId(officeId), r.DeskId is { } desk ? new DeskId(desk) : null, r.Profile, me.Value.Name, ct, r.Language);
+            var id = await security.StartAsync(new OfficeId(officeId), r.DeskId is { } desk ? new DeskId(desk) : null, r.Profile, me.Value.Name, ct, r.Language, r.HandOff);
             return Results.Created($"/api/tasks/{id.Value}", new { taskId = id.Value });
         });
 
@@ -34,12 +38,13 @@ internal static class SecurityAuditEndpoints
         audits.MapGet("/{run:int}/findings", (Guid officeId, int run, SecurityAudits security, CancellationToken ct) =>
             security.FindingsAsync(new OfficeId(officeId), run, ct));
 
-        audits.MapPost("/{run:int}/findings/{fingerprint}/fix", async (
-            Guid officeId, int run, string fingerprint, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
-        {
-            var id = await security.ProposeFixAsync(new OfficeId(officeId), run, fingerprint, me.Value.Name, ct);
-            return Results.Created($"/api/tasks/{id.Value}", new { taskId = id.Value });
-        });
+        audits.MapPost("/{run:int}/findings/{fingerprint}/fix", (
+            Guid officeId, int run, string fingerprint, HandOffRequest? r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
+            security.ProposeFixAsync(new OfficeId(officeId), run, fingerprint, me.Value.Name, ct, r?.Language));
+
+        audits.MapPost("/{run:int}/hand-off", (
+            Guid officeId, int run, HandOffRequest? r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
+            security.HandToSupervisorAsync(new OfficeId(officeId), run, me.Value.Name, ct, r?.Language));
 
         app.MapPost("/api/offices/{officeId:guid}/security-desk", async (Guid officeId, DeskRequest r, SecurityAudits security, CancellationToken ct) =>
             Results.Ok(new { deskId = (await security.AddDeskAsync(new OfficeId(officeId), r.Model, ct)).Value })).WithTags("Security audits");

@@ -88,4 +88,20 @@ public sealed class SecurityAuditRecordsTests : IDisposable
     {
         Assert.Throws<ArgumentException>(() => Records().List(project));
     }
+
+    [Fact]
+    public void Findings_handed_to_the_supervisor_are_remembered_with_the_run_hand_off()
+    {
+        var folder = Records().Open("e-corp", DateTimeOffset.UnixEpoch);
+        Records().Link(folder, Guid.NewGuid(), handOff: true);
+        File.WriteAllText(Path.Combine(folder, "findings.json"), Findings);
+
+        Records().MarkHanded("e-corp", 1, ["a1"], all: false);
+        var partly = Records().List("e-corp")[0];
+        Records().MarkHanded("e-corp", 1, ["b1", "a1"], all: true);
+
+        Assert.Equal((true, false), (partly.HandOff, partly.HandedOff));
+        Assert.True(Records().List("e-corp")[0].HandedOff);
+        Assert.Equal(["a1", "b1"], Records().Findings("e-corp", 1).Where(f => f.Handed).Select(f => f.Fingerprint));
+    }
 }

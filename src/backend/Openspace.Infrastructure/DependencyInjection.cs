@@ -131,6 +131,7 @@ public static class DependencyInjection
         // New releases of Openspace itself, from GitHub's public API: told, never installed.
         services.AddHttpClient<Application.Releases.IReleaseSource, Releases.GitHubReleases>(Honest);
         services.AddHostedService<ReleaseService>();
+        services.AddHostedService<SecurityHandOffService>();
 
         // The kanji of the day reads open dictionaries kept on this computer.
         services.AddSingleton<IKanjiBook, Routines.KanjiBook>();

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ShieldCheck, ShieldPlus, Wrench } from 'lucide-react'
+import { ShieldCheck, ShieldPlus, Users, Wrench } from 'lucide-react'
 import {
   useAddSecurityDesk,
+  useHandOff,
   useProposeFix,
   useRoles,
   useSecurityAudits,
@@ -15,7 +16,7 @@ import { LANGUAGES, type LanguageName } from '../reports/period'
 import { usePersistentState } from '../usePersistentState'
 import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
-import { auditorDesks, groupFindings, PROFILES, runSummary, severitySummary } from './securityRules'
+import { auditorDesks, groupFindings, handOffMessage, openFindings, PROFILES, runSummary, severitySummary } from './securityRules'
 import '../reports/reports.css'
 import './security.css'
 
@@ -33,6 +34,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
   const toast = useToast()
   const [profile, setProfile] = useState<SecurityAuditProfile>('Quick')
   const [language, setLanguage] = usePersistentState<LanguageName>('openspace.report-language', 'Italian')
+  const [handOff, setHandOff] = usePersistentState<'on' | 'off'>('openspace.security-hand-off', 'on')
   const [openRun, setOpenRun] = useState<number>()
   const auditors = auditorDesks(office, roles.data)
   const open = audits.data?.find((a) => a.run.number === openRun) ?? audits.data?.[0]
@@ -75,7 +77,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
           className="report-forms security-start"
           onSubmit={(e) => {
             e.preventDefault()
-            start.mutate({ profile, language }, {
+            start.mutate({ profile, language, handOff: handOff === 'on' }, {
               onSuccess: () => {
                 setOpenRun(undefined)
                 toast('Audit started: the auditor takes it from the queue')
@@ -107,6 +109,10 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
           <button type="submit" className="btn btn-primary" disabled={start.isPending || busy}>
             <ShieldCheck size={16} /> Start audit
           </button>
+          <label className="security-hand-off">
+            <input type="checkbox" checked={handOff === 'on'} onChange={(e) => setHandOff(e.target.checked ? 'on' : 'off')} />
+            <span>When it finishes, hand the findings to the supervisor, who proposes the fixes at the right desks</span>
+          </label>
           {busy && <p className="hint security-busy">An audit is already queued or running: one at a time keeps your plan in check.</p>}
           {start.error && <p className="error">{start.error.message}</p>}
         </form>
@@ -138,19 +144,22 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
               </li>
             ))}
           </ul>
-          {open && <AuditRun key={open.run.number} office={office} audit={open} />}
+          {open && <AuditRun key={open.run.number} office={office} audit={open} language={language} />}
         </div>
       )}
     </section>
   )
 }
 
-function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditView }) {
+function AuditRun({ office, audit, language }: { office: OfficeView; audit: SecurityAuditView; language: string }) {
   const { run } = audit
   const report = useSecurityReport(office.id, run.number, run.hasReport)
   const findings = useSecurityFindings(office.id, run.number)
   const groups = groupFindings(findings.data ?? [])
   const severities = severitySummary(run.severities)
+  const open = openFindings(findings.data ?? [])
+  const handAll = useHandOff(office.id)
+  const toast = useToast()
 
   return (
     <article className="report">
@@ -162,6 +171,24 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
         </span>
         {severities && <span className="security-severities">{severities}</span>}
       </header>
+
+      {run.hasReport && open.length > 0 && (
+        <div className="security-hand-all">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={handAll.isPending}
+            onClick={() => handAll.mutate({ run: run.number, language }, { onSuccess: (r) => toast(handOffMessage(r)) })}
+          >
+            <Users size={16} /> {handAll.isPending ? 'The supervisor is planning…' : `Hand ${open.length === 1 ? 'the open finding' : `all ${open.length} open findings`} to the supervisor`}
+          </button>
+          <span className="hint">It proposes one task per finding at the desk that works on that code; you approve them on the Board.</span>
+          {handAll.error && <p className="error">{handAll.error.message}</p>}
+        </div>
+      )}
+      {run.hasReport && open.length === 0 && (findings.data?.some((f) => f.handed) ?? false) && (
+        <p className="hint">Every open finding is with the supervisor: its tasks wait for you on the Board.</p>
+      )}
 
       {!run.hasReport && (
         <p className="hint">
@@ -177,7 +204,7 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
         <section className="findings" aria-label="Confirmed findings">
           <h2>Confirmed</h2>
           {groups.confirmed.map((f) => (
-            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} />
+            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} language={language} />
           ))}
         </section>
       )}
@@ -190,7 +217,7 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
             proves the hole, and stops there if it does not.
           </p>
           {groups.toVerify.map((f) => (
-            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} />
+            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} language={language} />
           ))}
         </section>
       )}
@@ -201,7 +228,7 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
             {groups.rejected.length} rejected: candidates a verifier disproved
           </summary>
           {groups.rejected.map((f) => (
-            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} />
+            <Finding key={f.fingerprint} office={office} run={run.number} finding={f} language={language} />
           ))}
         </details>
       )}
@@ -216,10 +243,9 @@ function AuditRun({ office, audit }: { office: OfficeView; audit: SecurityAuditV
   )
 }
 
-function Finding({ office, run, finding }: { office: OfficeView; run: number; finding: SecurityFindingView }) {
+function Finding({ office, run, finding, language }: { office: OfficeView; run: number; finding: SecurityFindingView; language: string }) {
   const fix = useProposeFix(office.id)
   const toast = useToast()
-  const [proposed, setProposed] = useState(false)
 
   return (
     <div className="finding">
@@ -230,29 +256,22 @@ function Finding({ office, run, finding }: { office: OfficeView; run: number; fi
       {finding.location && <code className="finding-where">{finding.location}</code>}
       {finding.description && <p>{finding.description}</p>}
       {finding.remediation && <p className="hint">How to fix it: {finding.remediation}</p>}
-      {(finding.verdict === 'confirmed' || finding.verdict === 'needs_validation') && (
-        <div className="row">
-          <button
-            type="button"
-            className="btn"
-            disabled={fix.isPending || proposed}
-            onClick={() =>
-              fix.mutate(
-                { run, fingerprint: finding.fingerprint },
-                {
-                  onSuccess: () => {
-                    setProposed(true)
-                    toast('Fix proposed: choose its desk and approve it on the Board')
-                  },
-                },
-              )
-            }
-          >
-            <Wrench size={16} /> {proposed ? 'Fix proposed' : finding.verdict === 'confirmed' ? 'Propose a fix' : 'Propose to verify and fix'}
-          </button>
-          {fix.error && <p className="error">{fix.error.message}</p>}
-        </div>
-      )}
+      {(finding.verdict === 'confirmed' || finding.verdict === 'needs_validation') &&
+        (finding.handed ? (
+          <p className="hint">With the supervisor: its task waits for you on the Board.</p>
+        ) : (
+          <div className="row">
+            <button
+              type="button"
+              className="btn"
+              disabled={fix.isPending}
+              onClick={() => fix.mutate({ run, fingerprint: finding.fingerprint, language }, { onSuccess: (r) => toast(handOffMessage(r)) })}
+            >
+              <Wrench size={16} /> {fix.isPending ? 'The supervisor is planning…' : finding.verdict === 'confirmed' ? 'Hand this fix to the supervisor' : 'Hand to the supervisor to verify and fix'}
+            </button>
+            {fix.error && <p className="error">{fix.error.message}</p>}
+          </div>
+        ))}
     </div>
   )
 }

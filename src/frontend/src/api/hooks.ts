@@ -3,6 +3,7 @@ import { readError, request } from './client'
 import type {
   SecurityAuditProfile,
   SecurityAuditView,
+  SecurityHandOffView,
   SecurityFindingView,
   SkillCatalogView,
   BranchMergeResult,
@@ -833,7 +834,7 @@ export function useAddSecurityDesk(officeId: string) {
 export function useStartSecurityAudit(officeId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (input: { profile: SecurityAuditProfile; language: string }) =>
+    mutationFn: (input: { profile: SecurityAuditProfile; language: string; handOff: boolean }) =>
       request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits`, input),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.securityAudits(officeId) })
@@ -842,11 +843,34 @@ export function useStartSecurityAudit(officeId: string) {
   })
 }
 
-/** Proposes a task to fix a confirmed finding; a person chooses its desk on the Board. */
+/** Hands findings to the office's supervisor, who proposes tasks already at the right desks. */
+function useHandOffWrite<TInput>(officeId: string, url: (input: TInput) => string, body: (input: TInput) => unknown) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: TInput) => request<SecurityHandOffView>('POST', url(input), body(input)),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.tasks })
+      void client.invalidateQueries({ queryKey: keys.epics })
+      void client.invalidateQueries({ queryKey: ['security-audits', officeId] })
+    },
+  })
+}
+
+/** One finding to the supervisor. */
 export function useProposeFix(officeId: string) {
-  return useWrite(
-    (input: { run: number; fingerprint: string }) =>
-      request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits/${input.run}/findings/${encodeURIComponent(input.fingerprint)}/fix`),
-    keys.tasks,
+  return useHandOffWrite(
+    officeId,
+    (input: { run: number; fingerprint: string; language: string }) =>
+      `/api/offices/${officeId}/security-audits/${input.run}/findings/${encodeURIComponent(input.fingerprint)}/fix`,
+    (input) => ({ language: input.language }),
+  )
+}
+
+/** Every open finding of a run to the supervisor. */
+export function useHandOff(officeId: string) {
+  return useHandOffWrite(
+    officeId,
+    (input: { run: number; language: string }) => `/api/offices/${officeId}/security-audits/${input.run}/hand-off`,
+    (input) => ({ language: input.language }),
   )
 }

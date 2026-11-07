@@ -144,6 +144,13 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// </summary>
     public string? OutputFolder { get; private set; }
 
+    /// <summary>
+    /// Whether the task waits for its desk's own account instead of going on with a reserve
+    /// model: a task keeping records of its own, such as a security audit, would mix two
+    /// models' ways of working halfway.
+    /// </summary>
+    public bool WaitsForItsDesk => OutputFolder is not null;
+
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
         Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)

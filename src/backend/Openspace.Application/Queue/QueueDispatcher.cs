@@ -82,7 +82,7 @@ public sealed class QueueDispatcher(
                 var office = await OfficeOfAsync(task, officeCache, cancellationToken).ConfigureAwait(false);
                 if (!Hand(task, office, desk, now))
                 {
-                    reasons[task.Id.Value] = Paused(office, desk);
+                    reasons[task.Id.Value] = Paused(office, desk, task.WaitsForItsDesk);
                     continue;
                 }
             }
@@ -110,12 +110,17 @@ public sealed class QueueDispatcher(
     }
 
     /// <summary>Why a task whose desk is over its limits found no reserve to go on with.</summary>
-    private string Paused(Office office, DeskId desk)
+    private string Paused(Office office, DeskId desk, bool ownDeskOnly)
     {
         var scope = EngineLimits.ScopeOf(office.Locate(desk).Desk.Agent);
         var pause = limits.Pauses().FirstOrDefault(p => p.Scope == scope);
         var account = pause?.Label ?? "Its account";
         var until = pause is null ? string.Empty : $" until {pause.Until.ToLocalTime():HH:mm}";
+        if (ownDeskOnly)
+        {
+            return $"{account} is over its limits{until}, and this task waits for its own desk rather than a reserve model: it goes on then.";
+        }
+
         return office.ReserveModels.Count == 0
             ? $"{account} is over its limits{until}, and the office has no reserve model: it goes on then."
             : $"{account} is over its limits{until}, and no reserve model is free: it goes on then.";
@@ -178,6 +183,11 @@ public sealed class QueueDispatcher(
             }
 
             return true;
+        }
+
+        if (task.WaitsForItsDesk)
+        {
+            return false;
         }
 
         var reserve = office.ReserveModels.FirstOrDefault(m =>

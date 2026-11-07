@@ -642,7 +642,9 @@ allowed, only that skill). Each audit is an ordinary task whose agent may also w
 run folder (the task's output folder, passed with `--add-dir` or an OpenCode
 `external_directory` rule): `SecurityAudits:Folder/<office>/run-N`, outside the repository,
 with an `openspace.json` naming the task. The brief tells the agent to leave the repository
-untouched and to read earlier runs as prior runs, so each run builds on the last. Openspace
+untouched and to read earlier runs as prior runs, so each run builds on the last. An audit never goes on
+with a reserve model: while its desk's account is over its limits it waits in the queue,
+so one run is never split between two models. Openspace
 reads the records as they are written; a file half written reads as missing. Fixes are
 separate proposed tasks, one per finding, with its location and remediation; for a finding
 still to verify the task writes a test that proves it first, and changes nothing if it does not.

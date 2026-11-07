@@ -1,3 +1,4 @@
+import { SupervisorStatus } from '../supervisor/SupervisorStatus'
 import { NeedsYou } from '../activity/NeedsYou'
 import { ReleaseBanner } from '../release/ReleaseBanner'
 import { MuteButton } from '../sounds/MuteButton'
@@ -64,6 +65,7 @@ export function TopBar({ view, onView, link }: Props) {
       <div className="statusbar" aria-label="Accounts and graphics card">
         <LimitPauses onOpen={() => onView('board')} />
         <GpuStatus onOpen={() => onView('board')} />
+        <SupervisorStatus onOpen={() => onView('board')} />
         <ClaudeMeter onOpen={() => onView('settings')} />
       </div>
       <ReleaseBanner />

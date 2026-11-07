@@ -1,5 +1,10 @@
 .security-start {
-  grid-template-columns: 160px 160px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(180px, 280px) 160px auto;
+  align-items: start;
+}
+
+.security-start > .btn {
+  align-self: end;
 }
 
 .security-report > .markdown {
@@ -107,9 +112,13 @@
   cursor: pointer;
 }
 
+/* The line that explains an action sits under it, never beside it. */
 .security-hand-all {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.security-planning {
+  margin: 0;
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Openspace.Application.Security;
+using Openspace.Application.Work;
 using Openspace.Domain.Offices;
 
 namespace Openspace.Api.Endpoints;
@@ -16,6 +17,8 @@ internal static class SecurityAuditEndpoints
 
     /// <param name="Model">The Claude model of the new Auditor desk; sonnet when left out.</param>
     public sealed record DeskRequest(string? Model);
+
+    private static SupervisorOutcome Outcome(SecurityHandOff handOff) => new(handOff.Tasks, handOff.EpicId);
 
     public static void MapSecurityAuditEndpoints(this IEndpointRouteBuilder app)
     {
@@ -38,13 +41,25 @@ internal static class SecurityAuditEndpoints
         audits.MapGet("/{run:int}/findings", (Guid officeId, int run, SecurityAudits security, CancellationToken ct) =>
             security.FindingsAsync(new OfficeId(officeId), run, ct));
 
-        audits.MapPost("/{run:int}/findings/{fingerprint}/fix", (
-            Guid officeId, int run, string fingerprint, HandOffRequest? r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
-            security.ProposeFixAsync(new OfficeId(officeId), run, fingerprint, me.Value.Name, ct, r?.Language));
+        // Handing findings over asks the supervisor for a plan: it runs in the background.
+        audits.MapPost("/{run:int}/findings/{fingerprint}/fix", async (
+            Guid officeId, int run, string fingerprint, HandOffRequest? r, SecurityAudits security, SupervisorJobs jobs, IOptions<OperatorOptions> me, CancellationToken ct) =>
+        {
+            var finding = await security.OpenFindingAsync(new OfficeId(officeId), run, fingerprint, ct);
+            var by = me.Value.Name;
+            var job = jobs.Start(officeId, "security", $"Fix: {finding.Title}", SecurityAudits.JobKey(officeId, run), async (services, token) =>
+                Outcome(await services.GetRequiredService<SecurityAudits>().ProposeFixAsync(new OfficeId(officeId), run, fingerprint, by, token, r?.Language)));
+            return Results.Accepted($"/api/supervisor/jobs?officeId={officeId}", job);
+        });
 
         audits.MapPost("/{run:int}/hand-off", (
-            Guid officeId, int run, HandOffRequest? r, SecurityAudits security, IOptions<OperatorOptions> me, CancellationToken ct) =>
-            security.HandToSupervisorAsync(new OfficeId(officeId), run, me.Value.Name, ct, r?.Language));
+            Guid officeId, int run, HandOffRequest? r, SupervisorJobs jobs, IOptions<OperatorOptions> me) =>
+        {
+            var by = me.Value.Name;
+            var job = jobs.Start(officeId, "security", $"Findings of security audit run {run}", SecurityAudits.JobKey(officeId, run), async (services, token) =>
+                Outcome(await services.GetRequiredService<SecurityAudits>().HandToSupervisorAsync(new OfficeId(officeId), run, by, token, r?.Language)));
+            return Results.Accepted($"/api/supervisor/jobs?officeId={officeId}", job);
+        });
 
         app.MapPost("/api/offices/{officeId:guid}/security-desk", async (Guid officeId, DeskRequest r, SecurityAudits security, CancellationToken ct) =>
             Results.Ok(new { deskId = (await security.AddDeskAsync(new OfficeId(officeId), r.Model, ct)).Value })).WithTags("Security audits");

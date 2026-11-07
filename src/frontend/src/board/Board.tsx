@@ -10,6 +10,7 @@ import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
 import { MergeDialog } from './MergeDialog'
+import { PlansStrip } from '../supervisor/PlansStrip'
 import { awaitingMerge, checksDone, COLUMNS, searchTasks, waitingFor, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
 
@@ -79,6 +80,8 @@ export function Board({ office, initialTaskId }: Props) {
           </button>
         </div>
       </header>
+
+      <PlansStrip officeId={office.id} onShowEpic={(id) => setEpicFilter(id)} />
 
       {tasks.error && <p className="error board-error">Could not load tasks: {tasks.error.message}</p>}
 

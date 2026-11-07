@@ -48,15 +48,6 @@ export function groupFindings(findings: SecurityFindingView[]) {
   }
 }
 
-/** The toast after a hand-off: where the tasks went, and what to do next. */
-export function handOffMessage(result: { tasks: number; byTheSupervisor: boolean }): string {
-  if (result.tasks === 0) return 'Nothing left to hand over: every open finding is already with the supervisor'
-  const tasks = result.tasks === 1 ? '1 task' : `${result.tasks} tasks`
-  return result.byTheSupervisor
-    ? `The supervisor proposed ${tasks} at the desks: approve them on the Board`
-    : `The supervisor could not plan: ${tasks} proposed without a desk, choose one on the Board`
-}
-
 /** Open findings of a run not handed over yet: confirmed or still to verify. */
 export function openFindings(findings: SecurityFindingView[]): SecurityFindingView[] {
   return findings.filter((f) => !f.handed && (f.verdict === 'confirmed' || f.verdict === 'needs_validation'))

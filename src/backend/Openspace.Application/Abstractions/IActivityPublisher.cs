@@ -23,4 +23,7 @@ public interface IActivityPublisher
 
     /// <summary>Why queued tasks wait changed: every queued task that waits, with its reason.</summary>
     Task QueueWaitsChangedAsync(IReadOnlyList<QueueWait> waits, CancellationToken cancellationToken);
+
+    /// <summary>A supervisor's plan started, finished or failed: every plan of the last minutes.</summary>
+    Task SupervisorJobsChangedAsync(IReadOnlyList<Work.SupervisorJob> jobs, CancellationToken cancellationToken);
 }

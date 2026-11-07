@@ -73,6 +73,21 @@ public sealed class Supervisor(
         Write titles and descriptions in the language of the request. Do not change anything.
         """;
 
+    /// <summary>Refuses at once what a plan would refuse after a minute: no repository, or no desks.</summary>
+    public async Task CheckAsync(OfficeId officeId, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        if (office.RepositoryPath is null)
+        {
+            throw new RejectedException("no-repository", $"Office '{office.Name}' has no repository yet: set it in Rooms so the supervisor can read the project.");
+        }
+
+        if (!office.Rooms.Any(r => r.Desks.Count > 0))
+        {
+            throw new RejectedException("no-desks", $"Office '{office.Name}' has no desks yet: add some in Rooms first.");
+        }
+    }
+
     public async Task<PlanView> PlanAsync(OfficeId officeId, string request, string requestedBy, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request))

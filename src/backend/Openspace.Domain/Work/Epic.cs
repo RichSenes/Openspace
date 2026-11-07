@@ -14,7 +14,7 @@ public readonly record struct EpicId(Guid Value)
 /// </summary>
 public sealed class Epic : AggregateRoot<EpicId>
 {
-    private const int MaxRequestLength = 4000;
+    private const int MaxRequestLength = 20_000;
 
     private Epic(EpicId id, OfficeId officeId, string title, string request, string requestedBy, DateTimeOffset createdAt)
         : base(id)

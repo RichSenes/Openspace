@@ -26,4 +26,7 @@ internal sealed class SignalRActivityPublisher(IHubContext<BuildingHub> hub) : I
 
     public Task QueueWaitsChangedAsync(IReadOnlyList<QueueWait> waits, CancellationToken cancellationToken) =>
         hub.Clients.All.SendAsync("QueueWaits", waits, cancellationToken);
+
+    public Task SupervisorJobsChangedAsync(IReadOnlyList<Application.Work.SupervisorJob> jobs, CancellationToken cancellationToken) =>
+        hub.Clients.All.SendAsync("SupervisorJobs", jobs, cancellationToken);
 }

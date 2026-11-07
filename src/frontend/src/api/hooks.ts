@@ -3,7 +3,7 @@ import { readError, request } from './client'
 import type {
   SecurityAuditProfile,
   SecurityAuditView,
-  SecurityHandOffView,
+  SupervisorJob,
   SecurityFindingView,
   SkillCatalogView,
   BranchMergeResult,
@@ -27,7 +27,6 @@ import type {
   FeedLine,
   EpicView,
   OfficeView,
-  PlanView,
   ReportView,
   RoleInput,
   RoleView,
@@ -76,6 +75,7 @@ export const keys = {
   deskUsage: ['usage', 'desks'] as const,
   google: ['google'] as const,
   skills: ['skills'] as const,
+  supervisorJobs: ['supervisor-jobs'] as const,
   securityAudits: (officeId: string) => ['security-audits', officeId] as const,
   securityFindings: (officeId: string, run: number) => ['security-audits', officeId, run, 'findings'] as const,
   securityReport: (officeId: string, run: number) => ['security-audits', officeId, run, 'report'] as const,
@@ -448,15 +448,22 @@ export function useEpics(officeId: string) {
 }
 
 /** Asks the supervisor to split a request into proposed tasks. Can take a minute. */
+/** Asks the supervisor for a plan: it runs in the background and shows up in the supervisor's jobs. */
 export function usePlan(officeId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (text: string) => request<PlanView>('POST', `/api/offices/${officeId}/plan`, { request: text }),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.tasks })
-      void client.invalidateQueries({ queryKey: keys.epics })
-    },
+    mutationFn: (text: string) => request<SupervisorJob>('POST', `/api/offices/${officeId}/plan`, { request: text }),
+    onSuccess: (job) => client.setQueryData<SupervisorJob[]>(keys.supervisorJobs, (list) => mergeJob(list, job)),
   })
+}
+
+/** The supervisor's plans of every office: running, and finished in the last quarter of an hour. */
+export function useSupervisorJobs() {
+  return useQuery({ queryKey: keys.supervisorJobs, queryFn: () => request<SupervisorJob[]>('GET', '/api/supervisor/jobs') })
+}
+
+function mergeJob(list: SupervisorJob[] | undefined, job: SupervisorJob): SupervisorJob[] {
+  return [...(list ?? []).filter((j) => j.id !== job.id), job]
 }
 
 export function useApproveEpic() {
@@ -843,23 +850,18 @@ export function useStartSecurityAudit(officeId: string) {
   })
 }
 
-/** Hands findings to the office's supervisor, who proposes tasks already at the right desks. */
-function useHandOffWrite<TInput>(officeId: string, url: (input: TInput) => string, body: (input: TInput) => unknown) {
+/** Hands findings to the office's supervisor in the background; its plan shows up in the supervisor's jobs. */
+function useHandOffWrite<TInput>(url: (input: TInput) => string, body: (input: TInput) => unknown) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (input: TInput) => request<SecurityHandOffView>('POST', url(input), body(input)),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.tasks })
-      void client.invalidateQueries({ queryKey: keys.epics })
-      void client.invalidateQueries({ queryKey: ['security-audits', officeId] })
-    },
+    mutationFn: (input: TInput) => request<SupervisorJob>('POST', url(input), body(input)),
+    onSuccess: (job) => client.setQueryData<SupervisorJob[]>(keys.supervisorJobs, (list) => mergeJob(list, job)),
   })
 }
 
 /** One finding to the supervisor. */
 export function useProposeFix(officeId: string) {
   return useHandOffWrite(
-    officeId,
     (input: { run: number; fingerprint: string; language: string }) =>
       `/api/offices/${officeId}/security-audits/${input.run}/findings/${encodeURIComponent(input.fingerprint)}/fix`,
     (input) => ({ language: input.language }),
@@ -869,7 +871,6 @@ export function useProposeFix(officeId: string) {
 /** Every open finding of a run to the supervisor. */
 export function useHandOff(officeId: string) {
   return useHandOffWrite(
-    officeId,
     (input: { run: number; language: string }) => `/api/offices/${officeId}/security-audits/${input.run}/hand-off`,
     (input) => ({ language: input.language }),
   )

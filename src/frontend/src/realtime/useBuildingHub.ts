@@ -7,7 +7,7 @@ import { mergeGuests } from '../building/guests'
 import { mergeInterns } from '../activity/interns'
 import { reportRoutineProgress } from './routineProgress'
 import { keys } from '../api/hooks'
-import type { DeskActivity, DeskContext, DeskInterns, Guest, OfficeGuests, QueueWait } from '../api/types'
+import type { DeskActivity, DeskContext, DeskInterns, Guest, OfficeGuests, QueueWait, SupervisorJob } from '../api/types'
 import { retryDelay } from './retry'
 import { cueOfActivity, emitCue, type SoundEvent } from '../sounds/rules'
 
@@ -47,6 +47,7 @@ export function useBuildingHub(): LinkState {
     })
     hub.on('DeskInterns', (interns: DeskInterns) => client.setQueryData<DeskInterns[]>(keys.interns, (list) => mergeInterns(list, interns)))
     hub.on('QueueWaits', (waits: QueueWait[]) => client.setQueryData<QueueWait[]>(keys.queueWaits, waits))
+    hub.on('SupervisorJobs', (jobs: SupervisorJob[]) => client.setQueryData<SupervisorJob[]>(keys.supervisorJobs, jobs))
     hub.on('OfficeGuests', (office: OfficeGuests) => client.setQueryData<Guest[]>(keys.guests, (list) => mergeGuests(list, office)))
     hub.on('DeskContext', (context: DeskContext) => client.setQueryData<DeskContext[]>(keys.context, (list) => mergeContext(list, context)))
     hub.on('TaskCue', (c: { taskId: string | null; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>

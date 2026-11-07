@@ -1,0 +1,43 @@
+.plans-strip {
+  display: grid;
+  gap: 6px;
+  margin: 0 20px 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-job {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.plan-job-planning {
+  color: var(--st-queued);
+}
+
+.plan-job-failed {
+  color: var(--danger);
+}
+
+.plan-job-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.plan-job-what {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.plan-job-close {
+  margin-left: auto;
+}

@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddSingleton<ActivityBoard>();
         services.AddSingleton<ContextBoard>();
         services.AddSingleton<InternBoard>();
+        services.AddSingleton<SupervisorJobs>();
         services.AddSingleton<Queue.QueueWaits>();
         services.AddSingleton<Weather.WeatherReport>();
         services.AddSingleton<Releases.ReleaseWatch>();

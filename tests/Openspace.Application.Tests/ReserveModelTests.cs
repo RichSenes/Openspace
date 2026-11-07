@@ -8,11 +8,18 @@ public class ReserveModelTests
 {
     private readonly Harness _h = new();
 
-    private async Task<WorkTask> PausedOnClaudeAsync(params string[] reserves)
+    private Task<WorkTask> PausedOnClaudeAsync(params string[] reserves) => PausedWritingAsync(null, reserves);
+
+    private async Task<WorkTask> PausedWritingAsync(string? outputFolder, params string[] reserves)
     {
         await _h.OfficeCommands().ChangeDeskAgentAsync(_h.Office.Id, _h.Desk.Id, AgentEngine.ClaudeCode, "build", "sonnet", default);
         await _h.OfficeCommands().SetReserveModelsAsync(_h.Office.Id, reserves, default);
         var task = _h.Enqueue();
+        if (outputFolder is not null)
+        {
+            task.WriteOutputTo(outputFolder);
+        }
+
         await _h.Runner().RunQueueAsync(default);
         await _h.Signals().OutOfLimitsAsync(task.Run!.SessionId, EngineLimits.ClaudeCode, Harness.Start.AddHours(3), "The Claude account is over its usage limits.", default);
         return task;
@@ -139,5 +146,16 @@ public class ReserveModelTests
         Assert.DoesNotContain(waits, w => w.TaskId == first.Id.Value);
         Assert.Equal("Its desk is busy with another task.", waits.Single(w => w.TaskId == second.Id.Value).Reason);
         Assert.Single(_h.Publisher.Waits);
+    }
+
+    [Fact]
+    public async Task A_task_keeping_records_of_its_own_waits_for_its_desk_instead_of_a_reserve()
+    {
+        var task = await PausedWritingAsync("/srv/audits/e-corp/run-1", "nvidia/qwen3-coder");
+
+        await _h.Runner().RunQueueAsync(default);
+
+        Assert.Equal((WorkTaskStatus.Queued, (string?)null), (task.Status, task.ReserveModel));
+        Assert.Contains("waits for its own desk rather than a reserve model", _h.Waits.Snapshot().Single(w => w.TaskId == task.Id.Value).Reason, StringComparison.Ordinal);
     }
 }

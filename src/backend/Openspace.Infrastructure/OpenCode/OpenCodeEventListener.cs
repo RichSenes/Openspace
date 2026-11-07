@@ -20,6 +20,9 @@ internal sealed partial class OpenCodeEventListener(
     /// <summary>Answers whose tokens were counted: OpenCode may report a finished answer more than once.</summary>
     private readonly HashSet<string> _counted = [];
 
+    /// <summary>Helpers' sessions and the agent's session they hang from.</summary>
+    private readonly Dictionary<string, string> _roots = [];
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var delay = TimeSpan.FromSeconds(1);
@@ -58,10 +61,12 @@ internal sealed partial class OpenCodeEventListener(
 
             AgentSignal? signal;
             AgentSignal? delegation;
+            string? directory;
             try
             {
                 using var json = JsonDocument.Parse(line.AsMemory(5));
                 var payload = json.RootElement.TryGetProperty("payload", out var p) ? p : json.RootElement;
+                directory = json.RootElement.TryGetProperty("directory", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() : null;
                 signal = OpenCodeEventTranslator.Translate(payload);
                 delegation = OpenCodeEventTranslator.Delegation(payload);
             }
@@ -74,6 +79,16 @@ internal sealed partial class OpenCodeEventListener(
             if (signal is AgentSignal.Used { MessageId: { } answer } && !Count(answer))
             {
                 continue;
+            }
+
+            // A helper's permission request is the agent's: its task answers it, or shows it to a person.
+            if (signal is AgentSignal.PermissionAsked asked)
+            {
+                signal = asked with { SessionId = await RootAsync(asked.SessionId, directory, stoppingToken).ConfigureAwait(false) };
+            }
+            else if (signal is AgentSignal.PermissionReplied replied)
+            {
+                signal = replied with { SessionId = await RootAsync(replied.SessionId, directory, stoppingToken).ConfigureAwait(false) };
             }
 
             if (signal is not null)
@@ -95,6 +110,32 @@ internal sealed partial class OpenCodeEventListener(
         }
     }
 
+    private async Task<string> RootAsync(string sessionId, string? directory, CancellationToken cancellationToken)
+    {
+        if (_roots.TryGetValue(sessionId, out var known))
+        {
+            return known;
+        }
+
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var root = await scope.ServiceProvider.GetRequiredService<OpenCodeRuntime>().RootSessionAsync(sessionId, directory, cancellationToken).ConfigureAwait(false);
+            if (_roots.Count > 10_000)
+            {
+                _roots.Clear();
+            }
+
+            _roots[sessionId] = root;
+            return root;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            LogNoRoot(logger, sessionId, ex.Message);
+            return sessionId;
+        }
+    }
+
     private bool Count(string answer)
     {
         if (_counted.Count > 10_000)
@@ -113,6 +154,9 @@ internal sealed partial class OpenCodeEventListener(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Lost the OpenCode event stream ({Reason}); retrying in {Seconds}s")]
     private static partial void LogDisconnected(ILogger logger, string reason, double seconds);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not find the session {Session} hangs from ({Reason})")]
+    private static partial void LogNoRoot(ILogger logger, string session, string reason);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Skipped an unreadable OpenCode event: {Reason}")]
     private static partial void LogUnreadable(ILogger logger, string reason);

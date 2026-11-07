@@ -347,7 +347,8 @@ public sealed partial class AgentSignals(
 
         var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
         var guarded = (await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false)).Count > 0;
-        if (pending.FirstOrDefault(p => p.SessionId == task.Run.SessionId && p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action, guarded)) is { } next)
+        // Every session in the task's copy is its agent's or one of its helpers'.
+        if (pending.FirstOrDefault(p => p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action, guarded)) is { } next)
         {
             await ShowWaitingAsync(task, next.Id, next.Action, cancellationToken).ConfigureAwait(false);
         }

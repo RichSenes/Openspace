@@ -65,6 +65,8 @@ public sealed class SkillsTests : IDisposable
         Assert.Contains("\"name\":\"openspace\"", File.ReadAllText(Path.Combine(some.PluginFolder, ".claude-plugin", "plugin.json")), StringComparison.Ordinal);
         Assert.Equal([some.PluginFolder, Skills], some.ReadFolders);
         Assert.Null(Catalog().For([]));
+        Assert.Equal([Skills, Path.Combine(_root, "plugins")], Catalog().ReadFolders);
+        Assert.Empty(Catalog(Path.Combine(_root, "missing")).ReadFolders);
     }
 
     [Fact]
@@ -113,16 +115,17 @@ public sealed class SkillsTests : IDisposable
     [Fact]
     public void OpenCode_agents_load_only_their_role_skills_read_the_skills_folder_and_may_write_their_output()
     {
-        var rules = OpenCodeRuntime.Rules(RolePermissions.Default, [], "/home/me/.claude/skills", ["security-audit"], "/srv/audits/run-1")
+        var rules = OpenCodeRuntime.Rules(RolePermissions.Default, [], ["/home/me/.claude/skills", "/home/me/.local/share/openspace/skill-plugins"], ["security-audit"], "/srv/audits/run-1")
             .Select(r => System.Text.Json.JsonSerializer.Serialize(r))
             .ToList();
-        var everything = OpenCodeRuntime.Rules(RolePermissions.Default, [], "/home/me/.claude/skills")
+        var everything = OpenCodeRuntime.Rules(RolePermissions.Default, [], ["/home/me/.claude/skills"])
             .Select(r => System.Text.Json.JsonSerializer.Serialize(r));
 
         Assert.Contains("""{"permission":"skill","pattern":"*","action":"deny"}""", rules);
         Assert.Contains("""{"permission":"skill","pattern":"security-audit","action":"allow"}""", rules);
         Assert.Contains("""{"permission":"external_directory","pattern":"/home/me/.claude/skills/*","action":"allow"}""", rules);
         Assert.Contains("""{"permission":"edit","pattern":"/home/me/.claude/skills/*","action":"deny"}""", rules);
+        Assert.Contains("""{"permission":"external_directory","pattern":"/home/me/.local/share/openspace/skill-plugins/*","action":"allow"}""", rules);
         Assert.Contains("""{"permission":"external_directory","pattern":"/srv/audits/run-1/*","action":"allow"}""", rules);
         Assert.DoesNotContain(everything, r => r.Contains("\"skill\"", StringComparison.Ordinal));
     }

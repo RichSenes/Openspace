@@ -480,6 +480,14 @@ sound the rules give that moment at that desk: the desk's rule first, then its
 room's, then the general one, then the default. Built-in sounds are drawn in code,
 in the spirit of the pixel art.
 
+## Helpers' permissions
+
+OpenCode runs each helper (an intern) in a session of its own, hanging from the agent's.
+When a helper asks for a permission, Openspace follows `parentID` up to the agent's session
+and treats the request as the task's: answered on its own when it may, shown under
+**needs you** otherwise. After an answer, and when a task is resumed, the requests still
+waiting in the task's copy are read again, the helpers' included.
+
 ## Private folders
 
 An office can list folders of the person's own that no agent may touch: photos,
@@ -620,6 +628,8 @@ restricted, so Openspace hands them over as a tiny plugin of links (`--plugin-di
 `Skills:PluginsFolder`): one link to the whole folder, or one per skill the role names.
 Its agents also get the `Skill` tool, the plugin and the skills' folder to read
 (`--add-dir`), and deny rules on editing both. Skills show up as `openspace:<name>`.
+OpenCode agents may read the plugins' folder too: a task begun on Claude Code and taken
+over by an OpenCode reserve keeps naming the skills' files by those paths.
 
 ## Security audits
 

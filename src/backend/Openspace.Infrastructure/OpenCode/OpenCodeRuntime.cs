@@ -24,7 +24,7 @@ internal sealed class OpenCodeRuntime(
         string workspacePath, string title, AgentSetup setup, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(setup);
-        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions, setup.PrivatePaths ?? [], skills?.Folder, setup.Skills, setup.OutputFolder) };
+        var body = new Dictionary<string, object> { ["title"] = title, ["permission"] = Rules(setup.Permissions, setup.PrivatePaths ?? [], skills?.ReadFolders ?? [], setup.Skills, setup.OutputFolder) };
 
         using var response = await http
             .PostAsJsonAsync(In("session", workspacePath), body, cancellationToken)
@@ -253,6 +253,28 @@ internal sealed class OpenCodeRuntime(
         return texts.Count > 0 ? texts[^1] : null;
     }
 
+    /// <summary>
+    /// The session a helper's session hangs from, up to the agent's own: helpers run in
+    /// sessions of their own, and Openspace only knows the agent's.
+    /// </summary>
+    public async Task<string> RootSessionAsync(string sessionId, string? directory, CancellationToken cancellationToken)
+    {
+        var current = sessionId;
+        for (var depth = 0; depth < 8; depth++)
+        {
+            var path = directory is null ? $"session/{current}" : In($"session/{current}", directory);
+            using var session = await GetJsonAsync(path, cancellationToken).ConfigureAwait(false);
+            if (!session.RootElement.TryGetProperty("parentID", out var parent) || parent.GetString() is not { Length: > 0 } next)
+            {
+                return current;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
     public async Task<IReadOnlyList<PermissionRequest>> PendingPermissionsAsync(string workspacePath, CancellationToken cancellationToken)
     {
         using var pending = await GetJsonAsync(In("permission", workspacePath), cancellationToken).ConfigureAwait(false);
@@ -298,13 +320,13 @@ internal sealed class OpenCodeRuntime(
     /// Read-only sessions (all denied) may not leave it at all.
     /// </summary>
     /// <summary>What an agent may touch, in OpenCode's terms. Later rules win, so private folders come last.</summary>
-    /// <param name="skillsFolder">The installed skills, readable by every agent, never writable.</param>
+    /// <param name="skillFolders">Where the installed skills are read from: readable by every agent, never writable.</param>
     /// <param name="skills">The skills the agent may load; null for all of them.</param>
     /// <param name="outputFolder">A folder outside its copy the agent may also write in.</param>
     internal static object[] Rules(
         RolePermissions? permissions,
         IReadOnlyList<string> privatePaths,
-        string? skillsFolder = null,
+        IReadOnlyList<string>? skillFolders = null,
         IReadOnlyList<string>? skills = null,
         string? outputFolder = null)
     {
@@ -323,11 +345,11 @@ internal sealed class OpenCodeRuntime(
             rules.AddRange(skills.Select(name => (object)new { permission = "skill", pattern = name, action = "allow" }));
         }
 
-        if (skillsFolder is not null)
+        foreach (var folder in skillFolders ?? [])
         {
             // A loaded skill's other files are read from its folder, outside the copy.
-            rules.Add(new { permission = "external_directory", pattern = $"{skillsFolder}/*", action = "allow" });
-            rules.Add(new { permission = "edit", pattern = $"{skillsFolder}/*", action = "deny" });
+            rules.Add(new { permission = "external_directory", pattern = $"{folder}/*", action = "allow" });
+            rules.Add(new { permission = "edit", pattern = $"{folder}/*", action = "deny" });
         }
 
         if (outputFolder is not null)

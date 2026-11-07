@@ -298,4 +298,21 @@ public class OpenCodeRuntimeTests
         Assert.Null(await runtime.ReviewAsync("/srv/worktrees/abc", "Review it.", "Task", """{"type":"object"}""", [], default));
         Assert.Empty(server.Requests);
     }
+
+    [Fact]
+    public async Task A_helper_session_is_traced_back_to_the_agent_session()
+    {
+        var (runtime, server) = Create(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/session/ses_intern" => (HttpStatusCode.OK, """{"id":"ses_intern","parentID":"ses_lead"}"""),
+            "/session/ses_lead" => (HttpStatusCode.OK, """{"id":"ses_lead","parentID":"ses_agent"}"""),
+            _ => (HttpStatusCode.OK, """{"id":"ses_agent"}"""),
+        });
+
+        var root = await runtime.RootSessionAsync("ses_intern", Workspace, default);
+
+        Assert.Equal("ses_agent", root);
+        Assert.Equal(3, server.Requests.Count);
+        Assert.Contains("directory=%2Fsrv%2Fworktrees%2Fabc", server.Requests[0].PathAndQuery, StringComparison.Ordinal);
+    }
 }

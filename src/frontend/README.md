@@ -85,8 +85,9 @@ proposes (yes or no), and run now.
 read them, copy them, download them.
 
 **Security.** The office's security audits: add a Security desk, start an audit (quick,
-standard or deep), follow its runs, read the report and the findings (confirmed worst
-first, those to verify, the rejected), and propose a fix task for a confirmed one.
+standard or deep, in a chosen language), follow its runs, read the findings (confirmed worst
+first, those to verify, the rejected) and the full report, and hand the findings to the
+supervisor, one or all at once, or let the audit do it by itself when it finishes.
 
 **Agents.** Roles: description, instructions (with an AI draft to review),
 preferred model, what the agent may do without asking, and which installed skills it

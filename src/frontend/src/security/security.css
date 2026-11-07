@@ -98,3 +98,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.security-hand-off {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.security-hand-all {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}

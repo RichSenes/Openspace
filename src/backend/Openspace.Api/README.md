@@ -91,11 +91,12 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | PUT | `/api/roles/{id}/skills` | `{ skills }`: the skills the role's agents may load, by name; `null` gives them every installed skill, `[]` none |
 | GET | `/api/skills` | `{ folder, skills: [{ name, description }] }`: the installed skills, read from their SKILL.md |
 | POST | `/api/offices/{id}/security-desk` | `{ model? }` → `{ deskId }`: a Security room with an Auditor desk on Claude Code (sonnet unless named) and the shared Security auditor role; the existing desk when there is one |
-| POST | `/api/offices/{id}/security-audits` | `{ deskId?, profile?, language? }` (`Quick`, `Standard` or `Deep`, quick by default; the language its report and findings are written in, English by default) → `{ taskId }`: queues an audit at the office's auditor desk with a new run folder. `422` with code `no-repository` or `no-auditor` |
+| POST | `/api/offices/{id}/security-audits` | `{ deskId?, profile?, language?, handOff? }` (`Quick`, `Standard` or `Deep`, quick by default; the language its report and findings are written in, English by default; `handOff`, on by default, hands its findings to the supervisor once it finishes) → `{ taskId }`: queues an audit at the office's auditor desk with a new run folder. `422` with code `no-repository` or `no-auditor` |
 | GET | `/api/offices/{id}/security-audits` | The office's runs, newest first: `[{ run: { number, startedAt, taskId, profile, sourceRef, confirmed, needsValidation, rejected, severities, hasReport }, status, deskName }]` |
 | GET | `/api/offices/{id}/security-audits/{run}/report` | The run's REPORT.md as Markdown; `404` while it has none |
 | GET | `/api/offices/{id}/security-audits/{run}/findings` | `[{ fingerprint, verdict, title, description, severity, location, remediation }]` |
-| POST | `/api/offices/{id}/security-audits/{run}/findings/{fingerprint}/fix` | Propose a task fixing a finding → `{ taskId }`: a confirmed one is fixed, one still to verify is proven by a test first; `422` with code `finding-rejected` for a disproved one |
+| POST | `/api/offices/{id}/security-audits/{run}/findings/{fingerprint}/fix` | `{ language? }`: hand one finding to the supervisor → `{ tasks, epicId, byTheSupervisor }`: a confirmed one is fixed, one still to verify is proven by a test first; `422` with code `finding-rejected` for a disproved one |
+| POST | `/api/offices/{id}/security-audits/{run}/hand-off` | `{ language? }`: hand every open finding not handed yet to the supervisor, same answer |
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
@@ -646,7 +647,12 @@ untouched and to read earlier runs as prior runs, so each run builds on the last
 with a reserve model: while its desk's account is over its limits it waits in the queue,
 so one run is never split between two models. Openspace
 reads the records as they are written; a file half written reads as missing. Fixes are
-separate proposed tasks, one per finding, with its location and remediation; for a finding
+separate proposed tasks: the office's supervisor gets the open findings (confirmed or still
+to verify) and proposes one task per finding at the desk that works on that code, never the
+Auditor, under one epic, ready for **Approve all**. Without a supervisor that can plan, each
+finding becomes a proposed task without a desk. Findings handed over are remembered in the
+run's `openspace.json`, so none goes twice; an audit started with `handOff` is handed over by
+itself within two minutes of finishing (`SecurityHandOffService`). For a finding
 still to verify the task writes a test that proves it first, and changes nothing if it does not.
 Confirming a finding needs a network-isolated sandbox to run the code in; where the system
 refuses one (Ubuntu limits unprivileged user namespaces), findings stay to verify.

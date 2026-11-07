@@ -36,16 +36,33 @@ internal sealed class SecurityAuditRecords(IOptionsMonitor<SecurityAuditOptions>
             var next = Runs(folder).Select(r => r.Number).DefaultIfEmpty(0).Max() + 1;
             var run = Path.Combine(folder, RunPrefix + next.ToString(CultureInfo.InvariantCulture));
             Directory.CreateDirectory(run);
-            File.WriteAllText(Path.Combine(run, Marker), JsonSerializer.Serialize(new { startedAt = now }));
+            Write(Path.Combine(run, Marker), new MarkerFile { StartedAt = now });
             return run;
         }
     }
 
-    public void Link(string folder, Guid taskId)
+    public void Link(string folder, Guid taskId, bool handOff = false)
     {
         var marker = Path.Combine(folder, Marker);
-        var startedAt = ReadMarker(marker).StartedAt ?? DateTimeOffset.UtcNow;
-        File.WriteAllText(marker, JsonSerializer.Serialize(new { startedAt, taskId }));
+        lock (_opening)
+        {
+            var current = ReadMarker(marker);
+            Write(marker, current with { StartedAt = current.StartedAt ?? DateTimeOffset.UtcNow, TaskId = taskId, HandOff = handOff });
+        }
+    }
+
+    public void MarkHanded(string project, int run, IEnumerable<string> fingerprints, bool all)
+    {
+        var marker = Path.Combine(Run(project, run), Marker);
+        lock (_opening)
+        {
+            var current = ReadMarker(marker);
+            Write(marker, current with
+            {
+                Handed = [.. (current.Handed ?? []).Concat(fingerprints).Distinct(StringComparer.Ordinal)],
+                HandedOff = current.HandedOff || all,
+            });
+        }
     }
 
     public IReadOnlyList<SecurityAuditRun> List(string project)
@@ -62,13 +79,15 @@ internal sealed class SecurityAuditRecords(IOptionsMonitor<SecurityAuditOptions>
 
     public IReadOnlyList<SecurityFinding> Findings(string project, int run)
     {
-        using var findings = Json(Path.Combine(Run(project, run), "findings.json"));
+        var folder = Run(project, run);
+        var handed = (ReadMarker(Path.Combine(folder, Marker)).Handed ?? []).ToHashSet(StringComparer.Ordinal);
+        using var findings = Json(Path.Combine(folder, "findings.json"));
         if (findings?.RootElement is not { ValueKind: JsonValueKind.Array } items)
         {
             return [];
         }
 
-        return [.. items.EnumerateArray().Where(i => i.ValueKind == JsonValueKind.Object).Select(Finding)];
+        return [.. items.EnumerateArray().Where(i => i.ValueKind == JsonValueKind.Object).Select(Finding).Select(f => f with { Handed = handed.Contains(f.Fingerprint) })];
     }
 
     internal static SecurityFinding Finding(JsonElement item)
@@ -132,7 +151,9 @@ internal sealed class SecurityAuditRecords(IOptionsMonitor<SecurityAuditOptions>
             findings.Count(f => f.Verdict == "needs_validation"),
             findings.Count(f => f.Verdict == "rejected"),
             severities,
-            File.Exists(Path.Combine(folder, "REPORT.md")));
+            File.Exists(Path.Combine(folder, "REPORT.md")),
+            marker.HandOff,
+            marker.HandedOff);
     }
 
     private string Project(string project)
@@ -153,18 +174,34 @@ internal sealed class SecurityAuditRecords(IOptionsMonitor<SecurityAuditOptions>
             .Where(r => r.Ok && r.Number > 0)
             .Select(r => (r.Number, r.Path));
 
-    private static (DateTimeOffset? StartedAt, Guid? TaskId) ReadMarker(string file)
+    /// <summary>What Openspace keeps in a run's folder: when it started, its task, and what went to the supervisor.</summary>
+    private sealed record MarkerFile
     {
-        using var json = Json(file);
-        if (json?.RootElement is not { ValueKind: JsonValueKind.Object } m)
-        {
-            return (null, null);
-        }
+        public DateTimeOffset? StartedAt { get; init; }
 
-        DateTimeOffset? startedAt = m.TryGetProperty("startedAt", out var at) && at.TryGetDateTimeOffset(out var when) ? when : null;
-        Guid? taskId = m.TryGetProperty("taskId", out var id) && id.TryGetGuid(out var guid) ? guid : null;
-        return (startedAt, taskId);
+        public Guid? TaskId { get; init; }
+
+        public bool HandOff { get; init; }
+
+        public bool HandedOff { get; init; }
+
+        public List<string>? Handed { get; init; }
     }
+
+    private static MarkerFile ReadMarker(string file)
+    {
+        try
+        {
+            return File.Exists(file) ? JsonSerializer.Deserialize<MarkerFile>(File.ReadAllText(file), JsonSerializerOptions.Web) ?? new MarkerFile() : new MarkerFile();
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            return new MarkerFile();
+        }
+    }
+
+    private static void Write(string file, MarkerFile marker) =>
+        File.WriteAllText(file, JsonSerializer.Serialize(marker, JsonSerializerOptions.Web));
 
     /// <summary>A JSON record, or null when it is missing or half written.</summary>
     private static JsonDocument? Json(string file)

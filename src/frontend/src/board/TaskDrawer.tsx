@@ -8,6 +8,7 @@ import {
   useMergeTask,
   useOpenPullRequest,
   useCheckPullRequest,
+  useRequestReview,
   useSendBack,
   useTaskCommand,
   useTickCheck,
@@ -40,6 +41,7 @@ const when = (iso: string) =>
 
 export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClose }: Props) {
   const toast = useToast()
+  const requestReview = useRequestReview()
   const waits = useQueueWaits().data
   const command = useTaskCommand()
   const approve = useApproveTask()
@@ -189,6 +191,19 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
 
             {reviewVerdictOf(task, reviewerOn) === 'reviewing' && (
               <p className="hint">The reviewer is reading this work: its verdict shows up in the notes in a few minutes.</p>
+            )}
+            {reviewerOn && task.status === 'Review' && ['waiting', 'failed', undefined].includes(reviewVerdictOf(task, reviewerOn)) && (
+              <div className="review-again">
+                <button type="button" className="btn" disabled={requestReview.isPending} onClick={() => requestReview.mutate(task.id, { onSuccess: () => toast('Review asked: its verdict shows up in the notes') })}>
+                  Review it now
+                </button>
+                <span className="hint">
+                  {reviewVerdictOf(task, reviewerOn) === 'waiting'
+                    ? 'The review waits for the Claude limits to reset and tries again by itself every quarter of an hour. Ask now if they already did.'
+                    : 'No review came for this round. Ask the reviewer to read it.'}
+                </span>
+                {requestReview.error && <p className="error">{requestReview.error.message}</p>}
+              </div>
             )}
 
             <BuildsOn task={task} tasks={tasks} />

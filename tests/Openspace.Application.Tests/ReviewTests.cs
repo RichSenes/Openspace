@@ -84,14 +84,52 @@ public class ReviewTests
     public async Task A_review_that_cannot_run_says_so_and_leaves_the_work_to_you()
     {
         var task = await FinishedTaskAsync();
-        _h.Runtime.FailOnReview = new InvalidOperationException("Claude Code stopped: usage limit reached");
+        _h.Runtime.FailOnReview = new InvalidOperationException("Claude Code stopped: the model is not available");
 
         await _h.Reviewer().ReviewAsync(task.Id, default);
 
         var note = task.Notes[^1];
         Assert.Equal(NoteAuthorKind.System, note.Author.Kind);
-        Assert.Contains("usage limit reached", note.Text, StringComparison.Ordinal);
+        Assert.StartsWith(Review.TaskReviewer.FailedNote, note.Text, StringComparison.Ordinal);
         Assert.Equal(WorkTaskStatus.Review, task.Status);
+        Assert.False(_h.Reviews.IsDeferred(task.Id));
+    }
+
+    [Theory]
+    [InlineData("Claude Code stopped: You've hit your 5-hour limit · resets 8:10pm (Europe/Rome)")]
+    [InlineData("Claude Code stopped: usage limit reached")]
+    public async Task A_review_stopped_by_the_account_limits_waits_and_tries_again_by_itself_told_once(string reason)
+    {
+        var task = await FinishedTaskAsync();
+        _h.Runtime.FailOnReview = new InvalidOperationException(reason);
+
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+        var early = _h.Reviews.EnqueueDue(_h.Clock.GetUtcNow());
+        _h.Clock.Advance(Review.TaskReviewer.RetryAfter);
+        var due = _h.Reviews.EnqueueDue(_h.Clock.GetUtcNow());
+        _h.Runtime.FailOnReview = null;
+        _h.Runtime.Review = """{"verdict":"ok","summary":"Fine.","findings":[]}""";
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+
+        Assert.Equal((0, 1), (early, due));
+        Assert.Single(task.Notes, n => n.Text.StartsWith(Review.TaskReviewer.WaitingNote, StringComparison.Ordinal));
+        Assert.Equal(NoteAuthorKind.Reviewer, task.Notes[^1].Author.Kind);
+    }
+
+    [Fact]
+    public async Task After_a_restart_reviews_left_waiting_are_put_back_in_line_and_a_person_can_ask_again()
+    {
+        var task = await FinishedTaskAsync();
+        _h.Runtime.FailOnReview = new InvalidOperationException("You've hit your 5-hour limit");
+        await _h.Reviewer().ReviewAsync(task.Id, default);
+
+        var recovered = await _h.Reviewer().RecoverWaitingAsync(default);
+        await _h.Reviewer().RequestAsync(task.Id, default);
+        var other = _h.Enqueue("Still queued");
+
+        Assert.Equal(1, recovered);
+        await Assert.ThrowsAsync<RejectedException>(() => _h.Reviewer().RequestAsync(other.Id, default));
     }
 
     [Fact]

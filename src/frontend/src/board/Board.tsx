@@ -149,6 +149,11 @@ export function Board({ office, initialTaskId }: Props) {
                               <Hourglass size={12} aria-hidden /> Being reviewed…
                             </span>
                           )}
+                          {verdict === 'waiting' && (
+                            <span className="card-review">
+                              <Hourglass size={12} aria-hidden /> Review waits for the Claude limits
+                            </span>
+                          )}
                           {verdict === 'ok' && (
                             <span className="card-review card-review-ok">
                               <Check size={12} aria-hidden /> Review: ready to accept

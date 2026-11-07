@@ -9,10 +9,33 @@ namespace Openspace.Infrastructure.Hosting;
 internal sealed partial class ReviewRunnerService(
     PendingReviews pending,
     IServiceScopeFactory scopes,
+    TimeProvider clock,
     ILogger<ReviewRunnerService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<TaskReviewer>().RecoverWaitingAsync(stoppingToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogRecoverFailed(logger, ex);
+        }
+
+        // Reviews put off for the account's limits come back when they are due.
+        _ = Task.Run(
+            async () =>
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), clock, stoppingToken).ConfigureAwait(false);
+                    pending.EnqueueDue(clock.GetUtcNow());
+                }
+            },
+            stoppingToken);
+
         await foreach (var taskId in pending.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             try
@@ -26,6 +49,9 @@ internal sealed partial class ReviewRunnerService(
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not look for reviews left waiting")]
+    private static partial void LogRecoverFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Could not review task {TaskId}")]
     private static partial void LogReviewFailed(ILogger logger, Exception exception, Guid taskId);

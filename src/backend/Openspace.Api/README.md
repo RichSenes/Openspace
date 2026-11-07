@@ -46,6 +46,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/tasks/{id}` | One task with its notes |
 | POST | `/api/tasks` | `{ officeId, deskId?, title, description? }`: queued with a desk, proposed without |
 | POST | `/api/tasks/{id}/approve` | Approve a proposed task: `{ deskId? }` |
+| POST | `/api/tasks/{id}/review` | Ask the reviewer to read work in review again → `202`; `422` with code `not-in-review` otherwise. A review stopped by the account's usage limits waits and tries again by itself every quarter of an hour (and after a restart), saying so once in a note |
 | POST | `/api/tasks/{id}/accept` | Accept work in review |
 | POST | `/api/tasks/{id}/send-back` | Back to the queue for another round: `{ text?, withReview? }`; with `withReview` the reviewer's note on this round goes along, after the text or alone |
 | PUT | `/api/tasks/{id}/checks/{number}` | Tick a check a person tried by hand, or untick it: `{ done }`; in review or done |

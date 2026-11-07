@@ -135,7 +135,7 @@ internal sealed class Harness
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Context, Interns, Audit, Publisher, Reviews, Permissions,
         new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, Clock);
 
-    public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance);
+    public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance, Reviews);
 
     public OfficeCommands OfficeCommands() => new(Offices, Roles, UnitOfWork, Workspaces, Clock);
 

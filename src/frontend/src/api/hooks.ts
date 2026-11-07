@@ -174,6 +174,11 @@ export function useTaskText(kind: 'notes' | 'send-back') {
 }
 
 /** Sends work back with feedback, the reviewer's latest note, or both. */
+/** Asks the reviewer to read work in review again, such as after it could not run. */
+export function useRequestReview() {
+  return useWrite((taskId: string) => request<void>('POST', `/api/tasks/${taskId}/review`), keys.tasks)
+}
+
 export function useSendBack() {
   return useWrite(
     (input: { taskId: string; text: string | null; withReview: boolean }) =>

@@ -80,7 +80,11 @@ export const timeOf = (iso: string) => Date.parse(iso.replace(/(\.\d{3})\d+/, '$
 /** Longest a review may take before Openspace stops saying one is under way. */
 export const REVIEW_PATIENCE_MS = 30 * 60_000
 
-export type ReviewVerdict = 'ok' | 'changes' | 'reviewing'
+export type ReviewVerdict = 'ok' | 'changes' | 'reviewing' | 'waiting' | 'failed'
+
+/** How the API starts its notes about reviews that did not happen (TaskReviewer). */
+export const REVIEW_FAILED_NOTE = 'The review could not run'
+export const REVIEW_WAITING_NOTE = "The review waits for the reviewer's account"
 
 /**
  * What the reviewer said about the work as it is now: its note written since the work last
@@ -92,8 +96,11 @@ export function reviewVerdictOf(task: WorkTaskView, reviewerOn = false, now = Da
   const since = timeOf(task.statusChangedAt)
   const latest = currentReview(task)
   if (latest) return latest.text.startsWith('OK') ? 'ok' : 'changes'
-  const failed = task.notes.some((n) => n.authorKind === 'System' && timeOf(n.writtenAt) >= since && n.text.startsWith('The review by Claude could not run'))
-  return reviewerOn && !failed && now - since < REVIEW_PATIENCE_MS ? 'reviewing' : undefined
+  const latestSystem = [...task.notes]
+    .reverse()
+    .find((n) => n.authorKind === 'System' && timeOf(n.writtenAt) >= since && (n.text.startsWith(REVIEW_FAILED_NOTE) || n.text.startsWith(REVIEW_WAITING_NOTE)))
+  if (latestSystem) return latestSystem.text.startsWith(REVIEW_WAITING_NOTE) ? 'waiting' : 'failed'
+  return reviewerOn && now - since < REVIEW_PATIENCE_MS ? 'reviewing' : undefined
 }
 
 /** The reviewer's note about the work as it is now, if it came. */

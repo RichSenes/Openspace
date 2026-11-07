@@ -83,6 +83,13 @@ describe('reviewVerdictOf', () => {
     expect(reviewVerdictOf({ ...reviewed, notes: [...reviewed.notes, note('Reviewer', 'OK: ready to accept.')] })).toBe('ok')
   })
 
+  it('tells a review that waits for the account from one that failed', () => {
+    const waiting = { ...task('Logout', 'Review'), notes: [note('System', "The review waits for the reviewer's account (You've hit your 5-hour limit): it tries again")] }
+    const failed = { ...task('Logout', 'Review'), notes: [note('System', 'The review could not run (no model). The work is ready for you anyway.')] }
+    expect(reviewVerdictOf(waiting, true)).toBe('waiting')
+    expect(reviewVerdictOf(failed, true)).toBe('failed')
+  })
+
   it('says nothing without a review, or once the work left review', () => {
     expect(reviewVerdictOf({ ...task('Logout', 'Review'), notes: [note('System', 'OK then')] })).toBeUndefined()
     expect(reviewVerdictOf({ ...task('Logout', 'Done'), notes: [note('Reviewer', 'OK: ready to accept.')] })).toBeUndefined()
@@ -109,8 +116,8 @@ describe('reviewVerdictOf across rounds', () => {
   })
 
   it('stops waiting when the review failed or never came', () => {
-    const failed = { ...resubmitted, notes: [...resubmitted.notes, at('System', 'The review by Claude could not run (limit).', '2015-06-24T10:01:00Z')] }
-    expect(reviewVerdictOf(failed, true, now)).toBeUndefined()
+    const failed = { ...resubmitted, notes: [...resubmitted.notes, at('System', 'The review could not run (no model).', '2015-06-24T10:01:00Z')] }
+    expect(reviewVerdictOf(failed, true, now)).toBe('failed')
     expect(reviewVerdictOf(resubmitted, true, timeOf('2015-06-24T11:00:00Z'))).toBeUndefined()
   })
 })

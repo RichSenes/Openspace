@@ -764,3 +764,10 @@
   align-items: start;
   gap: 8px;
 }
+
+/* The hint under the action it explains. */
+.review-again {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}

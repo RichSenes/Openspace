@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -19,10 +20,26 @@ public sealed partial class TaskReviewer(
     IAgentRuntime runtime,
     IAuditLog audit,
     TimeProvider clock,
-    ILogger<TaskReviewer> logger)
+    ILogger<TaskReviewer> logger,
+    PendingReviews? pending = null)
 {
     /// <summary>How the reviewer signs its notes, whichever engine reads the work.</summary>
     public const string Name = "Review";
+
+    /// <summary>The start of the note left when a review fails for good; the page reads it.</summary>
+    public const string FailedNote = "The review could not run";
+
+    /// <summary>The start of the note left when a review waits for the account's limits to reset.</summary>
+    public const string WaitingNote = "The review waits for the reviewer's account";
+
+    /// <summary>How long a review put off for the account's limits waits before it tries again.</summary>
+    public static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(15);
+
+    [GeneratedRegex(@"hit your [\w -]*limit|(usage|rate|session|weekly|5-hour) limit|limit (reached|exceeded)|out of (extra )?usage", RegexOptions.IgnoreCase)]
+    private static partial Regex LimitWords();
+
+    /// <summary>Whether a failed review only met the account's usage limits, and may simply be tried later.</summary>
+    public static bool IsOverLimits(string message) => LimitWords().IsMatch(message);
 
     private const string Instructions = """
         You review the work of an AI agent before a person accepts it. You may read files and run
@@ -74,6 +91,41 @@ public sealed partial class TaskReviewer(
         required = new[] { "verdict", "summary", "findings" },
     });
 
+    /// <summary>A person asks for the review again, for work in review: it joins the line at once.</summary>
+    public async Task RequestAsync(WorkTaskId taskId, CancellationToken cancellationToken)
+    {
+        var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
+        if (task.Status != WorkTaskStatus.Review || task.Run is null)
+        {
+            throw new RejectedException("not-in-review", "Only work in review can be reviewed.");
+        }
+
+        (pending ?? throw new InvalidOperationException("Reviews are not running here.")).Enqueue(taskId);
+    }
+
+    /// <summary>
+    /// After a restart: reviews that were waiting for the account's limits (only in memory
+    /// before) are looked for in the notes and put back in line.
+    /// </summary>
+    public async Task<int> RecoverWaitingAsync(CancellationToken cancellationToken)
+    {
+        if (pending is null)
+        {
+            return 0;
+        }
+
+        var waiting = (await tasks.ListAsync(null, WorkTaskStatus.Review, cancellationToken).ConfigureAwait(false))
+            .Where(t => !t.Notes.Any(n => n.WrittenAt >= t.StatusChangedAt && n.Author.Kind == NoteAuthorKind.Reviewer)
+                && t.Notes.Any(n => n.WrittenAt >= t.StatusChangedAt && n.Text.StartsWith(WaitingNote, StringComparison.Ordinal)))
+            .ToList();
+        foreach (var task in waiting)
+        {
+            pending.Enqueue(task.Id);
+        }
+
+        return waiting.Count;
+    }
+
     public async Task ReviewAsync(WorkTaskId taskId, CancellationToken cancellationToken)
     {
         var task = await tasks.GetAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -93,7 +145,21 @@ public sealed partial class TaskReviewer(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogReviewFailed(logger, ex, taskId.Value);
-            await NoteAsync(taskId, NoteAuthor.System, $"The review could not run ({ex.Message}). The work is ready for you anyway.", cancellationToken)
+            if (pending is not null && IsOverLimits(ex.Message))
+            {
+                // Only the account's limits: the review comes back by itself, told once.
+                var waitedBefore = task.Notes.Any(n => n.WrittenAt >= task.StatusChangedAt && n.Text.StartsWith(WaitingNote, StringComparison.Ordinal));
+                pending.Defer(taskId, clock.GetUtcNow() + RetryAfter);
+                if (!waitedBefore)
+                {
+                    await NoteAsync(taskId, NoteAuthor.System, $"{WaitingNote} ({ex.Message}): it tries again by itself every quarter of an hour until the limit resets. The work is ready for you anyway.", cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                return;
+            }
+
+            await NoteAsync(taskId, NoteAuthor.System, $"{FailedNote} ({ex.Message}). The work is ready for you anyway.", cancellationToken)
                 .ConfigureAwait(false);
             return;
         }

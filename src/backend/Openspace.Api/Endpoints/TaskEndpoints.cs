@@ -120,6 +120,12 @@ internal static class TaskEndpoints
             return Results.NoContent();
         });
 
+        tasks.MapPost("/{taskId:guid}/review", async (Guid taskId, Application.Review.TaskReviewer reviewer, CancellationToken ct) =>
+        {
+            await reviewer.RequestAsync(new WorkTaskId(taskId), ct);
+            return Results.Accepted();
+        });
+
         tasks.MapPost("/{taskId:guid}/accept", (Guid taskId, WorkTaskCommands commands, CancellationToken ct) =>
             NoContent(commands.AcceptAsync(new WorkTaskId(taskId), ct)));
 

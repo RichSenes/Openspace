@@ -6,6 +6,7 @@ import { BuildingView } from './building/BuildingView'
 import { Sidebar } from './layout/Sidebar'
 import { TopBar, type View } from './layout/TopBar'
 import { useSoundCues } from './sounds/useSoundCues'
+import { useSupervisorJobCues } from './supervisor/useSupervisorJobCues'
 import { useBuildingHub } from './realtime/useBuildingHub'
 import { ReportsPanel } from './reports/ReportsPanel'
 import { SettingsPanel } from './settings/SettingsPanel'
@@ -18,6 +19,7 @@ import './layout/layout.css'
 export default function App() {
   const link = useBuildingHub()
   useSoundCues()
+  useSupervisorJobCues()
   const offices = useOffices()
   const [view, setView] = usePersistentState<View>('openspace.view', 'building')
   const [selectedId, setSelectedId] = usePersistentState<string>('openspace.office', '')

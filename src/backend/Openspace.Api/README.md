@@ -75,7 +75,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, account over its limits, graphics card taken, no free seat) |
 | GET | `/api/guests?officeId=` | Claude Code sessions started outside Openspace, working in an office's repository now: `{ id, officeId, folder, branch, state, since, lastAt }`; `folder` and `branch` are null in offices with private folders |
 | GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
-| POST | `/api/offices/{id}/plan` | `{ request }`: the supervisor proposes tasks; returns `{ epic, tasks }`. `422` with `no-repository`, `no-desks`, `empty-text` or `planning-failed` |
+| POST | `/api/offices/{id}/plan` | `{ request }` (20,000 characters at most): the supervisor plans in the background; `202` with the job `{ id, officeId, kind, what, key, startedAt, state, tasks, epicId, error, endedAt }` at once. `422` with `no-repository`, `no-desks` or `empty-text` before it starts; a plan that fails ends as a `Failed` job with the reason |
+| GET | `/api/supervisor/jobs?officeId=` | The supervisor's plans: running (`Planning`), and `Done` or `Failed` in the last quarter of an hour |
 | GET | `/api/epics?officeId=` | Epics of an office |
 | POST | `/api/epics/{id}/approve` | Queue every proposal of the epic that has a desk; returns `{ approved }` |
 | POST | `/api/offices/{id}/reports` | `{ from, to, scope, language }`: report of what happened in that period |
@@ -95,8 +96,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/offices/{id}/security-audits` | The office's runs, newest first: `[{ run: { number, startedAt, taskId, profile, sourceRef, confirmed, needsValidation, rejected, severities, hasReport }, status, deskName }]` |
 | GET | `/api/offices/{id}/security-audits/{run}/report` | The run's REPORT.md as Markdown; `404` while it has none |
 | GET | `/api/offices/{id}/security-audits/{run}/findings` | `[{ fingerprint, verdict, title, description, severity, location, remediation }]` |
-| POST | `/api/offices/{id}/security-audits/{run}/findings/{fingerprint}/fix` | `{ language? }`: hand one finding to the supervisor → `{ tasks, epicId, byTheSupervisor }`: a confirmed one is fixed, one still to verify is proven by a test first; `422` with code `finding-rejected` for a disproved one |
-| POST | `/api/offices/{id}/security-audits/{run}/hand-off` | `{ language? }`: hand every open finding not handed yet to the supervisor, same answer |
+| POST | `/api/offices/{id}/security-audits/{run}/findings/{fingerprint}/fix` | `{ language? }`: hand one finding to the supervisor, in the background → `202` with its job (one at a time per run): a confirmed one is fixed, one still to verify is proven by a test first; `422` with code `finding-rejected` for a disproved one |
+| POST | `/api/offices/{id}/security-audits/{run}/hand-off` | `{ language? }`: hand every open finding not handed yet to the supervisor, in the background → `202` with its job |
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
@@ -162,6 +163,7 @@ SignalR hub at `/hubs/building`, server to client only:
 | `DeskInterns` | the desk's interns | an agent hands work to a helper, the helper comes back, or the agent stops |
 | `OfficeGuests` | an office's guests | a guest comes in, changes what it does, or leaves |
 | `QueueWaits` | every queued task that waits, with its reason | the reason a queued task waits changes, or it starts |
+| `SupervisorJobs` | every plan of the supervisor shown, as in `GET /api/supervisor/jobs` | a plan starts, ends or fails |
 | `DeskContext` | the energy | an answer changed how full a desk's conversation is, or the engine summarised it |
 | `TaskLogChanged` | task id | a tool call, step or permission was added to the task's log |
 | `RolesChanged` | none | a role was defined or changed |
@@ -170,7 +172,7 @@ SignalR hub at `/hubs/building`, server to client only:
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity`, `DeskContext`, `DeskInterns`,
-`OfficeGuests` and `QueueWaits` carry the data themselves, because activity, energy, interns,
+`OfficeGuests`, `QueueWaits` and `SupervisorJobs` carry the data themselves, because activity, energy, interns,
 guests and the queue's reasons are not stored.
 
 ## Run

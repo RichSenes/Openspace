@@ -84,6 +84,11 @@ proposes (yes or no), and run now.
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
 read them, copy them, download them.
 
+**The supervisor's plans** run in the background: asking for one (from the Board, or handing
+security findings over) never holds the page. While it plans, the status bar says so; when it
+ends, a notice says what it made wherever you are, and a strip on top of the Board shows it,
+with **Show them** and **Approve all**, for a quarter of an hour.
+
 **Security.** The office's security audits: add a Security desk, start an audit (quick,
 standard or deep, in a chosen language), follow its runs, read the findings (confirmed worst
 first, those to verify, the rejected) and the full report, and hand the findings to the

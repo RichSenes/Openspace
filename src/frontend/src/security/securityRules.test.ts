@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OfficeView, RoleView, SecurityAuditView, SecurityFindingView } from '../api/types'
-import { auditorDesks, groupFindings, handOffMessage, openFindings, runSummary, severitySummary } from './securityRules'
+import { auditorDesks, groupFindings, openFindings, runSummary, severitySummary } from './securityRules'
 
 const run = (over: Partial<SecurityAuditView['run']> = {}): SecurityAuditView['run'] => ({
   number: 1,
@@ -79,12 +79,6 @@ describe('auditorDesks', () => {
 })
 
 describe('hand-off', () => {
-  it('says where the tasks went', () => {
-    expect(handOffMessage({ tasks: 2, byTheSupervisor: true })).toBe('The supervisor proposed 2 tasks at the desks: approve them on the Board')
-    expect(handOffMessage({ tasks: 1, byTheSupervisor: false })).toBe('The supervisor could not plan: 1 task proposed without a desk, choose one on the Board')
-    expect(handOffMessage({ tasks: 0, byTheSupervisor: true })).toContain('Nothing left to hand over')
-  })
-
   it('keeps only the findings still to hand over', () => {
     const base = { title: '', description: '', severity: null, location: null, remediation: null }
     const findings = [

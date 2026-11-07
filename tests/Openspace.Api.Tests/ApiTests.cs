@@ -849,6 +849,8 @@ public sealed class ApiTests : IDisposable
             var runs = await GetAsync<JsonElement>($"/api/offices/{officeId}/security-audits");
             var task = await GetAsync<JsonElement>($"/api/tasks/{started.GetProperty("taskId").GetGuid()}");
             var report = await _http.GetAsync($"/api/offices/{officeId}/security-audits/1/report");
+            var handOff = await _http.PostAsJsonAsync($"/api/offices/{officeId}/security-audits/1/hand-off", new { language = "Italian" });
+            var job = await handOff.Content.ReadFromJsonAsync<JsonElement>();
             var roles = await GetAsync<JsonElement>("/api/roles");
 
             Assert.Equal(desk.GetProperty("deskId").GetGuid(), task.GetProperty("deskId").GetGuid());
@@ -856,6 +858,7 @@ public sealed class ApiTests : IDisposable
             Assert.Equal(1, runs[0].GetProperty("run").GetProperty("number").GetInt32());
             Assert.True(Directory.Exists(Path.Combine(_app.AuditsFolder, "e-corp", "run-1")));
             Assert.Equal(HttpStatusCode.NotFound, report.StatusCode);
+            Assert.Equal((HttpStatusCode.Accepted, "security"), (handOff.StatusCode, job.GetProperty("kind").GetString()));
             Assert.Equal("security-audit", roles[0].GetProperty("skills")[0].GetString());
         }
         finally

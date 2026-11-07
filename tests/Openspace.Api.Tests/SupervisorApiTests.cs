@@ -62,15 +62,24 @@ public sealed class SupervisorApiTests : IDisposable
             await PostAsync($"/api/offices/{office}/rooms/{room}/desks", new { name = "Frontend", agentName = "build" });
             await PostAsync($"/api/offices/{office}/rooms/{room}/desks", new { name = "Tester", agentName = "build" });
 
-            var plan = await PostAsync($"/api/offices/{office}/plan", new { request = "Add a contact page." });
-            var epicId = plan.GetProperty("epic").GetProperty("id").GetGuid();
+            var started = await _http.PostAsJsonAsync($"/api/offices/{office}/plan", new { request = "Add a contact page." });
+            var job = await started.Content.ReadFromJsonAsync<JsonElement>();
+            JsonElement done;
+            do
+            {
+                await Task.Delay(50);
+                done = (await _http.GetFromJsonAsync<JsonElement>($"/api/supervisor/jobs?officeId={office}"))
+                    .EnumerateArray().Single(j => j.GetProperty("id").GetGuid() == job.GetProperty("id").GetGuid());
+            }
+            while (done.GetProperty("state").GetString() == "Planning");
+            var epicId = done.GetProperty("epicId").GetGuid();
             var approved = await PostAsync($"/api/epics/{epicId}/approve", new { });
             var epics = await _http.GetFromJsonAsync<JsonElement>($"/api/epics?officeId={office}");
             var tasks = await _http.GetFromJsonAsync<JsonElement>($"/api/tasks?officeId={office}");
 
             Assert.Equal(HttpStatusCode.UnprocessableEntity, noRepo.StatusCode);
-            Assert.Equal("Contact page", plan.GetProperty("epic").GetProperty("title").GetString());
-            Assert.Equal(2, plan.GetProperty("tasks").GetArrayLength());
+            Assert.Equal(HttpStatusCode.Accepted, started.StatusCode);
+            Assert.Equal(("Done", 2), (done.GetProperty("state").GetString(), done.GetProperty("tasks").GetInt32()));
             Assert.Equal(1, approved.GetProperty("approved").GetInt32());
             Assert.Equal("Contact page", epics[0].GetProperty("title").GetString());
             Assert.Equal(["Queued", "Proposed"], tasks.EnumerateArray().Select(t => t.GetProperty("status").GetString()));

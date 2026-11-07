@@ -153,6 +153,42 @@ public sealed class SecurityAudits(
         return records.Findings(Project(office), run);
     }
 
+    /// <summary>What the supervisor's plans for a run's findings share: one at a time per run.</summary>
+    public static string JobKey(Guid officeId, int run) => $"security:{officeId}:{run}";
+
+    /// <summary>A finding that can still be fixed: confirmed or to verify. Rejected ones were disproved.</summary>
+    public async Task<SecurityFinding> OpenFindingAsync(OfficeId officeId, int run, string fingerprint, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        var finding = records.Findings(Project(office), run).FirstOrDefault(f => f.Fingerprint == fingerprint)
+            ?? throw new RejectedException("finding-not-found", $"Run {run} has no finding {fingerprint}.");
+        return finding.Verdict is "confirmed" or "needs_validation"
+            ? finding
+            : throw new RejectedException("finding-rejected", "A rejected finding was disproved: there is nothing to fix.");
+    }
+
+    /// <summary>A run whose findings are due to go to the supervisor by themselves.</summary>
+    public sealed record DueHandOff(Guid OfficeId, int Run, string RequestedBy, string? Language);
+
+    /// <summary>Finished runs started with a hand-off whose findings did not go to the supervisor yet.</summary>
+    public async Task<IReadOnlyList<DueHandOff>> DueHandOffsAsync(CancellationToken cancellationToken)
+    {
+        var due = new List<DueHandOff>();
+        foreach (var office in await offices.ListAsync(cancellationToken).ConfigureAwait(false))
+        {
+            foreach (var run in records.List(Project(office)).Where(r => r.HandOff && !r.HandedOff && r.HasReport && r.TaskId is not null).ToList())
+            {
+                var task = await tasks.FindAsync(new WorkTaskId(run.TaskId!.Value), cancellationToken).ConfigureAwait(false);
+                if (task?.Status is WorkTaskStatus.Review or WorkTaskStatus.Done)
+                {
+                    due.Add(new DueHandOff(office.Id.Value, run.Number, task.RequestedBy, LanguageOf(task)));
+                }
+            }
+        }
+
+        return due;
+    }
+
     /// <summary>Hands one finding to the supervisor to fix: see <see cref="HandToSupervisorAsync"/>.</summary>
     public async Task<SecurityHandOff> ProposeFixAsync(
         OfficeId officeId, int run, string fingerprint, string requestedBy, CancellationToken cancellationToken, string? language = null)
@@ -188,21 +224,13 @@ public sealed class SecurityAudits(
     /// </summary>
     public async Task<int> HandFinishedAsync(CancellationToken cancellationToken)
     {
-        var handed = 0;
-        foreach (var office in await offices.ListAsync(cancellationToken).ConfigureAwait(false))
+        var due = await DueHandOffsAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var run in due)
         {
-            foreach (var run in records.List(Project(office)).Where(r => r.HandOff && !r.HandedOff && r.HasReport && r.TaskId is not null).ToList())
-            {
-                var task = await tasks.FindAsync(new WorkTaskId(run.TaskId!.Value), cancellationToken).ConfigureAwait(false);
-                if (task?.Status is WorkTaskStatus.Review or WorkTaskStatus.Done)
-                {
-                    await HandToSupervisorAsync(office.Id, run.Number, task.RequestedBy, cancellationToken, LanguageOf(task)).ConfigureAwait(false);
-                    handed++;
-                }
-            }
+            await HandToSupervisorAsync(new OfficeId(run.OfficeId), run.Run, run.RequestedBy, cancellationToken, run.Language).ConfigureAwait(false);
         }
 
-        return handed;
+        return due.Count;
     }
 
     private async Task<SecurityHandOff> HandAsync(

@@ -684,3 +684,21 @@ export interface VersionView {
   newer: boolean
   checkedAt: string | null
 }
+
+export type SupervisorJobState = 'Planning' | 'Done' | 'Failed'
+
+/** A plan the supervisor is making in the background, or made in the last quarter of an hour. */
+export interface SupervisorJob {
+  id: string
+  officeId: string
+  /** What asked for it: 'plan' from the Board, 'security' for audit findings. */
+  kind: string
+  what: string
+  key: string
+  startedAt: string
+  state: SupervisorJobState
+  tasks: number
+  epicId: string | null
+  error: string | null
+  endedAt: string | null
+}

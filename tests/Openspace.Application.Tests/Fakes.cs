@@ -369,6 +369,14 @@ internal sealed class RecordingPublisher : IActivityPublisher
 
     public List<IReadOnlyList<Queue.QueueWait>> Waits { get; } = [];
 
+    public List<IReadOnlyList<Work.SupervisorJob>> Jobs { get; } = [];
+
+    public Task SupervisorJobsChangedAsync(IReadOnlyList<Work.SupervisorJob> jobs, CancellationToken cancellationToken)
+    {
+        Jobs.Add(jobs);
+        return Task.CompletedTask;
+    }
+
     public Task QueueWaitsChangedAsync(IReadOnlyList<Queue.QueueWait> waits, CancellationToken cancellationToken)
     {
         Waits.Add(waits);

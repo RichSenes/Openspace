@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readError, request } from './client'
 import type {
+  SecurityAuditProfile,
+  SecurityAuditView,
+  SecurityFindingView,
+  SkillCatalogView,
   BranchMergeResult,
   DeskLook,
   AgentEngine,
@@ -70,6 +74,10 @@ export const keys = {
   sounds: ['sounds'] as const,
   deskUsage: ['usage', 'desks'] as const,
   google: ['google'] as const,
+  skills: ['skills'] as const,
+  securityAudits: (officeId: string) => ['security-audits', officeId] as const,
+  securityFindings: (officeId: string, run: number) => ['security-audits', officeId, run, 'findings'] as const,
+  securityReport: (officeId: string, run: number) => ['security-audits', officeId, run, 'report'] as const,
 }
 
 interface Created {
@@ -400,9 +408,13 @@ export function useRoles() {
 export function useSaveRole() {
   return useWrite(
     (input: { id: string | null; role: RoleInput }) =>
-      input.id
+      (input.id
         ? request<void>('PUT', `/api/roles/${input.id}`, input.role).then(() => ({ id: input.id! }))
-        : request<Created>('POST', '/api/roles', input.role),
+        : request<Created>('POST', '/api/roles', input.role)
+      ).then(async ({ id }) => {
+        await request<void>('PUT', `/api/roles/${id}/skills`, { skills: input.role.skills })
+        return { id }
+      }),
     keys.roles,
   )
 }
@@ -773,4 +785,68 @@ export function useConnectGoogle() {
 
 export function useDisconnectGoogle() {
   return useWrite((email: string) => request<void>('DELETE', `/api/google/accounts/${encodeURIComponent(email)}`), keys.google)
+}
+
+/** The skills installed for the agents, to choose from in a role. */
+export function useSkills() {
+  return useQuery({ queryKey: keys.skills, queryFn: () => request<SkillCatalogView>('GET', '/api/skills') })
+}
+
+/** The office's security audits, newest first; polled while one is running. */
+export function useSecurityAudits(officeId: string) {
+  return useQuery({
+    queryKey: keys.securityAudits(officeId),
+    queryFn: () => request<SecurityAuditView[]>('GET', `/api/offices/${officeId}/security-audits`),
+    refetchInterval: (query) => (query.state.data?.some((a) => a.status === 'Running' || a.status === 'Queued') ? 15_000 : false),
+  })
+}
+
+export function useSecurityFindings(officeId: string, run: number | undefined) {
+  return useQuery({
+    queryKey: keys.securityFindings(officeId, run ?? 0),
+    queryFn: () => request<SecurityFindingView[]>('GET', `/api/offices/${officeId}/security-audits/${run}/findings`),
+    enabled: run !== undefined,
+  })
+}
+
+/** The run's REPORT.md, or null while it is not written yet. */
+export function useSecurityReport(officeId: string, run: number | undefined, ready: boolean) {
+  return useQuery({
+    queryKey: keys.securityReport(officeId, run ?? 0),
+    queryFn: async () => {
+      const response = await fetch(`/api/offices/${officeId}/security-audits/${run}/report`)
+      if (response.status === 404) return null
+      if (!response.ok) throw await readError(response)
+      return response.text()
+    },
+    enabled: run !== undefined && ready,
+  })
+}
+
+export function useAddSecurityDesk(officeId: string) {
+  return useWrite(
+    (model: string | null) => request<{ deskId: string }>('POST', `/api/offices/${officeId}/security-desk`, { model }),
+    keys.offices,
+  )
+}
+
+export function useStartSecurityAudit(officeId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (profile: SecurityAuditProfile) =>
+      request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits`, { profile }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.securityAudits(officeId) })
+      void client.invalidateQueries({ queryKey: keys.tasks })
+    },
+  })
+}
+
+/** Proposes a task to fix a confirmed finding; a person chooses its desk on the Board. */
+export function useProposeFix(officeId: string) {
+  return useWrite(
+    (input: { run: number; fingerprint: string }) =>
+      request<{ taskId: string }>('POST', `/api/offices/${officeId}/security-audits/${input.run}/findings/${encodeURIComponent(input.fingerprint)}/fix`),
+    keys.tasks,
+  )
 }

@@ -49,6 +49,8 @@ builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueO
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Skills.SkillsOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Skills.SkillsOptions.SectionName));
+builder.Services.Configure<Openspace.Infrastructure.Security.SecurityAuditOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Security.SecurityAuditOptions.SectionName));
 builder.Services.Configure<WorkspaceOptions>(options =>
 {
     builder.Configuration.GetSection(WorkspaceOptions.SectionName).Bind(options);
@@ -89,6 +91,7 @@ app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();
 app.MapVersionEndpoints();
+app.MapSecurityAuditEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");

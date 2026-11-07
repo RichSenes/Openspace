@@ -378,9 +378,58 @@ export interface RoleView {
   web: PermissionLevel
   /** Claude Code agents may hand work to helpers (interns): Allow or Deny. */
   helpers: PermissionLevel
+  /** The skills its agents may load; null gives them every installed skill. */
+  skills: string[] | null
 }
 
 export type RoleInput = Omit<RoleView, 'id'>
+
+/** A skill installed for the agents, read from its SKILL.md. */
+export interface SkillInfo {
+  name: string
+  description: string
+}
+
+export interface SkillCatalogView {
+  /** Where the skills are read from; null when that folder is missing. */
+  folder: string | null
+  skills: SkillInfo[]
+}
+
+export type SecurityAuditProfile = 'Quick' | 'Standard' | 'Deep'
+
+export type FindingSeverity = 'informational' | 'low' | 'medium' | 'high' | 'critical'
+
+export interface SecurityAuditRunView {
+  number: number
+  startedAt: string
+  taskId: string | null
+  profile: string | null
+  sourceRef: string | null
+  confirmed: number
+  needsValidation: number
+  rejected: number
+  /** Confirmed findings by overall severity. */
+  severities: Partial<Record<FindingSeverity, number>>
+  hasReport: boolean
+}
+
+export interface SecurityAuditView {
+  run: SecurityAuditRunView
+  /** The state of the task running it; null when that task is gone. */
+  status: TaskStatus | null
+  deskName: string | null
+}
+
+export interface SecurityFindingView {
+  fingerprint: string
+  verdict: 'confirmed' | 'needs_validation' | 'rejected' | string
+  title: string
+  description: string
+  severity: FindingSeverity | null
+  location: string | null
+  remediation: string | null
+}
 
 export interface EpicView {
   id: string

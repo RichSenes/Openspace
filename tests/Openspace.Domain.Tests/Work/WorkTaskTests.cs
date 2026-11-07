@@ -370,4 +370,18 @@ public class WorkTaskTests
         task.Start(Now);
         Assert.Throws<DomainException>(() => task.UseReserve("nvidia/qwen3-coder"));
     }
+
+    [Fact]
+    public void An_output_folder_is_a_full_path_set_before_the_agent_starts()
+    {
+        var task = QueuedTask(out _, out _);
+
+        task.WriteOutputTo("/srv/audits/e-corp/run-1/");
+        Assert.Equal("/srv/audits/e-corp/run-1", task.OutputFolder);
+        Assert.Throws<DomainException>(() => task.WriteOutputTo("audits/run-1"));
+
+        task.Start(Now);
+        task.AttachRun(SomeRun(), Now);
+        Assert.Throws<DomainException>(() => task.WriteOutputTo("/srv/audits/e-corp/run-2"));
+    }
 }

@@ -54,6 +54,7 @@ internal sealed class WorkTaskConfiguration : IEntityTypeConfiguration<WorkTask>
         builder.Property(t => t.PullRequestUrl).HasMaxLength(500);
         builder.Property(t => t.PullRequestTarget).HasMaxLength(200);
         builder.Property(t => t.ReserveModel).HasMaxLength(200);
+        builder.Property(t => t.OutputFolder).HasMaxLength(500);
         builder.PrimitiveCollection<List<Guid>>("_dependsOn").HasColumnName("DependsOn");
         builder.Ignore(t => t.MissingSteps);
         builder.OwnsMany(t => t.Procedure, step =>

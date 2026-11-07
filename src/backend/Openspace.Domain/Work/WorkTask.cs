@@ -138,6 +138,12 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
     /// </summary>
     public string? ReserveModel { get; private set; }
 
+    /// <summary>
+    /// A folder outside the task's copy that its agent may also write in, such as where a
+    /// security audit keeps its records; null for tasks that only work on their copy.
+    /// </summary>
+    public string? OutputFolder { get; private set; }
+
     /// <summary>A task waiting for human approval, possibly without a desk yet.</summary>
     public static WorkTask Propose(
         Office office, string title, string? description, string requestedBy, DateTimeOffset now, Epic? epic = null)
@@ -210,6 +216,20 @@ public sealed class WorkTask : AggregateRoot<WorkTaskId>
         }
 
         MoveTo(WorkTaskStatus.Queued, now);
+    }
+
+    /// <summary>Lets the task's agent write in one folder outside its copy, before it starts.</summary>
+    public void WriteOutputTo(string folder)
+    {
+        if (Run is not null)
+        {
+            throw new DomainException("A task's output folder is set before its agent starts.");
+        }
+
+        var trimmed = Guard.NotBlank(folder, "Output folder", 500);
+        OutputFolder = Path.IsPathFullyQualified(trimmed)
+            ? Path.TrimEndingDirectorySeparator(trimmed)
+            : throw new DomainException("A task's output folder is a full path.");
     }
 
     /// <summary>Hands a queued task to a reserve model, or back to its desk with null.</summary>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RoleView } from '../api/types'
-import { EMPTY_ROLE, formFrom, permissionSummary } from './roleForm'
+import { EMPTY_ROLE, formFrom, permissionSummary, skillsSummary, toggleSkill } from './roleForm'
 
 const auditor: RoleView = {
   id: 'r1',
@@ -12,6 +12,7 @@ const auditor: RoleView = {
   bash: 'Deny',
   web: 'Allow',
   helpers: 'Deny',
+  skills: null,
 }
 
 describe('permissionSummary', () => {
@@ -31,5 +32,19 @@ describe('formFrom', () => {
     expect(formFrom(auditor)).not.toHaveProperty('id')
     expect(formFrom(auditor).instructions).toBe('Never change code.')
     expect(formFrom(undefined)).toEqual(EMPTY_ROLE)
+  })
+})
+
+describe('skills', () => {
+  it('says what a role gives its agents', () => {
+    expect(skillsSummary(null)).toBe('Every installed skill')
+    expect(skillsSummary([])).toBe('No skills')
+    expect(skillsSummary(['security-audit'])).toBe('Skill: security-audit')
+    expect(skillsSummary(['security-audit', 'tdd'])).toBe('2 skills')
+  })
+
+  it('adds and removes one skill, sorted', () => {
+    expect(toggleSkill(['tdd'], 'security-audit')).toEqual(['security-audit', 'tdd'])
+    expect(toggleSkill(['security-audit', 'tdd'], 'tdd')).toEqual(['security-audit'])
   })
 })

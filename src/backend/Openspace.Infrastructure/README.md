@@ -30,6 +30,8 @@ implements a port of `Openspace.Application` (see the table there).
 | `Upkeep/` | Dependency files of every kind, OSV advisories, package registries, toolchains, system packages, unpushed work |
 | `Weather/` | `OpenMeteo`: town lookup and current weather, no key |
 | `Releases/` | `GitHubReleases`: the latest release on GitHub's public API, no key |
+| `Skills/` | `SkillCatalog`: the installed skills from their SKILL.md, and a plugin of links per set of skills for Claude Code desks |
+| `Security/` | `SecurityAuditRecords`: run folders, `findings.json`, `run-metadata.json` and `REPORT.md` of security audits, read as they are written |
 | `Hosting/` | The background services: queue, reviews, routines, graphics card, guests, backups, releases |
 
 ### What leaves the computer

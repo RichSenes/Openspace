@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
-import { useDeleteRole, useDraftRole, useEngines, useRoles, useSaveRole } from '../api/hooks'
+import { useDeleteRole, useDraftRole, useEngines, useRoles, useSaveRole, useSkills } from '../api/hooks'
 import type { PermissionLevel, RoleInput, RoleView } from '../api/types'
 import { modelOptions } from '../engines/engines'
 import { EnginesCard } from '../engines/EnginesCard'
 import { DeskUsage } from './DeskUsage'
 import { useToast } from '../ui/toastContext'
-import { CAPABILITIES, formFrom, HELPER_LABEL, PERMISSION_LABEL, permissionSummary } from './roleForm'
+import { CAPABILITIES, formFrom, HELPER_LABEL, PERMISSION_LABEL, permissionSummary, skillsSummary, toggleSkill } from './roleForm'
 import './agents.css'
 
 /** Defines the kinds of agents desks can host: what they do, how, and what they may do alone. */
@@ -37,7 +37,7 @@ export function AgentsPanel() {
                 <button type="button" className="role-item" aria-current={r.id === selected ? 'true' : undefined} onClick={() => setSelected(r.id)}>
                   <span className="role-name">{r.name}</span>
                   {r.description && <span className="hint">{r.description}</span>}
-                  <span className="hint">{permissionSummary(r)}</span>
+                  <span className="hint">{permissionSummary(r)} · {skillsSummary(r.skills ?? null)}</span>
                 </button>
               </li>
             ))}
@@ -64,6 +64,7 @@ function RoleEditor({ role, onSaved, onDeleted }: EditorProps) {
   const remove = useDeleteRole()
   const draft = useDraftRole()
   const engines = useEngines()
+  const skills = useSkills()
   const toast = useToast()
   const set = <K extends keyof RoleInput>(key: K, value: RoleInput[K]) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -171,6 +172,39 @@ function RoleEditor({ role, onSaved, onDeleted }: EditorProps) {
             plan and follows the same rules as the desk. OpenCode agents always can.
           </span>
         </label>
+      </fieldset>
+
+      <fieldset className="permissions skills-choice">
+        <legend className="hint">Skills its agents may load</legend>
+        <label className="field">
+          <span>Skills</span>
+          <select
+            className="input"
+            value={form.skills === null ? 'all' : 'some'}
+            onChange={(e) => set('skills', e.target.value === 'all' ? null : (form.skills ?? []))}
+          >
+            <option value="all">Every installed skill</option>
+            <option value="some">Only the ones ticked</option>
+          </select>
+          <span className="hint">
+            Skills are written guides an agent loads when its work calls for one, such as a security audit or test-first work. They are
+            read from {skills.data?.folder ?? 'the skills folder'}, never changed.
+          </span>
+        </label>
+        {form.skills !== null && (
+          <div className="skill-list" role="group" aria-label="Skills">
+            {skills.data?.skills.length === 0 && <p className="hint">No skills are installed yet.</p>}
+            {skills.data?.skills.map((skill) => (
+              <label key={skill.name} className="skill-option">
+                <input type="checkbox" checked={form.skills!.includes(skill.name)} onChange={() => set('skills', toggleSkill(form.skills ?? [], skill.name))} />
+                <span>
+                  <span className="skill-name">{skill.name}</span>
+                  {skill.description && <span className="hint skill-description">{skill.description}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </fieldset>
 
       {(save.error ?? remove.error) && <p className="error">{(save.error ?? remove.error)!.message}</p>}

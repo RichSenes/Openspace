@@ -16,7 +16,7 @@ Openspace is and how to start it, see the [main README](../../../README.md).
 [Rounds, checks and tokens](#rounds-checks-and-tokens) · [Routines](#routines) ·
 [Agents going in circles](#agents-going-in-circles) · [Sounds](#sounds) ·
 [Private folders](#private-folders) · [Usage limits](#usage-limits) ·
-[Claude Code](#claude-code) · [Guests](#guests)
+[Claude Code](#claude-code) · [Skills](#skills) · [Security audits](#security-audits) · [Guests](#guests)
 
 Errors come back as problem details: 404 for what does not exist, 422 with a
 readable `detail` (and often a `code`) for what breaks a rule.
@@ -88,6 +88,14 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | PUT | `/api/roles/{id}` | Change a role (same body) |
 | DELETE | `/api/roles/{id}` | Delete a role; `422` with code `role-in-use` while desks use it |
 | POST | `/api/roles/draft` | `{ name, description }` → `{ instructions }` drafted by the AI, not saved |
+| PUT | `/api/roles/{id}/skills` | `{ skills }`: the skills the role's agents may load, by name; `null` gives them every installed skill, `[]` none |
+| GET | `/api/skills` | `{ folder, skills: [{ name, description }] }`: the installed skills, read from their SKILL.md |
+| POST | `/api/offices/{id}/security-desk` | `{ model? }` → `{ deskId }`: a Security room with an Auditor desk on Claude Code (sonnet unless named) and the shared Security auditor role; the existing desk when there is one |
+| POST | `/api/offices/{id}/security-audits` | `{ deskId?, profile? }` (`Quick`, `Standard` or `Deep`; quick by default) → `{ taskId }`: queues an audit at the office's auditor desk with a new run folder. `422` with code `no-repository` or `no-auditor` |
+| GET | `/api/offices/{id}/security-audits` | The office's runs, newest first: `[{ run: { number, startedAt, taskId, profile, sourceRef, confirmed, needsValidation, rejected, severities, hasReport }, status, deskName }]` |
+| GET | `/api/offices/{id}/security-audits/{run}/report` | The run's REPORT.md as Markdown; `404` while it has none |
+| GET | `/api/offices/{id}/security-audits/{run}/findings` | `[{ fingerprint, verdict, title, description, severity, location, remediation }]` |
+| POST | `/api/offices/{id}/security-audits/{run}/findings/{fingerprint}/fix` | Propose a task fixing a finding → `{ taskId }`: a confirmed one is fixed, one still to verify is proven by a test first; `422` with code `finding-rejected` for a disproved one |
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
@@ -213,6 +221,9 @@ On startup it applies pending database migrations.
 | `ClaudeCode:SupervisorModel`, `ClaudeCode:ReviewModel` | none | Models for plans and reviews, such as `opus` or `sonnet`; none means Claude Code's default |
 | `OpenCode:ToolsUrl` | `http://127.0.0.1:5145/mcp` | Where OpenCode reaches this API's MCP tools; change it with the port |
 | `Workspaces:Root` | `~/.local/share/openspace/worktrees` | One git worktree per task lives here |
+| `Skills:Folder` | `~/.claude/skills` | Installed skills handed to the desks, read-only; blank for none |
+| `Skills:PluginsFolder` | `~/.local/share/openspace/skill-plugins` | The small plugins that hand skills to Claude Code desks (links only) |
+| `SecurityAudits:Folder` | `~/.local/share/openspace/security-audits` | Where audits keep their records, a `run-N` folder per office and run, outside every repository |
 
 `appsettings.json` holds non-secret defaults. Local overrides go in
 `appsettings.Local.json` (ignored by git) or environment variables, for example
@@ -598,6 +609,35 @@ allowed; editing, commands and the web follow the role (allowed, asked, or not g
 all). Anything to be asked goes through the `permission` tool of Openspace's MCP server,
 which waits for the person's answer in Openspace. Work counts against the limits of the
 account Claude Code is signed in with, shared with everything else done with it.
+
+## Skills
+
+Skills are folders with a `SKILL.md`, installed in `~/.claude/skills` (`Skills:Folder`).
+OpenCode reads that folder on its own; Openspace adds rules so its agents may read the
+skills' files outside their copy, never edit them, and load only the skills their role
+names (OpenCode's `skill` permission). Claude Code ignores installed skills when it runs
+restricted, so Openspace hands them over as a tiny plugin of links (`--plugin-dir`, in
+`Skills:PluginsFolder`): one link to the whole folder, or one per skill the role names.
+Its agents also get the `Skill` tool, the plugin and the skills' folder to read
+(`--add-dir`), and deny rules on editing both. Skills show up as `openspace:<name>`.
+
+## Security audits
+
+A Security desk audits the office's repository with the `security-audit` skill
+(Cloudflare's, MIT): reconnaissance, isolated hunters, a fresh verifier that tries to
+disprove each finding, `findings.json` checked against the skill's schema, and a report.
+`POST /api/offices/{id}/security-desk` sets it up: a Security room, an Auditor desk on
+Claude Code, and the Security auditor role (edit and commands allowed, web denied, interns
+allowed, only that skill). Each audit is an ordinary task whose agent may also write in its
+run folder (the task's output folder, passed with `--add-dir` or an OpenCode
+`external_directory` rule): `SecurityAudits:Folder/<office>/run-N`, outside the repository,
+with an `openspace.json` naming the task. The brief tells the agent to leave the repository
+untouched and to read earlier runs as prior runs, so each run builds on the last. Openspace
+reads the records as they are written; a file half written reads as missing. Fixes are
+separate proposed tasks, one per finding, with its location and remediation; for a finding
+still to verify the task writes a test that proves it first, and changes nothing if it does not.
+Confirming a finding needs a network-isolated sandbox to run the code in; where the system
+refuses one (Ubuntu limits unprivileged user namespaces), findings stay to verify.
 
 ## Guests
 

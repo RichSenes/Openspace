@@ -833,4 +833,48 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(HttpStatusCode.UnprocessableEntity, push.StatusCode);
         Assert.Contains("never pushes", await push.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_security_desk_runs_audits_that_keep_their_records_outside_the_repository()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+        var folder = Path.Combine(Path.GetTempPath(), $"openspace-audit-repo-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            (await _http.PutAsJsonAsync($"/api/offices/{officeId}/repository", new { path = folder, initialize = true })).EnsureSuccessStatusCode();
+            var desk = await PostAsync<JsonElement>($"/api/offices/{officeId}/security-desk", new { });
+
+            var started = await PostAsync<JsonElement>($"/api/offices/{officeId}/security-audits", new { profile = "Standard" });
+            var runs = await GetAsync<JsonElement>($"/api/offices/{officeId}/security-audits");
+            var task = await GetAsync<JsonElement>($"/api/tasks/{started.GetProperty("taskId").GetGuid()}");
+            var report = await _http.GetAsync($"/api/offices/{officeId}/security-audits/1/report");
+            var roles = await GetAsync<JsonElement>("/api/roles");
+
+            Assert.Equal(desk.GetProperty("deskId").GetGuid(), task.GetProperty("deskId").GetGuid());
+            Assert.Equal("Security audit (standard)", task.GetProperty("title").GetString());
+            Assert.Equal(1, runs[0].GetProperty("run").GetProperty("number").GetInt32());
+            Assert.True(Directory.Exists(Path.Combine(_app.AuditsFolder, "e-corp", "run-1")));
+            Assert.Equal(HttpStatusCode.NotFound, report.StatusCode);
+            Assert.Equal("security-audit", roles[0].GetProperty("skills")[0].GetString());
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_role_names_its_skills_and_the_catalog_lists_the_installed_ones()
+    {
+        var role = await PostAsync<Created>("/api/roles", new { name = "Writer" });
+
+        (await _http.PutAsJsonAsync($"/api/roles/{role.Id}/skills", new { skills = (string[])["tdd"] })).EnsureSuccessStatusCode();
+        var bad = await _http.PutAsJsonAsync($"/api/roles/{role.Id}/skills", new { skills = (string[])["../up"] });
+        var catalog = await GetAsync<JsonElement>("/api/skills");
+
+        Assert.Equal("tdd", (await GetAsync<JsonElement>("/api/roles"))[0].GetProperty("skills")[0].GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+        Assert.Equal(0, catalog.GetProperty("skills").GetArrayLength());
+    }
 }

@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<FeedQueries>();
         services.AddScoped<UsageQueries>();
         services.AddScoped<Supervisor>();
+        services.AddScoped<Security.SecurityAudits>();
         services.AddScoped<EpicQueries>();
         services.AddScoped<ReportWriter>();
         services.AddScoped<ReportQueries>();

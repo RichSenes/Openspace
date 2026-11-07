@@ -52,6 +52,9 @@ public static class DependencyInjection
             .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton<OpenCodeContextWindows>();
         services.AddSingleton<ClaudeCodeRuntime>();
+        services.AddSingleton<Skills.SkillCatalog>();
+        services.AddSingleton<ISkillCatalog>(sp => sp.GetRequiredService<Skills.SkillCatalog>());
+        services.AddSingleton<ISecurityAuditRecords, Security.SecurityAuditRecords>();
         services.AddSingleton<ClaudeCodeUsage>();
         services.AddScoped<IAgentRuntime, AgentRuntimeRouter>();
         services.AddScoped<IAgentEngines, AgentEngines>();

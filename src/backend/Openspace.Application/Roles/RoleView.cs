@@ -11,12 +11,13 @@ public sealed record RoleView(
     PermissionLevel Edit,
     PermissionLevel Bash,
     PermissionLevel Web,
-    PermissionLevel Helpers)
+    PermissionLevel Helpers,
+    IReadOnlyList<string>? Skills = null)
 {
     public static RoleView From(Role role)
     {
         ArgumentNullException.ThrowIfNull(role);
         return new(role.Id.Value, role.Name, role.Description, role.Instructions, role.Model,
-            role.Permissions.Edit, role.Permissions.Bash, role.Permissions.Web, role.Permissions.Helpers);
+            role.Permissions.Edit, role.Permissions.Bash, role.Permissions.Web, role.Permissions.Helpers, role.Skills);
     }
 }

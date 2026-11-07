@@ -32,6 +32,14 @@ public sealed class RoleCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Limits the role's agents to the named skills, or gives them all again with null.</summary>
+    public async Task UseSkillsAsync(RoleId id, IReadOnlyList<string>? skills, CancellationToken cancellationToken)
+    {
+        var role = await roles.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        role.UseSkills(skills, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Removes a role no desk uses any more.</summary>
     public async Task DeleteAsync(RoleId id, CancellationToken cancellationToken)
     {

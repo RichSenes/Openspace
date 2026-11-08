@@ -1,10 +1,25 @@
+/* A plain form: the choices in a row, the option under them, the button last at its own size. */
 .security-start {
-  grid-template-columns: minmax(180px, 280px) 160px auto;
-  align-items: start;
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 
-.security-start > .btn {
-  align-self: end;
+.security-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.security-depth {
+  flex: 0 1 300px;
+  min-width: 0;
+}
+
+.security-language {
+  flex: 0 1 180px;
 }
 
 .security-report > .markdown {
@@ -99,8 +114,9 @@
 }
 
 @media (max-width: 760px) {
-  .security-start {
-    grid-template-columns: minmax(0, 1fr);
+  .security-depth,
+  .security-language {
+    flex-basis: 100%;
   }
 }
 

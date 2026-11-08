@@ -76,7 +76,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
         </div>
       ) : (
         <form
-          className="report-forms security-start"
+          className="security-start"
           onSubmit={(e) => {
             e.preventDefault()
             start.mutate({ profile, language, handOff: handOff === 'on' }, {
@@ -87,7 +87,8 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
             })
           }}
         >
-          <label className="field">
+          <div className="security-fields">
+          <label className="field security-depth">
             <span>Depth</span>
             <select className="input" value={profile} onChange={(e) => setProfile(e.target.value as SecurityAuditProfile)}>
               {PROFILES.map((p) => (
@@ -98,7 +99,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
             </select>
             <span className="hint">{PROFILES.find((p) => p.id === profile)?.hint}</span>
           </label>
-          <label className="field">
+          <label className="field security-language">
             <span>Written in</span>
             <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as LanguageName)}>
               {LANGUAGES.map((l) => (
@@ -108,13 +109,14 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
               ))}
             </select>
           </label>
-          <button type="submit" className="btn btn-primary" disabled={start.isPending || busy}>
-            <ShieldCheck size={16} /> Start audit
-          </button>
+          </div>
           <label className="security-hand-off">
             <input type="checkbox" checked={handOff === 'on'} onChange={(e) => setHandOff(e.target.checked ? 'on' : 'off')} />
             <span>When it finishes, hand the findings to the supervisor, who proposes the fixes at the right desks</span>
           </label>
+          <button type="submit" className="btn btn-primary" disabled={start.isPending || busy}>
+            <ShieldCheck size={16} /> Start audit
+          </button>
           {busy && <p className="hint security-busy">An audit is already queued or running: one at a time keeps your plan in check.</p>}
           {start.error && <p className="error">{start.error.message}</p>}
         </form>

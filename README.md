@@ -247,3 +247,9 @@ opens the GitHub release.
   files outside it.
 - Every change of behaviour comes with tests, and with the README of what it
   touches, in the same commit.
+
+## License
+
+Openspace is free software under the [MIT License](LICENSE): use it, change it,
+share it, sell it, as long as the license and its copyright notice come along.
+Improvements are welcome.

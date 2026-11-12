@@ -71,6 +71,22 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
         return true;
     }
 
+    /// <summary>The bots named in <c>telegram.env</c>: the names before the "=", never the tokens.</summary>
+    public IReadOnlyList<string> Channels()
+    {
+        var tokens = Path.Combine(options.CurrentValue.Folder, "telegram.env");
+        return File.Exists(tokens) ? NamesIn(File.ReadLines(tokens)) : [];
+    }
+
+    internal static IReadOnlyList<string> NamesIn(IEnumerable<string> lines) =>
+    [
+        .. lines.Select(line => line.Trim())
+            .Where(line => !line.StartsWith('#') && line.IndexOf('=', StringComparison.Ordinal) > 0)
+            .Select(line => line[..line.IndexOf('=', StringComparison.Ordinal)].Trim().ToUpperInvariant())
+            .Distinct()
+            .Order(StringComparer.Ordinal),
+    ];
+
     internal static string? ChannelOf(string settings)
     {
         using var document = JsonDocument.Parse(settings);

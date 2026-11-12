@@ -9,5 +9,9 @@
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Openspace.Api.Tests" />
+  </ItemGroup>
+
 
 </Project>

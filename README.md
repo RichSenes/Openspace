@@ -32,7 +32,9 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
   fresh helper, and never changes the code: confirmed findings become fix tasks.
 - **Routines.** Recurring jobs for your own life: a morning paper, mail sorting,
   job offers, dependency checks, delivered to Telegram and never acting on what
-  cannot be undone without your yes.
+  cannot be undone without your yes. The morning paper has its own editor: sources
+  tested in one click, sections of different sizes side by side, columns and
+  pictures, and a live preview of the page.
 
 ![The board: proposed, queued, running, in review, failed and done tasks](docs/screenshots/board.png)
 

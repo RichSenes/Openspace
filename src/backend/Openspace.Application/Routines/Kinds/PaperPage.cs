@@ -8,8 +8,9 @@ namespace Openspace.Application.Routines.Kinds;
 /// <summary>
 /// The paper as pages. The front page: the issue line, the masthead, the day's opening
 /// story with a large picture, the opening note beside the good news, and the index. Then
-/// each section in two columns, its first story with a picture when there is one. Laid out
-/// for A4 and printed with backgrounds. Every text is escaped; links are only the feeds'
+/// each section in its columns, its first story with a picture when there is one. The layout
+/// comes from the settings: text columns, picture sizes, and sections of a full, half or third
+/// width that sit side by side. Laid out for A4 and printed with backgrounds. Every text is escaped; links are only the feeds'
 /// own web addresses; pictures are embedded, never fetched by the page. The kanji of the day
 /// closes the paper: its strokes drawn one by one, its words and sentences with their reading.
 /// </summary>
@@ -49,14 +50,14 @@ public static partial class PaperPage
 
         if (front is not null)
         {
-            html.Append("<article class=\"lead\">\n");
+            html.Append(CultureInfo.InvariantCulture, $"<article class=\"lead pic-{settings.Page.FrontPicture}\">\n");
             html.Append(CultureInfo.InvariantCulture, $"  <p class=\"kicker\">{E(words.Lead)}</p>\n  <h2>{E(front.Article.Headline)}</h2>\n");
             if (front.Picture is { } picture)
             {
                 html.Append(CultureInfo.InvariantCulture, $"  <figure><img src=\"{picture.Image.DataUri}\" alt=\"\"><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>\n");
             }
 
-            html.Append(CultureInfo.InvariantCulture, $"  <p class=\"lead-text\">{E(front.Article.Text)}</p>\n");
+            html.Append(CultureInfo.InvariantCulture, $"  <p class=\"lead-text\" style=\"column-count: {Math.Clamp(settings.Page.Columns, 1, 3)}\">{E(front.Article.Text)}</p>\n");
             AppendSources(html, front.Article, front.Items);
             html.Append("</article>\n");
         }
@@ -94,23 +95,31 @@ public static partial class PaperPage
 
         html.Append("</section>\n");
 
+        html.Append("<div class=\"sections\">\n");
         foreach (var section in sections)
         {
+            var wanted = settings.Sections.FirstOrDefault(s => s.Name == section.Name) ?? new PaperSettings.Section(section.Name, string.Empty, []);
+            var width = PaperSettings.WidthOf(wanted);
+            var columns = settings.ColumnsOf(wanted);
+            var size = settings.PictureOf(wanted);
+            var place = PaperSettings.PictureAtOf(wanted);
+            var columnsOpen = $"  <div class=\"columns{(columns > 1 ? " ruled" : string.Empty)}\" style=\"column-count: {columns}\">\n";
+
             // The heading travels with the first story, so it never ends a page alone.
-            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
+            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section w-{width}\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
             for (var i = 0; i < section.Articles.Count; i++)
             {
                 var article = section.Articles[i];
-                if (i == 0 && section.Picture is { } picture)
+                if (i == 0 && section.Picture is { } picture && size != "none")
                 {
                     // The section's first story opens it across the page, with its picture.
                     html.Append(CultureInfo.InvariantCulture, $"""
-                          <article class="top">
+                          <article class="top {place} pic-{size}">
                             <figure><img src="{picture.Image.DataUri}" alt=""><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>
                             <div><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>
                         """);
                     AppendSources(html, article, section.Items);
-                    html.Append("</div>\n  </article></div>\n  <div class=\"columns\">\n");
+                    html.Append("</div>\n  </article></div>\n").Append(columnsOpen);
                     continue;
                 }
 
@@ -119,7 +128,7 @@ public static partial class PaperPage
                     // Without a picture the first story is a plain one, kept with the heading.
                     html.Append(CultureInfo.InvariantCulture, $"<article class=\"first\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
                     AppendSources(html, article, section.Items);
-                    html.Append("</article></div>\n  <div class=\"columns\">\n");
+                    html.Append("</article></div>\n").Append(columnsOpen);
                     continue;
                 }
 
@@ -130,6 +139,8 @@ public static partial class PaperPage
 
             html.Append("  </div>\n</section>\n");
         }
+
+        html.Append("</div>\n");
 
         if (kanji is not null)
         {
@@ -381,7 +392,9 @@ public static partial class PaperPage
         .lead h2 { margin: 0 0 8px; font-size: 24pt; line-height: 1.12; }
         figure { margin: 0 0 8px; }
         figure img { display: block; width: 100%; object-fit: cover; border: 0.5px solid #b9ad99; }
-        .lead figure img { height: 58mm; }
+        .pic-small figure img { height: 38mm; }
+        .pic-medium figure img { height: 58mm; }
+        .pic-large figure img { height: 85mm; }
         figcaption { margin-top: 2px; font-size: 7.5pt; color: var(--muted); text-align: right; }
         .lead-text { margin: 0; column-count: 2; column-gap: 8mm; text-align: justify; hyphens: auto; font-size: 11pt; }
         .front-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-top: 12px; padding-top: 10px;
@@ -395,15 +408,20 @@ public static partial class PaperPage
         .index ul { margin: 0; padding: 0; list-style: none; font-size: 9pt; }
         .index li { margin: 0 0 3px; }
         .index strong { text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; }
-        .section { margin-top: 12px; }
+        .sections { display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 8mm; align-items: start; }
+        .section { margin-top: 12px; min-width: 0; }
+        .w-full { grid-column: span 6; }
+        .w-half { grid-column: span 3; break-inside: avoid; }
+        .w-third { grid-column: span 2; break-inside: avoid; }
         .opener { break-inside: avoid; }
         .section h2 { break-after: avoid; margin: 0 0 8px; padding-bottom: 2px; border-bottom: 1.5px solid var(--rule); font-size: 13pt;
                         text-transform: uppercase; letter-spacing: 0.12em; }
         .top { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-bottom: 10px; }
-        .top figure img { height: 58mm; }
+        .top.above { grid-template-columns: 1fr; gap: 0; }
         .top h3 { margin: 0 0 4px; font-size: 15pt; line-height: 1.15; }
         .top p { margin: 0; text-align: justify; hyphens: auto; }
-        .columns { column-count: 2; column-gap: 8mm; column-rule: 0.5px solid #b9ad99; }
+        .columns { column-gap: 8mm; }
+        .columns.ruled { column-rule: 0.5px solid #b9ad99; }
         article { break-inside: avoid; margin: 0 0 9px; }
         article h3 { margin: 0 0 3px; font-size: 12pt; line-height: 1.2; }
         article p { margin: 0; text-align: justify; hyphens: auto; }

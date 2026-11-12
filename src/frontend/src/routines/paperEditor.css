@@ -1,0 +1,362 @@
+/* The paper's editor: index, form and preview side by side when there is room; the preview
+   goes under the form on laptops, and the index becomes a row of links on narrow screens.
+   The rules follow the room the editor has, not the window: the office list takes some. */
+.paper-editor-room {
+  container: paper-editor / inline-size;
+}
+
+.paper-editor {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) minmax(380px, 36%);
+  grid-template-areas:
+    'head head head'
+    'index form preview';
+  align-items: start;
+  align-content: start;
+  gap: 16px 24px;
+  padding: 16px 20px 40px;
+}
+
+.paper-form fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.paper-editor-head {
+  grid-area: head;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 8px 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paper-editor-head h1 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+.paper-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.paper-editor-problems {
+  flex-basis: 100%;
+}
+
+.paper-editor-problems ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.paper-index {
+  grid-area: index;
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 2px;
+}
+
+.paper-index button {
+  padding: 7px 10px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--mute);
+  text-align: left;
+  cursor: pointer;
+}
+
+.paper-index button:hover {
+  color: var(--ink);
+}
+
+.paper-index button[aria-current='true'] {
+  border-left-color: var(--accent);
+  color: var(--ink);
+}
+
+.paper-form {
+  grid-area: form;
+  container: paper-form / inline-size;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.paper-part {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  scroll-margin-top: 16px;
+}
+
+.paper-part h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.paper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
+  gap: 14px 16px;
+}
+
+.paper-form .field {
+  align-content: start;
+}
+
+.paper-legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.paper-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.paper-choice:disabled .btn {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.paper-subhead {
+  margin: 6px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.paper-json {
+  font-size: 12px;
+}
+
+/* Sections: the list beside the chosen one's form. */
+.paper-sections {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.paper-section-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paper-section-list li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+}
+
+.paper-section-list li.picked {
+  border-color: var(--accent);
+  background: var(--raised);
+}
+
+.paper-section-pick {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paper-section-pick > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paper-section-move {
+  display: flex;
+}
+
+.paper-section-move .btn {
+  min-height: 30px;
+  padding: 0 6px;
+}
+
+.paper-section-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.paper-section-remove {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.paper-sources {
+  display: grid;
+  gap: 10px;
+}
+
+.paper-source {
+  display: grid;
+  gap: 6px;
+}
+
+.paper-source-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.6fr) minmax(220px, 1.4fr) max-content max-content;
+  align-items: end;
+  gap: 8px;
+}
+
+.paper-source-result {
+  margin: 0;
+  font-size: 13px;
+}
+
+.paper-source-result p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--st-running);
+}
+
+.paper-source-result ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--mute);
+}
+
+.paper-source-result.error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spin {
+  animation: run-spin 1.6s linear infinite;
+}
+
+/* The preview stays in view while the form scrolls. */
+.paper-preview {
+  grid-area: preview;
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  min-width: 0;
+}
+
+.paper-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paper-preview-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.paper-preview-box {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #f6f1e7;
+}
+
+.paper-preview-box iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  background: #f6f1e7;
+}
+
+@container paper-editor (max-width: 1299px) {
+  .paper-editor {
+    grid-template-columns: 170px minmax(0, 1fr);
+    grid-template-areas:
+      'head head'
+      'index form'
+      'index preview';
+  }
+
+  .paper-preview {
+    position: static;
+    max-height: none;
+    max-width: 720px;
+  }
+}
+
+@container paper-editor (max-width: 759px) {
+  .paper-editor {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'index'
+      'form'
+      'preview';
+    padding: 12px 12px 32px;
+  }
+
+  .paper-index {
+    top: 0;
+    z-index: 1;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 6px 0;
+    background: var(--bg);
+  }
+
+  .paper-index button {
+    flex: none;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+  }
+
+  .paper-index button[aria-current='true'] {
+    border-bottom-color: var(--accent);
+  }
+
+}
+
+@container paper-form (max-width: 720px) {
+  .paper-sections {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container paper-form (max-width: 560px) {
+  .paper-source-row {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+  }
+
+  .paper-source-row .field:first-child {
+    grid-column: 1 / -1;
+  }
+}

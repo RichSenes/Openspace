@@ -39,6 +39,30 @@ Below 1100 px the layout does not adapt: the office list keeps 240 px on tablets
 top of every view on phones, the tabs are cut without a hint, the building shrinks to a
 stamp and its toolbar spills off the screen.
 
+## Sections and use of space
+
+The way the views are divided, and how they use the width, is a problem of its own, not a
+list of small layout bugs.
+
+| | Finding |
+|---|---|
+| P1 | **Settings** is one column about 720 px wide that leaves half of a 1400 px window empty (two thirds at 1920). Its cards go from permissions to the number of seats, the supervisor, the Claude account, sounds, the weather, the version, backups, Google and keys, in no order a person would guess. |
+| P1 | **Rooms** holds the office's settings and every room's settings on the same page. |
+| P2 | **Routines** cards stop at about 760 px, with the right half of the page empty, while each card repeats the same paragraph. |
+| P2 | **Agents** puts the engine status above the roles, and the role form beside a short list. |
+| P2 | **Reports** puts three different actions with their inputs on one row. |
+
+Proposal: one pass on how things are grouped, before changing them one by one.
+
+- Group by what the person wants to do, not by when the feature was added.
+- Settings becomes sections with an index on the side (a menu at the top on narrow screens):
+  *Engines*, *Local AI*, *Connections* (Google, Telegram), *How agents work* (permissions,
+  seats, supervisor and reviewer), *Look and sound* (sounds, weather), *System* (version,
+  backups, storage).
+- On wide screens, use the width: index and content side by side, two columns where the
+  content allows it, and no page made of one narrow column.
+- Each view keeps one subject: office settings leave Rooms, engine status leaves Agents.
+
 ## Findings by view
 
 Severity: **P1** blocks or misleads a new person · **P2** slows down or breaks one of our
@@ -115,6 +139,7 @@ Cloudflare's skill and Claude Code (sonnet) before saying what the person gets.
 
 | | Finding |
 |---|---|
+| P1 | There are no ready-made roles. A beginner starts from an empty form and has to write the instructions and choose the permissions alone. A set of roles to add with one click (backend developer, frontend developer, database, tester, writer, reviewer…), each with sensible instructions and permissions, would get a first office working in minutes. |
 | P2 | The tab is called *Agents* but holds roles; the engine status box at the top is the only place that says the engines are missing. |
 | P2 | A new role starts with *Change files*, *Run commands* and *Use the web* all on *Allowed*: the safest default would be *Ask* for commands. |
 
@@ -162,8 +187,9 @@ There is no path: install engines → open an office → point it at a repositor
    ends with a **Test** button and a clear result.
 3. What waits for the person is counted in one place in the top bar, whatever view made it.
 4. One save per form, or saving on change: never both on one page.
-5. Ready-made starting points: routine presets and office templates.
+5. Ready-made starting points: roles, routine presets and office templates.
 6. Below 1100 px the layout changes, it does not just shrink.
+7. Views are grouped by what the person wants to do, and wide screens use their width.
 
 ## Proposals in order
 
@@ -172,17 +198,21 @@ There is no path: install engines → open an office → point it at a repositor
 2. **"Needs you" inbox in the top bar**: permissions, questions, reviews, failures, proposed
    tasks and routine proposals, with a count and a link to each. *(P1)*
 3. **Setup check and first-run path**: engine status in the top bar when something is
-   missing, and an empty state that walks through the first office. *(P1)*
+   missing, and an empty state that walks through the first office. With it, **ready-made
+   roles** in Agents (backend developer, frontend developer, database, tester, writer,
+   reviewer…) that a beginner adds with one click. *(P1)*
 4. **Office settings out of Rooms**: an *Office* page (repository, local only, private
    folders, reserves) and one save per room. *(P1/P2)*
-5. **Settings › Local AI**: models, start/stop, test, GPU holders. *(P1 for anyone without the
+5. **Sections and space**: Settings split into sections with an index, wide screens used
+   in full, one subject per view (see *Sections and use of space*). *(P1)*
+6. **Settings › Local AI**: models, start/stop, test, GPU holders. *(P1 for anyone without the
    config file)*
-6. **Guided Telegram and Google**, with channels chosen from a list in routines. *(P2)*
-7. **Responsive pass** below 1100 px: collapsible office list, scrollable tabs with a
+7. **Guided Telegram and Google**, with channels chosen from a list in routines. *(P2)*
+8. **Responsive pass** below 1100 px: collapsible office list, scrollable tabs with a
    *More* menu, board with the columns that need you first, building toolbar that wraps.
    *(P2)*
-8. **Office templates** and export/import. *(P2)*
-9. Small fixes: field borders to 3:1, radio alignment, cut selects, agent-name hint,
+9. **Office templates** and export/import. *(P2)*
+10. Small fixes: field borders to 3:1, radio alignment, cut selects, agent-name hint,
    sound prompt in a quiet colour, one date format, safer role defaults. *(P2/P3)*
 
 ## Not covered

@@ -5,6 +5,7 @@ import type { RoutineView, Weekday } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import { GRADES, gradeLabel, readKanji, withKanji } from './kanji'
 import {
+  FORMS,
   LENGTHS,
   PICTURE_SIZES,
   WIDTHS,
@@ -200,8 +201,25 @@ export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId:
                 />
                 <div className="paper-grid">
                   <Lines
+                    label="Never write"
+                    hint="Phrases the writer must never use, one per line: its habits, such as a set greeting or a closing it repeats."
+                    value={paper.neverWrite}
+                    onChange={(neverWrite) => change((p) => ({ ...p, neverWrite }))}
+                  />
+                  <div className="field">
+                    <label className="check">
+                      <input type="checkbox" checked={paper.proofread} onChange={(e) => change((p) => ({ ...p, proofread: e.target.checked }))} />
+                      Proofread before printing
+                    </label>
+                    <span className="hint">
+                      One last read of every article for mistakes of grammar and spelling, facts and style left alone. It takes a few minutes more.
+                    </span>
+                  </div>
+                </div>
+                <div className="paper-grid">
+                  <Lines
                     label="What matters most"
-                    hint="One topic per line: the front page goes to these before the most reported story."
+                    hint="One topic per line: after importance, they decide the front page, and they count in every section."
                     value={paper.priorities}
                     onChange={(priorities) => change((p) => ({ ...p, priorities }))}
                   />
@@ -277,6 +295,19 @@ export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId:
                   options={PICTURE_SIZES}
                   onChange={(pictures) => change((p) => ({ ...p, layout: { ...p.layout, pictures } }))}
                 />
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={paper.layout.adapt}
+                    onChange={(e) => change((p) => ({ ...p, layout: { ...p.layout, adapt: e.target.checked } }))}
+                  />
+                  The space follows the news
+                </label>
+                <span className="hint">
+                  {paper.layout.adapt
+                    ? "Each day the section with the biggest story spans the page with its picture, and quiet sections are told in brief, side by side at the end. The preview shows the sections as they are set."
+                    : 'Off: every section keeps its width and form every day.'}
+                </span>
               </Part>
 
               <Part id="sections" title="Sections">
@@ -476,6 +507,7 @@ function SectionForm({
       <Sources feeds={s.feeds} onChange={(feeds) => set({ feeds })} />
 
       <h3 className="paper-subhead">On the page</h3>
+      <Choice label="Form" hint={FORMS.find((f) => f.value === s.form)?.hint} value={s.form} options={FORMS} onChange={(form) => set({ form })} />
       <Choice
         label="Width"
         hint="Half and third sections sit side by side, in their order."
@@ -537,7 +569,14 @@ function SectionForm({
             ))}
           </select>
         </Field>
-        <Choice label="Length" hint={LENGTHS.find((l) => l.value === s.length)?.hint} value={s.length} options={LENGTHS} onChange={(length) => set({ length })} />
+        <Choice
+          label="Length"
+          hint={s.form === 'articles' ? LENGTHS.find((l) => l.value === s.length)?.hint : 'Set by the form: briefs are one sentence, the main story is long.'}
+          value={s.length}
+          options={LENGTHS}
+          disabled={s.form !== 'articles'}
+          onChange={(length) => set({ length })}
+        />
       </div>
 
       <h3 className="paper-subhead">What goes in</h3>

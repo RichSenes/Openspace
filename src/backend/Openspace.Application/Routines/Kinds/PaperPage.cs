@@ -98,25 +98,32 @@ public static partial class PaperPage
         html.Append("<div class=\"sections\">\n");
         foreach (var section in sections)
         {
-            var wanted = settings.Sections.FirstOrDefault(s => s.Name == section.Name) ?? new PaperSettings.Section(section.Name, string.Empty, []);
+            var set = settings.Sections.FirstOrDefault(s => s.Name == section.Name) ?? new PaperSettings.Section(section.Name, string.Empty, []);
+            var wanted = section.Width is null ? set : set with { Width = section.Width };
             var width = PaperSettings.WidthOf(wanted);
             var columns = settings.ColumnsOf(wanted);
-            var size = settings.PictureOf(wanted);
+            var size = section.PictureSize ?? settings.PictureOf(wanted);
             var place = PaperSettings.PictureAtOf(wanted);
+            var form = section.Form ?? PaperSettings.FormOf(wanted);
             var columnsOpen = $"  <div class=\"columns{(columns > 1 ? " ruled" : string.Empty)}\" style=\"column-count: {columns}\">\n";
 
             // The heading travels with the first story, so it never ends a page alone.
-            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section w-{width}\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
+            html.Append(CultureInfo.InvariantCulture, $"<section class=\"section w-{width} form-{form}\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
             for (var i = 0; i < section.Articles.Count; i++)
             {
                 var article = section.Articles[i];
-                if (i == 0 && section.Picture is { } picture && size != "none")
+
+                // Briefs: every story in a briefs section, the stories after the main one otherwise.
+                var brief = form == "briefs" || (i > 0 && form is "feature" or "explainer");
+                var kind = brief ? " class=\"brief\"" : string.Empty;
+                var questions = i == 0 && form == "explainer" ? Questions(article) : string.Empty;
+                if (i == 0 && !brief && section.Picture is { } picture && size != "none")
                 {
                     // The section's first story opens it across the page, with its picture.
                     html.Append(CultureInfo.InvariantCulture, $"""
                           <article class="top {place} pic-{size}">
                             <figure><img src="{picture.Image.DataUri}" alt=""><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>
-                            <div><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>
+                            <div><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>{questions}
                         """);
                     AppendSources(html, article, section.Items);
                     html.Append("</div>\n  </article></div>\n").Append(columnsOpen);
@@ -126,13 +133,13 @@ public static partial class PaperPage
                 if (i == 0)
                 {
                     // Without a picture the first story is a plain one, kept with the heading.
-                    html.Append(CultureInfo.InvariantCulture, $"<article class=\"first\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
+                    html.Append(CultureInfo.InvariantCulture, $"<article class=\"first{(brief ? " brief" : string.Empty)}\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>{questions}");
                     AppendSources(html, article, section.Items);
                     html.Append("</article></div>\n").Append(columnsOpen);
                     continue;
                 }
 
-                html.Append(CultureInfo.InvariantCulture, $"    <article><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
+                html.Append(CultureInfo.InvariantCulture, $"    <article{kind}><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
                 AppendSources(html, article, section.Items);
                 html.Append("</article>\n");
             }
@@ -309,6 +316,15 @@ public static partial class PaperPage
             .Select(m => WebUtility.HtmlDecode(m.Groups.Values.Skip(1).First(g => g.Success).Value).Trim())
             .Where(h => h.Length > 0);
 
+    /// <summary>The opening note a printed page carries, if it has one.</summary>
+    public static PaperOpening? OpeningOf(string html) =>
+        Opening().Match(html) is { Success: true } m
+            ? new PaperOpening(WebUtility.HtmlDecode(m.Groups[1].Value).Trim(), WebUtility.HtmlDecode(m.Groups[2].Value).Trim())
+            : null;
+
+    [GeneratedRegex(@"<section class=""opening""><h3>(.*?)</h3><p>(.*?)</p>", RegexOptions.Singleline)]
+    private static partial Regex Opening();
+
     [GeneratedRegex(@"<p class=""kicker"">[^<]*</p>\s*<h2>(.*?)</h2>|<article[^>]*>\s*(?:<figure>.*?</figure>\s*<div>)?<h3>(.*?)</h3>|<section class=""good""><p class=""kicker"">[^<]*</p><h3>(.*?)</h3>", RegexOptions.Singleline)]
     private static partial Regex Headlines();
 
@@ -320,6 +336,12 @@ public static partial class PaperPage
 
     [GeneratedRegex(@"^\s*[Mm]\s*(-?[\d.]+)[,\s]+(-?[\d.]+)")]
     private static partial Regex PathStart();
+
+    /// <summary>An explained story's questions, each followed by its answer.</summary>
+    private static string Questions(PaperArticle article) =>
+        article.Questions is not { Count: > 0 } questions
+            ? string.Empty
+            : $"<dl class=\"qa\">{string.Concat(questions.Select(q => $"<dt>{E(q.Question)}</dt><dd>{E(q.Answer)}</dd>"))}</dl>";
 
     private static void AppendSources(StringBuilder html, PaperArticle article, IReadOnlyList<FeedItem> items)
     {
@@ -438,6 +460,14 @@ public static partial class PaperPage
         article h3 { margin: 0 0 3px; font-size: 12pt; line-height: 1.2; }
         article p { margin: 0; text-align: justify; hyphens: auto; }
         p.sources { margin-top: 3px; font-size: 8.5pt; color: var(--muted); text-align: left; }
+        .brief { margin: 0 0 6px; }
+        .brief h3 { display: inline; margin: 0 5px 0 0; font-size: 10.5pt; }
+        .brief p { display: inline; margin: 0; }
+        .brief p.sources { display: inline; margin: 0 0 0 5px; }
+        .form-briefs .opener h2 { margin-bottom: 6px; }
+        .qa { margin: 6px 0 0; }
+        .qa dt { margin-top: 5px; font-weight: 700; break-after: avoid; }
+        .qa dd { margin: 1px 0 0; text-align: justify; hyphens: auto; }
         .sources a { color: var(--muted); }
         .kanji { break-inside: avoid; margin-top: 14px; padding: 10px 12px 8px; border: 1.5px solid var(--rule); }
         .kanji h2 { margin: 0 0 8px; padding-bottom: 2px; border-bottom: 1.5px solid var(--rule); font-size: 13pt; text-transform: uppercase; letter-spacing: 0.12em; }

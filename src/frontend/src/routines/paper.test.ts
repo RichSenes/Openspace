@@ -33,6 +33,7 @@ describe('the paper editor model', () => {
       columns: 2,
       frontPicture: 'medium',
       pictures: 'medium',
+      adapt: false,
     })
     expect(paper.sections[0]).toMatchObject({
       width: 'full',
@@ -125,6 +126,25 @@ describe('the paper editor model', () => {
     expect(paperProblems({ ...paper, sections: [{ ...music, keywords: [] }] })).toEqual(['Music prints only news naming its words, but has none.'])
     expect(readPaper(writePaper({ ...paper, sections: [{ ...music, hoursBack: 72 }] }))!.sections[0].hoursBack).toBe(72)
     expect(paper.sections[0].hoursBack).toBeNull()
+  })
+
+  it('keeps the form, the space that follows the news, the phrases never to write and the proofreading', () => {
+    const paper = readPaper(settings)!
+    expect(paper.sections[0].form).toBe('articles')
+    expect(paper.layout.adapt).toBe(false)
+    expect(paper.proofread).toBe(false)
+    const changed = {
+      ...paper,
+      neverWrite: ['Grab a coffee'],
+      proofread: true,
+      layout: { ...paper.layout, adapt: true },
+      sections: [{ ...paper.sections[0], form: 'explainer' as const }, paper.sections[1]],
+    }
+    const written = JSON.parse(writePaper(changed))
+    expect(written).toMatchObject({ neverWrite: ['Grab a coffee'], proofread: true, layout: { adapt: true } })
+    expect(written.sections[0].form).toBe('explainer')
+    expect(written.sections[1]).not.toHaveProperty('form')
+    expect(readPaper(writePaper(changed))).toEqual(changed)
   })
 
   it('turns text boxes into lists', () => {

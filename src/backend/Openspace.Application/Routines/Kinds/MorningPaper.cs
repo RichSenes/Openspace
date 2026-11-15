@@ -136,7 +136,8 @@ public sealed partial class MorningPaper(
         var front = await WriteLeadAsync(context, settings, lead, cancellationToken).ConfigureAwait(false);
         var goodNews = good is null ? null : await WriteGoodNewsAsync(context, settings, good, cancellationToken).ConfigureAwait(false);
 
-        var sections = new List<PaperSection>();
+        // First what each section prints, then how much room it gets, then the writing.
+        var plans = new List<(PaperSettings.Section Section, List<Candidate> Chosen)>();
         foreach (var section in settings.Sections)
         {
             var chosen = new List<Candidate>();
@@ -164,14 +165,26 @@ public sealed partial class MorningPaper(
                 continue;
             }
 
+            plans.Add((section, chosen));
+        }
+
+        var looks = settings.Page.Adapt
+            ? Adapt(settings, [.. plans.Select(p => (p.Section, p.Chosen.Max(c => c.Judgement.Importance)))])
+            : [.. plans.Select(p => (p.Section, SectionLook.AsSet))];
+        var sections = new List<PaperSection>();
+        foreach (var (section, look) in looks)
+        {
+            var chosen = plans.First(p => p.Section == section).Chosen;
+            var form = look.Form ?? PaperSettings.FormOf(section);
             var items = Items(chosen);
-            var articles = await WriteSectionAsync(context, settings, section, items, cancellationToken).ConfigureAwait(false);
+            var articles = await WriteSectionAsync(context, settings, section, form, items, cancellationToken).ConfigureAwait(false);
             if (articles.Count > 0)
             {
-                var picture = settings.PictureOf(section) == "none"
+                var size = look.Picture ?? settings.PictureOf(section);
+                var picture = size == "none" || form == "briefs"
                     ? null
                     : await PictureAsync(items.Take(chosen[0].Related.Count + 1), cancellationToken).ConfigureAwait(false);
-                sections.Add(new PaperSection(section.Name, articles, items, picture));
+                sections.Add(new PaperSection(section.Name, articles, items, picture, look.Width, form, look.Picture));
             }
         }
 
@@ -183,6 +196,11 @@ public sealed partial class MorningPaper(
         foreach (var candidate in used)
         {
             await context.MarkAsync(candidate.Item.Link.ToString(), SeenState.Shown, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (settings.Proofread)
+        {
+            (front, goodNews, sections) = await ProofreadAsync(context, settings, front, goodNews, sections, cancellationToken).ConfigureAwait(false);
         }
 
         var kanji = await KanjiOfTheDayAsync(context, settings, cancellationToken).ConfigureAwait(false);
@@ -350,22 +368,103 @@ public sealed partial class MorningPaper(
 
     private sealed record DeskPick(int Item, string? Section);
 
-    /// <summary>The headlines of the last issues kept in the folder, the newest first.</summary>
-    public static List<string> RecentHeadlines(string folder, int issues)
+    /// <summary>
+    /// One last read of every article for mistakes of grammar and spelling, the facts and the
+    /// style left alone. An answer that does not give back every article changes nothing.
+    /// </summary>
+    private async Task<(PaperLead? Front, PaperLead? Good, List<PaperSection> Sections)> ProofreadAsync(
+        RoutineContext context, PaperSettings settings, PaperLead? front, PaperLead? good, List<PaperSection> sections, CancellationToken cancellationToken)
     {
-        if (!Directory.Exists(folder))
+        var all = new List<PaperArticle>();
+        all.AddRange(new[] { front?.Article, good?.Article }.OfType<PaperArticle>());
+        all.AddRange(sections.SelectMany(s => s.Articles));
+        if (all.Count == 0)
         {
-            return [];
+            return (front, good, sections);
         }
 
-        return [.. Directory.EnumerateFiles(folder, "*.html")
+        context.Progress("Proofreading");
+        var list = string.Join("\n\n", all.Select((a, i) => $"[{i + 1}] {a.Headline}\n{a.Text}"));
+        try
+        {
+            var answer = await chat.AskAsync(context, new LocalAsk(
+                settings.Model, Editor(settings),
+                $"Proofread these {all.Count} articles in {settings.Language}, numbered:\n{list}\n\nCorrect only mistakes of grammar, spelling and agreement, words that do not exist and words not in {settings.Language}. Change nothing else: not the facts, not the order, not the style. Give back every article, in the same order, with its headline and text.",
+                ProofSchema, MaxTokens: 8000), cancellationToken).ConfigureAwait(false);
+            var read = JsonSerializer.Deserialize<ArticlesAnswer>(answer, JsonSerializerOptions.Web)?.Articles ?? [];
+            if (read.Count != all.Count)
+            {
+                context.Write($"Proofreading gave back {read.Count} of {all.Count} articles: they stay as written.");
+                return (front, good, sections);
+            }
+
+            var queue = new Queue<PaperArticle>(all.Select((a, i) => a with
+            {
+                Headline = string.IsNullOrWhiteSpace(read[i].Headline) ? a.Headline : read[i].Headline.Trim(),
+                Text = string.IsNullOrWhiteSpace(read[i].Text) ? a.Text : Markers().Replace(read[i].Text, string.Empty).Trim(),
+            }));
+            var changed = all.Select((a, i) => a.Headline != read[i].Headline?.Trim() || a.Text != read[i].Text?.Trim()).Count(c => c);
+            front = front is null ? null : front with { Article = queue.Dequeue() };
+            good = good is null ? null : good with { Article = queue.Dequeue() };
+            sections = [.. sections.Select(s => s with { Articles = [.. s.Articles.Select(_ => queue.Dequeue())] })];
+            context.Write($"Proofread: {changed} of {all.Count} articles corrected.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"Proofreading failed ({ex.Message}): the articles stay as written.");
+        }
+
+        return (front, good, sections);
+    }
+
+    /// <summary>Under this importance a section is quiet that day: in brief, with the other quiet ones.</summary>
+    private const double Quiet = 0.5;
+
+    /// <summary>
+    /// The room each section gets when the space follows the news: the section with the
+    /// day's most important story spans the page with its picture; quiet sections are told in
+    /// brief, together at the end, side by side so that every row is full; the rest keep their
+    /// settings. Without two sections nothing changes.
+    /// </summary>
+    internal static List<(PaperSettings.Section Section, SectionLook Look)> Adapt(PaperSettings settings, IReadOnlyList<(PaperSettings.Section Section, double Weight)> sections)
+    {
+        if (sections.Count < 2)
+        {
+            return [.. sections.Select(s => (s.Section, SectionLook.AsSet))];
+        }
+
+        var heaviest = sections.MaxBy(s => s.Weight).Section;
+        var quiet = sections.Where(s => s.Section != heaviest && s.Weight < Quiet).Select(s => s.Section).ToList();
+        var rest = sections.Select(s => s.Section).Where(s => !quiet.Contains(s))
+            .Select(s => (s, s == heaviest ? new SectionLook("full", null, settings.PictureOf(s) == "none" ? "medium" : null) : SectionLook.AsSet));
+        var widths = RowsOf(quiet.Count);
+        return [.. rest, .. quiet.Select((s, i) => (s, new SectionLook(widths[i], "briefs", "none")))];
+    }
+
+    /// <summary>Widths that fill whole rows: thirds, then two or four halves for what is left, one alone across.</summary>
+    public static List<string> RowsOf(int count) => (count, count % 3) switch
+    {
+        (0, _) => [],
+        (1, _) => ["full"],
+        (_, 0) => [.. Enumerable.Repeat("third", count)],
+        (_, 2) => [.. Enumerable.Repeat("third", count - 2), "half", "half"],
+        _ => [.. Enumerable.Repeat("third", count - 4), "half", "half", "half", "half"],
+    };
+
+    /// <summary>The opening notes of the last issues kept in the folder, the newest first.</summary>
+    public static List<PaperOpening> RecentOpenings(string folder, int issues) =>
+        [.. Issues(folder).Take(issues).Select(f => PaperPage.OpeningOf(File.ReadAllText(f))).OfType<PaperOpening>()];
+
+    private static IEnumerable<string> Issues(string folder) =>
+        !Directory.Exists(folder) ? [] : Directory.EnumerateFiles(folder, "*.html")
             .Select(f => (File: f, Match: IssueNumber().Match(Path.GetFileName(f))))
             .Where(f => f.Match.Success)
             .OrderByDescending(f => int.Parse(f.Match.Groups[1].Value, CultureInfo.InvariantCulture))
-            .Take(issues)
-            .SelectMany(f => PaperPage.HeadlinesOf(File.ReadAllText(f.File)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
-    }
+            .Select(f => f.File);
+
+    /// <summary>The headlines of the last issues kept in the folder, the newest first.</summary>
+    public static List<string> RecentHeadlines(string folder, int issues) =>
+        [.. Issues(folder).Take(issues).SelectMany(f => PaperPage.HeadlinesOf(File.ReadAllText(f))).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>
     /// Whether the title or summary contains one of the keywords, as words or the start of
@@ -519,12 +618,22 @@ public sealed partial class MorningPaper(
     }
 
     private Task<List<PaperArticle>> WriteSectionAsync(
-        RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> items, CancellationToken cancellationToken) =>
+        RoutineContext context, PaperSettings settings, PaperSettings.Section section, string form, List<FeedItem> items, CancellationToken cancellationToken) =>
         WriteAsync(
             context, settings, items, $"the section {section.Name} ({section.About})",
-            $"Write one {ArticleSize(section)} article per story (items about the same fact make one article), each with a headline and {SentencesOf(section)}."
-            + (string.IsNullOrWhiteSpace(section.Style) ? string.Empty : $" For this section: {section.Style.Trim()}"),
-            settings.ArticlesOf(section), cancellationToken);
+            FormTask(section, form) + (string.IsNullOrWhiteSpace(section.Style) ? string.Empty : $" For this section: {section.Style.Trim()}"),
+            settings.ArticlesOf(section), cancellationToken, form == "explainer" ? ExplainerSchema : ArticlesSchema);
+
+    private const string Brief = "a brief: a headline of a few words and one sentence with the fact";
+
+    /// <summary>What the writer is asked for a section of this form: articles, briefs, a main story with briefs, or a story explained by questions.</summary>
+    internal static string FormTask(PaperSettings.Section section, string form) => form switch
+    {
+        "briefs" => $"Write one brief per story (items about the same fact make one): a headline of a few words and one sentence with the fact.",
+        "feature" => $"The story of item [1] is the section's main one: write it as a full article, with a headline and five to seven sentences. Each other story (items about the same fact make one) is {Brief}.",
+        "explainer" => $"The story of item [1] is explained simply: a headline, two sentences that say what happened, and in \"questions\" three to five questions a reader would ask about it, each with a short answer taken only from the items. Each other story (items about the same fact make one) is {Brief}.",
+        _ => $"Write one {ArticleSize(section)} article per story (items about the same fact make one article), each with a headline and {SentencesOf(section)}.",
+    };
 
     private static string ArticleSize(PaperSettings.Section section) => PaperSettings.LengthOf(section) switch
     {
@@ -541,7 +650,8 @@ public sealed partial class MorningPaper(
     };
 
     private async Task<List<PaperArticle>> WriteAsync(
-        RoutineContext context, PaperSettings settings, List<FeedItem> items, string where, string task, int most, CancellationToken cancellationToken)
+        RoutineContext context, PaperSettings settings, List<FeedItem> items, string where, string task, int most, CancellationToken cancellationToken,
+        string schema = ArticlesSchema)
     {
         var list = string.Join("\n\n", items.Select((item, i) => $"[{i + 1}] {item.Source}: {item.Title}\n{item.Summary}"));
         var user = $"""
@@ -552,13 +662,14 @@ public sealed partial class MorningPaper(
             """;
         try
         {
-            var answer = await chat.AskAsync(context, new LocalAsk(settings.Model, Editor(settings), user, ArticlesSchema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
+            var answer = await chat.AskAsync(context, new LocalAsk(settings.Model, Editor(settings), user, schema, MaxTokens: 3000), cancellationToken).ConfigureAwait(false);
             var articles = (JsonSerializer.Deserialize<ArticlesAnswer>(answer, JsonSerializerOptions.Web)?.Articles ?? [])
                 .Where(a => !string.IsNullOrWhiteSpace(a.Headline) && !string.IsNullOrWhiteSpace(a.Text))
                 .Select(a => a with
                 {
                     Text = Markers().Replace(a.Text, string.Empty).Trim(),
                     Sources = [.. (a.Sources ?? []).Where(n => n >= 1 && n <= items.Count).Distinct()],
+                    Questions = a.Questions is null ? null : [.. a.Questions.Where(q => !string.IsNullOrWhiteSpace(q.Question) && !string.IsNullOrWhiteSpace(q.Answer))],
                 })
                 .Take(most)
                 .ToList();
@@ -590,6 +701,7 @@ public sealed partial class MorningPaper(
     private async Task<PaperOpening> OpeningAsync(
         RoutineContext context, PaperSettings settings, PaperLead? front, List<PaperSection> sections, CancellationToken cancellationToken)
     {
+        var past = RecentOpenings(Expand(settings.Folder), RecentIssues);
         var headlines = string.Join("\n", (front is null ? [] : new[] { $"- Front page: {front.Article.Headline}" })
             .Concat(sections.SelectMany(s => s.Articles.Select(a => $"- {s.Name}: {a.Headline}"))));
         try
@@ -597,7 +709,8 @@ public sealed partial class MorningPaper(
             var answer = await chat.AskAsync(context,
                 new LocalAsk(
                     settings.Model, Editor(settings),
-                    $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and three or four warm sentences that set the day, with a light touch.",
+                    $"Today's headlines:\n{headlines}\n\nWrite the paper's short opening note: a title of its own (not the paper's name) and three or four warm sentences that start from the day's biggest story and set the day, with a light touch. Never a set greeting or a set closing."
+                    + (past.Count == 0 ? string.Empty : $"\n\nThe last notes, whose words, images and closings you never reuse:\n{string.Join('\n', past.Select(o => $"- {o.Title}: {o.Text}"))}"),
                     OpeningSchema, MaxTokens: 800),
                 cancellationToken).ConfigureAwait(false);
             if (JsonSerializer.Deserialize<PaperOpening>(answer, JsonSerializerOptions.Web) is { Title.Length: > 0, Text.Length: > 0 } opening)
@@ -726,12 +839,31 @@ public sealed partial class MorningPaper(
         Rules:
         {string.Join("\n", settings.Rules.Select(r => $"- {r}"))}
         - Use only what the news items say: never invent facts, names, numbers or quotes.
+        - No superlatives, records or "for the first time" unless the items say so.
+        - A headline says the fact, with who did what, in a few words. Two headlines never start with the same word, and none is a formula such as "Between this and that" or "New…".
+        - Each article ends on a fact, never on a comment about what the news means, shows or opens.
+        {NeverWrite(settings)}
         """;
+
+    private static string NeverWrite(PaperSettings settings) =>
+        settings.NeverWrite is { Count: > 0 } phrases ? $"- Never write: {string.Join("; ", phrases.Select(p => $"\"{p}\""))}." : string.Empty;
 
     private const string ArticlesSchema = """
         {"type":"object","properties":{"articles":{"type":"array","items":{"type":"object",
           "properties":{"headline":{"type":"string"},"text":{"type":"string"},"sources":{"type":"array","items":{"type":"integer"}}},
           "required":["headline","text","sources"]}}},"required":["articles"]}
+        """;
+
+    private const string ExplainerSchema = """
+        {"type":"object","properties":{"articles":{"type":"array","items":{"type":"object",
+          "properties":{"headline":{"type":"string"},"text":{"type":"string"},"sources":{"type":"array","items":{"type":"integer"}},
+            "questions":{"type":"array","items":{"type":"object","properties":{"question":{"type":"string"},"answer":{"type":"string"}},"required":["question","answer"]}}},
+          "required":["headline","text","sources"]}}},"required":["articles"]}
+        """;
+
+    private const string ProofSchema = """
+        {"type":"object","properties":{"articles":{"type":"array","items":{"type":"object",
+          "properties":{"headline":{"type":"string"},"text":{"type":"string"}},"required":["headline","text"]}}},"required":["articles"]}
         """;
 
     private const string OpeningSchema = """
@@ -815,7 +947,16 @@ public sealed partial class MorningPaper(
 }
 
 /// <param name="Sources">Numbers of the items it comes from, from 1.</param>
-public sealed record PaperArticle(string Headline, string Text, IReadOnlyList<int>? Sources);
+/// <param name="Questions">An explained story's questions and answers.</param>
+public sealed record PaperArticle(string Headline, string Text, IReadOnlyList<int>? Sources, IReadOnlyList<PaperQuestion>? Questions = null);
+
+public sealed record PaperQuestion(string Question, string Answer);
+
+/// <summary>How a section looks in one issue, when the space follows the news; null keeps its settings.</summary>
+internal sealed record SectionLook(string? Width, string? Form, string? Picture)
+{
+    public static readonly SectionLook AsSet = new(null, null, null);
+}
 
 public sealed record PaperOpening(string Title, string Text);
 
@@ -830,14 +971,19 @@ public sealed record PaperLead(string Section, PaperArticle Article, IReadOnlyLi
 public sealed record PaperKanji(KanjiEntry Entry, string Meaning, string Hint, IReadOnlyList<string> WordMeanings, IReadOnlyList<string> Translations);
 
 /// <param name="Picture">A picture for the section's first story, when one was found.</param>
-public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Articles, IReadOnlyList<FeedItem> Items, PaperPicture? Picture = null);
+/// <param name="Width">Its width in this issue, instead of its settings'.</param>
+/// <param name="Form">Its form in this issue: articles, briefs, feature or explainer.</param>
+/// <param name="PictureSize">The size of its picture in this issue, instead of its settings'.</param>
+public sealed record PaperSection(
+    string Name, IReadOnlyList<PaperArticle> Articles, IReadOnlyList<FeedItem> Items, PaperPicture? Picture = null,
+    string? Width = null, string? Form = null, string? PictureSize = null);
 
 /// <summary>What a morning paper routine is told in its settings.</summary>
 public sealed record PaperSettings(
     string Title, string Subtitle, string Language, string Model, string Folder, string Reader,
     IReadOnlyList<string> Rules, int HoursBack, int PerSection, IReadOnlyList<PaperSettings.Section> Sections,
     IReadOnlyList<string>? GoodNews = null, IReadOnlyList<string>? Priorities = null, IReadOnlyList<string>? Avoid = null,
-    PaperSettings.PageLayout? Layout = null)
+    PaperSettings.PageLayout? Layout = null, IReadOnlyList<string>? NeverWrite = null, bool Proofread = false)
 {
     /// <summary>Picture sizes, as words in the settings: none, small, medium, large.</summary>
     public static readonly IReadOnlyList<string> PictureSizes = ["none", "small", "medium", "large"];
@@ -848,10 +994,14 @@ public sealed record PaperSettings(
     /// <summary>How long a section's articles are: short, normal or long.</summary>
     public static readonly IReadOnlyList<string> Lengths = ["short", "normal", "long"];
 
+    /// <summary>How a section tells its stories: articles, briefs, a main story with briefs, or the main story explained by questions.</summary>
+    public static readonly IReadOnlyList<string> Forms = ["articles", "briefs", "feature", "explainer"];
+
     /// <param name="Columns">Text columns of a full-width section, 1 to 4.</param>
     /// <param name="FrontPicture">The size of the front page's picture.</param>
     /// <param name="Pictures">The size of each section's picture, unless the section says otherwise.</param>
-    public sealed record PageLayout(int Columns = 2, string FrontPicture = "medium", string Pictures = "medium");
+    /// <param name="Adapt">The space follows the news: the day's biggest story gets the room, quiet sections go in brief.</param>
+    public sealed record PageLayout(int Columns = 2, string FrontPicture = "medium", string Pictures = "medium", bool Adapt = false);
 
     /// <summary>The page layout, with every value in its range.</summary>
     public PageLayout Page => Layout ?? new PageLayout();
@@ -879,6 +1029,9 @@ public sealed record PaperSettings(
     /// <summary>How far back the section looks for news, in hours: its own or the paper's.</summary>
     public int HoursBackOf(Section section) => section.HoursBack is > 0 and <= 24 * 7 ? section.HoursBack.Value : HoursBack;
 
+    /// <summary>How the section tells its stories.</summary>
+    public static string FormOf(Section section) => Pick(section.Form, Forms, "articles");
+
     /// <summary>How long the section's articles are.</summary>
     public static string LengthOf(Section section) => Pick(section.Length, Lengths, "normal");
 
@@ -904,13 +1057,14 @@ public sealed record PaperSettings(
     /// <param name="PictureAt">Beside the first story or above it.</param>
     /// <param name="Articles">The most articles it prints, instead of the paper's.</param>
     /// <param name="Length">How long its articles are: short, normal or long.</param>
+    /// <param name="Form">How it tells its stories: articles, briefs, feature (a main story and briefs) or explainer (the main story by questions).</param>
     /// <param name="HoursBack">How far back it looks for news, instead of the paper's: for outlets that write every few days.</param>
     /// <param name="OnlyWithKeywords">Only news naming one of its keywords: without any, the section is left out that day.</param>
     public sealed record Section(
         string Name, string About, IReadOnlyList<Feed> Feeds,
         string? Only = null, IReadOnlyList<string>? Focus = null, IReadOnlyList<string>? Keywords = null, string? Style = null,
         string? Width = null, int? Columns = null, string? Picture = null, string? PictureAt = null, int? Articles = null, string? Length = null,
-        bool OnlyWithKeywords = false, int? HoursBack = null);
+        bool OnlyWithKeywords = false, int? HoursBack = null, string? Form = null);
 
     public static PaperSettings Read(JsonElement json)
     {
@@ -937,7 +1091,9 @@ public sealed record PaperSettings(
             Layout = new PageLayout(
                 Math.Clamp(read.Layout?.Columns ?? 2, 1, 4),
                 Pick(read.Layout?.FrontPicture, PictureSizes, "medium"),
-                Pick(read.Layout?.Pictures, PictureSizes, "medium")),
+                Pick(read.Layout?.Pictures, PictureSizes, "medium"),
+                read.Layout?.Adapt ?? false),
+            NeverWrite = [.. (read.NeverWrite ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())],
         };
     }
 }

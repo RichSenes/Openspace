@@ -89,7 +89,9 @@ or third width side by side, articles and their length) and, beside the form whe
 room or under it otherwise, the paper laid out with sample text as the settings change.
 Telegram bots and local models are picked from lists; the JSON stays at the end. A section
 may look further back than the paper, or print only on days with news about its words (the
-artists or games the reader follows).
+artists or games the reader follows). Each section has a form (articles, in brief, main story
+and briefs, explained simply); the layout can let the space follow the news; the paper takes
+phrases never to write and a last proofreading.
 
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
 read them, copy them, download them.

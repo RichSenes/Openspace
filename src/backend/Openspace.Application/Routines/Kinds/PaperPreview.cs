@@ -28,10 +28,24 @@ public static class PaperPreview
         var opening = new PaperOpening("Good morning", Text(3));
         var sections = paper.Sections.Select(section => new PaperSection(
             section.Name,
-            [.. Enumerable.Range(1, paper.ArticlesOf(section)).Select(n => new PaperArticle($"{section.Name}: headline of story {n}", Text(SentencesIn(section)), []))],
+            [.. Enumerable.Range(1, paper.ArticlesOf(section)).Select(n => Sample(section, n))],
             [],
-            Frame())).ToList();
+            PaperSettings.FormOf(section) == "briefs" ? null : Frame())).ToList();
         return PaperPage.Render(paper, culture, 1, day, opening, lead, good, sections);
+    }
+
+    /// <summary>A sample story as the section's form tells it: briefs of one sentence, the main story long, or explained by questions.</summary>
+    private static PaperArticle Sample(PaperSettings.Section section, int n)
+    {
+        var form = PaperSettings.FormOf(section);
+        var headline = $"{section.Name}: headline of story {n}";
+        return (form, n) switch
+        {
+            ("briefs", _) or ("feature" or "explainer", > 1) => new PaperArticle(headline, Text(1), []),
+            ("feature", _) => new PaperArticle(headline, Text(7), []),
+            ("explainer", _) => new PaperArticle(headline, Text(2), [], [.. Enumerable.Range(1, 3).Select(q => new PaperQuestion($"A question a reader would ask, number {q}?", Text(1)))]),
+            _ => new PaperArticle(headline, Text(SentencesIn(section)), []),
+        };
     }
 
     /// <summary>Sentences of a sample article: the most its length allows, to show the room it may take.</summary>

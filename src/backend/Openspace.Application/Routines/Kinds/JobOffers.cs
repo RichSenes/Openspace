@@ -55,6 +55,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
           "cities": [],
           "most": 8,
           "fit": 3,
+          "avoid": [],
           "inbox": "~/Documents/CV/inbox",
           "offers": "~/Documents/CV/offers"
         }
@@ -86,37 +87,35 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
             }
 
             context.Progress($"Reading {choice.Board}");
-            try
+            if (await ReadAsync(context, board, choice.Board, cancellationToken).ConfigureAwait(false) is { } found)
             {
-                var found = await board.LatestAsync(choice.Board, cancellationToken).ConfigureAwait(false);
                 offers.AddRange(choice.AllInJapan ? found.Select(o => o with { InJapan = true }) : found);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-            {
-                context.Write($"{choice.Board} could not be read ({ex.Message}).");
             }
         }
 
         var kept = offers.Where(o => Passes(settings, o)).ToList();
-        var fresh = new List<JobOffer>();
+        var waiting = new List<JobOffer>();
         foreach (var offer in kept.OrderByDescending(o => o.Posted))
         {
-            if (fresh.Count < settings.Most && !fresh.Any(f => RoleKey(f) == RoleKey(offer))
+            if (waiting.Count < DeskReads && !waiting.Any(f => RoleKey(f) == RoleKey(offer))
                 && await context.IsNewAsync(OfferKey(offer), Fingerprint(offer), cancellationToken).ConfigureAwait(false)
                 && await context.IsNewAsync(RoleKey(offer), Fingerprint(offer), cancellationToken).ConfigureAwait(false))
             {
-                fresh.Add(offer);
+                waiting.Add(offer);
             }
         }
 
-        context.Write($"{offers.Count} offers read, {kept.Count} fit your rules, {fresh.Count} new to judge.");
+        // The person's own answers teach what they want; the desk picks the few worth a full reading.
+        var decided = await DecidedAsync(context, cancellationToken).ConfigureAwait(false);
+        var fresh = await DeskAsync(context, settings, profile, decided, waiting, cancellationToken).ConfigureAwait(false);
+        context.Write($"{offers.Count} offers read, {kept.Count} fit your rules, {waiting.Count} new, {fresh.Count} to judge.");
 
         var good = new List<(JobOffer Offer, Judgement Judgement)>();
         var judged = 0;
         foreach (var (listed, i) in fresh.Select((o, i) => (o, i)))
         {
             context.Progress($"Measuring offer {i + 1} of {fresh.Count} against your profile");
-            if (await JudgeAsync(context, settings, profile, listed, cancellationToken).ConfigureAwait(false) is not { } judgement)
+            if (await JudgeAsync(context, settings, profile, listed, cancellationToken, decided).ConfigureAwait(false) is not { } judgement)
             {
                 continue;
             }
@@ -165,6 +164,128 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         return (brought.Count > 0 ? $"{brought.Count} brought offers judged; " : string.Empty)
             + $"{good.Count - brought.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
     }
+
+    /// <summary>New offers the desk reads at most, by title: the newest first.</summary>
+    private const int DeskReads = 150;
+
+    /// <summary>Of the person's answers, how many recent ones teach the desk and the judge.</summary>
+    private const int Remembered = 30;
+
+    /// <summary>How long to wait before reading a board again when it could not be read: the network may be back.</summary>
+    public TimeSpan RetryAfter { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>A board's offers; read again once after a pause when it fails, null when it fails twice.</summary>
+    private async Task<IReadOnlyList<JobOffer>?> ReadAsync(RoutineContext context, IJobBoard board, string name, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await board.LatestAsync(name, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                if (attempt == 2)
+                {
+                    context.Write($"{name} could not be read ({ex.Message}).");
+                    return null;
+                }
+
+                context.Write($"{name} could not be read ({ex.Message}): trying again shortly.");
+                await Task.Delay(RetryAfter, context.Clock, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>What the person said of the offers shown to them, the newest answers first.</summary>
+    /// <param name="Yes">Offers they wanted, "title — company".</param>
+    /// <param name="No">Offers they turned down.</param>
+    internal sealed record Decided(IReadOnlyList<string> Yes, IReadOnlyList<string> No);
+
+    private async Task<Decided> DecidedAsync(RoutineContext context, CancellationToken cancellationToken)
+    {
+        var seen = await routines.ListSeenAsync(context.Routine.Id, RolePrefix, cancellationToken).ConfigureAwait(false);
+        List<string> Of(SeenState state) =>
+            [.. seen.Where(s => s.State == state).OrderByDescending(s => s.ChangedAt).Take(Remembered).Select(s => s.Title)];
+        return new Decided(Of(SeenState.Taken), Of(SeenState.Dismissed));
+    }
+
+    /// <summary>What the person does not want, and their past answers, for the desk and the judge.</summary>
+    private static string Wishes(JobSettings settings, Decided? decided)
+    {
+        var text = new StringBuilder();
+        if (settings.Avoid.Count > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\nThe person does not want: {string.Join("; ", settings.Avoid)}.");
+        }
+
+        if (decided is { Yes.Count: > 0 })
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\nOffers they said yes to:\n{string.Join('\n', decided.Yes.Select(t => $"- {t}"))}");
+        }
+
+        if (decided is { No.Count: > 0 })
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\nOffers they said no to:\n{string.Join('\n', decided.No.Select(t => $"- {t}"))}");
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// The desk: the local model reads the titles of every new offer that meets the rules, with
+    /// the person's profile, what they do not want and their past answers, and picks the few
+    /// worth a full reading. With few offers, or without an answer, the newest go on.
+    /// </summary>
+    private async Task<List<JobOffer>> DeskAsync(
+        RoutineContext context, JobSettings settings, string profile, Decided decided, List<JobOffer> waiting, CancellationToken cancellationToken)
+    {
+        if (waiting.Count <= settings.Most)
+        {
+            return waiting;
+        }
+
+        context.Progress($"Choosing {settings.Most} of {waiting.Count} new offers");
+        var list = string.Join('\n', waiting.Select((o, i) =>
+            $"[{i + 1}] {o.Title} — {o.Company}, {o.Location}{(o.Tags.Count > 0 ? $" ({string.Join(", ", o.Tags)})" : string.Empty)}"));
+        try
+        {
+            var answer = await chat.AskAsync(context,
+                new LocalAsk(
+                    settings.Model,
+                    $"""
+                    You help one person find a job, choosing which offers deserve a full reading. Answer only with the JSON asked.
+                    The person's profile:
+                    {Short(profile, 4000)}
+                    {Wishes(settings, decided)}
+                    """,
+                    $"""
+                    The desk of job offers. New offers, by title, numbered:
+                    {list}
+
+                    Pick the {settings.Most} that most likely fit the person, the best first: the roles and skills they have and look for, like the offers they said yes to, unlike those they said no to and what they do not want.
+                    Give the numbers in "picks".
+                    """,
+                    """{"type":"object","properties":{"picks":{"type":"array","items":{"type":"integer"}}},"required":["picks"]}""",
+                    MaxTokens: 400, Temperature: 0.2),
+                cancellationToken).ConfigureAwait(false);
+            var picks = (JsonSerializer.Deserialize<DeskAnswer>(answer, JsonSerializerOptions.Web)?.Picks ?? [])
+                .Where(n => n >= 1 && n <= waiting.Count).Distinct().Take(settings.Most).Select(n => waiting[n - 1]).ToList();
+            if (picks.Count > 0)
+            {
+                context.Write($"The desk picked {picks.Count} of {waiting.Count} new offers.");
+                return picks;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"The desk could not choose ({ex.Message}): the newest go on.");
+        }
+
+        return [.. waiting.Take(settings.Most)];
+    }
+
+    private sealed record DeskAnswer(List<int>? Picks);
 
     private static Task<Proposal> ProposeAsync(RoutineContext context, JobWords words, JobOffer offer, Judgement judgement, CancellationToken cancellationToken) =>
         context.ProposeAsync(
@@ -317,7 +438,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         return rank < 0 ? settings.Cities.Count : rank;
     }
 
-    private async Task<Judgement?> JudgeAsync(RoutineContext context, JobSettings settings, string profile, JobOffer offer, CancellationToken cancellationToken)
+    private async Task<Judgement?> JudgeAsync(
+        RoutineContext context, JobSettings settings, string profile, JobOffer offer, CancellationToken cancellationToken, Decided? decided = null)
     {
         try
         {
@@ -331,6 +453,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
                     Judge honestly from the profile and the offer only: never invent skills, experience or facts about the company.
                     The person's profile:
                     {Short(profile, 6000)}
+                    {Wishes(settings, decided)}
                     """,
                     $"""
                     {(brought
@@ -339,14 +462,14 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 
                     {Short(details, Reading)}
 
-                    How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it. Then, in one or two short sentences each: why it fits, and what they would have to fill in or watch out for.
+                    How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it; an offer like those they said no to, or mainly about what they do not want, fits 2 at most. Then, in one short sentence each, of twenty words at most: why it fits, and what they would have to fill in or watch out for.
                     Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
                     """,
                     JudgementSchema, MaxTokens: 600, Temperature: 0.2),
                 cancellationToken).ConfigureAwait(false);
             var judgement = JsonSerializer.Deserialize<Judgement>(answer, JsonSerializerOptions.Web);
             return judgement is { Fit: >= 1 and <= 5 } && !string.IsNullOrWhiteSpace(judgement.Why)
-                ? judgement with { Why = Short(judgement.Why.Trim(), 600), Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 600), Details = details }
+                ? judgement with { Why = Short(judgement.Why.Trim(), 220), Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 220), Details = details }
                 : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -356,25 +479,33 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         }
     }
 
+    /// <summary>
+    /// The message: a short heading, then each offer in a few short lines (what and where, the
+    /// facts, why it fits, what to watch, the link), so that many offers stay easy to read.
+    /// </summary>
     private static string Summary(JobSettings settings, JobWords words, List<(JobOffer Offer, Judgement Judgement)> good)
     {
-        var text = new StringBuilder().Append(CultureInfo.InvariantCulture, $"{settings.Title}: {words.New(good.Count)}");
+        var text = new StringBuilder().Append(CultureInfo.InvariantCulture, $"💼 {settings.Title} · {words.New(good.Count)}");
         foreach (var ((offer, judgement), i) in good.Select((g, i) => (g, i)))
         {
-            text.Append(CultureInfo.InvariantCulture, $"\n\n{i + 1}. {offer.Title} — {offer.Company} ({offer.Location})");
-            text.Append(CultureInfo.InvariantCulture, $"\n{Facts(offer, words)} · {judgement.Fit}/5");
-            text.Append(CultureInfo.InvariantCulture, $"\n{judgement.Why}");
+            text.Append(CultureInfo.InvariantCulture, $"\n\n{i + 1}. {Short(offer.Title, 90)} — {offer.Company}");
+            text.Append(CultureInfo.InvariantCulture, $"\n📍 {Short(offer.Location, 40)} · {Salary(offer, words)} · {Stars(judgement.Fit)}");
+            text.Append(CultureInfo.InvariantCulture, $"\n🇯🇵 {words.Japanese(offer.Japanese)} · {(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}");
+            text.Append(CultureInfo.InvariantCulture, $"\n👍 {judgement.Why}");
             if (!string.IsNullOrWhiteSpace(judgement.Gaps))
             {
-                text.Append(CultureInfo.InvariantCulture, $"\n{words.Gaps}: {judgement.Gaps}");
+                text.Append(CultureInfo.InvariantCulture, $"\n⚠️ {judgement.Gaps}");
             }
 
-            text.Append(CultureInfo.InvariantCulture, $"\n{offer.Url}");
+            text.Append(CultureInfo.InvariantCulture, $"\n🔗 {offer.Url}");
         }
 
         text.Append(CultureInfo.InvariantCulture, $"\n\n{words.Decide}");
         return text.ToString();
     }
+
+    /// <summary>"★★★★☆": the fit at a glance.</summary>
+    public static string Stars(int fit) => new string('★', Math.Clamp(fit, 0, 5)) + new string('☆', 5 - Math.Clamp(fit, 0, 5));
 
     /// <summary>"¥7–10M · Japanese not required · visa sponsored", or "visa to check" when nothing says.</summary>
     private static string Facts(JobOffer offer, JobWords words) =>
@@ -428,11 +559,15 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 /// <param name="Roles">Words of which a title must have one: the roles looked for; none takes every role.</param>
 /// <param name="Inbox">Where the offers the person brings wait to be judged, one file each.</param>
 /// <param name="Offers">Where an offer the person wants goes, in a folder of its own, for its CV.</param>
+/// <param name="Avoid">What the person does not want, in their words ("Go", "Kubernetes", "QA"): the desk and the judge keep it away.</param>
 public sealed record JobSettings(
     string Title, string Language, string Model, string Profile, IReadOnlyList<JobSettings.BoardChoice> Boards, IReadOnlyList<string> Roles, bool Visa,
     JapaneseLevel JapaneseUpTo, long MinSalary, IReadOnlyList<string> Cities, int Most, int Fit,
-    string Inbox = "~/Documents/CV/inbox", string Offers = "~/Documents/CV/offers")
+    string Inbox = "~/Documents/CV/inbox", string Offers = "~/Documents/CV/offers", IReadOnlyList<string>? AvoidList = null)
 {
+    /// <summary>What the person does not want; none when the settings say nothing.</summary>
+    public IReadOnlyList<string> Avoid => AvoidList ?? [];
+
     /// <param name="AllInJapan">Every job of the board is in Japan, whatever its place says ("Hybrid").</param>
     public sealed record BoardChoice(string Board, bool AllInJapan);
 
@@ -474,7 +609,8 @@ public sealed record JobSettings(
             settings.TryGetProperty("most", out var m) && m.TryGetInt32(out var most) ? Math.Clamp(most, 1, 40) : 8,
             settings.TryGetProperty("fit", out var f) && f.TryGetInt32(out var fit) ? Math.Clamp(fit, 1, 5) : 3,
             Text("inbox", "~/Documents/CV/inbox"),
-            Text("offers", "~/Documents/CV/offers"));
+            Text("offers", "~/Documents/CV/offers"),
+            List("avoid"));
     }
 }
 
@@ -499,7 +635,7 @@ internal sealed record JobWords(
         "stipendio non indicato",
         "Da colmare",
         "Ti interessa? Sì la segna tra quelle da seguire, no la scarta per sempre.",
-        "In Openspace, per ognuna: «sì» se ti interessa, «no» e non torna più.",
+        "Rispondi in Openspace: «sì» la segui, «no» non torna più.",
         "visto da verificare",
         "Offerta senza titolo");
 

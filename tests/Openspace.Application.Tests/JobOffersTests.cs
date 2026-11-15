@@ -29,12 +29,12 @@ public sealed class JobOffersTests : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    private JobOffers Kind() => new([_board], _chat, _h.Routines, _h.RoutineRequests);
+    private JobOffers Kind() => new([_board], _chat, _h.Routines, _h.RoutineRequests) { RetryAfter = TimeSpan.Zero };
 
-    private Routine Create(string language = "English", string profile = "", int most = 8, string boards = "\"made-up\"")
+    private Routine Create(string language = "English", string profile = "", int most = 8, string boards = "\"made-up\"", string extra = "")
     {
         var settings = $$"""
-            {"title":"Offers","language":"{{language}}","channel":"CAREER","profile":{{JsonSerializer.Serialize(profile.Length > 0 ? profile : Profile)}},"inbox":{{JsonSerializer.Serialize(Inbox)}},"offers":{{JsonSerializer.Serialize(Saved)}},
+            {{{extra}}"title":"Offers","language":"{{language}}","channel":"CAREER","profile":{{JsonSerializer.Serialize(profile.Length > 0 ? profile : Profile)}},"inbox":{{JsonSerializer.Serialize(Inbox)}},"offers":{{JsonSerializer.Serialize(Saved)}},
              "boards":[{{boards}}],"visa":true,"japaneseUpTo":"conversational","minSalary":4500000,"cities":["Kyoto","Osaka"],"most":{{most}},"fit":3}
             """;
         var routine = Routine.Create(_h.Office, "Offers", "job-offers", RoutineSchedule.Daily(new TimeOnly(8, 0)), settings, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
@@ -88,19 +88,21 @@ public sealed class JobOffersTests : IDisposable
         var (_, text, _) = Assert.Single(_h.Outbox.Sent);
         Assert.Equal(
             """
-            Offers: 2 new offers for you
+            💼 Offers · 2 new offers for you
 
-            1. Frontend Engineer — Kyo Labs (Kyoto)
-            salary not stated · Japanese not required · visa sponsored · 4/5
-            It fits Frontend Engineer.
-            To fill in: Some Japanese helps.
-            https://jobs.example/jobs/kyo-front?ref=list
+            1. Frontend Engineer — Kyo Labs
+            📍 Kyoto · salary not stated · ★★★★☆
+            🇯🇵 Japanese not required · visa sponsored
+            👍 It fits Frontend Engineer.
+            ⚠️ Some Japanese helps.
+            🔗 https://jobs.example/jobs/kyo-front?ref=list
 
-            2. Senior .NET Developer — Acme (Tokyo)
-            ¥6–8M · Japanese not required · visa sponsored · 5/5
-            It fits Senior .NET Developer.
-            To fill in: Some Japanese helps.
-            https://jobs.example/jobs/acme-dotnet?ref=list
+            2. Senior .NET Developer — Acme
+            📍 Tokyo · ¥6–8M · ★★★★★
+            🇯🇵 Japanese not required · visa sponsored
+            👍 It fits Senior .NET Developer.
+            ⚠️ Some Japanese helps.
+            🔗 https://jobs.example/jobs/acme-dotnet?ref=list
 
             In Openspace, for each: yes if it interests you, no and it never comes back.
             """.ReplaceLineEndings("\n"),
@@ -185,15 +187,71 @@ public sealed class JobOffersTests : IDisposable
     }
 
     [Fact]
-    public async Task Each_run_judges_at_most_a_few_the_newest_first()
+    public async Task Each_run_judges_at_most_a_few_those_the_desk_picks_from_every_new_title()
     {
         var routine = Create(most: 1);
         Board();
 
-        await RunAsync(routine);
+        var run = await RunAsync(routine);
+
+        Assert.Contains("Frontend Engineer at Kyo Labs", Assert.Single(_chat.Asked), StringComparison.Ordinal);
+        var desk = Assert.Single(_chat.Desks);
+        Assert.Contains("[1] Senior .NET Developer — Acme, Tokyo (Web / Full-stack)", desk, StringComparison.Ordinal);
+        Assert.Contains("[3] Sales Engineer — Acme, Tokyo", desk, StringComparison.Ordinal);
+        Assert.Contains("Pick the 1 that most likely fit the person", desk, StringComparison.Ordinal);
+        Assert.Contains("7 offers read, 3 fit your rules, 3 new, 1 to judge.", run.Log, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_the_desk_the_newest_are_judged()
+    {
+        var routine = Create(most: 1);
+        Board();
+        _chat.DeskFails = true;
+
+        var run = await RunAsync(routine);
 
         Assert.Contains("Senior .NET Developer", Assert.Single(_chat.Asked), StringComparison.Ordinal);
+        Assert.Contains("The desk could not choose (The desk is away.): the newest go on.", run.Log, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task The_desk_and_the_judge_learn_from_the_person_s_answers_and_what_they_do_not_want()
+    {
+        var routine = Create(most: 1, extra: "\"avoid\":[\"Go\",\"QA\"],");
+        Board();
+        await RunAsync(routine);
+        var first = _h.Routines.Proposals.Single();
+        await Proposals().RejectAsync(first.Id, default);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        _chat.Systems.Clear();
+        await RunAsync(routine);
+
+        var system = _chat.Systems.Last();
+        Assert.Contains("The person does not want: Go; QA.", system, StringComparison.Ordinal);
+        Assert.Contains("Offers they said no to:\n- Frontend Engineer — Kyo Labs", system, StringComparison.Ordinal);
+        Assert.Contains("fits 2 at most", _chat.Asked.Last(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_board_that_cannot_be_read_is_read_again_once()
+    {
+        var routine = Create();
+        Board();
+        _board.FailOnce = true;
+
+        var run = await RunAsync(routine);
+
+        Assert.Contains("made-up could not be read (Network down.): trying again shortly.", run.Log, StringComparison.Ordinal);
+        Assert.Equal("2 new offers for you, of 3 judged; 3 of 7 fit your rules.", run.Summary);
+    }
+
+    [Theory]
+    [InlineData(5, "★★★★★")]
+    [InlineData(3, "★★★☆☆")]
+    [InlineData(1, "★☆☆☆☆")]
+    public void The_fit_shows_as_stars(int fit, string stars) => Assert.Equal(stars, JobOffers.Stars(fit));
 
     [Fact]
     public async Task It_speaks_the_person_s_language()
@@ -204,9 +262,9 @@ public sealed class JobOffersTests : IDisposable
         await RunAsync(routine);
 
         var (_, text, _) = Assert.Single(_h.Outbox.Sent);
-        Assert.StartsWith("Offers: 2 offerte nuove per te", text, StringComparison.Ordinal);
-        Assert.Contains("stipendio non indicato · giapponese non richiesto · visto sponsorizzato · 4/5", text, StringComparison.Ordinal);
-        Assert.Contains("Da colmare: Some Japanese helps.", text, StringComparison.Ordinal);
+        Assert.StartsWith("💼 Offers · 2 offerte nuove per te", text, StringComparison.Ordinal);
+        Assert.Contains("📍 Kyoto · stipendio non indicato · ★★★★☆\n🇯🇵 giapponese non richiesto · visto sponsorizzato", text, StringComparison.Ordinal);
+        Assert.EndsWith("Rispondi in Openspace: «sì» la segui, «no» non torna più.", text, StringComparison.Ordinal);
         Assert.Contains("Write in Italian", _chat.Systems[0], StringComparison.Ordinal);
     }
 
@@ -242,8 +300,8 @@ public sealed class JobOffersTests : IDisposable
 
         Assert.Equal("2 new offers for you, of 4 judged; 4 of 6 fit your rules.", run.Summary);
         var text = _h.Outbox.Sent.Single().Text;
-        Assert.Contains("Frontend Engineer — Acme (Hybrid)\nsalary not stated · Japanese not required · visa sponsored · 4/5", text, StringComparison.Ordinal);
-        Assert.Contains("Backend Engineer — Acme (Hybrid)\nsalary not stated · Japanese not required · visa to check · 4/5", text, StringComparison.Ordinal);
+        Assert.Contains("Frontend Engineer — Acme\n📍 Hybrid · salary not stated · ★★★★☆\n🇯🇵 Japanese not required · visa sponsored", text, StringComparison.Ordinal);
+        Assert.Contains("Backend Engineer — Acme\n📍 Hybrid · salary not stated · ★★★★☆\n🇯🇵 Japanese not required · visa to check", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Full Stack", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Mobile", text, StringComparison.Ordinal);
         Assert.Contains("We sponsor visas. React and TypeScript.", _chat.Asked.First(a => a.Contains("Frontend", StringComparison.Ordinal)), StringComparison.Ordinal);
@@ -312,7 +370,7 @@ public sealed class JobOffersTests : IDisposable
         Assert.Equal("Platform Engineer — Faraway Inc, Sapporo", proposal.Title);
         Assert.Contains("business Japanese · visa to check · 2/5", proposal.Body, StringComparison.Ordinal);
         Assert.Contains(Pasted, _chat.Asked.Single(), StringComparison.Ordinal);
-        Assert.StartsWith("Offers: 1 new offer for you\n\n1. Platform Engineer — Faraway Inc (Sapporo)", _h.Outbox.Sent.Single().Text, StringComparison.Ordinal);
+        Assert.StartsWith("💼 Offers · 1 new offer for you\n\n1. Platform Engineer — Faraway Inc\n📍 Sapporo", _h.Outbox.Sent.Single().Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -378,10 +436,21 @@ public sealed class JobOffersTests : IDisposable
         /// <summary>A second board, of a company whose places say nothing ("Hybrid").</summary>
         public List<JobOffer> Company { get; } = [];
 
+        /// <summary>The first read fails, as when the network drops for a moment.</summary>
+        public bool FailOnce { get; set; }
+
         public bool Reads(string board) => board is "made-up" or "lever:acme";
 
-        public Task<IReadOnlyList<JobOffer>> LatestAsync(string board, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<JobOffer>>(board == "made-up" ? [.. Offers] : [.. Company]);
+        public Task<IReadOnlyList<JobOffer>> LatestAsync(string board, CancellationToken cancellationToken)
+        {
+            if (FailOnce)
+            {
+                FailOnce = false;
+                throw new HttpRequestException("Network down.");
+            }
+
+            return Task.FromResult<IReadOnlyList<JobOffer>>(board == "made-up" ? [.. Offers] : [.. Company]);
+        }
 
         public Task<string> DetailsAsync(JobOffer offer, CancellationToken cancellationToken) => Task.FromResult(offer.Text ?? $"Details of {offer.Title}.");
     }
@@ -393,6 +462,11 @@ public sealed class JobOffersTests : IDisposable
 
         public List<string> Systems { get; } = [];
 
+        /// <summary>What the desk was asked.</summary>
+        public List<string> Desks { get; } = [];
+
+        public bool DeskFails { get; set; }
+
         public bool Fail { get; set; }
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
@@ -402,8 +476,24 @@ public sealed class JobOffersTests : IDisposable
                 throw new InvalidOperationException("The model is busy.");
             }
 
-            Asked.Add(ask.User);
             Systems.Add(ask.System);
+            if (ask.User.StartsWith("The desk of job offers", StringComparison.Ordinal))
+            {
+                Desks.Add(ask.User);
+                if (DeskFails)
+                {
+                    throw new InvalidOperationException("The desk is away.");
+                }
+
+                var lines = ask.User.Split('\n').Where(l => l.StartsWith('[')).ToList();
+
+                // The desk keeps away sales and picks backwards, to show its order wins over the newest.
+                var picks = lines.Where(l => !l.Contains("Sales", StringComparison.Ordinal))
+                    .Select(l => int.Parse(l[1..l.IndexOf(']', StringComparison.Ordinal)], System.Globalization.CultureInfo.InvariantCulture)).Reverse();
+                return Task.FromResult(JsonSerializer.Serialize(new { picks }));
+            }
+
+            Asked.Add(ask.User);
             if (ask.User.StartsWith("A job offer the person found", StringComparison.Ordinal))
             {
                 return Task.FromResult(JsonSerializer.Serialize(new

@@ -423,7 +423,12 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   public API each service publishes for listing openings, full text included. A
   Workday site is `workday:<tenant>.<pod>/<site>` (`acme.wd1/AcmeCareers` for
   acme.wd1.myworkdayjobs.com/AcmeCareers), read the way its own pages read it,
-  where its robots.txt allows; each offer's text is read only when judged. As
+  where its robots.txt allows; each offer's text is read only when judged.
+  `linkedin:<words>` is a search on LinkedIn's public job pages, the ones anyone not
+  signed in sees, with no account: up to three pages of the last week's results in
+  Japan, or in a place given after `@` (`linkedin:react@Osaka`), pausing between
+  requests; each offer's description is read from its public page when judged. A
+  board that cannot be read is read again once after a pause. As
   `{ "board": "greenhouse:…", "allInJapan": true }` every job of it counts as in
   Japan, for companies whose places say only "Hybrid". Offers first pass the
   person's rules: in Japan; a job, not an internship; a title with one of the `roles` words (developer,
@@ -440,8 +445,14 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   in Openspace for yes (followed) or no (never again). An offer is known by its
   link and by company and title, so one posted again under another link does not
   come back; it comes back only when it changes in substance, unless turned down.
-  `most` (8) new offers are judged per run, the newest first; when the model
-  cannot judge any, the run fails and they stay new.
+  Of the new offers that meet the rules (the newest 150), a desk picks `most` (8)
+  to judge: the local model reads their titles with the profile, the person's last
+  answers (yes and no) and `avoid`, what they do not want in their words ("Go",
+  "QA"); without an answer the newest go on. The judge sees the same answers and
+  `avoid`, and gives what is like a no or mainly about `avoid` a fit of 2 at most.
+  When the model cannot judge any, the run fails and they stay new. The message
+  keeps each offer to a few short lines: role and company, place, salary and fit
+  as stars, Japanese and visa, why it fits, what to watch, the link.
   An offer the person found where no routine may read is pasted in Openspace
   (Evaluate an offer): it waits as a file in `inbox` and the next run, asked at
   once, judges it whatever the rules, the model reading its title, company and

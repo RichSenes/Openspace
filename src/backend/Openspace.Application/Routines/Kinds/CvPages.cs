@@ -57,8 +57,8 @@ public static class CvPages
         li::before{content:"\203A";position:absolute;left:.4mm;top:-.1em;color:var(--primary);font-weight:700;font-size:10.5pt;line-height:1.45}
         .groups{display:grid;grid-template-columns:23mm minmax(0,1fr);gap:2mm 3mm;align-items:start}
         .groups>span{color:var(--mute);font-size:8.2pt;padding-top:.5mm}
-        .chips{display:flex;flex-wrap:wrap;gap:1.5mm}
-        .chip{background:var(--card);border-radius:999px;padding:.5mm 2.4mm;font-size:8.1pt;color:var(--ink)}
+        .skills{color:var(--ink)}
+        .skills i{font-style:normal;color:var(--ash);padding:0 1.6mm}
         .pairs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2mm 4mm}
         .pairs b{display:block;color:var(--ink);font-weight:700}
         .pairs span{color:var(--mute);font-size:8.4pt}
@@ -130,13 +130,9 @@ public static class CvPages
             var skills = new StringBuilder("<div class=\"groups\">");
             foreach (var group in groups)
             {
-                skills.Append(CultureInfo.InvariantCulture, $"<span>{E(group.Group)}</span><div class=\"chips\">");
-                foreach (var item in group.Items.Where(i => !string.IsNullOrWhiteSpace(i)))
-                {
-                    skills.Append(CultureInfo.InvariantCulture, $"<span class=\"chip\">{E(item)}</span>");
-                }
-
-                skills.Append("</div>");
+                // A plain line, the skills apart by quiet dots.
+                skills.Append(CultureInfo.InvariantCulture,
+                    $"<span>{E(group.Group)}</span><p class=\"skills\">{string.Join("<i>·</i>", group.Items.Where(i => !string.IsNullOrWhiteSpace(i)).Select(i => E(i.Trim())))}</p>");
             }
 
             Row(html, labels.Skills, skills.Append("</div>").ToString());

@@ -485,7 +485,8 @@ offer's CV in answer to it.
   (`v3-2026-11-12`), and again when the CV's design changes: a CV in each of
   `languages`, in Karuta's look (Roboto embedded in the page, warm greys, one red,
   a soft header card with the photo; section names in a narrow left column, each kept
-  with its first item; dates in a column of their own; points marked by a small red
+  with its first item; dates in a column of their own; skills as plain lines apart by
+  quiet dots; points marked by a small red
   chevron; sections run on to a second page when needed), written full and concrete
   (a three or four sentence summary, three to five points per job and project with
   their technologies), and with

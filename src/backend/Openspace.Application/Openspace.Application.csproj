@@ -11,4 +11,8 @@
   </ItemGroup>
 
 
+  <ItemGroup>
+    <!-- Roboto, for the CV's look on any computer: OFL, see Routines/Kinds/Fonts/OFL.txt. -->
+    <EmbeddedResource Include="Routines/Kinds/Fonts/*.woff2" LogicalName="Openspace.Fonts.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

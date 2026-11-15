@@ -20,7 +20,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
     public const string MasterKey = "cv:master";
 
     /// <summary>Raised when the pages change, so a new look makes a new version.</summary>
-    private const string Design = "2";
+    private const string Design = "3";
 
     /// <summary>Offers given a CV per run at most.</summary>
     private const int MostOffers = 5;
@@ -115,6 +115,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
                 A CV for this job offer, in {settings.TailoredLanguage}, to fit on two pages.
                 Choose from the profile what the role needs and put it first; leave out what does not help; use the offer's words for skills the person truly has.
                 Never add a skill, a tool, a title or a result the profile does not state. In "focus", say in one sentence what the CV puts forward.
+                {Writing}
 
                 The offer:
                 {Short(offer, Reading)}
@@ -149,7 +150,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
         {
             context.Progress($"Writing the CV in {language}");
             var content = await AskAsync<CvContent>(context, settings, language,
-                $"A complete CV in {language}, to fit on two pages: the most recent and strongest first. Leave \"focus\" empty.",
+                $"A complete CV in {language}, to fit on two pages: the most recent and strongest first. Leave \"focus\" empty.\n{Writing}",
                 profile, cancellationToken).ConfigureAwait(false);
             pages.Add(($"CV_{personal.FileName}_{CvLabels.For(language).Code}.pdf", CvPages.Cv(content, personal, photo?.DataUri, CvLabels.For(language))));
         }
@@ -205,6 +206,16 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
         var pdf = await printer.PrintAsync(html, cancellationToken).ConfigureAwait(false);
         await File.WriteAllBytesAsync(file, pdf, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>How full and how concrete a CV is, so that it reads as the person's work and not as an outline.</summary>
+    private const string Writing = """
+        How to write it, from the profile only:
+        - "headline": the role, in a few words, as the person would introduce themselves.
+        - "summary": three or four sentences: what they build, with what, how long, and what they care about in their work.
+        - each job and project: three to five points, one line each, starting with what was done (built, led, designed, cut, moved), naming the technologies used and, only when the profile states it, the result in numbers.
+        - "skills": grouped (languages, frameworks, data, tools, practices), most used first; only what the profile shows.
+        - every period as the profile gives it, in the same style for all ("2021 – present").
+        """;
 
     private async Task<T> AskAsync<T>(RoutineContext context, CvSettings settings, string language, string task, string profile, CancellationToken cancellationToken)
     {

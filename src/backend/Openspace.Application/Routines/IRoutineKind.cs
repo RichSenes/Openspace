@@ -46,6 +46,9 @@ public interface IRoutineOutbox
     /// <param name="filePath">A file to attach, such as the paper's PDF.</param>
     /// <returns>False when the routine names no channel, so nothing was sent.</returns>
     Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken);
+
+    /// <summary>The channels a routine may name, by name only: never their keys.</summary>
+    IReadOnlyList<string> Channels() => [];
 }
 
 internal sealed class NoOutbox : IRoutineOutbox

@@ -262,6 +262,10 @@ clock, some days of the week (every day when none), every week or every few week
 | Method | Path | What it does |
 | --- | --- | --- |
 | GET | `/api/routine-kinds` | The kinds of routine, with their name, description and default settings |
+| POST | `/api/routine-kinds/morning-paper/preview` | `{ settings }`: the paper laid out with sample text, as HTML; no feed is read and no model asked |
+| POST | `/api/feeds/test` | `{ url }`: reads a feed once: `{ ok, count, titles, problem }`, the problem in words for people |
+| GET | `/api/routine-channels` | The Telegram bots named in `telegram.env`: names only, never tokens |
+| GET | `/api/routine-models` | The local models routines may write with, as `local/<id>` |
 | GET | `/api/offices/{id}/routines` | Routines with their next run and the latest one |
 | POST | `/api/offices/{id}/routines` | `{ name, kind, schedule: { days, at, everyWeeks }, settings? }` |
 | PUT | `/api/routines/{id}` | Change name, schedule or settings (what is left out stays) |
@@ -316,6 +320,14 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
     write that section on top of `rules`.
   - The good news of the day comes from the sections in `goodNews`, and must matter
     (medium importance at least): shows and celebrities do not count.
+  - Layout: `layout` gives the text `columns` of a full-width section (1 to 4), the size
+    of the front page's picture (`frontPicture`) and of the sections' (`pictures`):
+    `none`, `small`, `medium` or `large`. Each section may say its `width` (`full`,
+    `half`, `third`: narrower sections sit side by side, with two columns at most for a
+    half and one for a third), its own `columns` and `picture`, `pictureAt` (`beside` the
+    first story or `above` it; narrow sections always above), `articles` instead of
+    `perSection`, and the `length` of its articles (`short`, `normal`, `long`). A
+    paper without these keeps its old layout.
 - **Kanji of the day**, in the paper when its settings say `"kanji": { "enabled":
   true, "fromGrade": 1 }`: one kanji a day of the common use list, by school year
   and the most common first, never one explained before or one the person knows.

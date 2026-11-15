@@ -59,6 +59,52 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_paper_preview_is_a_page_in_the_settings_layout_and_bad_settings_say_why()
+    {
+        var settings = """{"title":"Daily Bugle","sections":[{"name":"City","about":"","width":"half","feeds":[{"name":"G","url":"https://g.example/feed"}]}]}""";
+        using var page = await _http.PostAsJsonAsync("/api/routine-kinds/morning-paper/preview", new { settings });
+        page.EnsureSuccessStatusCode();
+        Assert.Equal("text/html", page.Content.Headers.ContentType?.MediaType);
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("<h1>Daily Bugle</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("section w-half", html, StringComparison.Ordinal);
+
+        using var empty = await _http.PostAsJsonAsync("/api/routine-kinds/morning-paper/preview", new { settings = """{"sections":[]}""" });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
+        Assert.Contains("no sections", (await empty.Content.ReadFromJsonAsync<ProblemDetails>())!.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_feed_test_refuses_what_is_not_a_web_address_without_reading_anything()
+    {
+        using var response = await _http.PostAsJsonAsync("/api/feeds/test", new { url = "file:///etc/passwd" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Contains("https://", result.GetProperty("problem").GetString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, "refuses automatic readers")]
+    [InlineData(HttpStatusCode.NotFound, "the feed may have moved")]
+    [InlineData(HttpStatusCode.TooManyRequests, "slow down")]
+    [InlineData(HttpStatusCode.BadGateway, "an error (502)")]
+    public void A_feed_that_fails_is_explained_in_words_for_people(HttpStatusCode status, string expected)
+    {
+        var said = Endpoints.RoutineHelpEndpoints.Explain(new HttpRequestException("raw", null, status), new Uri("https://news.example/feed"));
+
+        Assert.Contains(expected, said, StringComparison.Ordinal);
+        Assert.StartsWith("news.example", said, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Routine_forms_list_channels_and_local_models_as_names()
+    {
+        Assert.Equal(JsonValueKind.Array, (await _http.GetFromJsonAsync<JsonElement>("/api/routine-channels")).ValueKind);
+        Assert.Equal(JsonValueKind.Array, (await _http.GetFromJsonAsync<JsonElement>("/api/routine-models")).ValueKind);
+    }
+
+    [Fact]
     public async Task Health_answers_ok()
     {
         Assert.Equal(HttpStatusCode.OK, (await _http.GetAsync("/health")).StatusCode);

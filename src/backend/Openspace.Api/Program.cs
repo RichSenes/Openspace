@@ -87,6 +87,7 @@ app.MapReportEndpoints();
 app.MapEngineEndpoints();
 app.MapGpuEndpoints();
 app.MapRoutineEndpoints();
+app.MapRoutineHelpEndpoints();
 app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();

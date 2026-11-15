@@ -27,6 +27,7 @@ import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
 import { runNews } from './progress'
 import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
 import { offerProblem } from './offers'
+import { PaperEditor } from './PaperEditor'
 import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
 import './routines.css'
 
@@ -38,6 +39,19 @@ export function RoutinesPanel({ office }: { office: OfficeView }) {
   const kinds = useRoutineKinds()
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<RoutineView>()
+  /** The paper's own page: one being changed, or a new one ("new"). */
+  const [paper, setPaper] = useState<RoutineView | 'new'>()
+
+  if (paper) {
+    return (
+      <PaperEditor
+        officeId={office.id}
+        routine={paper === 'new' ? undefined : paper}
+        defaults={kinds.data?.find((k) => k.key === 'morning-paper')?.defaultSettings ?? '{}'}
+        onDone={() => setPaper(undefined)}
+      />
+    )
+  }
 
   return (
     <section className="routines">
@@ -61,13 +75,20 @@ export function RoutinesPanel({ office }: { office: OfficeView }) {
       ) : (
         <ul className="routine-list" aria-label="Routines">
           {routines.data?.map((r) => (
-            <RoutineCard key={r.id} routine={r} onEdit={() => setEditing(r)} />
+            <RoutineCard key={r.id} routine={r} onEdit={() => (r.kind === 'morning-paper' ? setPaper(r) : setEditing(r))} />
           ))}
         </ul>
       )}
 
       <Dialog title={`New routine in ${office.name}`} open={creating} onClose={() => setCreating(false)}>
-        <RoutineForm officeId={office.id} onDone={() => setCreating(false)} />
+        <RoutineForm
+          officeId={office.id}
+          onDone={() => setCreating(false)}
+          onPaper={() => {
+            setCreating(false)
+            setPaper('new')
+          }}
+        />
       </Dialog>
       <Dialog title={editing ? `Change ${editing.name}` : 'Change routine'} open={Boolean(editing)} onClose={() => setEditing(undefined)}>
         {editing && <RoutineForm officeId={office.id} routine={editing} onDone={() => setEditing(undefined)} />}
@@ -399,7 +420,7 @@ function Runs({ routineId }: { routineId: string }) {
   )
 }
 
-function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?: RoutineView; onDone: () => void }) {
+function RoutineForm({ officeId, routine, onDone, onPaper }: { officeId: string; routine?: RoutineView; onDone: () => void; onPaper?: () => void }) {
   const kinds = useRoutineKinds()
   const create = useCreateRoutine(officeId)
   const update = useUpdateRoutine()
@@ -448,6 +469,21 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
           {chosen && <span className="hint">{chosen.description}</span>}
         </label>
       )}
+      {kind === 'morning-paper' && onPaper && (
+        <div className="routine-paper-open">
+          <p className="hint">The paper has a page of its own: sources, sections, layout and a preview.</p>
+          <div className="row">
+            <button type="button" className="btn btn-primary" onClick={onPaper}>
+              Set up the paper
+            </button>
+            <button type="button" className="btn btn-quiet" onClick={onDone}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {!(kind === 'morning-paper' && onPaper) && (
+      <>
       <label className="field">
         <span>Name</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
@@ -505,6 +541,8 @@ function RoutineForm({ officeId, routine, onDone }: { officeId: string; routine?
           Cancel
         </button>
       </div>
+        </>
+      )}
     </form>
   )
 }

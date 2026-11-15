@@ -880,3 +880,44 @@ export function useHandOff(officeId: string) {
     (input) => ({ language: input.language }),
   )
 }
+
+/** The channels a routine may deliver to: names of the bots, never their keys. */
+export function useRoutineChannels() {
+  return useQuery({ queryKey: [...keys.routines, 'channels'], queryFn: () => request<string[]>('GET', '/api/routine-channels') })
+}
+
+/** The local models routines may write with, as "local/<id>". */
+export function useRoutineModels() {
+  return useQuery({ queryKey: [...keys.routines, 'models'], queryFn: () => request<{ id: string; name: string }[]>('GET', '/api/routine-models') })
+}
+
+export interface FeedTest {
+  ok: boolean
+  count: number
+  titles: string[]
+  problem: string | null
+}
+
+/** Reads a news feed once and tells what came from it. */
+export function useTestFeed() {
+  return useMutation({ mutationFn: (url: string) => request<FeedTest>('POST', '/api/feeds/test', { url }) })
+}
+
+/** The paper laid out as these settings say, with sample text: a page of HTML. */
+export function usePaperPreview(settings: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.routines, 'paper-preview', settings],
+    queryFn: async () => {
+      const response = await fetch('/api/routine-kinds/morning-paper/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      })
+      if (!response.ok) throw await readError(response)
+      return response.text()
+    },
+    enabled,
+    placeholderData: (previous) => previous,
+    staleTime: Infinity,
+  })
+}

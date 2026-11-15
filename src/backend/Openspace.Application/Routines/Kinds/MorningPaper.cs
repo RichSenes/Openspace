@@ -42,12 +42,14 @@ public sealed partial class MorningPaper(
           "avoid": [],
           "hoursBack": 24,
           "perSection": 4,
+          "layout": { "columns": 2, "frontPicture": "medium", "pictures": "medium" },
           "goodNews": ["World"],
           "kanji": { "enabled": false, "fromGrade": 1 },
           "sections": [
             {
               "name": "World", "about": "What happened in the world.",
               "only": "", "keywords": [], "style": "",
+              "width": "full", "picture": "medium", "pictureAt": "beside", "length": "normal",
               "feeds": [ { "name": "Example News", "url": "https://news.example/feed" } ]
             }
           ]
@@ -113,7 +115,7 @@ public sealed partial class MorningPaper(
                          .Where(c => c.Section == section && !used.Contains(c) && c.Judgement.News >= 0.5 && (c.Judgement.Interest >= 0.35 || c.Judgement.Priority >= 0.6))
                          .OrderByDescending(c => c.Score))
             {
-                if (chosen.Count == settings.PerSection)
+                if (chosen.Count == settings.ArticlesOf(section))
                 {
                     break;
                 }
@@ -137,7 +139,9 @@ public sealed partial class MorningPaper(
             var articles = await WriteSectionAsync(context, settings, section, items, cancellationToken).ConfigureAwait(false);
             if (articles.Count > 0)
             {
-                var picture = await PictureAsync(items.Take(chosen[0].Related.Count + 1), cancellationToken).ConfigureAwait(false);
+                var picture = settings.PictureOf(section) == "none"
+                    ? null
+                    : await PictureAsync(items.Take(chosen[0].Related.Count + 1), cancellationToken).ConfigureAwait(false);
                 sections.Add(new PaperSection(section.Name, articles, items, picture));
             }
         }
@@ -345,7 +349,8 @@ public sealed partial class MorningPaper(
             return null;
         }
 
-        return new PaperLead(lead.Section.Name, article, items, await PictureAsync(items, cancellationToken).ConfigureAwait(false));
+        var picture = settings.Page.FrontPicture == "none" ? null : await PictureAsync(items, cancellationToken).ConfigureAwait(false);
+        return new PaperLead(lead.Section.Name, article, items, picture);
     }
 
     private async Task<PaperLead?> WriteGoodNewsAsync(RoutineContext context, PaperSettings settings, Candidate good, CancellationToken cancellationToken)
@@ -362,9 +367,23 @@ public sealed partial class MorningPaper(
         RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> items, CancellationToken cancellationToken) =>
         WriteAsync(
             context, settings, items, $"the section {section.Name} ({section.About})",
-            "Write one short article per story (items about the same fact make one article), each with a headline and two to four sentences."
+            $"Write one {ArticleSize(section)} article per story (items about the same fact make one article), each with a headline and {SentencesOf(section)}."
             + (string.IsNullOrWhiteSpace(section.Style) ? string.Empty : $" For this section: {section.Style.Trim()}"),
-            settings.PerSection, cancellationToken);
+            settings.ArticlesOf(section), cancellationToken);
+
+    private static string ArticleSize(PaperSettings.Section section) => PaperSettings.LengthOf(section) switch
+    {
+        "short" => "very short",
+        "long" => "full",
+        _ => "short",
+    };
+
+    internal static string SentencesOf(PaperSettings.Section section) => PaperSettings.LengthOf(section) switch
+    {
+        "short" => "one or two sentences",
+        "long" => "five to seven sentences",
+        _ => "two to four sentences",
+    };
 
     private async Task<List<PaperArticle>> WriteAsync(
         RoutineContext context, PaperSettings settings, List<FeedItem> items, string where, string task, int most, CancellationToken cancellationToken)
@@ -657,8 +676,55 @@ public sealed record PaperSection(string Name, IReadOnlyList<PaperArticle> Artic
 public sealed record PaperSettings(
     string Title, string Subtitle, string Language, string Model, string Folder, string Reader,
     IReadOnlyList<string> Rules, int HoursBack, int PerSection, IReadOnlyList<PaperSettings.Section> Sections,
-    IReadOnlyList<string>? GoodNews = null, IReadOnlyList<string>? Priorities = null, IReadOnlyList<string>? Avoid = null)
+    IReadOnlyList<string>? GoodNews = null, IReadOnlyList<string>? Priorities = null, IReadOnlyList<string>? Avoid = null,
+    PaperSettings.PageLayout? Layout = null)
 {
+    /// <summary>Picture sizes, as words in the settings: none, small, medium, large.</summary>
+    public static readonly IReadOnlyList<string> PictureSizes = ["none", "small", "medium", "large"];
+
+    /// <summary>How wide a section is on the page: the whole width, half or a third of it.</summary>
+    public static readonly IReadOnlyList<string> Widths = ["full", "half", "third"];
+
+    /// <summary>How long a section's articles are: short, normal or long.</summary>
+    public static readonly IReadOnlyList<string> Lengths = ["short", "normal", "long"];
+
+    /// <param name="Columns">Text columns of a full-width section, 1 to 4.</param>
+    /// <param name="FrontPicture">The size of the front page's picture.</param>
+    /// <param name="Pictures">The size of each section's picture, unless the section says otherwise.</param>
+    public sealed record PageLayout(int Columns = 2, string FrontPicture = "medium", string Pictures = "medium");
+
+    /// <summary>The page layout, with every value in its range.</summary>
+    public PageLayout Page => Layout ?? new PageLayout();
+
+    /// <summary>How wide the section is: full, half or third.</summary>
+    public static string WidthOf(Section section) => Pick(section.Width, Widths, "full");
+
+    /// <summary>The section's text columns: its own or the paper's, never more than its width allows.</summary>
+    public int ColumnsOf(Section section)
+    {
+        var most = WidthOf(section) switch { "third" => 1, "half" => 2, _ => 4 };
+        return Math.Clamp(section.Columns ?? Page.Columns, 1, most);
+    }
+
+    /// <summary>The size of the section's picture: its own or the paper's.</summary>
+    public string PictureOf(Section section) => Pick(section.Picture, PictureSizes, Page.Pictures);
+
+    /// <summary>Where the picture goes: beside the first story, or above it. Narrow sections always put it above.</summary>
+    public static string PictureAtOf(Section section) =>
+        WidthOf(section) != "full" ? "above" : Pick(section.PictureAt, ["beside", "above"], "beside");
+
+    /// <summary>The most articles the section prints: its own or the paper's.</summary>
+    public int ArticlesOf(Section section) => section.Articles is > 0 and <= 10 ? section.Articles.Value : PerSection;
+
+    /// <summary>How long the section's articles are.</summary>
+    public static string LengthOf(Section section) => Pick(section.Length, Lengths, "normal");
+
+    private static string Pick(string? value, IReadOnlyList<string> allowed, string fallback)
+    {
+        var word = value?.Trim().ToLowerInvariant();
+        return word is not null && allowed.Contains(word) ? word : fallback;
+    }
+
     /// <summary>Whether the good news of the day may come from this section: from any, unless some are named.</summary>
     public bool GoodNewsFrom(Section section) =>
         GoodNews is not { Count: > 0 } names || names.Contains(section.Name, StringComparer.OrdinalIgnoreCase);
@@ -669,9 +735,16 @@ public sealed record PaperSettings(
     /// <param name="Focus">Topics this section looks out for, on top of the reader's priorities.</param>
     /// <param name="Keywords">Words, or starts of words, that put an item on the shortlist before newer ones.</param>
     /// <param name="Style">How to write this section, on top of the paper's rules.</param>
+    /// <param name="Width">How wide it is on the page: full, half or third; narrower sections sit side by side.</param>
+    /// <param name="Columns">Its text columns, instead of the paper's.</param>
+    /// <param name="Picture">The size of its picture (none, small, medium, large), instead of the paper's.</param>
+    /// <param name="PictureAt">Beside the first story or above it.</param>
+    /// <param name="Articles">The most articles it prints, instead of the paper's.</param>
+    /// <param name="Length">How long its articles are: short, normal or long.</param>
     public sealed record Section(
         string Name, string About, IReadOnlyList<Feed> Feeds,
-        string? Only = null, IReadOnlyList<string>? Focus = null, IReadOnlyList<string>? Keywords = null, string? Style = null);
+        string? Only = null, IReadOnlyList<string>? Focus = null, IReadOnlyList<string>? Keywords = null, string? Style = null,
+        string? Width = null, int? Columns = null, string? Picture = null, string? PictureAt = null, int? Articles = null, string? Length = null);
 
     public static PaperSettings Read(JsonElement json)
     {
@@ -695,6 +768,10 @@ public sealed record PaperSettings(
             HoursBack = read.HoursBack is > 0 and <= 24 * 7 ? read.HoursBack : 24,
             PerSection = read.PerSection is > 0 and <= 10 ? read.PerSection : 4,
             Sections = [.. read.Sections.Where(s => s.Feeds is { Count: > 0 })],
+            Layout = new PageLayout(
+                Math.Clamp(read.Layout?.Columns ?? 2, 1, 4),
+                Pick(read.Layout?.FrontPicture, PictureSizes, "medium"),
+                Pick(read.Layout?.Pictures, PictureSizes, "medium")),
         };
     }
 }

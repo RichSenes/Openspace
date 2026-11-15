@@ -28,6 +28,19 @@ public sealed class TelegramOutboxTests : IDisposable
             DateTimeOffset.UnixEpoch, TimeZoneInfo.Utc);
 
     [Fact]
+    public void The_channels_are_the_bots_names_never_their_tokens()
+    {
+        var channels = Outbox().Channels();
+
+        Assert.Equal(["PAPERBOY", "POSTMAN"], channels);
+        Assert.DoesNotContain(channels, c => c.Contains("fake", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_a_tokens_file_there_are_no_channels() =>
+        Assert.Empty(new TelegramOutbox(new HttpClient(), new LiveOptions<TelegramOptions>(new TelegramOptions { Folder = Path.Combine(_folder, "missing") })).Channels());
+
+    [Fact]
     public async Task A_routine_writes_with_its_bot_in_that_bot_s_topic()
     {
         await Outbox().SendAsync(Routine("""{"channel":"paperboy"}"""), "Good morning.", null, default);

@@ -68,7 +68,7 @@ public sealed class MorningPaperTests : IDisposable
         Assert.EndsWith("Daily-Bugle-N001-2015-06-24.pdf", pdf, StringComparison.Ordinal);
         var html = Html();
         Assert.True(html.IndexOf("class=\"issue\"", StringComparison.Ordinal) < html.IndexOf("<h1>", StringComparison.Ordinal), "The issue line comes before the title.");
-        Assert.Contains("class=\"lead\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"lead pic-medium\"", html, StringComparison.Ordinal);
         Assert.Contains("In this issue", html, StringComparison.Ordinal);
         Assert.Contains("デイリー", html, StringComparison.Ordinal);
         Assert.Contains("Written by a local model", html, StringComparison.Ordinal);
@@ -87,7 +87,7 @@ public sealed class MorningPaperTests : IDisposable
         await RunAsync(routine);
 
         var html = Html();
-        var lead = html[html.IndexOf("class=\"lead\"", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
+        var lead = html[html.IndexOf("class=\"lead ", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
         Assert.Contains("About Big strike stops the city", lead, StringComparison.Ordinal);
         Assert.Contains("src=\"data:image/jpeg;base64,", lead, StringComparison.Ordinal);
         Assert.Contains("Photo: Gazette", lead, StringComparison.Ordinal);
@@ -102,7 +102,7 @@ public sealed class MorningPaperTests : IDisposable
         await RunAsync(routine);
 
         var html = Html();
-        var lead = html[html.IndexOf("class=\"lead\"", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
+        var lead = html[html.IndexOf("class=\"lead ", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
         Assert.DoesNotContain("<figure>", lead, StringComparison.Ordinal);
         Assert.Contains("About Big strike stops the city", lead, StringComparison.Ordinal);
     }
@@ -153,6 +153,63 @@ public sealed class MorningPaperTests : IDisposable
         await RunAsync(routine);
 
         Assert.DoesNotContain("class=\"good\"", Html(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_section_prints_as_many_articles_as_long_and_as_wide_as_its_settings_say()
+    {
+        var routine = Create(perSection: 3, sections: """
+            [{"name":"City","about":"The town.","width":"half","columns":3,"picture":"none","articles":1,"length":"long",
+              "feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] =
+        [
+            Item("Gazette", "Big strike stops the city"), Item("Gazette", "Cat cafe opens", image: new Uri("https://img.example/cafe.jpg")),
+            Item("Gazette", "Tram line opens"), Item("Gazette", "Bakery wins a prize"),
+        ];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var section = html[html.IndexOf("<section class=\"section", StringComparison.Ordinal)..];
+        Assert.StartsWith("<section class=\"section w-half\">", section, StringComparison.Ordinal);
+        Assert.Contains("style=\"column-count: 2\"", section, StringComparison.Ordinal);
+        Assert.DoesNotContain("<figure>", section, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(section, "<h3>"));
+        Assert.Contains(_chat.Prompts, p => p.Contains("five to seven sentences", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_preview_lays_out_sample_text_as_the_settings_say_without_reading_or_asking_anything()
+    {
+        var html = PaperPreview.Render("""
+            {"title":"Daily Bugle","layout":{"columns":3,"frontPicture":"large","pictures":"small"},"perSection":2,
+             "sections":[
+               {"name":"City","about":"","feeds":[{"name":"G","url":"https://g.example/feed"}]},
+               {"name":"Sport","about":"","width":"third","columns":4,"picture":"huge","pictureAt":"beside","articles":5,"length":"short","feeds":[{"name":"G","url":"https://g.example/feed"}]}]}
+            """, new DateOnly(2026, 11, 13));
+
+        Assert.Contains("class=\"lead pic-large\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"lead-text\" style=\"column-count: 3\"", html, StringComparison.Ordinal);
+        var city = html[html.IndexOf("<section class=\"section w-full\">", StringComparison.Ordinal)..html.IndexOf("<section class=\"section w-third\">", StringComparison.Ordinal)];
+        Assert.Contains("class=\"top beside pic-small\"", city, StringComparison.Ordinal);
+        Assert.Contains("column-count: 3", city, StringComparison.Ordinal);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(city, "City: headline"));
+        var sport = html[html.IndexOf("<section class=\"section w-third\">", StringComparison.Ordinal)..];
+        Assert.Contains("class=\"top above pic-small\"", sport, StringComparison.Ordinal);
+        Assert.Contains("column-count: 1", sport, StringComparison.Ordinal);
+        Assert.Equal(5, System.Text.RegularExpressions.Regex.Count(sport, "Sport: headline"));
+    }
+
+    [Fact]
+    public void A_paper_without_a_layout_keeps_the_layout_it_always_had()
+    {
+        var html = PaperPreview.Render("""{"sections":[{"name":"City","about":"","feeds":[{"name":"G","url":"https://g.example/feed"}]}]}""", new DateOnly(2026, 11, 13));
+
+        Assert.Contains("class=\"lead pic-medium\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"top beside pic-medium\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"columns ruled\" style=\"column-count: 2\"", html, StringComparison.Ordinal);
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Count(html, "<h3>City: headline"));
     }
 
     [Fact]

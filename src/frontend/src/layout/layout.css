@@ -195,7 +195,7 @@
 }
 
 /* Pages that scroll as a whole keep their full height, bottom padding included. */
-.main > :is(.settings, .reports, .agents, .rooms) {
+.main > :is(.settings, .reports, .agents, .rooms, .paper-editor-room) {
   flex: 1 0 auto;
 }
 

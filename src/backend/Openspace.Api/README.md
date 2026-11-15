@@ -301,6 +301,15 @@ What a routine makes goes to the person's Telegram group: its settings name a bo
 in a repository). Long text is split on line breaks; files go as documents. A
 routine without a channel delivers nothing; tests point the folder somewhere empty.
 
+Routines whose proposals ask in the chat (job offers) put yes and no buttons under each
+message, and Openspace listens to the buttons pressed: only on the bots of enabled
+routines of those kinds, so a bot also read elsewhere must not be named by them, and
+only presses in the group of `telegram.json`. A press says yes or no to the proposal as
+in Openspace, a short notice answers it and the buttons give way to the answer; a press
+on a proposal already decided only says so. A proposal keeps its message's number, and
+after a yes the offer's folder keeps it in `message.txt`: the CV routine sends that
+offer's CV in answer to it.
+
 ### Kinds of routine
 
 - **Morning paper** (`morning-paper`): news of the last hours (`hoursBack`) from the
@@ -457,7 +466,8 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   opens with a tap, the role in detail: what the person would do, the skills asked
   that they have and lack, how to fill each gap, what to clarify with the company
   (fewer points per list when the message would pass Telegram's length); a link
-  naming the board, with no preview. The same detail is in the proposal and, after
+  naming the board, with no preview; under it, the buttons "interested" and "no",
+  which answer the proposal (see Telegram above). The same detail is in the proposal and, after
   a yes, in `offer.md` under "How the person fits", for the CV. LinkedIn places are tidied ("Tokyo, Tokyo, Japan" is
   "Tokyo") and a title written mostly in Japanese counts as business Japanese.
   An offer the person found where no routine may read is pasted in Openspace

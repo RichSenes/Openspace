@@ -87,7 +87,13 @@ public sealed class JobOffersTests : IDisposable
         Assert.Contains("Details of Senior .NET Developer.", _chat.Asked[0], StringComparison.Ordinal);
         Assert.Empty(_h.Outbox.Sent);
         Assert.Equal(3, _h.Outbox.Posted.Count);
-        Assert.Equal("💼 Offers · 2 new offers for you\nIn Openspace, for each: yes if it interests you, no and it never comes back.", _h.Outbox.Posted[0].Message.Plain);
+        Assert.Equal("💼 Offers · 2 new offers for you\nAnswer with the buttons under each offer: interested and its CV follows, no and it never comes back.", _h.Outbox.Posted[0].Message.Plain);
+        Assert.Null(_h.Outbox.Posted[0].Message.Buttons);
+        var kyoto = _h.Routines.Proposals.Single(p => p.Title.Contains("Kyo Labs", StringComparison.Ordinal));
+        Assert.Equal(2, kyoto.MessageId);
+        Assert.Equal(
+            [new OutboxButton("✅ I'm interested", $"p:{kyoto.Id.Value:N}:y"), new OutboxButton("❌ No", $"p:{kyoto.Id.Value:N}:n")],
+            _h.Outbox.Posted[1].Message.Buttons);
         Assert.Equal(
             """
             <b>Frontend Engineer</b>
@@ -304,7 +310,8 @@ public sealed class JobOffersTests : IDisposable
         await RunAsync(routine);
 
         var posted = _h.Outbox.Posted.Select(p => p.Message.Plain).ToList();
-        Assert.Equal("💼 Offers · 2 offerte nuove per te\nRispondi in Openspace: «sì» la segui, «no» non torna più.", posted[0]);
+        Assert.Equal("💼 Offers · 2 offerte nuove per te\nRispondi con i bottoni sotto ogni offerta: «mi interessa» e arriva il CV, «no» e non torna più.", posted[0]);
+        Assert.Equal(["✅ Mi interessa", "❌ No"], _h.Outbox.Posted[1].Message.Buttons!.Select(b => b.Text));
         Assert.Contains("Kyo Labs · Kyoto\n\n★★★★☆ · stipendio non indicato\n🇯🇵 Giapponese non richiesto · 🛂 Visto sponsorizzato", posted[1], StringComparison.Ordinal);
         Assert.Contains("Il ruolo nel dettaglio\n📋 Cosa faresti: You would build the booking API.\n\n✅ Hai già", posted[2], StringComparison.Ordinal);
         Assert.EndsWith("Apri l'offerta: https://jobs.example/jobs/kyo-front?ref=list", posted[1], StringComparison.Ordinal);
@@ -483,6 +490,69 @@ public sealed class JobOffersTests : IDisposable
         Assert.Contains("<blockquote expandable>", html, StringComparison.Ordinal);
         Assert.Contains("• Point 1 ", html, StringComparison.Ordinal);
         Assert.DoesNotContain("• Point 6 ", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Yes_keeps_the_offer_s_message_in_its_folder_for_the_cv_to_answer()
+    {
+        var routine = Create();
+        Board();
+        await RunAsync(routine);
+        var kyoto = _h.Routines.Proposals.Single(p => p.Title.Contains("Kyo Labs", StringComparison.Ordinal));
+
+        await Proposals().ApproveAsync(kyoto.Id, default);
+
+        Assert.Equal("2", File.ReadAllText(Path.Combine(Saved, "kyo-labs-frontend-engineer", JobOffers.MessageFile)));
+    }
+
+    [Fact]
+    public async Task In_the_chat_yes_and_no_answer_the_proposal_and_a_second_press_is_told_it_is_decided()
+    {
+        var routine = Create(language: "Italian");
+        Board();
+        await RunAsync(routine);
+        var kyoto = _h.Routines.Proposals.Single(p => p.Title.Contains("Kyo Labs", StringComparison.Ordinal));
+        var dotnet = _h.Routines.Proposals.Single(p => p.Title.Contains(".NET", StringComparison.Ordinal));
+        var answers = new ChatAnswers(_h.Routines, [Kind()], Proposals());
+
+        var yes = await answers.AnswerAsync($"p:{kyoto.Id.Value:N}:y", default);
+        var no = await answers.AnswerAsync($"p:{dotnet.Id.Value:N}:n", default);
+        var again = await answers.AnswerAsync($"p:{kyoto.Id.Value:N}:n", default);
+
+        Assert.Equal(new ChatAnswer("Segnata: ti interessa. Il CV arriverà in risposta qui.", "✅ Ti interessa"), yes);
+        Assert.Equal(ProposalStatus.Done, kyoto.Status);
+        Assert.True(File.Exists(Path.Combine(Saved, "kyo-labs-frontend-engineer", JobOffers.OfferFile)));
+        Assert.Equal(new ChatAnswer("Scartata: non tornerà.", "❌ Scartata"), no);
+        Assert.Equal(ProposalStatus.Rejected, dotnet.Status);
+        Assert.Equal(new ChatAnswer("Già decisa.", "✅ Ti interessa"), again);
+        Assert.Equal(ProposalStatus.Done, kyoto.Status);
+    }
+
+    [Theory]
+    [InlineData("done")]
+    [InlineData("p:not-a-proposal:y")]
+    [InlineData("p:0123456789abcdef0123456789abcdef:maybe")]
+    public async Task What_is_not_an_answer_to_a_proposal_is_left_alone(string data) =>
+        Assert.Null(await new ChatAnswers(_h.Routines, [Kind()], Proposals()).AnswerAsync(data, default));
+
+    [Fact]
+    public async Task A_proposal_no_longer_there_is_said_so() =>
+        Assert.Equal(
+            "This proposal is no longer in Openspace.",
+            (await new ChatAnswers(_h.Routines, [Kind()], Proposals()).AnswerAsync($"p:{Guid.NewGuid():N}:y", default))!.Notice);
+
+    [Fact]
+    public async Task Only_the_bots_of_enabled_routines_that_ask_in_the_chat_are_listened_to()
+    {
+        Create();
+        var paused = Routine.Create(_h.Office, "Old offers", "job-offers", RoutineSchedule.Daily(new TimeOnly(8, 0)), """{"channel":"OLD"}""", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        paused.TurnOn(false, _h.Clock.GetUtcNow(), TimeZoneInfo.Utc);
+        _h.Routines.Add(paused);
+        _h.Routines.Add(Routine.Create(_h.Office, "Paper", "morning-paper", RoutineSchedule.Daily(new TimeOnly(6, 0)), """{"channel":"PAPERBOY"}""", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc));
+
+        var channels = await new ChatAnswers(_h.Routines, [Kind()], Proposals()).ChannelsAsync(default);
+
+        Assert.Equal(["CAREER"], channels);
     }
 
     [Fact]

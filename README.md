@@ -39,7 +39,8 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
   sends misplaced news to the right section and skips stories already told. Sections
   may be articles, briefs, a main story with briefs or a story explained by questions,
   and the space can follow the news: the big story gets the room, quiet sections go in
-  brief.
+  brief. Job offers arrive one per message with yes and no buttons; a yes brings the
+  offer's CV in answer to that message.
 
 ![The board: proposed, queued, running, in review, failed and done tasks](docs/screenshots/board.png)
 

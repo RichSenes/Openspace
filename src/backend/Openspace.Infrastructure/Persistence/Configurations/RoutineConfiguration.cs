@@ -61,6 +61,7 @@ internal sealed class RoutineConfiguration :
         builder.Property(p => p.CreatedAt);
         builder.Property(p => p.DecidedAt);
         builder.Property(p => p.Outcome);
+        builder.Property(p => p.MessageId);
         builder.HasOne<Routine>().WithMany().HasForeignKey(p => p.RoutineId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<RoutineRun>().WithMany().HasForeignKey(p => p.RunId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(p => new { p.OfficeId, p.Status });

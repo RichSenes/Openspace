@@ -123,8 +123,17 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
             var labels = CvLabels.For(settings.TailoredLanguage);
             var file = Path.Combine(folder, $"CV_{personal.FileName}.pdf");
             await PrintAsync(CvPages.Cv(content, personal, photo?.DataUri, labels), file, cancellationToken).ConfigureAwait(false);
-            await context.DeliverAsync($"{settings.Title}: {Path.GetFileName(folder)}" + (content.Focus is { Length: > 0 } focus ? $"\n{focus}" : string.Empty), file, cancellationToken)
-                .ConfigureAwait(false);
+            // In answer to the offer's own message, when it came with yes and no in the chat.
+            var caption = $"{settings.Title}: {Path.GetFileName(folder)}" + (content.Focus is { Length: > 0 } focus ? $"\n{focus}" : string.Empty);
+            var asked = Path.Combine(folder, JobOffers.MessageFile);
+            if (File.Exists(asked) && long.TryParse(await File.ReadAllTextAsync(asked, cancellationToken).ConfigureAwait(false), NumberStyles.None, CultureInfo.InvariantCulture, out var message))
+            {
+                await context.PostAsync(new OutboxMessage(OutboxMessage.Escape(caption), caption, ReplyTo: message, FilePath: file), cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await context.DeliverAsync(caption, file, cancellationToken).ConfigureAwait(false);
+            }
             made.Add(file);
         }
 

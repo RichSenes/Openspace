@@ -148,6 +148,14 @@ public static class DependencyInjection
             http.Timeout = TimeSpan.FromMinutes(2);
         });
 
+        // The buttons under routines' messages are answered in Openspace: only the bots of routines that ask.
+        services.AddHttpClient(Telegram.TelegramListener.HttpClientName, http =>
+        {
+            http.BaseAddress = new Uri("https://api.telegram.org/");
+            http.Timeout = TimeSpan.FromSeconds(40);
+        });
+        services.AddHostedService<Telegram.TelegramListener>();
+
         // Google accounts connected with the person's own OAuth client; their mail for the mail routine.
         services.AddHttpClient(Google.GoogleHttp.Name).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(1));
         services.AddSingleton(sp => new Google.GoogleAccounts(

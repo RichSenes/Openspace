@@ -36,6 +36,12 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 
     public string Key => "job-offers";
 
+    /// <summary>Each offer comes with yes and no in the chat.</summary>
+    public bool AsksInChat => true;
+
+    /// <summary>In an offer's folder, the chat message that proposed it, for its CV to answer.</summary>
+    public const string MessageFile = "message.txt";
+
     public string Name => "Job offers";
 
     public string Description =>
@@ -149,27 +155,33 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 
         // The preferred cities first, in their order; then the better fit.
         good = [.. good.OrderBy(g => CityRank(settings, g.Offer)).ThenByDescending(g => g.Judgement.Fit)];
+        var proposed = new List<(JobOffer Offer, Judgement Judgement, Proposal Proposal)>();
         foreach (var (offer, judgement) in good)
         {
-            await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false);
+            proposed.Add((offer, judgement, await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false)));
         }
 
         // What the person brought comes first: they asked for it.
-        good = [.. brought, .. good];
-        if (good.Count == 0)
+        proposed = [.. brought, .. proposed];
+        if (proposed.Count == 0)
         {
             return $"No new offers for you: {kept.Count} of {offers.Count} fit your rules, {judged} new ones judged.";
         }
 
-        // A heading, then each offer in a message of its own: many offers stay easy to read and answer.
-        await context.PostAsync(Heading(settings, words, good.Count), cancellationToken).ConfigureAwait(false);
-        foreach (var (offer, judgement) in good)
+        // A heading, then each offer in a message of its own with its yes and no: the proposal keeps
+        // the message, so that the offer's CV can answer it.
+        await context.PostAsync(Heading(settings, words, proposed.Count), cancellationToken).ConfigureAwait(false);
+        foreach (var (offer, judgement, proposal) in proposed)
         {
-            await context.PostAsync(Message(words, offer, judgement.Fit, judgement.Why, judgement.Gaps, judgement.Detail), cancellationToken).ConfigureAwait(false);
+            var message = Message(words, offer, judgement.Fit, judgement.Why, judgement.Gaps, judgement.Detail) with { Buttons = ChatAnswers.Buttons(proposal, words.Yes, words.No) };
+            if (await context.PostAsync(message, cancellationToken).ConfigureAwait(false) is { } id)
+            {
+                proposal.Asked(id);
+            }
         }
 
         return (brought.Count > 0 ? $"{brought.Count} brought offers judged; " : string.Empty)
-            + $"{good.Count - brought.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
+            + $"{proposed.Count - brought.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
     }
 
     /// <summary>New offers the desk reads at most, by title: the newest first.</summary>
@@ -309,14 +321,14 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
     /// model also reads its title, company and place. A file judged leaves the inbox; one the
     /// model could not judge stays for the next run.
     /// </summary>
-    private async Task<List<(JobOffer Offer, Judgement Judgement)>> BroughtAsync(
+    private async Task<List<(JobOffer Offer, Judgement Judgement, Proposal Proposal)>> BroughtAsync(
         RoutineContext context, JobSettings settings, JobWords words, string profile, CancellationToken cancellationToken)
     {
         var inbox = MorningPaper.Expand(settings.Inbox);
         var files = Directory.Exists(inbox)
             ? Directory.GetFiles(inbox).Where(f => f.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).ToList()
             : [];
-        var judged = new List<(JobOffer, Judgement)>();
+        var judged = new List<(JobOffer, Judgement, Proposal)>();
         foreach (var (file, i) in files.Select((f, i) => (f, i)))
         {
             context.Progress($"Measuring the offer you brought, {i + 1} of {files.Count}");
@@ -339,9 +351,9 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
             };
             await context.MeetAsync(OfferKey(offer), RoutineContext.Fingerprint(text), Short($"{offer.Title} — {offer.Company}", 280), cancellationToken).ConfigureAwait(false);
             await context.MarkAsync(OfferKey(offer), SeenState.Shown, cancellationToken).ConfigureAwait(false);
-            await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false);
+            var proposal = await ProposeAsync(context, words, offer, judgement, cancellationToken).ConfigureAwait(false);
             File.Delete(file);
-            judged.Add((offer, judgement));
+            judged.Add((offer, judgement, proposal));
         }
 
         return judged;
@@ -358,6 +370,11 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         // The offer in its own folder, where the CV routines make a CV for it.
         var folder = Path.Combine(MorningPaper.Expand(JobSettings.Read(context.Settings).Offers), FolderName(payload.Company, payload.Title));
         Directory.CreateDirectory(folder);
+        if (proposal.MessageId is { } message)
+        {
+            await File.WriteAllTextAsync(Path.Combine(folder, MessageFile), message.ToString(CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
+        }
+
         await File.WriteAllTextAsync(
             Path.Combine(folder, OfferFile),
             $"# {payload.Title}\n\nCompany: {payload.Company}\nPlace: {payload.Location}\nLink: {payload.Url}\nFacts: {payload.Facts}\n\n{payload.Text}\n"
@@ -708,7 +725,7 @@ public sealed record RoleDetail(string Role, IReadOnlyList<string> Have, IReadOn
 internal sealed record JobWords(
     Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck, string Untitled,
     string OpenOffer = "Open the offer", string On = "on", string InDetail = "The role in detail", string Role = "What you would do", string Have = "You already have",
-    string Missing = "You lack", string Improve = "How to fill the gap", string AskAbout = "To clarify")
+    string Missing = "You lack", string Improve = "How to fill the gap", string AskAbout = "To clarify", string Yes = "✅ I'm interested", string No = "❌ No")
 {
     /// <summary>"Apri l'offerta su LinkedIn": the link's words, naming the board when it is a known one.</summary>
     public string Open(Uri url)
@@ -736,7 +753,7 @@ internal sealed record JobWords(
         "stipendio non indicato",
         "Da colmare",
         "Ti interessa? Sì la segna tra quelle da seguire, no la scarta per sempre.",
-        "Rispondi in Openspace: «sì» la segui, «no» non torna più.",
+        "Rispondi con i bottoni sotto ogni offerta: «mi interessa» e arriva il CV, «no» e non torna più.",
         "visto da verificare",
         "Offerta senza titolo",
         "Apri l'offerta",
@@ -746,7 +763,9 @@ internal sealed record JobWords(
         "Hai già",
         "Ti manca",
         "Come colmarlo",
-        "Da chiarire");
+        "Da chiarire",
+        "✅ Mi interessa",
+        "❌ No");
 
     private static readonly JobWords English = new(
         n => n == 1 ? "1 new offer for you" : $"{n} new offers for you",
@@ -763,7 +782,7 @@ internal sealed record JobWords(
         "salary not stated",
         "To fill in",
         "Interested? Yes keeps it among those to follow, no drops it for good.",
-        "In Openspace, for each: yes if it interests you, no and it never comes back.",
+        "Answer with the buttons under each offer: interested and its CV follows, no and it never comes back.",
         "visa to check",
         "Untitled offer");
 }

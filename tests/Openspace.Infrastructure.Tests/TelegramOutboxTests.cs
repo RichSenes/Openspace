@@ -94,6 +94,31 @@ public sealed class TelegramOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task A_message_carries_its_buttons_and_answers_another()
+    {
+        await Outbox().PostAsync(Routine("""{"channel":"PAPERBOY"}"""), new("<b>Job</b>", "Job", [new("✅ Yes", "p:1:y"), new("❌ No", "p:1:n")], ReplyTo: 7), default);
+
+        var body = Assert.Single(_telegram.Calls).Body;
+        Assert.Contains("reply_markup={\"inline_keyboard\":[[{\"text\":\"✅ Yes\",\"callback_data\":\"p:1:y\"},{\"text\":\"❌ No\",\"callback_data\":\"p:1:n\"}]]}", body, StringComparison.Ordinal);
+        Assert.Contains("reply_parameters={\"message_id\":7,\"allow_sending_without_reply\":true}", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_message_with_a_file_goes_as_a_document_with_its_formatted_caption()
+    {
+        var pdf = Path.Combine(_folder, "cv.pdf");
+        await File.WriteAllBytesAsync(pdf, [37, 80, 68, 70]);
+
+        await Outbox().PostAsync(Routine("""{"channel":"PAPERBOY"}"""), new("<b>CV</b>", "CV", ReplyTo: 9, FilePath: pdf), default);
+
+        var (path, body) = Assert.Single(_telegram.Calls);
+        Assert.Equal("/bot111:fake-token/sendDocument", path);
+        Assert.Contains("filename=cv.pdf", body, StringComparison.Ordinal);
+        Assert.Contains("<b>CV</b>", body, StringComparison.Ordinal);
+        Assert.Contains("\"message_id\":9", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_routine_without_a_channel_delivers_nothing()
     {
         Assert.False(await Outbox().SendAsync(Routine("{}"), "Nobody reads this.", null, default));
@@ -121,7 +146,7 @@ public sealed class TelegramOutboxTests : IDisposable
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Calls.Add((request.RequestUri!.AbsolutePath, request.Content is null ? "" : Uri.UnescapeDataString(await request.Content.ReadAsStringAsync(cancellationToken))));
+            Calls.Add((request.RequestUri!.AbsolutePath, request.Content is null ? "" : Uri.UnescapeDataString((await request.Content.ReadAsStringAsync(cancellationToken)).Replace('+', ' '))));
             return new HttpResponseMessage(Answer.Status) { Content = new StringContent(Answer.Body) };
         }
     }

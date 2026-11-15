@@ -71,6 +71,37 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
         return true;
     }
 
+    public async Task<long?> PostAsync(Routine routine, OutboxMessage message, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(routine);
+        ArgumentNullException.ThrowIfNull(message);
+        if (ChannelOf(routine.Settings) is not { } channel)
+        {
+            return null;
+        }
+
+        var (token, chat, topic) = Read(channel);
+        var fields = new Dictionary<string, string>
+        {
+            ["chat_id"] = chat,
+            ["text"] = message.Html.Length <= MaxText ? message.Html : message.Plain[..Math.Min(message.Plain.Length, MaxText)],
+            ["link_preview_options"] = """{"is_disabled":true}""",
+        };
+        if (message.Html.Length <= MaxText)
+        {
+            fields["parse_mode"] = "HTML";
+        }
+
+        if (topic is not null)
+        {
+            fields["message_thread_id"] = topic;
+        }
+
+        using var form = new FormUrlEncodedContent(fields);
+        var answer = await PostAsync(token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
+        return answer.TryGetProperty("result", out var result) && result.TryGetProperty("message_id", out var id) && id.TryGetInt64(out var number) ? number : 0;
+    }
+
     /// <summary>The bots named in <c>telegram.env</c>: the names before the "=", never the tokens.</summary>
     public IReadOnlyList<string> Channels()
     {
@@ -138,16 +169,27 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
         return (token, chat, topic);
     }
 
-    private async Task PostAsync(string token, string method, HttpContent content, CancellationToken cancellationToken)
+    /// <summary>Calls the bot; Telegram's answer, its "result" holding what was sent.</summary>
+    private async Task<JsonElement> PostAsync(string token, string method, HttpContent content, CancellationToken cancellationToken)
     {
         // "./": a token has a colon, which would otherwise read as a scheme.
         using var response = await http.PostAsync(new Uri($"./bot{token}/{method}", UriKind.Relative), content, cancellationToken).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             // Telegram says what went wrong in the body; the token never goes into the message.
-            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var description = JsonDocument.Parse(body).RootElement.TryGetProperty("description", out var d) ? d.GetString() : body;
             throw new HttpRequestException($"Telegram refused the message: {description}");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return default;
         }
     }
 }

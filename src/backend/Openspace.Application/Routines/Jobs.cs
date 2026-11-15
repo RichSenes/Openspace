@@ -51,6 +51,15 @@ public static class JapanPlaces
 
     public static bool Mentions(string place) => Names.Any(n => place.Contains(n, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>"Tokyo, Tokyo, Japan" as "Tokyo": each part once, and the country only when nothing else is said.</summary>
+    public static string Tidy(string place)
+    {
+        ArgumentNullException.ThrowIfNull(place);
+        var parts = place.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var named = parts.Where(p => !p.Equals("Japan", StringComparison.OrdinalIgnoreCase) && p != "日本").ToList();
+        return string.Join(", ", named.Count > 0 ? named : parts);
+    }
+
     /// <summary>
     /// A title written mostly in Japanese is for people who read it: "AD/ADAS SIL環境開発エンジニア" is,
     /// "Backend Engineer / バックエンドエンジニア" is not.

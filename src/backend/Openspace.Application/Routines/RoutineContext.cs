@@ -153,6 +153,18 @@ public sealed class RoutineContext(
         }
     }
 
+    /// <summary>A message of its own, formatted; its number in the chat, or null when nothing was sent.</summary>
+    public async Task<long?> PostAsync(OutboxMessage message, CancellationToken cancellationToken)
+    {
+        var id = await outbox.PostAsync(Routine, message, cancellationToken).ConfigureAwait(false);
+        if (id is null)
+        {
+            Write("Not delivered: this routine names no channel.");
+        }
+
+        return id;
+    }
+
     /// <summary>A short, stable digest of the parts of something that matter, to tell when it changed.</summary>
     public static string Fingerprint(params string?[] parts)
     {

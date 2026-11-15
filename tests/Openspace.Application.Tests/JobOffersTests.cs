@@ -462,6 +462,24 @@ public sealed class JobOffersTests : IDisposable
     }
 
     [Fact]
+    public async Task The_pay_the_description_states_is_read_as_yen_a_year_and_the_rules_hold_for_it()
+    {
+        var routine = Create();
+        _board.Offers.AddRange([
+            Offer("paid", "Frontend Engineer", company: "Kyo Labs", min: null, max: null) with { Text = "React. Salary: 600万円〜900万円 per year." },
+            Offer("cheap", "Backend Developer", company: "Low Pay", min: null, max: null) with { Text = "C#. 月給30万円." },
+        ]);
+
+        var run = await RunAsync(routine);
+
+        var posted = string.Join("\n", _h.Outbox.Posted.Select(p => p.Message.Plain));
+        Assert.Contains("Kyo Labs · Tokyo\n\n★★★★☆ · ¥6–9M", posted, StringComparison.Ordinal);
+        Assert.DoesNotContain("Low Pay", posted, StringComparison.Ordinal);
+        Assert.Contains("\"salaryUnit\"", _chat.Asked[0], StringComparison.Ordinal);
+        Assert.Equal("1 new offers for you, of 2 judged; 2 of 2 fit your rules.", run.Summary);
+    }
+
+    [Fact]
     public async Task Yes_keeps_the_role_in_detail_in_the_offer_s_file_for_its_cv()
     {
         var routine = Create();
@@ -669,6 +687,10 @@ public sealed class JobOffersTests : IDisposable
             return Task.FromResult(JsonSerializer.Serialize(new
             {
                 fit, why = $"It fits {title}.", gaps = "Some Japanese helps.", japanese, visa,
+                salaryLow = ask.User.Contains("600万円", StringComparison.Ordinal) ? 600 : ask.User.Contains("月給", StringComparison.Ordinal) ? 30 : 0,
+                salaryHigh = ask.User.Contains("600万円", StringComparison.Ordinal) ? 900 : 0,
+                salaryUnit = ask.User.Contains("万円", StringComparison.Ordinal) ? "man-yen" : "yen",
+                salaryPer = ask.User.Contains("月給", StringComparison.Ordinal) ? "month" : "year",
                 role = detailed ? "You would build the booking API." : "",
                 have = detailed ? Wordy ? many : Have : [],
                 missing = detailed ? Wordy ? many : Missing : [],

@@ -448,7 +448,9 @@ offer's CV in answer to it.
   `minSalary` (yen a year). Then the local model reads each new one with the
   person's `profile` (a text file on this computer, never in the repository) and
   gives it a fit from 1 to 5 with why and what to fill in, and says what the text
-  states on Japanese and visas when the board does not: the rules are asked again
+  states on Japanese, visas and pay when the board does not (the pay as written, turned
+  into yen a year by Openspace: 800万円 is ¥8M, a monthly pay counts twelve, other
+  currencies and hourly pay are left out): the rules are asked again
   with it, and an offer that says nothing on visas shows "visa to check". From `fit` (3) up
   they reach `channel` in `language`, the `cities` first in their order, and wait
   in Openspace for yes (followed) or no (never again). An offer is known by its

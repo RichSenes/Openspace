@@ -173,7 +173,7 @@ public sealed class MorningPaperTests : IDisposable
         var html = Html();
         var section = html[html.IndexOf("<section class=\"section", StringComparison.Ordinal)..];
         Assert.StartsWith("<section class=\"section w-half form-articles\">", section, StringComparison.Ordinal);
-        Assert.Contains("style=\"column-count: 2\"", section, StringComparison.Ordinal);
+        Assert.Contains("style=\"column-count: 1\"", section, StringComparison.Ordinal); // nothing after its one story
         Assert.DoesNotContain("<figure>", section, StringComparison.Ordinal);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(section, "<h3>"));
         Assert.Contains(_chat.Prompts, p => p.Contains("five to seven sentences", StringComparison.Ordinal));
@@ -193,7 +193,7 @@ public sealed class MorningPaperTests : IDisposable
         Assert.Contains("class=\"lead-text\" style=\"column-count: 3\"", html, StringComparison.Ordinal);
         var city = html[html.IndexOf("<section class=\"section w-full form-articles\">", StringComparison.Ordinal)..html.IndexOf("<section class=\"section w-third form-articles\">", StringComparison.Ordinal)];
         Assert.Contains("class=\"top beside pic-small\"", city, StringComparison.Ordinal);
-        Assert.Contains("column-count: 3", city, StringComparison.Ordinal);
+        Assert.Contains("column-count: 1", city, StringComparison.Ordinal); // one story after the first
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(city, "City: headline"));
         var sport = html[html.IndexOf("<section class=\"section w-third form-articles\">", StringComparison.Ordinal)..];
         Assert.Contains("class=\"top above pic-small\"", sport, StringComparison.Ordinal);
@@ -807,6 +807,17 @@ public sealed class MorningPaperTests : IDisposable
         Assert.Equal("Good morning", PaperPage.OpeningOf(html)!.Title);
         Assert.Null(PaperPage.OpeningOf("<p>No note.</p>"));
     }
+
+    [Theory]
+    [InlineData(3, 2, 2)]
+    [InlineData(3, 3, 3)]
+    [InlineData(3, 4, 2)]
+    [InlineData(3, 5, 3)]
+    [InlineData(4, 6, 3)]
+    [InlineData(2, 1, 1)]
+    [InlineData(3, 0, 1)]
+    public void Columns_never_stay_empty_on_a_day_with_less_news(int columns, int stories, int expected) =>
+        Assert.Equal(expected, PaperPage.ColumnsFor(columns, stories));
 
     [Fact]
     public void Titles_sharing_their_main_words_tell_the_same_story()

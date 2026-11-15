@@ -289,6 +289,21 @@ export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId:
                   }
                 />
                 <Choice
+                  label="Front page picture place"
+                  hint={
+                    paper.layout.frontPictureAt === 'beside'
+                      ? 'In the first of two columns, the story running beside it and on: the front page keeps room for the index.'
+                      : 'Across the page, above the story.'
+                  }
+                  value={paper.layout.frontPictureAt}
+                  options={[
+                    { value: 'above', label: 'Above the story' },
+                    { value: 'beside', label: 'Beside it' },
+                  ]}
+                  disabled={paper.layout.frontPicture === 'none'}
+                  onChange={(frontPictureAt) => change((p) => ({ ...p, layout: { ...p.layout, frontPictureAt } }))}
+                />
+                <Choice
                   label="Section pictures"
                   hint="The photo of each section's first story."
                   value={paper.layout.pictures}

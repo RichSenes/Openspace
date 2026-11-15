@@ -54,7 +54,7 @@ export interface Paper {
   hoursBack: number
   perSection: number
   goodNews: string[]
-  layout: { columns: number; frontPicture: PictureSize; pictures: PictureSize; adapt: boolean }
+  layout: { columns: number; frontPicture: PictureSize; frontPictureAt: PictureAt; pictures: PictureSize; adapt: boolean }
   /** Phrases the writer never uses. */
   neverWrite: string[]
   /** One last read of every article for mistakes of grammar and spelling. */
@@ -176,6 +176,7 @@ export function readPaper(settings: string): Paper | undefined {
     layout: {
       columns: whole(layout.columns, 1, 4) ?? 2,
       frontPicture: oneOf(layout.frontPicture, SIZES, 'medium'),
+      frontPictureAt: oneOf(layout.frontPictureAt, ['beside', 'above'], 'above'),
       pictures: oneOf(layout.pictures, SIZES, 'medium'),
       adapt: layout.adapt === true,
     },

@@ -50,16 +50,32 @@ public static partial class PaperPage
 
         if (front is not null)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<article class=\"lead pic-{settings.Page.FrontPicture}\">\n");
+            // Beside: the picture at the top of the first column and the story running on, so the
+            // front page keeps room for the opening note and the index.
+            var beside = front.Picture is not null && settings.Page.FrontPictureAt == "beside";
+            var leadColumns = beside ? 2 : Math.Clamp(settings.Page.Columns, 1, 3);
+            var figure = front.Picture is { } picture
+                ? $"<figure class=\"pic-{settings.Page.FrontPicture}\"><img src=\"{picture.Image.DataUri}\" alt=\"\"><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>"
+                : string.Empty;
+            html.Append(CultureInfo.InvariantCulture, $"<article class=\"lead{(beside ? " beside" : string.Empty)} pic-{settings.Page.FrontPicture}\">\n");
             html.Append(CultureInfo.InvariantCulture, $"  <p class=\"kicker\">{E(words.Lead)}</p>\n  <h2>{E(front.Article.Headline)}</h2>\n");
-            if (front.Picture is { } picture)
+            if (beside)
             {
-                html.Append(CultureInfo.InvariantCulture, $"  <figure><img src=\"{picture.Image.DataUri}\" alt=\"\"><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>\n");
+                html.Append(CultureInfo.InvariantCulture, $"  <div class=\"body ruled\" style=\"column-count: {leadColumns}\">{figure}<p class=\"lead-text\">{E(front.Article.Text)}</p>");
+                AppendSources(html, front.Article, front.Items);
+                html.Append("</div>\n</article>\n");
             }
+            else
+            {
+                if (figure.Length > 0)
+                {
+                    html.Append("  ").Append(figure).Append('\n');
+                }
 
-            html.Append(CultureInfo.InvariantCulture, $"  <p class=\"lead-text\" style=\"column-count: {Math.Clamp(settings.Page.Columns, 1, 3)}\">{E(front.Article.Text)}</p>\n");
-            AppendSources(html, front.Article, front.Items);
-            html.Append("</article>\n");
+                html.Append(CultureInfo.InvariantCulture, $"  <p class=\"lead-text\" style=\"column-count: {leadColumns}\">{E(front.Article.Text)}</p>\n");
+                AppendSources(html, front.Article, front.Items);
+                html.Append("</article>\n");
+            }
         }
 
         html.Append("<div class=\"front-row\">\n");
@@ -82,7 +98,8 @@ public static partial class PaperPage
             html.Append(CultureInfo.InvariantCulture, $"<nav class=\"index\"><h3>{E(words.InThisIssue)}</h3><ul>\n");
             foreach (var section in sections)
             {
-                html.Append(CultureInfo.InvariantCulture, $"  <li><strong>{E(section.Name)}</strong> {string.Join(" · ", section.Articles.Select(a => E(a.Headline)))}</li>\n");
+                // The section's main story only: the index has to fit on the front page.
+                html.Append(CultureInfo.InvariantCulture, $"  <li><strong>{E(section.Name)}</strong> {E(section.Articles[0].Headline)}</li>\n");
             }
 
             if (kanji is not null)
@@ -95,17 +112,32 @@ public static partial class PaperPage
 
         html.Append("</section>\n");
 
+        // Full-width sections are plain blocks, so that a page can break inside them; narrower
+        // ones sit side by side in rows of their own.
         html.Append("<div class=\"sections\">\n");
+        var inRow = false;
         foreach (var section in sections)
         {
             var set = settings.Sections.FirstOrDefault(s => s.Name == section.Name) ?? new PaperSettings.Section(section.Name, string.Empty, []);
             var wanted = section.Width is null ? set : set with { Width = section.Width };
             var width = PaperSettings.WidthOf(wanted);
-            var columns = ColumnsFor(settings.ColumnsOf(wanted), section.Articles.Count - 1);
+            if (width == "full" && inRow)
+            {
+                html.Append("</div>\n");
+                inRow = false;
+            }
+            else if (width != "full" && !inRow)
+            {
+                html.Append("<div class=\"row\">\n");
+                inRow = true;
+            }
+
+            var columns = settings.ColumnsOf(wanted);
             var size = section.PictureSize ?? settings.PictureOf(wanted);
             var place = PaperSettings.PictureAtOf(wanted);
             var form = section.Form ?? PaperSettings.FormOf(wanted);
-            var columnsOpen = $"  <div class=\"columns{(columns > 1 ? " ruled" : string.Empty)}\" style=\"column-count: {columns}\">\n";
+            var rest = ColumnsFor(columns, section.Articles.Count - 1);
+            var columnsOpen = $"  <div class=\"columns{(rest > 1 ? " ruled" : string.Empty)}\" style=\"column-count: {rest}\">\n";
 
             // The heading travels with the first story, so it never ends a page alone.
             html.Append(CultureInfo.InvariantCulture, $"<section class=\"section w-{width} form-{form}\">\n  <div class=\"opener\"><h2>{E(section.Name)}</h2>\n");
@@ -117,23 +149,30 @@ public static partial class PaperPage
                 var brief = form == "briefs" || (i > 0 && form is "feature" or "explainer");
                 var kind = brief ? " class=\"brief\"" : string.Empty;
                 var questions = i == 0 && form == "explainer" ? Questions(article) : string.Empty;
-                if (i == 0 && !brief && section.Picture is { } picture && size != "none")
+                if (i == 0 && !brief)
                 {
-                    // The section's first story opens it across the page, with its picture.
+                    // The main story: its headline across the section, kept with the heading; its
+                    // text in columns, the picture at the top of the first column (or across, above
+                    // the headline), so that the text runs under it and no space stays empty.
+                    var picture = size != "none" ? section.Picture : null;
+                    var figure = picture is null ? string.Empty
+                        : $"<figure class=\"pic-{size}\"><img src=\"{picture.Image.DataUri}\" alt=\"\"><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>";
+                    var across = picture is not null && place == "above";
+                    // Beside its picture a story takes two wide columns: narrower ones leave gaps in justified text.
+                    var bodyColumns = picture is not null && !across ? 2 : columns;
                     html.Append(CultureInfo.InvariantCulture, $"""
-                          <article class="top {place} pic-{size}">
-                            <figure><img src="{picture.Image.DataUri}" alt=""><figcaption>{E(words.Photo)}: {E(picture.Credit)}</figcaption></figure>
-                            <div><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>{questions}
+                          {(across ? figure : string.Empty)}<h3 class="top-head">{E(article.Headline)}</h3>
+                          <article class="top {(picture is null ? "plain" : place)}"><div class="body{(bodyColumns > 1 ? " ruled" : string.Empty)}" style="column-count: {bodyColumns}">{(across ? string.Empty : figure)}<p>{E(article.Text)}</p>{questions}
                         """);
                     AppendSources(html, article, section.Items);
-                    html.Append("</div>\n  </article></div>\n").Append(columnsOpen);
+                    html.Append("</div></article></div>\n").Append(columnsOpen);
                     continue;
                 }
 
                 if (i == 0)
                 {
-                    // Without a picture the first story is a plain one, kept with the heading.
-                    html.Append(CultureInfo.InvariantCulture, $"<article class=\"first{(brief ? " brief" : string.Empty)}\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>{questions}");
+                    // A brief opens the section: short, kept with the heading.
+                    html.Append(CultureInfo.InvariantCulture, $"<article class=\"first brief\"><h3>{E(article.Headline)}</h3><p>{E(article.Text)}</p>");
                     AppendSources(html, article, section.Items);
                     html.Append("</article></div>\n").Append(columnsOpen);
                     continue;
@@ -147,14 +186,14 @@ public static partial class PaperPage
             html.Append("  </div>\n</section>\n");
         }
 
-        html.Append("</div>\n");
+        html.Append(inRow ? "</div>\n</div>\n" : "</div>\n");
 
         if (kanji is not null)
         {
             AppendKanji(html, kanji, words);
         }
 
-        html.Append("</body>\n</html>\n");
+        html.Append(CultureInfo.InvariantCulture, $"<script>{Fitting}</script>\n</body>\n</html>\n");
         return html.ToString();
     }
 
@@ -325,7 +364,7 @@ public static partial class PaperPage
     [GeneratedRegex(@"<section class=""opening""><h3>(.*?)</h3><p>(.*?)</p>", RegexOptions.Singleline)]
     private static partial Regex Opening();
 
-    [GeneratedRegex(@"<p class=""kicker"">[^<]*</p>\s*<h2>(.*?)</h2>|<article[^>]*>\s*(?:<figure>.*?</figure>\s*<div>)?<h3>(.*?)</h3>|<section class=""good""><p class=""kicker"">[^<]*</p><h3>(.*?)</h3>", RegexOptions.Singleline)]
+    [GeneratedRegex(@"<p class=""kicker"">[^<]*</p>\s*<h2>(.*?)</h2>|<article[^>]*>\s*(?:<figure>.*?</figure>\s*<div>)?<h3>(.*?)</h3>|<section class=""good""><p class=""kicker"">[^<]*</p><h3>(.*?)</h3>|<h3 class=""top-head"">(.*?)</h3>", RegexOptions.Singleline)]
     private static partial Regex Headlines();
 
     [GeneratedRegex(@"\[([^\[\]|]+)((?:\|[^\[\]|]*)+)\]")]
@@ -427,12 +466,34 @@ public static partial class PaperPage
     }
 
     /// <summary>Warm paper, near-black ink: muted text stays above 7:1 on the paper colour.</summary>
+    /// <summary>
+    /// After the layout: when only a line or two of a main story would sit under its picture,
+    /// they move to the next column, so the picture fills its column alone. The page is as wide
+    /// as A4, so what the screen measures is what prints.
+    /// </summary>
+    private const string Fitting = """
+        for (const body of document.querySelectorAll('.beside .body')) {
+          const figure = body.querySelector('figure');
+          if (!figure) continue;
+          const line = parseFloat(getComputedStyle(body).lineHeight) || 15;
+          const spacer = document.createElement('div');
+          spacer.className = 'spacer';
+          figure.after(spacer);
+          for (let i = 0; i < 6; i++) {
+            const under = body.getBoundingClientRect().bottom - figure.getBoundingClientRect().bottom
+              - parseFloat(getComputedStyle(figure).marginBottom) - spacer.offsetHeight;
+            if (under < 2 || under > line * 2.7) break;
+            spacer.style.height = (spacer.offsetHeight + under + 1) + 'px';
+          }
+        }
+        """;
+
     internal const string Style = """
         @page { size: A4; margin: 0; }
         :root { --paper: #f6f1e7; --ink: #1f1b16; --muted: #4a4339; --rule: #1f1b16; --box: #ece4d4; }
         * { box-sizing: border-box; }
         html { background: var(--paper); }
-        body { margin: 0; padding: 12mm 15mm 14mm; color: var(--ink); background: var(--paper);
+        body { width: 210mm; margin: 0 auto; padding: 12mm 15mm 14mm; color: var(--ink); background: var(--paper);
                box-decoration-break: clone; -webkit-box-decoration-break: clone;
                font-family: "Noto Serif", "Noto Serif CJK JP", Georgia, serif; font-size: 10.5pt; line-height: 1.45; }
         .front { margin-bottom: 6px; }
@@ -445,9 +506,17 @@ public static partial class PaperPage
         .lead h2 { margin: 0 0 8px; font-size: 24pt; line-height: 1.12; }
         figure { margin: 0 0 8px; }
         figure img { display: block; width: 100%; object-fit: cover; border: 0.5px solid #b9ad99; }
-        .pic-small figure img { height: 38mm; }
-        .pic-medium figure img { height: 58mm; }
-        .pic-large figure img { height: 85mm; }
+        .pic-small figure img, figure.pic-small img { height: 38mm; }
+        .pic-medium figure img, figure.pic-medium img { height: 58mm; }
+        .pic-large figure img, figure.pic-large img { height: 85mm; }
+        .beside figure { break-inside: avoid; margin: 0 0 6px; }
+        .spacer { break-inside: avoid; }
+        .beside figure.pic-small img { height: auto; aspect-ratio: 16 / 9; }
+        .beside figure.pic-medium img { height: auto; aspect-ratio: 4 / 3; }
+        .beside figure.pic-large img { height: auto; aspect-ratio: 1 / 1; }
+        .lead .body { column-gap: 8mm; }
+        .lead .body.ruled { column-rule: 0.5px solid #b9ad99; }
+        .lead .body .lead-text { column-count: auto; }
         figcaption { margin-top: 2px; font-size: 7.5pt; color: var(--muted); text-align: right; }
         .lead-text { margin: 0; column-count: 2; column-gap: 8mm; text-align: justify; hyphens: auto; font-size: 11pt; }
         .front-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-top: 12px; padding-top: 10px;
@@ -456,12 +525,12 @@ public static partial class PaperPage
         .opening h3, .good h3 { margin: 0 0 4px; font-size: 13pt; font-style: normal; }
         .opening p, .good p { margin: 0; }
         .good { padding: 8px 10px; background: var(--box); border: 1px solid #b9ad99; }
-        .index { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--rule); }
+        .index { break-inside: avoid; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--rule); }
         .index h3 { margin: 0 0 4px; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.12em; }
-        .index ul { margin: 0; padding: 0; list-style: none; font-size: 9pt; }
-        .index li { margin: 0 0 3px; }
+        .index ul { margin: 0; padding: 0; list-style: none; font-size: 9pt; column-count: 2; column-gap: 8mm; column-rule: 0.5px solid #b9ad99; }
+        .index li { margin: 0 0 3px; break-inside: avoid; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .index strong { text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; }
-        .sections { display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 8mm; align-items: start; }
+        .row { display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 8mm; align-items: start; }
         .section { margin-top: 12px; min-width: 0; }
         .w-full { grid-column: span 6; }
         .w-half { grid-column: span 3; break-inside: avoid; }
@@ -469,9 +538,10 @@ public static partial class PaperPage
         .opener { break-inside: avoid; }
         .section h2 { break-after: avoid; margin: 0 0 8px; padding-bottom: 2px; border-bottom: 1.5px solid var(--rule); font-size: 13pt;
                         text-transform: uppercase; letter-spacing: 0.12em; }
-        .top { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; break-inside: avoid; margin-bottom: 10px; }
-        .top.above { grid-template-columns: 1fr; gap: 0; }
-        .top h3 { margin: 0 0 4px; font-size: 15pt; line-height: 1.15; }
+        .top-head { margin: 0 0 5px; font-size: 16pt; line-height: 1.15; }
+        .top { margin: 0 0 10px; break-inside: auto; }
+        .top .body { column-gap: 8mm; }
+        .top .body.ruled { column-rule: 0.5px solid #b9ad99; }
         .top p { margin: 0; text-align: justify; hyphens: auto; }
         .columns { column-gap: 8mm; }
         .columns.ruled { column-rule: 0.5px solid #b9ad99; }

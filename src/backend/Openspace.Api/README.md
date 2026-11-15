@@ -436,8 +436,16 @@ offer's CV in answer to it.
   `linkedin:<words>` is a search on LinkedIn's public job pages, the ones anyone not
   signed in sees, with no account: up to three pages of the last week's results in
   Japan, or in a place given after `@` (`linkedin:react@Osaka`), pausing between
-  requests; each offer's description is read from its public page when judged. A
-  board that cannot be read is read again once after a pause. As
+  requests; each offer's description is read from its public page when judged.
+  `tokyodev` is TokyoDev, whose offers' pages turn automatic readers away: it is read
+  through the sitemap it publishes, so only each offer's company and title (from its
+  address) are known and the judge is told so. `daijob:<words>` is Daijob's search in
+  English, where its robots.txt allows: salary and Japanese come from each card, the
+  text from the offer's schema.org posting. An offer pasted whole (80 characters at
+  least) in the chat of the routine's bot goes to its `inbox` and comes back judged,
+  with its buttons: in a group, as an answer to one of the bot's messages, or with the
+  bot's privacy turned off. A board that cannot be read is read again once after a
+  pause. `POST /api/job-boards/test` reads a board once (how many offers, the newest). As
   `{ "board": "greenhouse:…", "allInJapan": true }` every job of it counts as in
   Japan, for companies whose places say only "Hybrid". Offers first pass the
   person's rules: in Japan; a job, not an internship; a title with one of the `roles` words (developer,

@@ -360,3 +360,40 @@
     grid-column: 1 / -1;
   }
 }
+
+/* An editor without a preview: the index and the form only. */
+.paper-editor.no-preview {
+  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-areas:
+    'head head'
+    'index form';
+  max-width: 1100px;
+}
+
+.jobs-board-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(200px, 1.3fr) max-content max-content;
+  align-items: end;
+  gap: 8px;
+}
+
+@container paper-editor (max-width: 759px) {
+  .paper-editor.no-preview {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'index'
+      'form';
+  }
+}
+
+@container paper-form (max-width: 560px) {
+  .jobs-board-row {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+  }
+
+  .jobs-board-row .field:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

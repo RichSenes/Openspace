@@ -338,6 +338,20 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
     first story or `above` it; narrow sections always above), `articles` instead of
     `perSection`, and the `length` of its articles (`short`, `normal`, `long`). A
     paper without these keeps its old layout.
+  - Each section has a `form`: `articles` (the default), `briefs` (each story in one
+    sentence under a short headline, no picture), `feature` (the main story at length
+    with the picture, the others as briefs) or `explainer` (the main story told by the
+    questions a reader would ask, the others as briefs).
+  - With `layout.adapt`, the space follows the news: each day the section holding the
+    most important story (after the front page) spans the page with its picture, and
+    sections with only minor news are told in brief, together at the end, side by side
+    so that every row is full.
+  - Writing: every article ends on a fact, headlines say who did what and never start
+    alike, no record or "first time" the items do not state; `neverWrite` lists phrases
+    the writer must never use. The opening note starts from the day's biggest story and
+    is shown the last three notes so as never to repeat them. With `proofread`, one last
+    call corrects grammar and spelling in every article, and changes nothing unless it
+    gives every article back.
 - **Kanji of the day**, in the paper when its settings say `"kanji": { "enabled":
   true, "fromGrade": 1 }`: one kanji a day of the common use list, by school year
   and the most common first, never one explained before or one the person knows.

@@ -7,6 +7,7 @@ export type PictureSize = 'none' | 'small' | 'medium' | 'large'
 export type Width = 'full' | 'half' | 'third'
 export type Length = 'short' | 'normal' | 'long'
 export type PictureAt = 'beside' | 'above'
+export type Form = 'articles' | 'briefs' | 'feature' | 'explainer'
 
 export interface Feed {
   name: string
@@ -30,6 +31,7 @@ export interface PaperSection {
   /** Null: the paper's. */
   articles: number | null
   length: Length
+  form: Form
   /** Only news naming one of the keywords; without any, the section is left out that day. */
   onlyWithKeywords: boolean
   /** Null: the paper's. */
@@ -52,7 +54,11 @@ export interface Paper {
   hoursBack: number
   perSection: number
   goodNews: string[]
-  layout: { columns: number; frontPicture: PictureSize; pictures: PictureSize }
+  layout: { columns: number; frontPicture: PictureSize; pictures: PictureSize; adapt: boolean }
+  /** Phrases the writer never uses. */
+  neverWrite: string[]
+  /** One last read of every article for mistakes of grammar and spelling. */
+  proofread: boolean
   sections: PaperSection[]
   /** Keys of the paper the editor does not know, the kanji among them. */
   rest: Record<string, unknown>
@@ -71,13 +77,20 @@ export const WIDTHS: { value: Width; label: string }[] = [
   { value: 'third', label: 'A third' },
 ]
 
+export const FORMS: { value: Form; label: string; hint: string }[] = [
+  { value: 'articles', label: 'Articles', hint: 'Each story as an article, as long as the length below.' },
+  { value: 'briefs', label: 'In brief', hint: 'Each story in one sentence, under a short headline: good for many small facts. No picture.' },
+  { value: 'feature', label: 'Main story and briefs', hint: 'The most important story at length, with the picture; the others in one sentence.' },
+  { value: 'explainer', label: 'Explained simply', hint: 'The most important story told by the questions a reader would ask; the others in one sentence.' },
+]
+
 export const LENGTHS: { value: Length; label: string; hint: string }[] = [
   { value: 'short', label: 'Short', hint: 'one or two sentences' },
   { value: 'normal', label: 'Normal', hint: 'two to four sentences' },
   { value: 'long', label: 'Long', hint: 'five to seven sentences' },
 ]
 
-const SECTION_KEYS = ['name', 'about', 'feeds', 'only', 'focus', 'keywords', 'style', 'width', 'columns', 'picture', 'pictureAt', 'articles', 'length', 'onlyWithKeywords', 'hoursBack']
+const SECTION_KEYS = ['name', 'about', 'feeds', 'only', 'focus', 'keywords', 'style', 'width', 'columns', 'picture', 'pictureAt', 'articles', 'length', 'onlyWithKeywords', 'hoursBack', 'form']
 const PAPER_KEYS = [
   'title',
   'subtitle',
@@ -94,6 +107,8 @@ const PAPER_KEYS = [
   'goodNews',
   'layout',
   'sections',
+  'neverWrite',
+  'proofread',
 ]
 
 type Json = Record<string, unknown>
@@ -129,6 +144,7 @@ function readSection(raw: unknown): PaperSection {
     length: oneOf(s.length, ['short', 'normal', 'long'], 'normal'),
     onlyWithKeywords: s.onlyWithKeywords === true,
     hoursBack: whole(s.hoursBack, 1, 168),
+    form: oneOf(s.form, ['articles', 'briefs', 'feature', 'explainer'], 'articles'),
     rest: without(s, SECTION_KEYS),
   }
 }
@@ -161,7 +177,10 @@ export function readPaper(settings: string): Paper | undefined {
       columns: whole(layout.columns, 1, 4) ?? 2,
       frontPicture: oneOf(layout.frontPicture, SIZES, 'medium'),
       pictures: oneOf(layout.pictures, SIZES, 'medium'),
+      adapt: layout.adapt === true,
     },
+    neverWrite: texts(parsed.neverWrite),
+    proofread: parsed.proofread === true,
     sections: Array.isArray(parsed.sections) ? parsed.sections.map(readSection) : [],
     rest: without(parsed, PAPER_KEYS),
   }
@@ -186,6 +205,7 @@ function writeSection(s: PaperSection): Json {
   if (s.articles !== null) out.articles = s.articles
   if (s.onlyWithKeywords) out.onlyWithKeywords = true
   if (s.hoursBack !== null) out.hoursBack = s.hoursBack
+  if (s.form !== 'articles') out.form = s.form
   return out
 }
 

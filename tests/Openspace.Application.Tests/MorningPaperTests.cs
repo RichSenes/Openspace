@@ -172,7 +172,7 @@ public sealed class MorningPaperTests : IDisposable
 
         var html = Html();
         var section = html[html.IndexOf("<section class=\"section", StringComparison.Ordinal)..];
-        Assert.StartsWith("<section class=\"section w-half\">", section, StringComparison.Ordinal);
+        Assert.StartsWith("<section class=\"section w-half form-articles\">", section, StringComparison.Ordinal);
         Assert.Contains("style=\"column-count: 2\"", section, StringComparison.Ordinal);
         Assert.DoesNotContain("<figure>", section, StringComparison.Ordinal);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(section, "<h3>"));
@@ -191,11 +191,11 @@ public sealed class MorningPaperTests : IDisposable
 
         Assert.Contains("class=\"lead pic-large\"", html, StringComparison.Ordinal);
         Assert.Contains("class=\"lead-text\" style=\"column-count: 3\"", html, StringComparison.Ordinal);
-        var city = html[html.IndexOf("<section class=\"section w-full\">", StringComparison.Ordinal)..html.IndexOf("<section class=\"section w-third\">", StringComparison.Ordinal)];
+        var city = html[html.IndexOf("<section class=\"section w-full form-articles\">", StringComparison.Ordinal)..html.IndexOf("<section class=\"section w-third form-articles\">", StringComparison.Ordinal)];
         Assert.Contains("class=\"top beside pic-small\"", city, StringComparison.Ordinal);
         Assert.Contains("column-count: 3", city, StringComparison.Ordinal);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(city, "City: headline"));
-        var sport = html[html.IndexOf("<section class=\"section w-third\">", StringComparison.Ordinal)..];
+        var sport = html[html.IndexOf("<section class=\"section w-third form-articles\">", StringComparison.Ordinal)..];
         Assert.Contains("class=\"top above pic-small\"", sport, StringComparison.Ordinal);
         Assert.Contains("column-count: 1", sport, StringComparison.Ordinal);
         Assert.Equal(5, System.Text.RegularExpressions.Regex.Count(sport, "Sport: headline"));
@@ -634,6 +634,180 @@ public sealed class MorningPaperTests : IDisposable
         Assert.Equal(headlines, MorningPaper.RecentHeadlines(_folder, 3));
     }
 
+    private const string ThreeSections = """
+        [{"name":"City","about":"The town.","form":"FORM","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+         {"name":"Pets","about":"Animals.","feeds":[{"name":"Paws","url":"https://paws.example/feed"}]},
+         {"name":"Parks","about":"Green.","feeds":[{"name":"Leaf","url":"https://leaf.example/feed"}]}]
+        """;
+
+    private void ThreeSectionsNews()
+    {
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Opening day for the tram"), Item("Gazette", "Big strike stops the city", image: new Uri("https://img.example/strike.jpg")), Item("Gazette", "Bridge reopens"), Item("Gazette", "Tram fares fall")];
+        _feeds.Items["https://paws.example/feed"] = [Item("Paws", "Cat show on Sunday")];
+        _feeds.Items["https://leaf.example/feed"] = [Item("Leaf", "Cat naps in the park")];
+    }
+
+    [Fact]
+    public async Task A_section_in_brief_tells_each_story_in_one_sentence_without_a_picture()
+    {
+        var routine = Create(perSection: 3, sections: ThreeSections.Replace("FORM", "briefs", StringComparison.Ordinal));
+        ThreeSectionsNews();
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var city = html[html.IndexOf("<h2>City</h2>", StringComparison.Ordinal)..html.IndexOf("<h2>Pets</h2>", StringComparison.Ordinal)];
+        Assert.Contains("form-briefs", html, StringComparison.Ordinal);
+        Assert.Contains("<article class=\"first brief\"><h3>", city, StringComparison.Ordinal);
+        Assert.Contains("<article class=\"brief\"><h3>", city, StringComparison.Ordinal);
+        Assert.DoesNotContain("<figure>", city, StringComparison.Ordinal);
+        Assert.Contains(_chat.Prompts, p => p.Contains("Write one brief per story", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_feature_section_tells_its_main_story_at_length_and_the_rest_in_brief()
+    {
+        var routine = Create(perSection: 3, sections: ThreeSections.Replace("FORM", "feature", StringComparison.Ordinal));
+        ThreeSectionsNews();
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var city = html[html.IndexOf("<h2>City</h2>", StringComparison.Ordinal)..html.IndexOf("<h2>Pets</h2>", StringComparison.Ordinal)];
+        Assert.Contains("<article class=\"first\"><h3>", city, StringComparison.Ordinal);
+        Assert.Contains("<article class=\"brief\"><h3>", city, StringComparison.Ordinal);
+        Assert.Contains(_chat.Prompts, p => p.Contains("five to seven sentences. Each other story", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_explained_story_comes_with_its_questions_and_answers()
+    {
+        var routine = Create(perSection: 3, sections: ThreeSections.Replace("FORM", "explainer", StringComparison.Ordinal));
+        ThreeSectionsNews();
+
+        await RunAsync(routine);
+
+        var html = Html();
+        Assert.Contains("<dl class=\"qa\"><dt>Why now?</dt><dd>Because.</dd></dl>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dropped.", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task When_the_space_follows_the_news_the_big_story_spans_the_page_and_quiet_sections_go_in_brief_together()
+    {
+        var routine = Create(perSection: 2, sections: """
+            [{"name":"Pets","about":"Animals.","width":"half","feeds":[{"name":"Paws","url":"https://paws.example/feed"}]},
+             {"name":"City","about":"The town.","width":"third","picture":"none","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+             {"name":"Parks","about":"Green.","feeds":[{"name":"Leaf","url":"https://leaf.example/feed"}]}]
+            """, extra: "\"layout\":{\"adapt\":true},");
+        // The strike opens the paper; the talks are the biggest story left, in City.
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Strike talks resume in the town hall", image: new Uri("https://img.example/talks.jpg")), Item("Gazette", "Tram fares fall")];
+        _feeds.Items["https://paws.example/feed"] = [Item("Paws", "Cat show on Sunday")];
+        _feeds.Items["https://leaf.example/feed"] = [Item("Leaf", "Cat naps in the park")];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var sections = html[html.IndexOf("<div class=\"sections\">", StringComparison.Ordinal)..];
+        Assert.True(System.Text.RegularExpressions.Regex.IsMatch(sections, "^<div class=\"sections\">\\s*<section class=\"section w-full form-articles\">\\s*<div class=\"opener\"><h2>City</h2>"), sections[..Math.Min(900, sections.Length)]);
+        Assert.Contains("<figure>", sections[..sections.IndexOf("<h2>Pets</h2>", StringComparison.Ordinal)], StringComparison.Ordinal);
+        Assert.Contains("<section class=\"section w-half form-briefs\">\n  <div class=\"opener\"><h2>Pets</h2>", sections, StringComparison.Ordinal);
+        Assert.Contains("<section class=\"section w-half form-briefs\">\n  <div class=\"opener\"><h2>Parks</h2>", sections, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(1, "full")]
+    [InlineData(2, "half half")]
+    [InlineData(3, "third third third")]
+    [InlineData(4, "half half half half")]
+    [InlineData(5, "third third third half half")]
+    [InlineData(7, "third third third half half half half")]
+    public void Quiet_sections_fill_whole_rows(int count, string widths) =>
+        Assert.Equal(widths, string.Join(' ', MorningPaper.RowsOf(count)));
+
+    [Fact]
+    public async Task The_writer_is_told_the_rules_of_a_good_article_and_the_phrases_never_to_write()
+    {
+        var routine = Create(extra: "\"neverWrite\":[\"Grab a coffee\",\" \"],");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        await RunAsync(routine);
+
+        var system = _chat.Systems.Last();
+        Assert.Contains("Never write: \"Grab a coffee\".", system, StringComparison.Ordinal);
+        Assert.Contains("ends on a fact", system, StringComparison.Ordinal);
+        Assert.Contains("for the first time", system, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_opening_note_starts_from_the_news_and_never_repeats_the_last_ones()
+    {
+        var routine = Create();
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+        await RunAsync(routine);
+        Assert.DoesNotContain("The last notes", _chat.Prompts.Last(p => p.StartsWith("Today's headlines", StringComparison.Ordinal)), StringComparison.Ordinal);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Bridge reopens")];
+        await RunAsync(routine);
+
+        var opening = _chat.Prompts.Last(p => p.StartsWith("Today's headlines", StringComparison.Ordinal));
+        Assert.Contains("start from the day's biggest story", opening, StringComparison.Ordinal);
+        Assert.Contains("- A calm morning: Coffee first.", opening, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Proofreading_corrects_every_article_or_leaves_them_all_as_written()
+    {
+        var routine = Create(goodNews: """["City"]""", extra: "\"proofread\":true,");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Bridge reopens"), Item("Gazette", "Cat show on Sunday")];
+
+        var run = await RunAsync(routine);
+
+        var html = Html();
+        Assert.Contains("<h2>Proofread 1</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<h3>Proofread 2</h3>", html, StringComparison.Ordinal);
+        Assert.Contains("<h3>Proofread 3</h3><p>Corrected.</p>", html, StringComparison.Ordinal);
+        Assert.Contains("Proofread: 3 of 3 articles corrected.", run.Log, StringComparison.Ordinal);
+        Assert.Contains("Proofread 3", _chat.Prompts.Last(p => p.StartsWith("Today's headlines", StringComparison.Ordinal)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Proofreading_that_loses_an_article_changes_nothing()
+    {
+        var routine = Create(extra: "\"proofread\":true,");
+        _chat.ProofShort = true;
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Cat show on Sunday")];
+
+        var run = await RunAsync(routine);
+
+        Assert.DoesNotContain("Proofread 1", Html(), StringComparison.Ordinal);
+        Assert.Contains("Proofreading gave back 1 of 2 articles: they stay as written.", run.Log, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_preview_shows_each_section_in_its_form()
+    {
+        var html = PaperPreview.Render("""
+            {"sections":[{"name":"City","about":"","form":"explainer","articles":3,"feeds":[{"name":"G","url":"https://g.example/feed"}]},
+                         {"name":"Pets","about":"","form":"briefs","feeds":[{"name":"P","url":"https://p.example/feed"}]}]}
+            """, new DateOnly(2026, 11, 15));
+
+        Assert.Contains("<dl class=\"qa\"><dt>A question a reader would ask, number 1?</dt>", html, StringComparison.Ordinal);
+        Assert.Contains("<article class=\"brief\"><h3>City: headline of story 2</h3>", html, StringComparison.Ordinal);
+        var pets = html[html.IndexOf("<h2>Pets</h2>", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("<figure>", pets, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_printed_page_gives_back_its_opening_note()
+    {
+        var html = PaperPreview.Render("""{"sections":[{"name":"City","about":"","feeds":[{"name":"G","url":"https://g.example/feed"}]}]}""", new DateOnly(2026, 11, 15));
+
+        Assert.Equal("Good morning", PaperPage.OpeningOf(html)!.Title);
+        Assert.Null(PaperPage.OpeningOf("<p>No note.</p>"));
+    }
+
     [Fact]
     public void Titles_sharing_their_main_words_tell_the_same_story()
     {
@@ -708,6 +882,12 @@ public sealed class MorningPaperTests : IDisposable
 
         public bool DeskFails { get; set; }
 
+        /// <summary>The system prompt of every ask.</summary>
+        public List<string> Systems { get; } = [];
+
+        /// <summary>Proofreading gives back one article less than it was given.</summary>
+        public bool ProofShort { get; set; }
+
         public string? Headline { get; set; }
 
         /// <summary>What it answers about the kanji of the day, when not the usual.</summary>
@@ -718,6 +898,15 @@ public sealed class MorningPaperTests : IDisposable
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
         {
+            Systems.Add(ask.System);
+            if (ask.User.StartsWith("Proofread these ", StringComparison.Ordinal))
+            {
+                Prompts.Add(ask.User);
+                var count = int.Parse(ask.User.Split(' ')[2], System.Globalization.CultureInfo.InvariantCulture) - (ProofShort ? 1 : 0);
+                var proofed = Enumerable.Range(1, count).Select(i => new { headline = $"Proofread {i}", text = "Corrected." });
+                return Task.FromResult(JsonSerializer.Serialize(new { articles = proofed }));
+            }
+
             if (ask.User.StartsWith("The desk of the section", StringComparison.Ordinal))
             {
                 Desks.Add(ask.User);
@@ -757,7 +946,14 @@ public sealed class MorningPaperTests : IDisposable
                 return Task.FromResult(JsonSerializer.Serialize(new { articles = new[] { new { headline = "Town news", text = "All at once. [1, 2]", sources = Enumerable.Range(1, titles.Count).ToArray() } } }));
             }
 
-            var articles = titles.Select((title, i) => new { headline = Headline ?? $"About {title}", text = $"It happened. [{i + 1}]", sources = Enumerable.Range(1, titles.Count).Append(99).ToArray() });
+            var explained = ask.User.Contains("explained simply", StringComparison.Ordinal);
+            var articles = titles.Select((title, i) => new
+            {
+                headline = Headline ?? $"About {title}",
+                text = $"It happened. [{i + 1}]",
+                sources = Enumerable.Range(1, titles.Count).Append(99).ToArray(),
+                questions = explained && i == 0 ? new[] { new { question = "Why now?", answer = "Because." }, new { question = " ", answer = "Dropped." } } : null,
+            });
             return Task.FromResult(JsonSerializer.Serialize(new { articles }));
         }
     }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -164,7 +165,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         await context.PostAsync(Heading(settings, words, good.Count), cancellationToken).ConfigureAwait(false);
         foreach (var (offer, judgement) in good)
         {
-            await context.PostAsync(Message(words, offer, judgement.Fit, judgement.Why, judgement.Gaps), cancellationToken).ConfigureAwait(false);
+            await context.PostAsync(Message(words, offer, judgement.Fit, judgement.Why, judgement.Gaps, judgement.Detail), cancellationToken).ConfigureAwait(false);
         }
 
         return (brought.Count > 0 ? $"{brought.Count} brought offers judged; " : string.Empty)
@@ -297,8 +298,10 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         context.ProposeAsync(
             InterestedAction,
             Short($"{offer.Title} — {offer.Company}, {offer.Location}", 200),
-            Short($"{Facts(offer, words)} · {judgement.Fit}/5\n\n{judgement.Why}\n\n{words.Gaps}: {judgement.Gaps}\n\n{offer.Url}\n\n{words.Ask}", 20_000),
-            new OfferPayload(OfferKey(offer), RoleKey(offer), offer.Url.ToString(), offer.Title, offer.Company, offer.Location, Facts(offer, JobWords.For("English")), offer.Text ?? string.Empty),
+            Short($"{Facts(offer, words)} · {judgement.Fit}/5\n\n{judgement.Why}\n\n{words.Gaps}: {judgement.Gaps}\n\n{judgement.Detail.Plain(words)}\n\n{offer.Url}\n\n{words.Ask}".Replace("\n\n\n\n", "\n\n", StringComparison.Ordinal), 20_000),
+            new OfferPayload(
+                OfferKey(offer), RoleKey(offer), offer.Url.ToString(), offer.Title, offer.Company, offer.Location, Facts(offer, JobWords.For("English")), offer.Text ?? string.Empty,
+                judgement.Detail.Plain(words)),
             cancellationToken);
 
     /// <summary>
@@ -357,7 +360,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         Directory.CreateDirectory(folder);
         await File.WriteAllTextAsync(
             Path.Combine(folder, OfferFile),
-            $"# {payload.Title}\n\nCompany: {payload.Company}\nPlace: {payload.Location}\nLink: {payload.Url}\nFacts: {payload.Facts}\n\n{payload.Text}\n",
+            $"# {payload.Title}\n\nCompany: {payload.Company}\nPlace: {payload.Location}\nLink: {payload.Url}\nFacts: {payload.Facts}\n\n{payload.Text}\n"
+            + (payload.Fit.Length > 0 ? $"\n## How the person fits\n\n{payload.Fit}\n" : string.Empty),
             cancellationToken).ConfigureAwait(false);
         var makers = (await routines.ListAsync(context.Routine.OfficeId, cancellationToken).ConfigureAwait(false)).Where(r => r.Kind == CvMaker.KindKey).ToList();
         foreach (var maker in makers)
@@ -468,15 +472,31 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 
                     {Short(details, Reading)}
 
-                    How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it; an offer like those they said no to, or mainly about what they do not want, fits 2 at most. Then, in one short sentence each, of twenty words at most: why it fits, and what they would have to fill in or watch out for.
-                    Write "why" and "gaps" in {settings.Language}, whatever the language of the offer and of the notes above.
+                    How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it; an offer like those they said no to, or mainly about what they do not want, fits 2 at most. Then, in one short sentence each, of twenty words at most: why it fits ("why"), and what they would have to fill in or watch out for ("gaps").
+                    Then the role in detail, each point one short line, taken from the offer and the profile only:
+                    - "role": what the person would do day to day, in one or two sentences;
+                    - "have": the skills and experience the offer asks for that the person has;
+                    - "missing": those it asks for that they lack or have only in part;
+                    - "improve": for each missing one, a concrete way to fill it or show it (a course, a small project, what to say at the interview);
+                    - "ask": what to clarify with the company (visa, remote work, Japanese, salary, seniority), only what the offer leaves open.
+                    Write every text in {settings.Language}, whatever the language of the offer and of the notes above; names of technologies stay as they are.
                     Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
                     """,
-                    JudgementSchema, MaxTokens: 600, Temperature: 0.2),
+                    JudgementSchema, MaxTokens: 1500, Temperature: 0.2),
                 cancellationToken).ConfigureAwait(false);
             var judgement = JsonSerializer.Deserialize<Judgement>(answer, JsonSerializerOptions.Web);
             return judgement is { Fit: >= 1 and <= 5 } && !string.IsNullOrWhiteSpace(judgement.Why)
-                ? judgement with { Why = Short(judgement.Why.Trim(), 220), Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 220), Details = details }
+                ? judgement with
+                {
+                    Why = Short(judgement.Why.Trim(), 220),
+                    Gaps = Short((judgement.Gaps ?? string.Empty).Trim(), 220),
+                    Role = Short((judgement.Role ?? string.Empty).Trim(), 400),
+                    Have = Points(judgement.Have),
+                    Missing = Points(judgement.Missing),
+                    Improve = Points(judgement.Improve),
+                    Ask = Points(judgement.Ask),
+                    Details = details,
+                }
                 : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -495,15 +515,36 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
     /// One offer in a message of its own, in short lines with room between them: the role in bold,
     /// company and place; fit, salary, Japanese and visa; why it fits and what to watch; the link.
     /// </summary>
-    internal static OutboxMessage Message(JobWords words, JobOffer offer, int fit, string why, string? gaps)
+    internal static OutboxMessage Message(JobWords words, JobOffer offer, int fit, string why, string? gaps, RoleDetail? detail = null)
+    {
+        // Telegram takes 4096 characters: fewer points per list rather than a message cut short.
+        foreach (var most in new[] { 6, 3, 1 })
+        {
+            var message = Compose(words, offer, fit, why, gaps, detail?.Fewer(most));
+            if (message.Html.Length <= MessageRoom || most == 1)
+            {
+                return message;
+            }
+        }
+
+        throw new UnreachableException();
+    }
+
+    private const int MessageRoom = 3900;
+
+    private static OutboxMessage Compose(JobWords words, JobOffer offer, int fit, string why, string? gaps, RoleDetail? detail)
     {
         string E(string text) => OutboxMessage.Escape(text);
-        var facts = $"{Stars(fit)} · {Salary(offer, words)}\n🇯🇵 {Capital(words.Japanese(offer.Japanese))}\n🛂 {Capital(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}";
-        var notes = $"👍 {why}" + (string.IsNullOrWhiteSpace(gaps) ? string.Empty : $"\n⚠️ {gaps}");
+        var facts = $"{Stars(fit)} · {Salary(offer, words)}\n🇯🇵 {Capital(words.Japanese(offer.Japanese))} · 🛂 {Capital(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}";
+
+        // With the role in detail, what to watch is in it; without, it stands under why it fits.
+        var notes = $"👍 {why}" + (detail is { IsEmpty: false } || string.IsNullOrWhiteSpace(gaps) ? string.Empty : $"\n⚠️ {gaps}");
         var link = words.Open(offer.Url);
+        var folded = detail is { IsEmpty: false } d ? $"\n\n<blockquote expandable><b>{E(words.InDetail)}</b>\n{E(d.Plain(words))}</blockquote>" : string.Empty;
+        var open = detail is { IsEmpty: false } p ? $"\n\n{words.InDetail}\n{p.Plain(words)}" : string.Empty;
         return new OutboxMessage(
-            $"<b>{E(offer.Title)}</b>\n{E(offer.Company)} · {E(offer.Location)}\n\n{E(facts)}\n\n{E(notes)}\n\n<a href=\"{E(offer.Url.ToString())}\">{E(link)}</a>",
-            $"{offer.Title}\n{offer.Company} · {offer.Location}\n\n{facts}\n\n{notes}\n\n{link}: {offer.Url}");
+            $"<b>{E(offer.Title)}</b>\n{E(offer.Company)} · {E(offer.Location)}\n\n{E(facts)}\n\n{E(notes)}{folded}\n\n<a href=\"{E(offer.Url.ToString())}\">{E(link)}</a>",
+            $"{offer.Title}\n{offer.Company} · {offer.Location}\n\n{facts}\n\n{notes}{open}\n\n{link}: {offer.Url}");
     }
 
     private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
@@ -535,21 +576,33 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
 
     private static readonly char[] Separators = [.. Enumerable.Range(0, 128).Select(i => (char)i).Where(c => !char.IsLetterOrDigit(c))];
 
+    /// <summary>Points of a list the model wrote: blank ones left out, each short, six at most.</summary>
+    private static List<string> Points(IReadOnlyList<string>? points) =>
+        [.. (points ?? []).Select(p => p?.Trim().TrimStart('-', '•', '*', ' ') ?? string.Empty).Where(p => p.Length > 0).Distinct().Take(6).Select(p => Short(p, 180))];
+
     private const string JudgementSchema = """
         {"type":"object","properties":{"fit":{"type":"integer","minimum":1,"maximum":5},"why":{"type":"string"},"gaps":{"type":"string"},
+          "role":{"type":"string"},"have":{"type":"array","items":{"type":"string"}},"missing":{"type":"array","items":{"type":"string"}},
+          "improve":{"type":"array","items":{"type":"string"}},"ask":{"type":"array","items":{"type":"string"}},
           "japanese":{"type":"string","enum":["none","basic","conversational","business","fluent","unknown"]},
           "visa":{"type":"string","enum":["yes","no","unknown"]},
-          "title":{"type":"string"},"company":{"type":"string"},"location":{"type":"string"}},"required":["fit","why","gaps","japanese","visa"]}
+          "title":{"type":"string"},"company":{"type":"string"},"location":{"type":"string"}},"required":["fit","why","gaps","role","have","missing","improve","ask","japanese","visa"]}
         """;
 
     /// <param name="Title">Read from the text, for offers the person brings; the same for <paramref name="Company"/> and <paramref name="Location"/>.</param>
     /// <param name="Details">The offer's text the model read, kept for its CV.</param>
+    /// <param name="Role">What the person would do there; with <paramref name="Have"/>, <paramref name="Missing"/>, <paramref name="Improve"/> and <paramref name="Ask"/>, the role in detail.</param>
     private sealed record Judgement(
         int Fit, string Why, string? Gaps, string? Japanese = null, string? Visa = null, string? Title = null, string? Company = null, string? Location = null,
-        string? Details = null);
+        string? Details = null, string? Role = null, IReadOnlyList<string>? Have = null, IReadOnlyList<string>? Missing = null, IReadOnlyList<string>? Improve = null,
+        IReadOnlyList<string>? Ask = null)
+    {
+        public RoleDetail Detail => new(Role ?? string.Empty, Have ?? [], Missing ?? [], Improve ?? [], Ask ?? []);
+    }
 
+    /// <param name="Fit">The role in detail as the judge wrote it, plain, for the offer's file and its CV.</param>
     private sealed record OfferPayload(
-        string OfferKey, string RoleKey, string Url, string Title = "", string Company = "", string Location = "", string Facts = "", string Text = "");
+        string OfferKey, string RoleKey, string Url, string Title = "", string Company = "", string Location = "", string Facts = "", string Text = "", string Fit = "");
 }
 
 /// <summary>A job offers routine's settings, read from its JSON.</summary>
@@ -618,10 +671,44 @@ public sealed record JobSettings(
     }
 }
 
+/// <summary>An offer's role in detail: what the person would do, the skills asked they have and lack, how to fill the gaps, what to clarify.</summary>
+public sealed record RoleDetail(string Role, IReadOnlyList<string> Have, IReadOnlyList<string> Missing, IReadOnlyList<string> Improve, IReadOnlyList<string> Ask)
+{
+    public bool IsEmpty => Role.Length == 0 && Have.Count == 0 && Missing.Count == 0 && Improve.Count == 0 && Ask.Count == 0;
+
+    /// <summary>The same detail with at most <paramref name="most"/> points per list.</summary>
+    public RoleDetail Fewer(int most) => new(Role, [.. Have.Take(most)], [.. Missing.Take(most)], [.. Improve.Take(most)], [.. Ask.Take(most)]);
+
+    /// <summary>The detail as short lines under their headings, each part only when it says something.</summary>
+    internal string Plain(JobWords words)
+    {
+        var parts = new List<string>();
+        if (Role.Length > 0)
+        {
+            parts.Add($"📋 {words.Role}: {Role}");
+        }
+
+        void List(string heading, IReadOnlyList<string> points)
+        {
+            if (points.Count > 0)
+            {
+                parts.Add($"{heading}\n{string.Join('\n', points.Select(p => $"• {p}"))}");
+            }
+        }
+
+        List($"✅ {words.Have}", Have);
+        List($"🧩 {words.Missing}", Missing);
+        List($"📈 {words.Improve}", Improve);
+        List($"❓ {words.AskAbout}", Ask);
+        return string.Join("\n\n", parts);
+    }
+}
+
 /// <summary>The message's few fixed words, in the person's language.</summary>
 internal sealed record JobWords(
     Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck, string Untitled,
-    string OpenOffer = "Open the offer", string On = "on")
+    string OpenOffer = "Open the offer", string On = "on", string InDetail = "The role in detail", string Role = "What you would do", string Have = "You already have",
+    string Missing = "You lack", string Improve = "How to fill the gap", string AskAbout = "To clarify")
 {
     /// <summary>"Apri l'offerta su LinkedIn": the link's words, naming the board when it is a known one.</summary>
     public string Open(Uri url)
@@ -653,7 +740,13 @@ internal sealed record JobWords(
         "visto da verificare",
         "Offerta senza titolo",
         "Apri l'offerta",
-        "su");
+        "su",
+        "Il ruolo nel dettaglio",
+        "Cosa faresti",
+        "Hai già",
+        "Ti manca",
+        "Come colmarlo",
+        "Da chiarire");
 
     private static readonly JobWords English = new(
         n => n == 1 ? "1 new offer for you" : $"{n} new offers for you",

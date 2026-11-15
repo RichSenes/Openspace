@@ -453,8 +453,12 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   When the model cannot judge any, the run fails and they stay new. A short heading
   comes first, then each offer in a message of its own, in short lines with room
   between them: the role in bold, company and place; fit as stars and salary;
-  Japanese; visa; why it fits and what to watch, always in `language`; a link naming
-  the board, with no preview. LinkedIn places are tidied ("Tokyo, Tokyo, Japan" is
+  Japanese and visa; why it fits, always in `language`; then, folded in a quote that
+  opens with a tap, the role in detail: what the person would do, the skills asked
+  that they have and lack, how to fill each gap, what to clarify with the company
+  (fewer points per list when the message would pass Telegram's length); a link
+  naming the board, with no preview. The same detail is in the proposal and, after
+  a yes, in `offer.md` under "How the person fits", for the CV. LinkedIn places are tidied ("Tokyo, Tokyo, Japan" is
   "Tokyo") and a title written mostly in Japanese counts as business Japanese.
   An offer the person found where no routine may read is pasted in Openspace
   (Evaluate an offer): it waits as a file in `inbox` and the next run, asked at

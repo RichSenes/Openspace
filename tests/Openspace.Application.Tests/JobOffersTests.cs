@@ -94,8 +94,7 @@ public sealed class JobOffersTests : IDisposable
             Kyo Labs · Kyoto
 
             ★★★★☆ · salary not stated
-            🇯🇵 Japanese not required
-            🛂 Visa sponsored
+            🇯🇵 Japanese not required · 🛂 Visa sponsored
 
             👍 It fits Frontend Engineer.
             ⚠️ Some Japanese helps.
@@ -105,6 +104,31 @@ public sealed class JobOffersTests : IDisposable
             _h.Outbox.Posted[1].Message.Html);
         Assert.StartsWith("Senior .NET Developer\nAcme · Tokyo\n\n★★★★★ · ¥6–8M", _h.Outbox.Posted[2].Message.Plain, StringComparison.Ordinal);
         Assert.EndsWith("Open the offer: https://jobs.example/jobs/acme-dotnet?ref=list", _h.Outbox.Posted[2].Message.Plain, StringComparison.Ordinal);
+        Assert.Contains(
+            """
+            👍 It fits Senior .NET Developer.
+
+            <blockquote expandable><b>The role in detail</b>
+            📋 What you would do: You would build the booking API.
+
+            ✅ You already have
+            • C# and .NET
+            • SQL
+
+            🧩 You lack
+            • Kubernetes
+
+            📈 How to fill the gap
+            • Deploy a small app on a cluster.
+
+            ❓ To clarify
+            • Whether remote work is possible.</blockquote>
+            """.ReplaceLineEndings("\n").TrimEnd(),
+            _h.Outbox.Posted[2].Message.Html,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("⚠️", _h.Outbox.Posted[2].Message.Html, StringComparison.Ordinal);
+        Assert.Contains("✅ You already have\n• C# and .NET", _h.Routines.Proposals.Single(p => p.Title.Contains(".NET", StringComparison.Ordinal)).Body, StringComparison.Ordinal);
+        Assert.Contains("\"have\"", _chat.Asked[0], StringComparison.Ordinal);
         Assert.Equal(2, _h.Routines.Proposals.Count);
         Assert.All(_h.Routines.Proposals, p => Assert.Equal(ProposalStatus.Pending, p.Status));
     }
@@ -281,9 +305,10 @@ public sealed class JobOffersTests : IDisposable
 
         var posted = _h.Outbox.Posted.Select(p => p.Message.Plain).ToList();
         Assert.Equal("💼 Offers · 2 offerte nuove per te\nRispondi in Openspace: «sì» la segui, «no» non torna più.", posted[0]);
-        Assert.Contains("Kyo Labs · Kyoto\n\n★★★★☆ · stipendio non indicato\n🇯🇵 Giapponese non richiesto\n🛂 Visto sponsorizzato", posted[1], StringComparison.Ordinal);
+        Assert.Contains("Kyo Labs · Kyoto\n\n★★★★☆ · stipendio non indicato\n🇯🇵 Giapponese non richiesto · 🛂 Visto sponsorizzato", posted[1], StringComparison.Ordinal);
+        Assert.Contains("Il ruolo nel dettaglio\n📋 Cosa faresti: You would build the booking API.\n\n✅ Hai già", posted[2], StringComparison.Ordinal);
         Assert.EndsWith("Apri l'offerta: https://jobs.example/jobs/kyo-front?ref=list", posted[1], StringComparison.Ordinal);
-        Assert.Contains("Write \"why\" and \"gaps\" in Italian, whatever the language of the offer", _chat.Asked[0], StringComparison.Ordinal);
+        Assert.Contains("Write every text in Italian, whatever the language of the offer", _chat.Asked[0], StringComparison.Ordinal);
         Assert.Contains("Write in Italian", _chat.Systems[0], StringComparison.Ordinal);
     }
 
@@ -319,8 +344,8 @@ public sealed class JobOffersTests : IDisposable
 
         Assert.Equal("2 new offers for you, of 4 judged; 4 of 6 fit your rules.", run.Summary);
         var text = string.Join("\n\n", _h.Outbox.Posted.Select(p => p.Message.Plain));
-        Assert.Contains("Frontend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required\n🛂 Visa sponsored", text, StringComparison.Ordinal);
-        Assert.Contains("Backend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required\n🛂 Visa to check", text, StringComparison.Ordinal);
+        Assert.Contains("Frontend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required · 🛂 Visa sponsored", text, StringComparison.Ordinal);
+        Assert.Contains("Backend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required · 🛂 Visa to check", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Full Stack", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Mobile", text, StringComparison.Ordinal);
         Assert.Contains("We sponsor visas. React and TypeScript.", _chat.Asked.First(a => a.Contains("Frontend", StringComparison.Ordinal)), StringComparison.Ordinal);
@@ -430,6 +455,37 @@ public sealed class JobOffersTests : IDisposable
     }
 
     [Fact]
+    public async Task Yes_keeps_the_role_in_detail_in_the_offer_s_file_for_its_cv()
+    {
+        var routine = Create();
+        Board();
+        await RunAsync(routine);
+        var dotnet = _h.Routines.Proposals.Single(p => p.Title.Contains(".NET", StringComparison.Ordinal));
+
+        await Proposals().ApproveAsync(dotnet.Id, default);
+
+        var offer = File.ReadAllText(Path.Combine(Saved, "acme-senior-net-developer", JobOffers.OfferFile));
+        Assert.Contains("\n## How the person fits\n\n📋 What you would do: You would build the booking API.", offer, StringComparison.Ordinal);
+        Assert.Contains("🧩 You lack\n• Kubernetes", offer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_long_detail_keeps_fewer_points_so_the_message_fits_telegram()
+    {
+        var routine = Create();
+        Board();
+        _chat.Wordy = true;
+
+        await RunAsync(routine);
+
+        var html = _h.Outbox.Posted.Single(p => p.Message.Html.Contains(".NET", StringComparison.Ordinal)).Message.Html;
+        Assert.True(html.Length <= 3900, $"{html.Length} characters");
+        Assert.Contains("<blockquote expandable>", html, StringComparison.Ordinal);
+        Assert.Contains("• Point 1 ", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("• Point 6 ", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Yes_saves_the_offer_in_its_own_folder_and_asks_the_cv_routines_to_run()
     {
         var routine = Create();
@@ -487,6 +543,17 @@ public sealed class JobOffersTests : IDisposable
 
         public bool DeskFails { get; set; }
 
+        private static readonly string[] Have = ["C# and .NET", " ", "- SQL"];
+
+        private static readonly string[] Missing = ["Kubernetes"];
+
+        private static readonly string[] Improve = ["Deploy a small app on a cluster."];
+
+        private static readonly string[] Ask = ["Whether remote work is possible."];
+
+        /// <summary>The role in detail with six long points per list.</summary>
+        public bool Wordy { get; set; }
+
         public bool Fail { get; set; }
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
@@ -526,7 +593,18 @@ public sealed class JobOffersTests : IDisposable
             var fit = title.Contains("Sales", StringComparison.Ordinal) ? 1 : title.Contains(".NET", StringComparison.Ordinal) ? 5 : 4;
             var japanese = ask.User.Contains("Japanese: Unknown", StringComparison.Ordinal) && ask.User.Contains("fluent Japanese", StringComparison.Ordinal) ? "business" : "none";
             var visa = ask.User.Contains("We sponsor visas.", StringComparison.Ordinal) ? "yes" : ask.User.Contains("No visa support.", StringComparison.Ordinal) ? "no" : "unknown";
-            return Task.FromResult(JsonSerializer.Serialize(new { fit, why = $"It fits {title}.", gaps = "Some Japanese helps.", japanese, visa }));
+            // .NET offers come with the role in detail, the others without, to show both messages.
+            var detailed = title.Contains(".NET", StringComparison.Ordinal);
+            var many = Enumerable.Range(1, 6).Select(n => $"Point {n} " + new string('x', 170)).ToArray();
+            return Task.FromResult(JsonSerializer.Serialize(new
+            {
+                fit, why = $"It fits {title}.", gaps = "Some Japanese helps.", japanese, visa,
+                role = detailed ? "You would build the booking API." : "",
+                have = detailed ? Wordy ? many : Have : [],
+                missing = detailed ? Wordy ? many : Missing : [],
+                improve = detailed ? Wordy ? many : Improve : [],
+                ask = detailed ? Wordy ? many : Ask : [],
+            }));
         }
     }
 }

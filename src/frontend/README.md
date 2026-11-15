@@ -93,6 +93,12 @@ artists or games the reader follows). Each section has a form (articles, in brie
 and briefs, explained simply); the layout can let the space follow the news; the paper takes
 phrases never to write and a last proofreading.
 
+**The job offers' editor.** The job offers routine has a page of its own too, built from the
+same parts: where to look (Japan Dev, TokyoDev, LinkedIn and Daijob searches, companies' own
+job pages), each place with **Test**; what the person looks for and does not want, cities,
+Japanese, visa and the lowest salary; where the profile and the offer folders are; how many
+offers are judged and from how many stars they arrive; the bot and the language.
+
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
 read them, copy them, download them.
 

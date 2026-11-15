@@ -31,7 +31,8 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
   holes with Cloudflare's security-audit skill, has every finding disproved by a
   fresh helper, and never changes the code: confirmed findings become fix tasks.
 - **Routines.** Recurring jobs for your own life: a morning paper, mail sorting,
-  job offers (Japan Dev, LinkedIn's public search, companies' own job pages),
+  job offers (Japan Dev, TokyoDev, Daijob, LinkedIn's public search, companies' own job
+  pages, or an offer pasted in the chat), with a page of their own to set them up,
   dependency checks, delivered to Telegram and never acting on what
   cannot be undone without your yes. The morning paper has its own editor: sources
   tested in one click, sections of different sizes side by side, columns and

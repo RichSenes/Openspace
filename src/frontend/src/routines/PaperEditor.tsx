@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, CircleCheck, CircleX, LoaderCircle, Plus, Trash2 } from 'lucide-react'
 import { useCreateRoutine, usePaperPreview, useRoutineChannels, useRoutineModels, useTestFeed, useUpdateRoutine, type FeedTest } from '../api/hooks'
 import type { RoutineView, Weekday } from '../api/types'
@@ -10,7 +10,6 @@ import {
   PICTURE_SIZES,
   WIDTHS,
   hostOf,
-  linesOf,
   mostColumns,
   move,
   newSection,
@@ -25,7 +24,9 @@ import {
   type Paper,
   type PaperSection,
 } from './paper'
-import { describeSchedule, scheduleFrom, settingsProblem, toggleDay, WEEK } from './schedule'
+import { scheduleFrom, settingsProblem } from './schedule'
+import { Choice, Field, Lines, Part, ScheduleFields } from './editorParts'
+import { LANGUAGES, clamp, useDebounced, useFollowIndex } from './editorTools'
 import './paperEditor.css'
 
 const PARTS = [
@@ -38,8 +39,6 @@ const PARTS = [
   { id: 'when', label: 'Name and time' },
   { id: 'advanced', label: 'Advanced (JSON)' },
 ] as const
-
-const LANGUAGES = ['English', 'Italian', 'Japanese', 'Spanish', 'French', 'German', 'Portuguese']
 
 /**
  * The morning paper's settings on a page of their own: every setting a field with its
@@ -74,20 +73,7 @@ export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId:
   const preview = useDebounced(settings, 500)
 
   const hasFields = paper !== undefined
-  // The index follows the part in view: the last one whose top has reached the upper third.
-  useEffect(() => {
-    const root = body.current
-    const scroller = root?.closest('.main')
-    if (!root || !scroller) return
-    const follow = () => {
-      const line = scroller.getBoundingClientRect().top + scroller.clientHeight / 3
-      const parts = [...root.querySelectorAll<HTMLElement>('[id^="paper-part-"]')]
-      const current = parts.filter((el) => el.getBoundingClientRect().top <= line).pop() ?? parts[0]
-      if (current) setPart(current.id.replace('paper-part-', ''))
-    }
-    scroller.addEventListener('scroll', follow, { passive: true })
-    return () => scroller.removeEventListener('scroll', follow)
-  }, [hasFields])
+  useFollowIndex(body, hasFields, setPart)
 
   const save = () => {
     if (!paper || problems.length > 0) return
@@ -417,45 +403,18 @@ export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId:
           )}
 
           <Part id="when" title="Name and time">
-            <div className="paper-grid">
-              <Field label="Routine name" hint="How the routine is called in Openspace; the paper's own title is above.">
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
-              </Field>
-              <Field label="At" hint="On this computer's clock.">
-                <input className="input" type="time" value={at} onChange={(e) => setAt(e.target.value)} required />
-              </Field>
-            </div>
-            <fieldset className="field">
-              <legend className="paper-legend">Days</legend>
-              <div className="choice">
-                {WEEK.map((w) => (
-                  <button
-                    key={w.day}
-                    type="button"
-                    className="btn day-toggle"
-                    aria-pressed={days.includes(w.day)}
-                    onClick={() => setDays(toggleDay(days, w.day))}
-                  >
-                    {days.includes(w.day) && <CircleCheck size={14} aria-hidden />} {w.short}
-                  </button>
-                ))}
-              </div>
-              <span className="hint">
-                {describeSchedule(scheduleFrom(days, at, everyWeeks))}
-                {days.length === 0 && '. Pick days to print only on those.'}
-              </span>
-            </fieldset>
-            {days.length > 0 && (
-              <Choice
-                label="Every"
-                value={everyWeeks}
-                options={[1, 2, 3, 4].map((n) => ({
-                  value: n,
-                  label: n === 1 ? 'Week' : `${n} weeks`,
-                }))}
-                onChange={setEveryWeeks}
-              />
-            )}
+            <ScheduleFields
+              name={name}
+              onName={setName}
+              nameHint="How the routine is called in Openspace; the paper's own title is above."
+              at={at}
+              onAt={setAt}
+              days={days}
+              onDays={setDays}
+              everyWeeks={everyWeeks}
+              onEveryWeeks={setEveryWeeks}
+              doing="print"
+            />
           </Part>
 
           <Part id="advanced" title="Advanced (JSON)">
@@ -864,89 +823,5 @@ function Preview({ settings, ready }: { settings: string; ready: boolean }) {
   )
 }
 
-function Part({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section id={`paper-part-${id}`} className="paper-part" aria-labelledby={`paper-part-${id}-title`}>
-      <h2 id={`paper-part-${id}-title`}>{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {children}
-      {hint && <span className="hint">{hint}</span>}
-    </label>
-  )
-}
-
-/** A list typed one item per line. Kept as typed while editing, so blank lines can be added. */
-function Lines({ label, hint, value, onChange }: { label: string; hint: string; value: string[]; onChange: (lines: string[]) => void }) {
-  const [draft, setDraft] = useState(value.join('\n'))
-  useEffect(() => {
-    if (linesOf(draft).join('\n') !== value.join('\n')) setDraft(value.join('\n'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.join('\n')])
-  return (
-    <Field label={label} hint={hint}>
-      <textarea
-        className="input"
-        rows={Math.min(8, Math.max(3, value.length + 1))}
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          onChange(linesOf(e.target.value))
-        }}
-      />
-    </Field>
-  )
-}
-
-function Choice<T extends string | number>({
-  label,
-  hint,
-  value,
-  options,
-  onChange,
-  disabled,
-}: {
-  label: string
-  hint?: string
-  value: T
-  options: readonly { value: T; label: string }[]
-  onChange: (value: T) => void
-  disabled?: boolean
-}) {
-  return (
-    <fieldset className="field paper-choice" disabled={disabled}>
-      <legend className="paper-legend">{label}</legend>
-      <div className="choice">
-        {options.map((o) => (
-          <button key={String(o.value)} type="button" className="btn" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
-            {o.value === value && <CircleCheck size={14} aria-hidden />} {o.label}
-          </button>
-        ))}
-      </div>
-      {hint && <span className="hint">{hint}</span>}
-    </fieldset>
-  )
-}
-
 const sourcesLabel = (n: number): string => (n === 1 ? '1 source' : `${n} sources`)
 
-function clamp(text: string, min: number, max: number, fallback: number): number {
-  const n = Number(text)
-  return Number.isInteger(n) ? Math.min(max, Math.max(min, n)) : fallback
-}
-
-function useDebounced<T>(value: T, ms: number): T {
-  const [settled, setSettled] = useState(value)
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(value), ms)
-    return () => clearTimeout(timer)
-  }, [value, ms])
-  return settled
-}

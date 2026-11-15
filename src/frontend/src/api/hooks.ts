@@ -899,6 +899,11 @@ export interface FeedTest {
 }
 
 /** Reads a news feed once and tells what came from it. */
+/** A job board read once, as the offers routine would: how many offers, the newest. */
+export function useTestBoard() {
+  return useMutation({ mutationFn: (board: string) => request<FeedTest>('POST', '/api/job-boards/test', { board }) })
+}
+
 export function useTestFeed() {
   return useMutation({ mutationFn: (url: string) => request<FeedTest>('POST', '/api/feeds/test', { url }) })
 }

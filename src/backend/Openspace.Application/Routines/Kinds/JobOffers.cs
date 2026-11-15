@@ -767,7 +767,14 @@ internal sealed record JobWords(
     {
         ArgumentNullException.ThrowIfNull(url);
         var host = url.Host.ToLowerInvariant();
-        var board = host.EndsWith("linkedin.com", StringComparison.Ordinal) ? "LinkedIn" : host.EndsWith("japan-dev.com", StringComparison.Ordinal) ? "Japan Dev" : null;
+        var board = host switch
+        {
+            _ when host.EndsWith("linkedin.com", StringComparison.Ordinal) => "LinkedIn",
+            _ when host.EndsWith("japan-dev.com", StringComparison.Ordinal) => "Japan Dev",
+            _ when host.EndsWith("tokyodev.com", StringComparison.Ordinal) => "TokyoDev",
+            _ when host.EndsWith("daijob.com", StringComparison.Ordinal) => "Daijob",
+            _ => null,
+        };
         return board is null ? OpenOffer : $"{OpenOffer} {On} {board}";
     }
 

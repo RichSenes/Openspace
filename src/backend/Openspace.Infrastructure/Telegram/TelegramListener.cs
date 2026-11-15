@@ -86,7 +86,7 @@ internal sealed partial class TelegramListener(
     {
         var (token, chat, _) = Bots.Read(folder, channel);
         var http = clients.CreateClient(HttpClientName);
-        var asked = new Dictionary<string, string> { ["timeout"] = "0", ["allowed_updates"] = """["callback_query"]""" };
+        var asked = new Dictionary<string, string> { ["timeout"] = "0", ["allowed_updates"] = """["callback_query","message"]""" };
         if (_offsets.TryGetValue(channel, out var offset))
         {
             asked["offset"] = offset.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -110,7 +110,48 @@ internal sealed partial class TelegramListener(
             {
                 await AnswerAsync(http, token, chat, press, cancellationToken).ConfigureAwait(false);
             }
+            else if (update.TryGetProperty("message", out var message))
+            {
+                await ReadAsync(http, token, chat, channel, message, cancellationToken).ConfigureAwait(false);
+            }
         }
+    }
+
+    /// <summary>A person's text to the bot in their chat: an offer pasted whole, judged like the others.</summary>
+    private async Task ReadAsync(HttpClient http, string token, string chat, string channel, JsonElement message, CancellationToken cancellationToken)
+    {
+        var fromChat = message.TryGetProperty("chat", out var c) ? c.GetProperty("id").GetRawText() : null;
+        var byBot = message.TryGetProperty("from", out var from) && from.TryGetProperty("is_bot", out var bot) && bot.GetBoolean();
+        var text = message.TryGetProperty("text", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+        if (fromChat != chat || byBot || text.Length == 0 || text.StartsWith('/'))
+        {
+            return;
+        }
+
+        string? reply;
+        using (var scope = scopes.CreateScope())
+        {
+            reply = await scope.ServiceProvider.GetRequiredService<IChatAnswers>().OfferAsync(channel, text, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (reply is null)
+        {
+            return;
+        }
+
+        var fields = new Dictionary<string, string>
+        {
+            ["chat_id"] = chat,
+            ["text"] = reply,
+            ["reply_parameters"] = JsonSerializer.Serialize(new { message_id = message.GetProperty("message_id").GetInt64(), allow_sending_without_reply = true }),
+        };
+        if (message.TryGetProperty("message_thread_id", out var thread))
+        {
+            fields["message_thread_id"] = thread.GetRawText();
+        }
+
+        using var form = new FormUrlEncodedContent(fields);
+        await Bots.CallAsync(http, token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task AnswerAsync(HttpClient http, string token, string chat, JsonElement press, CancellationToken cancellationToken)

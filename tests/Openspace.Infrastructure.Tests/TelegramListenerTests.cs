@@ -48,12 +48,31 @@ public sealed class TelegramListenerTests : IDisposable
         Assert.All(_bot.Calls, c => Assert.StartsWith("/bot333:fake-token/", c.Path, StringComparison.Ordinal));
         var calls = _bot.Calls.Select(c => c.Path[(c.Path.LastIndexOf('/') + 1)..]).ToList();
         Assert.Equal(["getUpdates", "answerCallbackQuery", "editMessageReplyMarkup", "answerCallbackQuery", "getUpdates"], calls);
-        Assert.Contains("allowed_updates=[\"callback_query\"]", _bot.Calls[0].Body, StringComparison.Ordinal);
+        Assert.Contains("allowed_updates=[\"callback_query\",\"message\"]", _bot.Calls[0].Body, StringComparison.Ordinal);
         Assert.Contains("text=Noted.", _bot.Calls[1].Body, StringComparison.Ordinal);
         Assert.Contains("message_id=55", _bot.Calls[2].Body, StringComparison.Ordinal);
         Assert.Contains("{\"text\":\"✅ Interested\",\"callback_data\":\"done\"}", _bot.Calls[2].Body, StringComparison.Ordinal);
         Assert.DoesNotContain("text=", _bot.Calls[3].Body, StringComparison.Ordinal);
         Assert.Contains("offset=12", _bot.Calls[4].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_offer_written_to_the_bot_in_the_person_s_chat_is_taken_and_answered_there()
+    {
+        _bot.Updates = """
+            {"ok":true,"result":[
+              {"update_id":20,"message":{"message_id":70,"message_thread_id":5,"chat":{"id":-100123},"from":{"is_bot":false},"text":"Senior engineer at Kyo, the whole offer…"}},
+              {"update_id":21,"message":{"message_id":71,"chat":{"id":-100123},"from":{"is_bot":true},"text":"A bot talking"}},
+              {"update_id":22,"message":{"message_id":72,"chat":{"id":999},"from":{"is_bot":false},"text":"Another chat"}}]}
+            """;
+
+        await Listener().ListenOnceAsync(default);
+
+        Assert.Equal(["CAREER: Senior engineer at Kyo, the whole offer…"], _answers.Offers);
+        var reply = Assert.Single(_bot.Calls, c => c.Path.EndsWith("/sendMessage", StringComparison.Ordinal));
+        Assert.Contains("text=Taken.", reply.Body, StringComparison.Ordinal);
+        Assert.Contains("message_thread_id=5", reply.Body, StringComparison.Ordinal);
+        Assert.Contains("\"message_id\":70", reply.Body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -70,7 +89,15 @@ public sealed class TelegramListenerTests : IDisposable
     {
         public List<string> Asked { get; } = [];
 
+        public List<string> Offers { get; } = [];
+
         public Task<IReadOnlyList<string>> ChannelsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<string>>(["CAREER"]);
+
+        public Task<string?> OfferAsync(string channel, string text, CancellationToken cancellationToken)
+        {
+            Offers.Add($"{channel}: {text}");
+            return Task.FromResult<string?>("Taken.");
+        }
 
         public Task<ChatAnswer?> AnswerAsync(string data, CancellationToken cancellationToken)
         {

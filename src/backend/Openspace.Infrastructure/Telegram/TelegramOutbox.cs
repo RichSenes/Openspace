@@ -52,7 +52,7 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
             var content = new StreamContent(file);
             content.Headers.ContentType = new MediaTypeHeaderValue(filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "application/octet-stream");
             form.Add(content, "document", Path.GetFileName(filePath));
-            await PostAsync(token, "sendDocument", form, cancellationToken).ConfigureAwait(false);
+            await Bots.CallAsync(http, token, "sendDocument", form, cancellationToken).ConfigureAwait(false);
             return true;
         }
 
@@ -65,7 +65,7 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
             }
 
             using var form = new FormUrlEncodedContent(fields);
-            await PostAsync(token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
+            await Bots.CallAsync(http, token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
         }
 
         return true;
@@ -81,13 +81,14 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
         }
 
         var (token, chat, topic) = Read(channel);
+        var most = message.FilePath is null ? MaxText : MaxCaption;
+        var html = message.Html.Length <= most;
         var fields = new Dictionary<string, string>
         {
             ["chat_id"] = chat,
-            ["text"] = message.Html.Length <= MaxText ? message.Html : message.Plain[..Math.Min(message.Plain.Length, MaxText)],
-            ["link_preview_options"] = """{"is_disabled":true}""",
+            [message.FilePath is null ? "text" : "caption"] = html ? message.Html : Cut(message.Plain, most),
         };
-        if (message.Html.Length <= MaxText)
+        if (html)
         {
             fields["parse_mode"] = "HTML";
         }
@@ -97,10 +98,52 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
             fields["message_thread_id"] = topic;
         }
 
-        using var form = new FormUrlEncodedContent(fields);
-        var answer = await PostAsync(token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
-        return answer.TryGetProperty("result", out var result) && result.TryGetProperty("message_id", out var id) && id.TryGetInt64(out var number) ? number : 0;
+        if (message.ReplyTo is { } replyTo)
+        {
+            // When the message is gone the answer still arrives, on its own.
+            fields["reply_parameters"] = JsonSerializer.Serialize(new { message_id = replyTo, allow_sending_without_reply = true });
+        }
+
+        if (message.Buttons is { Count: > 0 } buttons)
+        {
+            fields["reply_markup"] = Keyboard(buttons);
+        }
+
+        JsonElement answer;
+        if (message.FilePath is { } path)
+        {
+            using var form = new MultipartFormDataContent();
+            foreach (var (name, value) in fields)
+            {
+                form.Add(new StringContent(value), name);
+            }
+
+            await using var file = File.OpenRead(path);
+            var content = new StreamContent(file);
+            content.Headers.ContentType = new MediaTypeHeaderValue(path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "application/octet-stream");
+            form.Add(content, "document", Path.GetFileName(path));
+            answer = await Bots.CallAsync(http, token, "sendDocument", form, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            fields["link_preview_options"] = """{"is_disabled":true}""";
+            using var form = new FormUrlEncodedContent(fields);
+            answer = await Bots.CallAsync(http, token, "sendMessage", form, cancellationToken).ConfigureAwait(false);
+        }
+
+        return answer.ValueKind == JsonValueKind.Object && answer.TryGetProperty("result", out var result) && result.TryGetProperty("message_id", out var id) && id.TryGetInt64(out var number)
+            ? number
+            : 0;
     }
+
+    /// <summary>Buttons side by side under a message, in Telegram's shape.</summary>
+    internal static string Keyboard(IEnumerable<OutboxButton> buttons) =>
+        JsonSerializer.Serialize(new { inline_keyboard = new[] { buttons.Select(b => new { text = b.Text, callback_data = b.Data }).ToArray() } }, Plain);
+
+    /// <summary>JSON with its text as written: it goes in a form, never in a page.</summary>
+    private static readonly JsonSerializerOptions Plain = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
+    private static string Cut(string text, int most) => text.Length <= most ? text : string.Concat(text.AsSpan(0, most - 1), "…");
 
     /// <summary>The bots named in <c>telegram.env</c>: the names before the "=", never the tokens.</summary>
     public IReadOnlyList<string> Channels()
@@ -145,9 +188,14 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
         }
     }
 
-    private (string Token, string Chat, string? Topic) Read(string channel)
+    private (string Token, string Chat, string? Topic) Read(string channel) => Bots.Read(options.CurrentValue.Folder, channel);
+}
+
+/// <summary>The person's bots: each one's token, the group chat and the bot's topic in it.</summary>
+internal static class Bots
+{
+    public static (string Token, string Chat, string? Topic) Read(string folder, string channel)
     {
-        var folder = options.CurrentValue.Folder;
         var tokens = Path.Combine(folder, "telegram.env");
         var targets = Path.Combine(folder, "telegram.json");
         if (!File.Exists(tokens) || !File.Exists(targets))
@@ -170,7 +218,7 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
     }
 
     /// <summary>Calls the bot; Telegram's answer, its "result" holding what was sent.</summary>
-    private async Task<JsonElement> PostAsync(string token, string method, HttpContent content, CancellationToken cancellationToken)
+    public static async Task<JsonElement> CallAsync(HttpClient http, string token, string method, HttpContent content, CancellationToken cancellationToken)
     {
         // "./": a token has a colon, which would otherwise read as a scheme.
         using var response = await http.PostAsync(new Uri($"./bot{token}/{method}", UriKind.Relative), content, cancellationToken).ConfigureAwait(false);

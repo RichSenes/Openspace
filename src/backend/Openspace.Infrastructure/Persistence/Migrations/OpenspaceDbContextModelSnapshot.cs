@@ -158,6 +158,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<long?>("DecidedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("OfficeId")
                         .HasColumnType("TEXT");
 

@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<RoutineCommands>();
         services.AddScoped<RoutineQueries>();
         services.AddScoped<ProposalCommands>();
+        services.AddScoped<IChatAnswers, ChatAnswers>();
         services.AddScoped<KanjiCourse>();
         services.AddScoped<IRoutineKind, Routines.Kinds.MorningPaper>();
         services.AddScoped<IRoutineKind, Routines.Kinds.MailSorting>();

@@ -85,6 +85,18 @@ public sealed class Proposal : AggregateRoot<ProposalId>
         return proposal;
     }
 
+    /// <summary>The message that asked the person in their chat, to answer it later (with the CV of an offer); null when none.</summary>
+    public long? MessageId { get; private set; }
+
+    /// <summary>Notes the chat message that asks the person about it.</summary>
+    public void Asked(long messageId)
+    {
+        if (messageId > 0)
+        {
+            MessageId = messageId;
+        }
+    }
+
     public void Approve(DateTimeOffset now) => Decide(ProposalStatus.Approved, now);
 
     public void Reject(DateTimeOffset now) => Decide(ProposalStatus.Rejected, now);

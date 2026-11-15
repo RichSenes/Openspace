@@ -127,6 +127,22 @@ public sealed class CvMakerTests : IDisposable
     }
 
     [Fact]
+    public async Task An_offer_proposed_in_the_chat_gets_its_cv_in_answer_to_that_message()
+    {
+        var routine = Create("\"English\"");
+        await RunAsync(routine);
+        Offer("kyo-labs-frontend-engineer", "# Frontend Engineer\n\nCompany: Kyo Labs\n\nReact & TypeScript.");
+        File.WriteAllText(Path.Combine(Offers, "kyo-labs-frontend-engineer", JobOffers.MessageFile), "4242");
+
+        await RunAsync(routine);
+
+        var (_, message) = Assert.Single(_h.Outbox.Posted);
+        Assert.Equal(4242, message.ReplyTo);
+        Assert.Equal(Path.Combine(Offers, "kyo-labs-frontend-engineer", "CV_Ada-Example.pdf"), message.FilePath);
+        Assert.Equal("CV: kyo-labs-frontend-engineer\nIt puts React first.", message.Plain);
+    }
+
+    [Fact]
     public async Task Without_personal_data_it_leaves_a_form_to_fill_and_says_so()
     {
         File.Delete(Path.Combine(_root, "personal.json"));

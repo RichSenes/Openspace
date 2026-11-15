@@ -31,6 +31,9 @@ public interface IRoutineKind
     /// </summary>
     bool CanUndo(string action) => false;
 
+    /// <summary>Its proposals come with yes and no in the chat: its routines' bots are listened to.</summary>
+    bool AsksInChat => false;
+
     /// <summary>A proposal of this kind was approved: carry it out.</summary>
     /// <returns>What was done, for people.</returns>
     Task<string> CarryOutAsync(Proposal proposal, RoutineContext context, CancellationToken cancellationToken) =>
@@ -56,12 +59,18 @@ public interface IRoutineOutbox
 }
 
 /// <summary>A message in Telegram's HTML (bold, italics, links), with its text plain for where HTML is not read.</summary>
-public sealed record OutboxMessage(string Html, string Plain)
+/// <param name="Buttons">Answers under the message, side by side: what each says and what it sends back.</param>
+/// <param name="ReplyTo">The message it answers, in the same chat.</param>
+/// <param name="FilePath">A file it carries, the text as its caption.</param>
+public sealed record OutboxMessage(string Html, string Plain, IReadOnlyList<OutboxButton>? Buttons = null, long? ReplyTo = null, string? FilePath = null)
 {
     /// <summary>Text made safe inside the HTML of a message.</summary>
     public static string Escape(string text) =>
         (text ?? string.Empty).Replace("&", "&amp;", StringComparison.Ordinal).Replace("<", "&lt;", StringComparison.Ordinal).Replace(">", "&gt;", StringComparison.Ordinal).Replace("\"", "&quot;", StringComparison.Ordinal);
 }
+
+/// <param name="Data">What the chat sends back when it is pressed, 64 bytes at most.</param>
+public sealed record OutboxButton(string Text, string Data);
 
 internal sealed class NoOutbox : IRoutineOutbox
 {

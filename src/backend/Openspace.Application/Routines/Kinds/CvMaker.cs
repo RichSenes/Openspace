@@ -20,7 +20,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
     public const string MasterKey = "cv:master";
 
     /// <summary>Raised when the pages change, so a new look makes a new version.</summary>
-    private const string Design = "1";
+    private const string Design = "2";
 
     /// <summary>Offers given a CV per run at most.</summary>
     private const int MostOffers = 5;

@@ -5,8 +5,8 @@ using System.Text;
 namespace Openspace.Application.Routines.Kinds;
 
 /// <summary>
-/// The CV's pages, for printing on A4. The CV wears the Karuta look: white paper, warm greys,
-/// one red used sparingly, rounded corners. The rirekisho and the shokumu keirekisho keep the
+/// The CV's pages, for printing on A4. The CV is a strict grid in a frontend developer's hand:
+/// section names on the left, the name large, details in monospace, one indigo accent. The rirekisho and the shokumu keirekisho keep the
 /// plain ruled layout Japanese companies expect.
 /// </summary>
 public static class CvPages
@@ -21,30 +21,47 @@ public static class CvPages
         html:lang(ja) body{font-family:"Noto Sans CJK JP","Hiragino Sans","Noto Sans",system-ui,sans-serif}
         """;
 
+    /// <summary>
+    /// The CV: a strict layout with the section names in a narrow column on the left (placed
+    /// apart, so that a section may run on to the next page), the name
+    /// large and tight, details (contacts, dates, skills) in monospace, one indigo accent for
+    /// the dates and markers; the photo sits in the left column, over the section names.
+    /// </summary>
     private const string CvStyle = """
-        header{display:flex;gap:6mm;align-items:flex-start;padding-bottom:5mm;border-bottom:1px solid var(--hairline);margin-bottom:5mm}
-        header .who{flex:1}
-        h1{font-size:24pt;line-height:1.1;color:var(--charcoal);font-weight:700;letter-spacing:-0.01em}
-        .headline{font-size:12pt;color:var(--primary);font-weight:600;margin-top:1.5mm}
-        .contacts{margin-top:3mm;color:var(--mute);font-size:8.5pt;display:flex;flex-wrap:wrap;gap:1mm 4mm}
-        .photo{width:30mm;height:38mm;object-fit:cover;border-radius:3mm;flex:none}
-        section{margin-top:5mm}
-        h2{font-size:8.5pt;text-transform:uppercase;letter-spacing:0.12em;color:var(--charcoal);font-weight:700;margin-bottom:2.5mm}
-        .summary{font-size:10pt}
-        .item{margin-bottom:3.5mm;break-inside:avoid}
-        .item .top{display:flex;justify-content:space-between;gap:4mm}
-        .item .what{font-weight:700;color:var(--charcoal)}
-        .item .where{color:var(--mute)}
-        .item .when{color:var(--mute);white-space:nowrap;font-size:8.5pt}
-        ul{margin:1.2mm 0 0 4.5mm}
-        li{margin-bottom:0.6mm}
+        :root{--ink:#111111;--body:#2d2d2d;--mute:#6b6b6b;--rule:#e6e6e6;--accent:#4338ca;--soft:#eef0ff;--chip:#d4d4d8}
+        @page{size:A4;margin:14mm 15mm}
+        body{font-size:9.2pt;line-height:1.46;color:var(--body)}
+        .mono{font-family:"DejaVu Sans Mono","Ubuntu Mono","Noto Sans Mono",monospace}
+        html:lang(ja) .mono{font-family:"Noto Sans CJK JP","DejaVu Sans Mono",monospace}
+        header{display:grid;grid-template-columns:30mm minmax(0,1fr) 60mm;gap:0 7mm;align-items:center;margin-bottom:6mm}
+        header.nophoto{grid-template-columns:minmax(0,1fr) 60mm}
+        .photo{width:30mm;height:37mm;object-fit:cover;border-radius:1.6mm;display:block}
+        h1{font-family:"Noto Sans Display","Noto Sans","Noto Sans CJK JP",sans-serif;font-weight:900;font-size:34pt;line-height:.98;letter-spacing:-0.035em;color:var(--ink)}
+        html:lang(ja) h1{font-size:20pt;letter-spacing:0;line-height:1.2}
+        .headline{margin-top:3mm;font-size:9.6pt;color:var(--accent);font-weight:700;line-height:1.35}
+        .headline::before{content:"// ";color:var(--mute);font-weight:400}
+        .contacts{font-size:8pt;line-height:1.75;border-left:2pt solid var(--accent);padding-left:4mm;color:var(--body);word-break:break-word}
+        .row{position:relative;padding-left:37mm;margin-top:4.6mm}
+        h2{position:absolute;left:0;top:0;width:30mm;font-size:7.8pt;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);font-weight:700;padding-top:.7mm}
+        .summary{font-size:10.1pt;color:var(--ink);line-height:1.55}
+        .item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 4mm;break-inside:avoid;padding-bottom:2.8mm;margin-bottom:2.8mm;border-bottom:.5pt solid var(--rule)}
+        .item:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+        .what{font-weight:700;color:var(--ink);font-size:10.1pt}
+        .where{grid-column:1/-1;color:var(--mute);font-size:8.7pt}
+        .when{font-size:7.6pt;color:var(--accent);white-space:nowrap;background:var(--soft);border-radius:1mm;padding:.3mm 1.6mm;align-self:start;margin-top:.5mm}
+        ul{grid-column:1/-1;list-style:none;margin-top:1.4mm}
+        li{padding-left:4.5mm;position:relative;margin-bottom:.7mm}
+        li::before{content:"→";position:absolute;left:0;color:var(--accent);font-size:8pt}
+        .groups{display:grid;grid-template-columns:24mm minmax(0,1fr);gap:1.6mm 3mm;align-items:start}
+        .groups>span{color:var(--mute);font-size:8.1pt;padding-top:.4mm}
         .chips{display:flex;flex-wrap:wrap;gap:1.4mm}
-        .chip{background:var(--card);border-radius:999px;padding:0.6mm 2.6mm;font-size:8.5pt;color:var(--body)}
-        .group{display:grid;grid-template-columns:34mm 1fr;gap:2mm;margin-bottom:2mm;break-inside:avoid}
-        .group .name{color:var(--mute);font-size:8.5pt;padding-top:0.6mm}
-        .pairs{display:flex;flex-wrap:wrap;gap:1mm 6mm}
-        .pairs b{color:var(--charcoal)}
-        a{color:inherit;text-decoration:none}
+        .chip{border:.6pt solid var(--chip);border-radius:1mm;padding:.35mm 1.8mm;font-size:7.9pt;color:var(--ink)}
+        .pairs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2mm 4mm}
+        .pairs b{display:block;color:var(--ink);font-weight:700}
+        .pairs span{color:var(--mute);font-size:8.3pt}
+        .list p+p{margin-top:1mm}
+        .list b{color:var(--ink)}
+        .list span{color:var(--mute)}
         """;
 
     private const string FormStyle = """
@@ -84,87 +101,65 @@ public static class CvPages
         ArgumentNullException.ThrowIfNull(labels);
         var html = new StringBuilder();
         html.Append(CultureInfo.InvariantCulture, $"""<!doctype html><html lang="{labels.Lang}"><head><meta charset="utf-8"><title>{E(me.Name)}</title><style>{Base}{CvStyle}</style></head><body>""");
-        html.Append("<header><div class=\"who\">");
-        html.Append(CultureInfo.InvariantCulture, $"<h1>{E(me.Name)}</h1>");
+        html.Append(photo is null ? "<header class=\"nophoto\">" : $"<header><img class=\"photo\" src=\"{E(photo)}\" alt=\"\">");
+        html.Append(CultureInfo.InvariantCulture, $"<div><h1>{E(me.Name)}</h1>");
         if (cv.Headline.Length > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<p class=\"headline\">{E(cv.Headline)}</p>");
-        }
-
-        var contacts = new[] { me.Email, me.Phone, me.Location }.Concat(me.Links).Where(c => c.Length > 0).ToList();
-        if (contacts.Count > 0)
-        {
-            html.Append("<p class=\"contacts\">");
-            foreach (var contact in contacts)
-            {
-                html.Append(CultureInfo.InvariantCulture, $"<span>{E(contact)}</span>");
-            }
-
-            html.Append("</p>");
+            html.Append(CultureInfo.InvariantCulture, $"<p class=\"headline mono\">{E(cv.Headline)}</p>");
         }
 
         html.Append("</div>");
-        if (photo is not null)
-        {
-            html.Append(CultureInfo.InvariantCulture, $"<img class=\"photo\" src=\"{E(photo)}\" alt=\"\">");
-        }
+        var contacts = new[] { me.Email, me.Phone, me.Location }.Concat(me.Links).Where(c => c.Length > 0).ToList();
+        html.Append(CultureInfo.InvariantCulture, $"<div class=\"contacts mono\">{string.Join("<br>", contacts.Select(E))}</div></header>");
 
-        html.Append("</header>");
         if (cv.Summary.Length > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(labels.Profile)}</h2><p class=\"summary\">{E(cv.Summary)}</p></section>");
+            Row(html, labels.Profile, $"<p class=\"summary\">{E(cv.Summary)}</p>");
         }
 
         Items(html, labels.Experience, cv.Experience.Select(j => (j.Role, Join(" · ", j.Company, j.Place), j.Period, j.Points)));
         Items(html, labels.Projects, cv.Projects.Select(p => (p.Name, Join(" · ", p.Kind, p.Link), p.Period, p.Points)));
         Items(html, labels.Education, cv.Education.Select(s => (s.Title, Join(" · ", s.School, s.Note), s.Period, (IReadOnlyList<string>)[])));
 
-        if (cv.Skills.Count > 0)
+        var groups = cv.Skills.Where(g => g.Items.Count > 0).ToList();
+        if (groups.Count > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(labels.Skills)}</h2>");
-            foreach (var group in cv.Skills.Where(g => g.Items.Count > 0))
+            var skills = new StringBuilder("<div class=\"groups\">");
+            foreach (var group in groups)
             {
-                html.Append(CultureInfo.InvariantCulture, $"<div class=\"group\"><span class=\"name\">{E(group.Group)}</span><span class=\"chips\">");
-                foreach (var item in group.Items)
+                skills.Append(CultureInfo.InvariantCulture, $"<span>{E(group.Group)}</span><div class=\"chips\">");
+                foreach (var item in group.Items.Where(i => !string.IsNullOrWhiteSpace(i)))
                 {
-                    html.Append(CultureInfo.InvariantCulture, $"<span class=\"chip\">{E(item)}</span>");
+                    skills.Append(CultureInfo.InvariantCulture, $"<span class=\"chip mono\">{E(item)}</span>");
                 }
 
-                html.Append("</span></div>");
+                skills.Append("</div>");
             }
 
-            html.Append("</section>");
+            Row(html, labels.Skills, skills.Append("</div>").ToString());
         }
 
         if (cv.Languages.Count > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(labels.Languages)}</h2><p class=\"pairs\">");
-            foreach (var language in cv.Languages)
-            {
-                html.Append(CultureInfo.InvariantCulture, $"<span><b>{E(language.Name)}</b> {E(language.Level)}</span>");
-            }
-
-            html.Append("</p></section>");
+            Row(html, labels.Languages, $"<div class=\"pairs\">{string.Concat(cv.Languages.Select(l => $"<p><b>{E(l.Name)}</b><span>{E(l.Level)}</span></p>"))}</div>");
         }
 
         if (cv.Certifications.Count > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(labels.Certifications)}</h2>");
-            foreach (var certificate in cv.Certifications)
-            {
-                html.Append(CultureInfo.InvariantCulture, $"<p><b>{E(certificate.Name)}</b> · {E(Join(", ", certificate.Issuer, certificate.Year))}</p>");
-            }
-
-            html.Append("</section>");
+            Row(html, labels.Certifications, $"<div class=\"list\">{string.Concat(cv.Certifications.Select(c => $"<p><b>{E(c.Name)}</b> <span>· {E(Join(", ", c.Issuer, c.Year))}</span></p>"))}</div>");
         }
 
         if (cv.Interests.Length > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(labels.Interests)}</h2><p>{E(cv.Interests)}</p></section>");
+            Row(html, labels.Interests, $"<p>{E(cv.Interests)}</p>");
         }
 
         return html.Append("</body></html>").ToString();
     }
+
+    /// <summary>A section of the CV: its name in the left column, what it holds on the right.</summary>
+    private static void Row(StringBuilder html, string heading, string content) =>
+        html.Append(CultureInfo.InvariantCulture, $"<div class=\"row\"><h2>{E(heading)}</h2><div>{content}</div></div>");
 
     /// <summary>The rirekisho on two pages: who, then 学歴・職歴; then 免許・資格, 志望の動機 and 本人希望記入欄.</summary>
     public static string Rirekisho(Rirekisho form, PersonalData me, string? photo, DateOnly today)
@@ -281,21 +276,21 @@ public static class CvPages
             return;
         }
 
-        html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(heading)}</h2>");
+        var content = new StringBuilder();
         foreach (var (what, where, when, points) in list)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<div class=\"item\"><div class=\"top\"><span><span class=\"what\">{E(what)}</span>");
+            content.Append(CultureInfo.InvariantCulture, $"<div class=\"item\"><span class=\"what\">{E(what)}</span>");
+            content.Append(when.Length > 0 ? $"<span class=\"when mono\">{E(when)}</span>" : "<span></span>");
             if (where.Length > 0)
             {
-                html.Append(CultureInfo.InvariantCulture, $" <span class=\"where\">· {E(where)}</span>");
+                content.Append(CultureInfo.InvariantCulture, $"<span class=\"where\">{E(where)}</span>");
             }
 
-            html.Append(CultureInfo.InvariantCulture, $"</span><span class=\"when\">{E(when)}</span></div>");
-            Points(html, points);
-            html.Append("</div>");
+            Points(content, points);
+            content.Append("</div>");
         }
 
-        html.Append("</section>");
+        Row(html, heading, content.ToString());
     }
 
     private static void Points(StringBuilder html, IReadOnlyList<string> points)

@@ -134,6 +134,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
             {
                 Japanese = listed.Japanese == JapaneseLevel.Unknown ? Level(judgement.Japanese) : listed.Japanese,
                 SponsorsVisa = listed.SponsorsVisa ?? Visa(judgement.Visa),
+                SalaryMin = listed.SalaryMin ?? judgement.YearlyYen(judgement.SalaryLow),
+                SalaryMax = listed.SalaryMax ?? judgement.YearlyYen(judgement.SalaryHigh is > 0 ? judgement.SalaryHigh : judgement.SalaryLow),
                 Text = judgement.Details,
             };
             var title = Short($"{offer.Title} — {offer.Company}", 280);
@@ -348,6 +350,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
                 Location = Short(judgement.Location?.Trim() is { Length: > 0 } place ? place : "?", 120),
                 Japanese = Level(judgement.Japanese),
                 SponsorsVisa = Visa(judgement.Visa),
+                SalaryMin = judgement.YearlyYen(judgement.SalaryLow),
+                SalaryMax = judgement.YearlyYen(judgement.SalaryHigh is > 0 ? judgement.SalaryHigh : judgement.SalaryLow),
             };
             await context.MeetAsync(OfferKey(offer), RoutineContext.Fingerprint(text), Short($"{offer.Title} — {offer.Company}", 280), cancellationToken).ConfigureAwait(false);
             await context.MarkAsync(OfferKey(offer), SeenState.Shown, cancellationToken).ConfigureAwait(false);
@@ -497,7 +501,8 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
                     - "improve": for each missing one, a concrete way to fill it or show it (a course, a small project, what to say at the interview);
                     - "ask": what to clarify with the company (visa, remote work, Japanese, salary, seniority), only what the offer leaves open.
                     Write every text in {settings.Language}, whatever the language of the offer and of the notes above; names of technologies stay as they are.
-                    Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
+                    Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say). Read the whole text for them: they are often in the description.
+                    And the pay, when the text states it: in "salaryLow" and "salaryHigh" the numbers as written (one number: both the same; none: 0), in "salaryUnit" how they are written ("yen" for ¥8,000,000; "man-yen" for 800万円; "million-yen" for ¥8M or 8 million yen; "other" for another currency), and in "salaryPer" what they pay for ("year", "month", "hour", or "unknown").{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
                     """,
                     JudgementSchema, MaxTokens: 1500, Temperature: 0.2),
                 cancellationToken).ConfigureAwait(false);
@@ -603,7 +608,10 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
           "improve":{"type":"array","items":{"type":"string"}},"ask":{"type":"array","items":{"type":"string"}},
           "japanese":{"type":"string","enum":["none","basic","conversational","business","fluent","unknown"]},
           "visa":{"type":"string","enum":["yes","no","unknown"]},
-          "title":{"type":"string"},"company":{"type":"string"},"location":{"type":"string"}},"required":["fit","why","gaps","role","have","missing","improve","ask","japanese","visa"]}
+          "salaryLow":{"type":"number"},"salaryHigh":{"type":"number"},
+          "salaryUnit":{"type":"string","enum":["yen","man-yen","million-yen","other"]},
+          "salaryPer":{"type":"string","enum":["year","month","hour","unknown"]},
+          "title":{"type":"string"},"company":{"type":"string"},"location":{"type":"string"}},"required":["fit","why","gaps","role","have","missing","improve","ask","japanese","visa","salaryLow","salaryHigh","salaryUnit","salaryPer"]}
         """;
 
     /// <param name="Title">Read from the text, for offers the person brings; the same for <paramref name="Company"/> and <paramref name="Location"/>.</param>
@@ -612,9 +620,36 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
     private sealed record Judgement(
         int Fit, string Why, string? Gaps, string? Japanese = null, string? Visa = null, string? Title = null, string? Company = null, string? Location = null,
         string? Details = null, string? Role = null, IReadOnlyList<string>? Have = null, IReadOnlyList<string>? Missing = null, IReadOnlyList<string>? Improve = null,
-        IReadOnlyList<string>? Ask = null)
+        IReadOnlyList<string>? Ask = null, decimal? SalaryLow = null, decimal? SalaryHigh = null, string? SalaryUnit = null, string? SalaryPer = null)
     {
         public RoleDetail Detail => new(Role ?? string.Empty, Have ?? [], Missing ?? [], Improve ?? [], Ask ?? []);
+
+        /// <summary>
+        /// A pay the text states, as yen a year: 800万円 is 8,000,000, a month counts twelve; null
+        /// for other currencies, pay by the hour, or a number that cannot be a yearly pay in Japan.
+        /// </summary>
+        public long? YearlyYen(decimal? amount)
+        {
+            if (amount is not > 0)
+            {
+                return null;
+            }
+
+            var yen = SalaryUnit?.Trim().ToLowerInvariant() switch
+            {
+                "yen" => amount.Value,
+                "man-yen" => amount.Value * 10_000,
+                "million-yen" => amount.Value * 1_000_000,
+                _ => 0m,
+            };
+            yen *= SalaryPer?.Trim().ToLowerInvariant() switch
+            {
+                "month" => 12,
+                "year" or "unknown" or null => 1,
+                _ => 0,
+            };
+            return yen is >= 1_000_000 and <= 100_000_000 ? (long)yen : null;
+        }
     }
 
     /// <param name="Fit">The role in detail as the judge wrote it, plain, for the offer's file and its CV.</param>

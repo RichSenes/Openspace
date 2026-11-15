@@ -20,10 +20,28 @@ internal sealed partial class FeedReader(HttpClient http) : IFeedReader
         return Parse(stream, feed, source);
     }
 
+    /// <summary>
+    /// The feed without the blank lines some sites send before the XML declaration, which
+    /// the XML reader refuses: such feeds open in every browser and feed reader.
+    /// </summary>
+    private static MemoryStream SkipLeadingBlanks(Stream stream)
+    {
+        var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        var bytes = copy.GetBuffer();
+        var start = 0;
+        while (start < copy.Length && bytes[start] is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n')
+        {
+            start++;
+        }
+
+        return new MemoryStream(bytes, start, (int)copy.Length - start, writable: false);
+    }
+
     internal static IReadOnlyList<FeedItem> Parse(Stream stream, Uri feed, string source)
     {
         var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, XmlResolver = null, IgnoreComments = true };
-        using var reader = XmlReader.Create(stream, settings);
+        using var reader = XmlReader.Create(SkipLeadingBlanks(stream), settings);
         var root = XDocument.Load(reader).Root ?? throw new InvalidDataException($"{source}: the feed is empty.");
         XNamespace atom = "http://www.w3.org/2005/Atom";
         XNamespace content = "http://purl.org/rss/1.0/modules/content/";

@@ -300,6 +300,18 @@ public static partial class PaperPage
     private static string Marked(string text, string literal) =>
         literal.Length == 0 ? E(text) : string.Join($"<b>{E(literal)}</b>", text.Split(literal).Select(E));
 
+    /// <summary>
+    /// The headlines a printed page carries: the front page's, the good news', every
+    /// section's; not the opening note, the index or the kanji's.
+    /// </summary>
+    public static IEnumerable<string> HeadlinesOf(string html) =>
+        Headlines().Matches(html)
+            .Select(m => WebUtility.HtmlDecode(m.Groups.Values.Skip(1).First(g => g.Success).Value).Trim())
+            .Where(h => h.Length > 0);
+
+    [GeneratedRegex(@"<p class=""kicker"">[^<]*</p>\s*<h2>(.*?)</h2>|<article[^>]*>\s*(?:<figure>.*?</figure>\s*<div>)?<h3>(.*?)</h3>|<section class=""good""><p class=""kicker"">[^<]*</p><h3>(.*?)</h3>", RegexOptions.Singleline)]
+    private static partial Regex Headlines();
+
     [GeneratedRegex(@"\[([^\[\]|]+)((?:\|[^\[\]|]*)+)\]")]
     private static partial Regex RubyMarkup();
 

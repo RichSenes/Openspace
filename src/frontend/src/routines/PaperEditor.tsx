@@ -45,6 +45,14 @@ const LANGUAGES = ['English', 'Italian', 'Japanese', 'Spanish', 'French', 'Germa
  * explanation under it, the sections with their sources and layout, and beside them the paper
  * laid out with sample text. The JSON stays at the end, for what has no field yet.
  */
+const LOOK_BACK = [
+  { hours: 12, label: '12 hours' },
+  { hours: 24, label: '1 day' },
+  { hours: 48, label: '2 days' },
+  { hours: 72, label: '3 days' },
+  { hours: 168, label: 'A week' },
+]
+
 export function PaperEditor({ officeId, routine, defaults, onDone }: { officeId: string; routine?: RoutineView; defaults: string; onDone: () => void }) {
   const create = useCreateRoutine(officeId)
   const update = useUpdateRoutine()
@@ -534,13 +542,48 @@ function SectionForm({
 
       <h3 className="paper-subhead">What goes in</h3>
       <div className="paper-grid">
+        <Field label="News from the last" hint="For outlets that write every few days, look further back than the rest of the paper.">
+          <select
+            className="input"
+            value={s.hoursBack ?? 0}
+            onChange={(e) =>
+              set({
+                hoursBack: Number(e.target.value) === 0 ? null : Number(e.target.value),
+              })
+            }
+          >
+            <option value={0}>Paper's ({paper.hoursBack} hours)</option>
+            {s.hoursBack !== null && !LOOK_BACK.some((l) => l.hours === s.hoursBack) && <option value={s.hoursBack}>{s.hoursBack} hours</option>}
+            {LOOK_BACK.map((l) => (
+              <option key={l.hours} value={l.hours}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Only if" hint='A condition every article must meet, such as "it happened in Italy"; empty for none.'>
           <input className="input" value={s.only} onChange={(e) => set({ only: e.target.value })} />
         </Field>
-        <Field label="Words to look for" hint="Separated by commas: news with them comes first. Starts of words work too.">
+        <Field
+          label={s.onlyWithKeywords ? 'Names and words it needs' : 'Words to look for'}
+          hint={
+            s.onlyWithKeywords
+              ? 'Separated by commas: only news naming one of them is printed. Write names as the outlets do, in every alphabet they use.'
+              : 'Separated by commas: news with them comes first. Starts of words work too.'
+          }
+        >
           <input className="input" value={s.keywords.join(', ')} onChange={(e) => set({ keywords: wordsOf(e.target.value) })} />
         </Field>
       </div>
+      <label className="check">
+        <input type="checkbox" checked={s.onlyWithKeywords} onChange={(e) => set({ onlyWithKeywords: e.target.checked })} />
+        Print it only on days with news about these words
+      </label>
+      <span className="hint">
+        {s.onlyWithKeywords
+          ? 'A section for the artists, games or people you follow: on a day without news about them, it is left out.'
+          : 'Off: the section prints every day, with the words only putting their news first.'}
+      </span>
       <Lines
         label="Topics to look out for"
         hint="One per line, on top of what matters most to the reader."

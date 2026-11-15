@@ -34,7 +34,8 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
   job offers, dependency checks, delivered to Telegram and never acting on what
   cannot be undone without your yes. The morning paper has its own editor: sources
   tested in one click, sections of different sizes side by side, columns and
-  pictures, and a live preview of the page.
+  pictures, and a live preview of the page. Each section's desk reads every title,
+  sends misplaced news to the right section and skips stories already told.
 
 ![The board: proposed, queued, running, in review, failed and done tasks](docs/screenshots/board.png)
 

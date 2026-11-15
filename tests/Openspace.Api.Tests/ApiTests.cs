@@ -84,6 +84,16 @@ public sealed class ApiTests : IDisposable
         Assert.Contains("https://", result.GetProperty("problem").GetString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_board_test_names_the_boards_it_reads_when_it_has_no_reader_for_one()
+    {
+        using var response = await _http.PostAsJsonAsync("/api/job-boards/test", new { board = "monster:everything" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Contains("\"tokyodev\"", result.GetProperty("problem").GetString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, "refuses automatic readers")]
     [InlineData(HttpStatusCode.NotFound, "the feed may have moved")]

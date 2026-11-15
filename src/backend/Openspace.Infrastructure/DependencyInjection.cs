@@ -114,6 +114,16 @@ public static class DependencyInjection
             http.Timeout = TimeSpan.FromSeconds(60);
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
         });
+        services.AddHttpClient<IJobBoard, Routines.TokyoDevBoard>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(30);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
+        });
+        services.AddHttpClient<IJobBoard, Routines.DaijobBoard>(http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(30);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Openspace/1.0 (personal news reader)");
+        });
         services.AddHttpClient<IJobBoard, Routines.LinkedInBoard>(http =>
         {
             http.Timeout = TimeSpan.FromSeconds(30);

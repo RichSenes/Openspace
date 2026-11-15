@@ -15,6 +15,8 @@ internal static class RoutineHelpEndpoints
 
     public sealed record FeedTestRequest(string Url);
 
+    public sealed record BoardTestRequest(string Board);
+
     public sealed record FeedTestResult(bool Ok, int Count, IReadOnlyList<string> Titles, string? Problem);
 
     public sealed record ModelChoice(string Id, string Name);
@@ -54,6 +56,28 @@ internal static class RoutineHelpEndpoints
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 return new FeedTestResult(false, 0, [], Explain(ex, url));
+            }
+        });
+
+        // A job board read once, as the offers routine would: how many offers, the newest titles.
+        help.MapPost("/job-boards/test", async (BoardTestRequest request, IEnumerable<IJobBoard> boards, CancellationToken ct) =>
+        {
+            var name = request.Board?.Trim() ?? string.Empty;
+            if (boards.FirstOrDefault(b => b.Reads(name)) is not { } board)
+            {
+                return new FeedTestResult(false, 0, [], "Openspace has no reader for this board: write it as \"japan-dev\", \"tokyodev\", \"linkedin:words\", \"daijob:words\" or \"lever:company\".");
+            }
+
+            try
+            {
+                var offers = await board.LatestAsync(name, ct);
+                return offers.Count == 0
+                    ? new FeedTestResult(false, 0, [], "The board answers, but lists no offers for this.")
+                    : new FeedTestResult(true, offers.Count, [.. offers.OrderByDescending(o => o.Posted).Take(5).Select(o => $"{o.Title} — {o.Company}")], null);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                return new FeedTestResult(false, 0, [], Uri.TryCreate("https://" + name.Split(':')[0], UriKind.Absolute, out var host) ? Explain(ex, host) : ex.Message);
             }
         });
 

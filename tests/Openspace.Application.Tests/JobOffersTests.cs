@@ -531,7 +531,7 @@ public sealed class JobOffersTests : IDisposable
         await RunAsync(routine);
         var kyoto = _h.Routines.Proposals.Single(p => p.Title.Contains("Kyo Labs", StringComparison.Ordinal));
         var dotnet = _h.Routines.Proposals.Single(p => p.Title.Contains(".NET", StringComparison.Ordinal));
-        var answers = new ChatAnswers(_h.Routines, [Kind()], Proposals());
+        var answers = new ChatAnswers(_h.Routines, [Kind()], Proposals(), new OfferInbox(_h.Routines, _h.RoutineRequests, _h.Clock));
 
         var yes = await answers.AnswerAsync($"p:{kyoto.Id.Value:N}:y", default);
         var no = await answers.AnswerAsync($"p:{dotnet.Id.Value:N}:n", default);
@@ -551,13 +551,33 @@ public sealed class JobOffersTests : IDisposable
     [InlineData("p:not-a-proposal:y")]
     [InlineData("p:0123456789abcdef0123456789abcdef:maybe")]
     public async Task What_is_not_an_answer_to_a_proposal_is_left_alone(string data) =>
-        Assert.Null(await new ChatAnswers(_h.Routines, [Kind()], Proposals()).AnswerAsync(data, default));
+        Assert.Null(await new ChatAnswers(_h.Routines, [Kind()], Proposals(), new OfferInbox(_h.Routines, _h.RoutineRequests, _h.Clock)).AnswerAsync(data, default));
 
     [Fact]
     public async Task A_proposal_no_longer_there_is_said_so() =>
         Assert.Equal(
             "This proposal is no longer in Openspace.",
-            (await new ChatAnswers(_h.Routines, [Kind()], Proposals()).AnswerAsync($"p:{Guid.NewGuid():N}:y", default))!.Notice);
+            (await new ChatAnswers(_h.Routines, [Kind()], Proposals(), new OfferInbox(_h.Routines, _h.RoutineRequests, _h.Clock)).AnswerAsync($"p:{Guid.NewGuid():N}:y", default))!.Notice);
+
+    [Fact]
+    public async Task An_offer_pasted_in_the_chat_goes_to_the_inbox_of_that_bot_s_routine_and_is_judged()
+    {
+        var routine = Create(language: "Italian");
+        var answers = new ChatAnswers(_h.Routines, [Kind()], Proposals(), new OfferInbox(_h.Routines, _h.RoutineRequests, _h.Clock));
+        var pasted = "Senior C# Developer at Kyo Labs, Kyoto. We build booking software with .NET and React; visa sponsored. https://jobs.example/kyo/42.";
+
+        var received = await answers.OfferAsync("career", pasted, default);
+        var tooShort = await answers.OfferAsync("CAREER", "https://jobs.example/kyo/42", default);
+        var nobody = await answers.OfferAsync("PAPERBOY", pasted, default);
+
+        Assert.Equal("📥 Ricevuta: la giudico e torna qui con i suoi bottoni.", received);
+        Assert.StartsWith("Incolla tutta l'offerta", tooShort, StringComparison.Ordinal);
+        Assert.Null(nobody);
+        var file = Assert.Single(Directory.GetFiles(Inbox));
+        Assert.StartsWith("Link: https://jobs.example/kyo/42\n\nSenior C# Developer", File.ReadAllText(file), StringComparison.Ordinal);
+        Assert.True(_h.RoutineRequests.TryTake(out var asked));
+        Assert.Equal(routine.Id, asked);
+    }
 
     [Fact]
     public async Task Only_the_bots_of_enabled_routines_that_ask_in_the_chat_are_listened_to()
@@ -568,7 +588,7 @@ public sealed class JobOffersTests : IDisposable
         _h.Routines.Add(paused);
         _h.Routines.Add(Routine.Create(_h.Office, "Paper", "morning-paper", RoutineSchedule.Daily(new TimeOnly(6, 0)), """{"channel":"PAPERBOY"}""", _h.Clock.GetUtcNow(), TimeZoneInfo.Utc));
 
-        var channels = await new ChatAnswers(_h.Routines, [Kind()], Proposals()).ChannelsAsync(default);
+        var channels = await new ChatAnswers(_h.Routines, [Kind()], Proposals(), new OfferInbox(_h.Routines, _h.RoutineRequests, _h.Clock)).ChannelsAsync(default);
 
         Assert.Equal(["CAREER"], channels);
     }

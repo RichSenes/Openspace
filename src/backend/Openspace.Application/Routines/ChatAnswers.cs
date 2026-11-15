@@ -16,6 +16,10 @@ public interface IChatAnswers
 
     /// <returns>What to show in the chat; null when the button is not an answer to a proposal.</returns>
     Task<ChatAnswer?> AnswerAsync(string data, CancellationToken cancellationToken);
+
+    /// <summary>Text the person wrote to a bot: an offer pasted whole goes to the job offers routine of that bot.</summary>
+    /// <returns>What to answer in the chat; null when no routine of that bot takes offers.</returns>
+    Task<string?> OfferAsync(string channel, string text, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -23,7 +27,7 @@ public interface IChatAnswers
 /// under the message say yes or no to it. Only the bots of routines that ask in the chat are
 /// listened to, so a bot used elsewhere is never read.
 /// </summary>
-public sealed class ChatAnswers(IRoutineRepository routines, IEnumerable<IRoutineKind> kinds, ProposalCommands commands) : IChatAnswers
+public sealed partial class ChatAnswers(IRoutineRepository routines, IEnumerable<IRoutineKind> kinds, ProposalCommands commands, OfferInbox inbox) : IChatAnswers
 {
     private const string Prefix = "p:";
 
@@ -95,6 +99,36 @@ public sealed class ChatAnswers(IRoutineRepository routines, IEnumerable<IRoutin
         return new ChatAnswer(notice.Length <= 190 ? notice : notice[..189] + "…", Button(words, proposal));
     }
 
+    public async Task<string?> OfferAsync(string channel, string text, CancellationToken cancellationToken)
+    {
+        // The enabled job offers routine that writes with this bot.
+        Routine? taker = null;
+        foreach (var office in await routines.OfficesWithRoutinesAsync(cancellationToken).ConfigureAwait(false))
+        {
+            taker ??= (await routines.ListAsync(office, cancellationToken).ConfigureAwait(false))
+                .FirstOrDefault(r => r.Enabled && r.Kind == "job-offers" && string.Equals(Setting(r.Settings, "channel"), channel, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (taker is null)
+        {
+            return null;
+        }
+
+        var words = Words.For(Setting(taker.Settings, "language"));
+        text = text.Trim();
+        if (text.Length < OfferInbox.LeastText)
+        {
+            return words.PasteWhole;
+        }
+
+        var link = Link().Match(text) is { Success: true } found ? found.Value.TrimEnd('.', ',', ')', ']') : null;
+        await inbox.AddAsync(taker.Id, text.Length <= OfferInbox.MostText ? text : text[..OfferInbox.MostText], link, cancellationToken).ConfigureAwait(false);
+        return words.Received;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"https?://\S+")]
+    private static partial System.Text.RegularExpressions.Regex Link();
+
     private static string Button(Words words, Proposal proposal) => proposal.Status switch
     {
         ProposalStatus.Rejected => words.DroppedButton,
@@ -110,15 +144,20 @@ public sealed class ChatAnswers(IRoutineRepository routines, IEnumerable<IRoutin
             : null;
     }
 
-    private sealed record Words(string Taken, string TakenButton, string Dropped, string DroppedButton, string Failed, string FailedButton, string Already, string Gone)
+    private sealed record Words(
+        string Taken, string TakenButton, string Dropped, string DroppedButton, string Failed, string FailedButton, string Already, string Gone, string Received, string PasteWhole)
     {
         public static readonly Words English = new(
             "Noted: it interests you. Its CV will answer here.", "✅ Interested", "Dropped: it will not come back.", "❌ Dropped",
-            "It could not be done", "⚠️ Not done", "Already decided.", "This proposal is no longer in Openspace.");
+            "It could not be done", "⚠️ Not done", "Already decided.", "This proposal is no longer in Openspace.",
+            "📥 Got it: the offer is being judged and comes back here with its buttons.",
+            "Paste the whole offer, its text and not only the link: a site that turns readers away cannot be opened.");
 
         private static readonly Words Italian = new(
             "Segnata: ti interessa. Il CV arriverà in risposta qui.", "✅ Ti interessa", "Scartata: non tornerà.", "❌ Scartata",
-            "Non è riuscito", "⚠️ Non riuscito", "Già decisa.", "Questa proposta non è più in Openspace.");
+            "Non è riuscito", "⚠️ Non riuscito", "Già decisa.", "Questa proposta non è più in Openspace.",
+            "📥 Ricevuta: la giudico e torna qui con i suoi bottoni.",
+            "Incolla tutta l'offerta, il testo e non solo il link: un sito che chiude le porte ai lettori non si può aprire.");
 
         public static Words For(string? language) => language?.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
     }

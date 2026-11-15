@@ -142,6 +142,38 @@ public sealed class CvMakerTests : IDisposable
         Assert.Equal("CV: kyo-labs-frontend-engineer\nIt puts React first.", message.Plain);
     }
 
+    private static readonly CvContent Sample = new(
+        "Full-stack <developer>", "Builds web products.",
+        [new("Senior Engineer", "Acme & Co", "Kyoto", "2021 – present", ["Rewrote the booking API.", " "])],
+        [], [new("BSc Computer Science", "Example University", "2012 – 2016", "")],
+        [new("Languages", ["C#", "TypeScript"]), new("Empty", [])], [new("Italian", "native")], [], "Trains.");
+
+    private static readonly PersonalData Person = new("Ada Example", "", "", "", "", "ada@example.com", "", "Kyoto", ["github.com/ada"], "");
+
+    [Fact]
+    public void The_cv_puts_each_section_s_name_on_the_left_and_its_details_in_monospace()
+    {
+        var html = CvPages.Cv(Sample, Person, "data:image/jpeg;base64,AAAA", CvLabels.For("English"));
+
+        Assert.Contains("<header><img class=\"photo\" src=\"data:image/jpeg;base64,AAAA\" alt=\"\"><div><h1>Ada Example</h1><p class=\"headline mono\">Full-stack &lt;developer&gt;</p></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"contacts mono\">ada@example.com<br>Kyoto<br>github.com/ada</div></header>", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"row\"><h2>Experience</h2><div><div class=\"item\"><span class=\"what\">Senior Engineer</span><span class=\"when mono\">2021 – present</span><span class=\"where\">Acme &amp; Co &#183; Kyoto</span><ul><li>Rewrote the booking API.</li></ul></div></div></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<span>Languages</span><div class=\"chips\"><span class=\"chip mono\">C#</span><span class=\"chip mono\">TypeScript</span></div>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Empty", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>Projects</h2>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>Certifications</h2>", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_photo_the_header_gives_its_room_to_the_name()
+    {
+        var html = CvPages.Cv(Sample, Person, null, CvLabels.For("Italian"));
+
+        Assert.Contains("<header class=\"nophoto\"><div><h1>Ada Example</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("<h2>Esperienza</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<html lang=\"it\">", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Without_personal_data_it_leaves_a_form_to_fill_and_says_so()
     {

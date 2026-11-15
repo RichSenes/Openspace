@@ -32,6 +32,7 @@ describe('the paper editor model', () => {
     expect(paper.layout).toEqual({
       columns: 2,
       frontPicture: 'medium',
+      frontPictureAt: 'above',
       pictures: 'medium',
       adapt: false,
     })

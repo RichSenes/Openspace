@@ -1001,7 +1001,8 @@ public sealed record PaperSettings(
     /// <param name="FrontPicture">The size of the front page's picture.</param>
     /// <param name="Pictures">The size of each section's picture, unless the section says otherwise.</param>
     /// <param name="Adapt">The space follows the news: the day's biggest story gets the room, quiet sections go in brief.</param>
-    public sealed record PageLayout(int Columns = 2, string FrontPicture = "medium", string Pictures = "medium", bool Adapt = false);
+    /// <param name="FrontPictureAt">The front page's picture across the page above its story, or beside it in the first column.</param>
+    public sealed record PageLayout(int Columns = 2, string FrontPicture = "medium", string Pictures = "medium", bool Adapt = false, string FrontPictureAt = "above");
 
     /// <summary>The page layout, with every value in its range.</summary>
     public PageLayout Page => Layout ?? new PageLayout();
@@ -1092,7 +1093,8 @@ public sealed record PaperSettings(
                 Math.Clamp(read.Layout?.Columns ?? 2, 1, 4),
                 Pick(read.Layout?.FrontPicture, PictureSizes, "medium"),
                 Pick(read.Layout?.Pictures, PictureSizes, "medium"),
-                read.Layout?.Adapt ?? false),
+                read.Layout?.Adapt ?? false,
+                Pick(read.Layout?.FrontPictureAt, ["above", "beside"], "above")),
             NeverWrite = [.. (read.NeverWrite ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())],
         };
     }

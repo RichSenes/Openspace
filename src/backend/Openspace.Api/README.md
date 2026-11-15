@@ -338,6 +338,11 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
     first story or `above` it; narrow sections always above), `articles` instead of
     `perSection`, and the `length` of its articles (`short`, `normal`, `long`). A
     paper without these keeps its old layout.
+  - Printing: a section's main story keeps its heading, headline and picture together;
+    beside its picture it runs in two columns, the picture at the top of the first, so
+    the text flows under it and nothing stays empty. Full-width sections may break
+    across pages; narrower ones share rows. `layout.frontPictureAt` (`above` or `beside`)
+    places the front page's picture; the index lists each section's main story.
   - Each section has a `form`: `articles` (the default), `briefs` (each story in one
     sentence under a short headline, no picture), `feature` (the main story at length
     with the picture, the others as briefs) or `explainer` (the main story told by the

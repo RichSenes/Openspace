@@ -20,7 +20,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
     public const string MasterKey = "cv:master";
 
     /// <summary>Raised when the pages change, so a new look makes a new version.</summary>
-    private const string Design = "3";
+    private const string Design = "4";
 
     /// <summary>Offers given a CV per run at most.</summary>
     private const int MostOffers = 5;
@@ -223,7 +223,7 @@ public sealed class CvMaker(ILocalChat chat, IPdfPrinter printer) : IRoutineKind
             new LocalAsk(
                 settings.Model,
                 $"""
-                You write a person's CV from their profile. Write in {language}.
+                You write a person's CV from their profile. Write in {language}: every text, the points, the periods, the names of the skill groups and the language levels too, whatever the language of the profile. Only names of companies, schools, products and technologies stay as they are.
                 Use only what the profile says: never invent experience, skills, dates, titles, numbers or places. Keep names of companies, products and technologies as they are.
                 Leave out phone numbers and addresses: they are added apart.
                 The profile:

@@ -123,6 +123,7 @@ public sealed class CvMakerTests : IDisposable
         Assert.True(File.Exists(Path.Combine(Offers, "kyo-labs-frontend-engineer", "CV_Ada-Example.pdf")));
         Assert.Contains("React and TypeScript, Kyoto.", _chat.Asked[^1], StringComparison.Ordinal);
         Assert.Contains("three to five points, one line each", _chat.Asked[^1], StringComparison.Ordinal);
+        Assert.Contains("the names of the skill groups and the language levels too", _chat.Systems[^1], StringComparison.Ordinal);
         Assert.Equal("CV: kyo-labs-frontend-engineer\nIt puts React first.", _h.Outbox.Sent[^1].Text);
         Assert.Equal("Nothing new: the profile has not changed and no offer waits for a CV.", again.Summary);
     }
@@ -159,7 +160,7 @@ public sealed class CvMakerTests : IDisposable
         Assert.Contains("<header><img class=\"photo\" src=\"data:image/jpeg;base64,AAAA\" alt=\"\"><div><h1>Ada Example</h1><p class=\"headline\">Full-stack &lt;developer&gt;</p></div>", html, StringComparison.Ordinal);
         Assert.Contains("<div class=\"contacts mono\">ada@example.com<br>Kyoto<br>github.com/ada</div></header>", html, StringComparison.Ordinal);
         Assert.Contains("<div class=\"row\"><div class=\"item\"><h2>Experience</h2><span class=\"what\">Senior Engineer</span><span class=\"when\">2021 – present</span><span class=\"where\">Acme &amp; Co &#183; Kyoto</span><ul><li>Rewrote the booking API.</li></ul></div></div>", html, StringComparison.Ordinal);
-        Assert.Contains("<div class=\"row\"><div class=\"lead\"><h2>Skills</h2><div class=\"groups\"><span>Languages</span><div class=\"chips\"><span class=\"chip\">C#</span><span class=\"chip\">TypeScript</span></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"row\"><div class=\"lead\"><h2>Skills</h2><div class=\"groups\"><span>Languages</span><p class=\"skills\">C#<i>·</i>TypeScript</p>", html, StringComparison.Ordinal);
         Assert.Contains("@font-face{font-family:\"CV Roboto\";font-weight:700;", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Empty", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Projects</h2>", html, StringComparison.Ordinal);

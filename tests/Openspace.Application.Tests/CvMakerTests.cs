@@ -122,6 +122,7 @@ public sealed class CvMakerTests : IDisposable
         Assert.Equal("1 CVs made for offers.", run.Summary);
         Assert.True(File.Exists(Path.Combine(Offers, "kyo-labs-frontend-engineer", "CV_Ada-Example.pdf")));
         Assert.Contains("React and TypeScript, Kyoto.", _chat.Asked[^1], StringComparison.Ordinal);
+        Assert.Contains("three to five points, one line each", _chat.Asked[^1], StringComparison.Ordinal);
         Assert.Equal("CV: kyo-labs-frontend-engineer\nIt puts React first.", _h.Outbox.Sent[^1].Text);
         Assert.Equal("Nothing new: the profile has not changed and no offer waits for a CV.", again.Summary);
     }
@@ -151,14 +152,15 @@ public sealed class CvMakerTests : IDisposable
     private static readonly PersonalData Person = new("Ada Example", "", "", "", "", "ada@example.com", "", "Kyoto", ["github.com/ada"], "");
 
     [Fact]
-    public void The_cv_puts_each_section_s_name_on_the_left_and_its_details_in_monospace()
+    public void The_cv_puts_each_section_s_name_with_its_first_item_and_its_dates_in_a_column()
     {
         var html = CvPages.Cv(Sample, Person, "data:image/jpeg;base64,AAAA", CvLabels.For("English"));
 
-        Assert.Contains("<header><img class=\"photo\" src=\"data:image/jpeg;base64,AAAA\" alt=\"\"><div><h1>Ada Example</h1><p class=\"headline mono\">Full-stack &lt;developer&gt;</p></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<header><img class=\"photo\" src=\"data:image/jpeg;base64,AAAA\" alt=\"\"><div><h1>Ada Example</h1><p class=\"headline\">Full-stack &lt;developer&gt;</p></div>", html, StringComparison.Ordinal);
         Assert.Contains("<div class=\"contacts mono\">ada@example.com<br>Kyoto<br>github.com/ada</div></header>", html, StringComparison.Ordinal);
-        Assert.Contains("<div class=\"row\"><h2>Experience</h2><div><div class=\"item\"><span class=\"what\">Senior Engineer</span><span class=\"when mono\">2021 – present</span><span class=\"where\">Acme &amp; Co &#183; Kyoto</span><ul><li>Rewrote the booking API.</li></ul></div></div></div>", html, StringComparison.Ordinal);
-        Assert.Contains("<span>Languages</span><div class=\"chips\"><span class=\"chip mono\">C#</span><span class=\"chip mono\">TypeScript</span></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"row\"><div class=\"item\"><h2>Experience</h2><span class=\"what\">Senior Engineer</span><span class=\"when\">2021 – present</span><span class=\"where\">Acme &amp; Co &#183; Kyoto</span><ul><li>Rewrote the booking API.</li></ul></div></div>", html, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"row\"><div class=\"lead\"><h2>Skills</h2><div class=\"groups\"><span>Languages</span><div class=\"chips\"><span class=\"chip\">C#</span><span class=\"chip\">TypeScript</span></div>", html, StringComparison.Ordinal);
+        Assert.Contains("@font-face{font-family:\"CV Roboto\";font-weight:700;", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Empty", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Projects</h2>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Certifications</h2>", html, StringComparison.Ordinal);

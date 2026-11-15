@@ -450,9 +450,12 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
   answers (yes and no) and `avoid`, what they do not want in their words ("Go",
   "QA"); without an answer the newest go on. The judge sees the same answers and
   `avoid`, and gives what is like a no or mainly about `avoid` a fit of 2 at most.
-  When the model cannot judge any, the run fails and they stay new. The message
-  keeps each offer to a few short lines: role and company, place, salary and fit
-  as stars, Japanese and visa, why it fits, what to watch, the link.
+  When the model cannot judge any, the run fails and they stay new. A short heading
+  comes first, then each offer in a message of its own, in short lines with room
+  between them: the role in bold, company and place; fit as stars and salary;
+  Japanese; visa; why it fits and what to watch, always in `language`; a link naming
+  the board, with no preview. LinkedIn places are tidied ("Tokyo, Tokyo, Japan" is
+  "Tokyo") and a title written mostly in Japanese counts as business Japanese.
   An offer the person found where no routine may read is pasted in Openspace
   (Evaluate an offer): it waits as a file in `inbox` and the next run, asked at
   once, judges it whatever the rules, the model reading its title, company and

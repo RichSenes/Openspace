@@ -160,7 +160,13 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
             return $"No new offers for you: {kept.Count} of {offers.Count} fit your rules, {judged} new ones judged.";
         }
 
-        await context.DeliverAsync(Summary(settings, words, good), null, cancellationToken).ConfigureAwait(false);
+        // A heading, then each offer in a message of its own: many offers stay easy to read and answer.
+        await context.PostAsync(Heading(settings, words, good.Count), cancellationToken).ConfigureAwait(false);
+        foreach (var (offer, judgement) in good)
+        {
+            await context.PostAsync(Message(words, offer, judgement.Fit, judgement.Why, judgement.Gaps), cancellationToken).ConfigureAwait(false);
+        }
+
         return (brought.Count > 0 ? $"{brought.Count} brought offers judged; " : string.Empty)
             + $"{good.Count - brought.Count} new offers for you, of {judged} judged; {kept.Count} of {offers.Count} fit your rules.";
     }
@@ -463,6 +469,7 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
                     {Short(details, Reading)}
 
                     How well does it fit the person, from 1 (not at all) to 5 (made for them)? Weigh the skills and experience it asks against theirs, what they look for, and whether they could grow into it; an offer like those they said no to, or mainly about what they do not want, fits 2 at most. Then, in one short sentence each, of twenty words at most: why it fits, and what they would have to fill in or watch out for.
+                    Write "why" and "gaps" in {settings.Language}, whatever the language of the offer and of the notes above.
                     Also say what the offer itself states, never guessed: how much Japanese it asks for ("none", "basic", "conversational", "business", "fluent", or "unknown" when it does not say), and whether the company sponsors a work visa ("yes", "no", or "unknown" when it does not say).{(brought ? "\nAnd its title, company and place, as the text writes them." : string.Empty)}
                     """,
                     JudgementSchema, MaxTokens: 600, Temperature: 0.2),
@@ -479,30 +486,27 @@ public sealed class JobOffers(IEnumerable<IJobBoard> boards, ILocalChat chat, Ab
         }
     }
 
+    /// <summary>The heading before the offers: how many, and how to answer.</summary>
+    internal static OutboxMessage Heading(JobSettings settings, JobWords words, int count) => new(
+        $"💼 <b>{OutboxMessage.Escape(settings.Title)}</b> · {OutboxMessage.Escape(words.New(count))}\n{OutboxMessage.Escape(words.Decide)}",
+        $"💼 {settings.Title} · {words.New(count)}\n{words.Decide}");
+
     /// <summary>
-    /// The message: a short heading, then each offer in a few short lines (what and where, the
-    /// facts, why it fits, what to watch, the link), so that many offers stay easy to read.
+    /// One offer in a message of its own, in short lines with room between them: the role in bold,
+    /// company and place; fit, salary, Japanese and visa; why it fits and what to watch; the link.
     /// </summary>
-    private static string Summary(JobSettings settings, JobWords words, List<(JobOffer Offer, Judgement Judgement)> good)
+    internal static OutboxMessage Message(JobWords words, JobOffer offer, int fit, string why, string? gaps)
     {
-        var text = new StringBuilder().Append(CultureInfo.InvariantCulture, $"💼 {settings.Title} · {words.New(good.Count)}");
-        foreach (var ((offer, judgement), i) in good.Select((g, i) => (g, i)))
-        {
-            text.Append(CultureInfo.InvariantCulture, $"\n\n{i + 1}. {Short(offer.Title, 90)} — {offer.Company}");
-            text.Append(CultureInfo.InvariantCulture, $"\n📍 {Short(offer.Location, 40)} · {Salary(offer, words)} · {Stars(judgement.Fit)}");
-            text.Append(CultureInfo.InvariantCulture, $"\n🇯🇵 {words.Japanese(offer.Japanese)} · {(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}");
-            text.Append(CultureInfo.InvariantCulture, $"\n👍 {judgement.Why}");
-            if (!string.IsNullOrWhiteSpace(judgement.Gaps))
-            {
-                text.Append(CultureInfo.InvariantCulture, $"\n⚠️ {judgement.Gaps}");
-            }
-
-            text.Append(CultureInfo.InvariantCulture, $"\n🔗 {offer.Url}");
-        }
-
-        text.Append(CultureInfo.InvariantCulture, $"\n\n{words.Decide}");
-        return text.ToString();
+        string E(string text) => OutboxMessage.Escape(text);
+        var facts = $"{Stars(fit)} · {Salary(offer, words)}\n🇯🇵 {Capital(words.Japanese(offer.Japanese))}\n🛂 {Capital(offer.SponsorsVisa == true ? words.Visa : words.VisaToCheck)}";
+        var notes = $"👍 {why}" + (string.IsNullOrWhiteSpace(gaps) ? string.Empty : $"\n⚠️ {gaps}");
+        var link = words.Open(offer.Url);
+        return new OutboxMessage(
+            $"<b>{E(offer.Title)}</b>\n{E(offer.Company)} · {E(offer.Location)}\n\n{E(facts)}\n\n{E(notes)}\n\n<a href=\"{E(offer.Url.ToString())}\">{E(link)}</a>",
+            $"{offer.Title}\n{offer.Company} · {offer.Location}\n\n{facts}\n\n{notes}\n\n{link}: {offer.Url}");
     }
+
+    private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     /// <summary>"★★★★☆": the fit at a glance.</summary>
     public static string Stars(int fit) => new string('★', Math.Clamp(fit, 0, 5)) + new string('☆', 5 - Math.Clamp(fit, 0, 5));
@@ -616,8 +620,18 @@ public sealed record JobSettings(
 
 /// <summary>The message's few fixed words, in the person's language.</summary>
 internal sealed record JobWords(
-    Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck, string Untitled)
+    Func<int, string> New, Func<JapaneseLevel, string> Japanese, string Visa, string NoSalary, string Gaps, string Ask, string Decide, string VisaToCheck, string Untitled,
+    string OpenOffer = "Open the offer", string On = "on")
 {
+    /// <summary>"Apri l'offerta su LinkedIn": the link's words, naming the board when it is a known one.</summary>
+    public string Open(Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        var host = url.Host.ToLowerInvariant();
+        var board = host.EndsWith("linkedin.com", StringComparison.Ordinal) ? "LinkedIn" : host.EndsWith("japan-dev.com", StringComparison.Ordinal) ? "Japan Dev" : null;
+        return board is null ? OpenOffer : $"{OpenOffer} {On} {board}";
+    }
+
     public static JobWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
     private static readonly JobWords Italian = new(
@@ -637,7 +651,9 @@ internal sealed record JobWords(
         "Ti interessa? Sì la segna tra quelle da seguire, no la scarta per sempre.",
         "Rispondi in Openspace: «sì» la segui, «no» non torna più.",
         "visto da verificare",
-        "Offerta senza titolo");
+        "Offerta senza titolo",
+        "Apri l'offerta",
+        "su");
 
     private static readonly JobWords English = new(
         n => n == 1 ? "1 new offer for you" : $"{n} new offers for you",

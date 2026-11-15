@@ -93,9 +93,11 @@ internal sealed partial class LinkedInBoard(HttpClient http) : IJobBoard
             var location = Clean(Place().Match(body).Groups[1].Value);
             DateTimeOffset? posted = DateTimeOffset.TryParse(Posted().Match(body).Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var when) ? when : null;
             var remote = title.Contains("remote", StringComparison.OrdinalIgnoreCase) || title.Contains("リモート", StringComparison.Ordinal) ? "remote" : string.Empty;
+            // A title written mostly in Japanese is for people who read it, as on the other boards.
             offers.Add(new JobOffer(
-                board, new Uri($"https://www.linkedin.com/jobs/view/{card.Groups["id"].Value}/"), company.Length > 0 ? company : "LinkedIn", title, location,
-                JapaneseLevel.Unknown, null, null, null, null, string.Empty, remote, [], posted, JapanPlaces.Mentions(location)));
+                board, new Uri($"https://www.linkedin.com/jobs/view/{card.Groups["id"].Value}/"), company.Length > 0 ? company : "LinkedIn", title, JapanPlaces.Tidy(location),
+                JapanPlaces.WrittenInJapanese(title) ? JapaneseLevel.Business : JapaneseLevel.Unknown, null, null, null, null, string.Empty, remote, [], posted,
+                JapanPlaces.Mentions(location)));
         }
 
         return offers;

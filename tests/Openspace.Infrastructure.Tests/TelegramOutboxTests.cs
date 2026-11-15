@@ -78,6 +78,22 @@ public sealed class TelegramOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task A_message_of_its_own_goes_as_html_without_a_preview_and_gives_its_number()
+    {
+        _telegram.Answer = (HttpStatusCode.OK, """{"ok":true,"result":{"message_id":42}}""");
+
+        var id = await Outbox().PostAsync(Routine("""{"channel":"PAPERBOY"}"""), new("<b>Hi</b>", "Hi"), default);
+
+        Assert.Equal(42, id);
+        var (path, body) = Assert.Single(_telegram.Calls);
+        Assert.Equal("/bot111:fake-token/sendMessage", path);
+        Assert.Contains("text=<b>Hi</b>", body, StringComparison.Ordinal);
+        Assert.Contains("parse_mode=HTML", body, StringComparison.Ordinal);
+        Assert.Contains("link_preview_options={\"is_disabled\":true}", body, StringComparison.Ordinal);
+        Assert.Null(await Outbox().PostAsync(Routine("{}"), new("<b>Hi</b>", "Hi"), default));
+    }
+
+    [Fact]
     public async Task A_routine_without_a_channel_delivers_nothing()
     {
         Assert.False(await Outbox().SendAsync(Routine("{}"), "Nobody reads this.", null, default));

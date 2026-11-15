@@ -65,13 +65,15 @@ public sealed class LinkedInBoardTests
     {
         var html = Card(101, "Full Stack Engineer_Fully Remote", "Acme &amp; Co", "Osaka, Osaka, Japan", "2026-11-14")
             + Card(102, "Backend Engineer", "Faraway", "Berlin, Germany", "2026-11-13")
-            + Card(103, "", "Nameless", "Tokyo", "2026-11-13");
+            + Card(103, "", "Nameless", "Tokyo", "2026-11-13")
+            + Card(104, "フルスタックエンジニア（リモート可）", "Acme", "Tokyo, Japan", "2026-11-13");
 
         var offers = LinkedInBoard.Cards(html, "linkedin:full stack");
 
-        Assert.Equal(2, offers.Count);
+        Assert.Equal(3, offers.Count);
+        Assert.Equal(JapaneseLevel.Business, offers[2].Japanese);
         var first = offers[0];
-        Assert.Equal(("Full Stack Engineer_Fully Remote", "Acme & Co", "Osaka, Osaka, Japan"), (first.Title, first.Company, first.Location));
+        Assert.Equal(("Full Stack Engineer_Fully Remote", "Acme & Co", "Osaka"), (first.Title, first.Company, first.Location));
         Assert.Equal(new Uri("https://www.linkedin.com/jobs/view/101/"), first.Url);
         Assert.Equal(("linkedin:full stack", "remote", true), (first.Board, first.Remote, first.InJapan));
         Assert.Equal(new DateTimeOffset(2026, 11, 14, 0, 0, 0, TimeSpan.Zero), first.Posted);

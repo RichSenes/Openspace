@@ -68,10 +68,19 @@ internal sealed class RecordingOutbox : IRoutineOutbox
 {
     public List<(string Routine, string Text, string? File)> Sent { get; } = [];
 
+    /// <summary>The messages of their own, numbered from 1 in the order posted.</summary>
+    public List<(string Routine, OutboxMessage Message)> Posted { get; } = [];
+
     public Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken)
     {
         Sent.Add((routine.Name, text, filePath));
         return Task.FromResult(true);
+    }
+
+    public Task<long?> PostAsync(Routine routine, OutboxMessage message, CancellationToken cancellationToken)
+    {
+        Posted.Add((routine.Name, message));
+        return Task.FromResult<long?>(Posted.Count);
     }
 }
 

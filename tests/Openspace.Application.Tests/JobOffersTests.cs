@@ -85,28 +85,26 @@ public sealed class JobOffersTests : IDisposable
         Assert.Equal(3, _chat.Asked.Count);
         Assert.All(_chat.Systems, s => Assert.Contains("A C# developer who likes clean code.", s, StringComparison.Ordinal));
         Assert.Contains("Details of Senior .NET Developer.", _chat.Asked[0], StringComparison.Ordinal);
-        var (_, text, _) = Assert.Single(_h.Outbox.Sent);
+        Assert.Empty(_h.Outbox.Sent);
+        Assert.Equal(3, _h.Outbox.Posted.Count);
+        Assert.Equal("💼 Offers · 2 new offers for you\nIn Openspace, for each: yes if it interests you, no and it never comes back.", _h.Outbox.Posted[0].Message.Plain);
         Assert.Equal(
             """
-            💼 Offers · 2 new offers for you
+            <b>Frontend Engineer</b>
+            Kyo Labs · Kyoto
 
-            1. Frontend Engineer — Kyo Labs
-            📍 Kyoto · salary not stated · ★★★★☆
-            🇯🇵 Japanese not required · visa sponsored
+            ★★★★☆ · salary not stated
+            🇯🇵 Japanese not required
+            🛂 Visa sponsored
+
             👍 It fits Frontend Engineer.
             ⚠️ Some Japanese helps.
-            🔗 https://jobs.example/jobs/kyo-front?ref=list
 
-            2. Senior .NET Developer — Acme
-            📍 Tokyo · ¥6–8M · ★★★★★
-            🇯🇵 Japanese not required · visa sponsored
-            👍 It fits Senior .NET Developer.
-            ⚠️ Some Japanese helps.
-            🔗 https://jobs.example/jobs/acme-dotnet?ref=list
-
-            In Openspace, for each: yes if it interests you, no and it never comes back.
-            """.ReplaceLineEndings("\n"),
-            text);
+            <a href="https://jobs.example/jobs/kyo-front?ref=list">Open the offer</a>
+            """.ReplaceLineEndings("\n").TrimEnd(),
+            _h.Outbox.Posted[1].Message.Html);
+        Assert.StartsWith("Senior .NET Developer\nAcme · Tokyo\n\n★★★★★ · ¥6–8M", _h.Outbox.Posted[2].Message.Plain, StringComparison.Ordinal);
+        Assert.EndsWith("Open the offer: https://jobs.example/jobs/acme-dotnet?ref=list", _h.Outbox.Posted[2].Message.Plain, StringComparison.Ordinal);
         Assert.Equal(2, _h.Routines.Proposals.Count);
         Assert.All(_h.Routines.Proposals, p => Assert.Equal(ProposalStatus.Pending, p.Status));
     }
@@ -128,7 +126,7 @@ public sealed class JobOffersTests : IDisposable
         var third = await RunAsync(routine);
 
         Assert.Equal("1 new offers for you, of 1 judged; 4 of 8 fit your rules.", third.Summary);
-        Assert.Contains("¥6–10M", _h.Outbox.Sent[^1].Text, StringComparison.Ordinal);
+        Assert.Contains("¥6–10M", _h.Outbox.Posted[^1].Message.Plain, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -247,6 +245,26 @@ public sealed class JobOffersTests : IDisposable
         Assert.Equal("2 new offers for you, of 3 judged; 3 of 7 fit your rules.", run.Summary);
     }
 
+    [Fact]
+    public async Task Offer_text_is_escaped_and_the_link_names_a_known_board()
+    {
+        var routine = Create(language: "Italian");
+        _board.Offers.Add(Offer("x", "C# & \"Rust\" Developer", company: "R&D <Lab>", location: "Osaka") with { Url = new Uri("https://www.linkedin.com/jobs/view/1/") });
+
+        await RunAsync(routine);
+
+        var html = _h.Outbox.Posted[1].Message.Html;
+        Assert.StartsWith("<b>C# &amp; &quot;Rust&quot; Developer</b>\nR&amp;D &lt;Lab&gt; · Osaka", html, StringComparison.Ordinal);
+        Assert.EndsWith("<a href=\"https://www.linkedin.com/jobs/view/1/\">Apri l'offerta su LinkedIn</a>", html, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Tokyo, Tokyo, Japan", "Tokyo")]
+    [InlineData("Minato-ku, Tokyo, Japan", "Minato-ku, Tokyo")]
+    [InlineData("Japan", "Japan")]
+    [InlineData("Hybrid", "Hybrid")]
+    public void A_place_says_each_part_once_and_the_country_only_alone(string place, string tidy) => Assert.Equal(tidy, JapanPlaces.Tidy(place));
+
     [Theory]
     [InlineData(5, "★★★★★")]
     [InlineData(3, "★★★☆☆")]
@@ -261,10 +279,11 @@ public sealed class JobOffersTests : IDisposable
 
         await RunAsync(routine);
 
-        var (_, text, _) = Assert.Single(_h.Outbox.Sent);
-        Assert.StartsWith("💼 Offers · 2 offerte nuove per te", text, StringComparison.Ordinal);
-        Assert.Contains("📍 Kyoto · stipendio non indicato · ★★★★☆\n🇯🇵 giapponese non richiesto · visto sponsorizzato", text, StringComparison.Ordinal);
-        Assert.EndsWith("Rispondi in Openspace: «sì» la segui, «no» non torna più.", text, StringComparison.Ordinal);
+        var posted = _h.Outbox.Posted.Select(p => p.Message.Plain).ToList();
+        Assert.Equal("💼 Offers · 2 offerte nuove per te\nRispondi in Openspace: «sì» la segui, «no» non torna più.", posted[0]);
+        Assert.Contains("Kyo Labs · Kyoto\n\n★★★★☆ · stipendio non indicato\n🇯🇵 Giapponese non richiesto\n🛂 Visto sponsorizzato", posted[1], StringComparison.Ordinal);
+        Assert.EndsWith("Apri l'offerta: https://jobs.example/jobs/kyo-front?ref=list", posted[1], StringComparison.Ordinal);
+        Assert.Contains("Write \"why\" and \"gaps\" in Italian, whatever the language of the offer", _chat.Asked[0], StringComparison.Ordinal);
         Assert.Contains("Write in Italian", _chat.Systems[0], StringComparison.Ordinal);
     }
 
@@ -299,9 +318,9 @@ public sealed class JobOffersTests : IDisposable
         var run = await RunAsync(routine);
 
         Assert.Equal("2 new offers for you, of 4 judged; 4 of 6 fit your rules.", run.Summary);
-        var text = _h.Outbox.Sent.Single().Text;
-        Assert.Contains("Frontend Engineer — Acme\n📍 Hybrid · salary not stated · ★★★★☆\n🇯🇵 Japanese not required · visa sponsored", text, StringComparison.Ordinal);
-        Assert.Contains("Backend Engineer — Acme\n📍 Hybrid · salary not stated · ★★★★☆\n🇯🇵 Japanese not required · visa to check", text, StringComparison.Ordinal);
+        var text = string.Join("\n\n", _h.Outbox.Posted.Select(p => p.Message.Plain));
+        Assert.Contains("Frontend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required\n🛂 Visa sponsored", text, StringComparison.Ordinal);
+        Assert.Contains("Backend Engineer\nAcme · Hybrid\n\n★★★★☆ · salary not stated\n🇯🇵 Japanese not required\n🛂 Visa to check", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Full Stack", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Mobile", text, StringComparison.Ordinal);
         Assert.Contains("We sponsor visas. React and TypeScript.", _chat.Asked.First(a => a.Contains("Frontend", StringComparison.Ordinal)), StringComparison.Ordinal);
@@ -370,7 +389,8 @@ public sealed class JobOffersTests : IDisposable
         Assert.Equal("Platform Engineer — Faraway Inc, Sapporo", proposal.Title);
         Assert.Contains("business Japanese · visa to check · 2/5", proposal.Body, StringComparison.Ordinal);
         Assert.Contains(Pasted, _chat.Asked.Single(), StringComparison.Ordinal);
-        Assert.StartsWith("💼 Offers · 1 new offer for you\n\n1. Platform Engineer — Faraway Inc\n📍 Sapporo", _h.Outbox.Sent.Single().Text, StringComparison.Ordinal);
+        Assert.StartsWith("💼 Offers · 1 new offer for you", _h.Outbox.Posted[0].Message.Plain, StringComparison.Ordinal);
+        Assert.StartsWith("<b>Platform Engineer</b>\nFaraway Inc · Sapporo", _h.Outbox.Posted[1].Message.Html, StringComparison.Ordinal);
     }
 
     [Fact]

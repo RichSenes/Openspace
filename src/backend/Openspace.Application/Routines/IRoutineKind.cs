@@ -47,13 +47,27 @@ public interface IRoutineOutbox
     /// <returns>False when the routine names no channel, so nothing was sent.</returns>
     Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken);
 
+    /// <summary>A message of its own, formatted: one offer, one reminder.</summary>
+    /// <returns>Its number in the chat, to answer it later; null when the routine names no channel.</returns>
+    Task<long?> PostAsync(Routine routine, OutboxMessage message, CancellationToken cancellationToken);
+
     /// <summary>The channels a routine may name, by name only: never their keys.</summary>
     IReadOnlyList<string> Channels() => [];
+}
+
+/// <summary>A message in Telegram's HTML (bold, italics, links), with its text plain for where HTML is not read.</summary>
+public sealed record OutboxMessage(string Html, string Plain)
+{
+    /// <summary>Text made safe inside the HTML of a message.</summary>
+    public static string Escape(string text) =>
+        (text ?? string.Empty).Replace("&", "&amp;", StringComparison.Ordinal).Replace("<", "&lt;", StringComparison.Ordinal).Replace(">", "&gt;", StringComparison.Ordinal).Replace("\"", "&quot;", StringComparison.Ordinal);
 }
 
 internal sealed class NoOutbox : IRoutineOutbox
 {
     public Task<bool> SendAsync(Routine routine, string text, string? filePath, CancellationToken cancellationToken) => Task.FromResult(false);
+
+    public Task<long?> PostAsync(Routine routine, OutboxMessage message, CancellationToken cancellationToken) => Task.FromResult<long?>(null);
 }
 
 /// <summary>What a running routine is doing, line by line, for whoever watches: the building's bubbles.</summary>

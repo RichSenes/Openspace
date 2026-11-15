@@ -367,11 +367,17 @@ public sealed partial class MorningPaper(
             .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
-    /// <summary>Whether the title or summary contains one of the keywords, as words or the start of words.</summary>
+    /// <summary>
+    /// Whether the title or summary contains one of the keywords, as words or the start of
+    /// words; spaces and punctuation do not count, so "Tyler the Creator" finds "Tyler, The
+    /// Creator" and "Mrs. GREEN APPLE" finds "Mrs.GREEN APPLE".
+    /// </summary>
     public static bool Mentions(FeedItem item, IReadOnlyList<string>? keywords) =>
         keywords is { Count: > 0 }
-        && $"{item.Title} {item.Summary}".ToLowerInvariant() is var text
-        && keywords.Any(k => !string.IsNullOrWhiteSpace(k) && text.Contains(k.Trim().ToLowerInvariant(), StringComparison.Ordinal));
+        && Bare($"{item.Title} {item.Summary}") is var text
+        && keywords.Select(Bare).Any(k => k.Length > 0 && text.Contains(k, StringComparison.Ordinal));
+
+    private static string Bare(string text) => WordParts().Replace(text.ToLowerInvariant(), string.Empty);
 
     /// <summary>Links each item to the others telling the same story, by the words their titles share.</summary>
     private static void Relate(List<Candidate> pool)

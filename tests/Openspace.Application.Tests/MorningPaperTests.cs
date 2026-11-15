@@ -592,6 +592,18 @@ public sealed class MorningPaperTests : IDisposable
         Assert.Contains("About Tram line opens downtown", Html(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Tyler, The Creator announces a tour", "Tyler the Creator")]
+    [InlineData("Mrs.GREEN APPLE: new single", "Mrs. GREEN APPLE")]
+    [InlineData("あいみょん、新曲を発表", "あいみょん")]
+    [InlineData("Lo sciopero generale di domani", "scioper")]
+    public void Keywords_are_found_whatever_the_spaces_and_punctuation(string title, string keyword) =>
+        Assert.True(MorningPaper.Mentions(Item("Tunes", title), [keyword]));
+
+    [Fact]
+    public void A_keyword_is_not_found_in_another_name() =>
+        Assert.False(MorningPaper.Mentions(Item("Tunes", "Bruno Martini wins the race"), ["Bruno Mars"]));
+
     [Fact]
     public void The_shortlist_takes_turns_among_outlets_so_the_busiest_never_fills_it()
     {

@@ -87,7 +87,9 @@ with their sources (each with **Test**, which reads the feed once and lists its 
 or says why it cannot), the layout (text columns, picture sizes, sections of a full, half
 or third width side by side, articles and their length) and, beside the form when there is
 room or under it otherwise, the paper laid out with sample text as the settings change.
-Telegram bots and local models are picked from lists; the JSON stays at the end.
+Telegram bots and local models are picked from lists; the JSON stays at the end. A section
+may look further back than the paper, or print only on days with news about its words (the
+artists or games the reader follows).
 
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
 read them, copy them, download them.

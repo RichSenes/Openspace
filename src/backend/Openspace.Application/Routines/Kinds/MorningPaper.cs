@@ -62,18 +62,47 @@ public sealed partial class MorningPaper(
     /// <summary>Items the decider weighs per section, at most: it takes over ten seconds each on a processor.</summary>
     private const int Candidates = 12;
 
+    /// <summary>Titles a section's desk reads, at most: the busiest outlets take turns with the others.</summary>
+    private const int DeskReads = 100;
+
+    /// <summary>Items another section's desk may send to a section, at most.</summary>
+    private const int Sent = 4;
+
+    /// <summary>The issues whose headlines the desk is shown, so that a story comes back only with something new.</summary>
+    private const int RecentIssues = 3;
+
     public async Task<string> RunAsync(RoutineContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var settings = PaperSettings.Read(context.Settings);
         var culture = CultureOf(settings.Language);
-        var since = context.Now - TimeSpan.FromHours(settings.HoursBack);
 
-        var pool = new List<Candidate>();
+        // Every section's news first, so that the desk can send an item to the section it belongs to.
+        var met = new HashSet<Uri>();
+        var gathered = new List<(PaperSettings.Section Section, List<FeedItem> Fresh)>();
         foreach (var section in settings.Sections)
         {
-            var fresh = await GatherAsync(context, section, since, pool, cancellationToken).ConfigureAwait(false);
-            pool.AddRange(Shortlist(fresh, section).Select(i => new Candidate(i, section)));
+            gathered.Add((section, await GatherAsync(context, section, context.Now - TimeSpan.FromHours(settings.HoursBackOf(section)), met, cancellationToken).ConfigureAwait(false)));
+        }
+
+        // What the paper already told: the last issues' headlines, then what the desk takes today.
+        var told = RecentHeadlines(Expand(settings.Folder), RecentIssues);
+        var pool = new List<Candidate>();
+        var sent = new List<Candidate>();
+        foreach (var (section, fresh) in gathered)
+        {
+            foreach (var (item, to) in await DeskAsync(context, settings, section, fresh, told, cancellationToken).ConfigureAwait(false))
+            {
+                (to == section ? pool : sent).Add(new Candidate(item, to));
+            }
+
+            told.AddRange(pool.Where(c => c.Section == section).Select(c => c.Item.Title));
+        }
+
+        // Items sent from another desk join their section, a few at most, and only where they may go.
+        foreach (var group in sent.GroupBy(c => c.Section))
+        {
+            pool.AddRange(group.Where(c => !group.Key.OnlyWithKeywords || Mentions(c.Item, group.Key.Keywords)).Take(Sent));
         }
 
         if (pool.Count == 0)
@@ -185,7 +214,7 @@ public sealed partial class MorningPaper(
 
     /// <summary>The section's news since <paramref name="since"/> that the paper never printed.</summary>
     private async Task<List<FeedItem>> GatherAsync(
-        RoutineContext context, PaperSettings.Section section, DateTimeOffset since, List<Candidate> pool, CancellationToken cancellationToken)
+        RoutineContext context, PaperSettings.Section section, DateTimeOffset since, HashSet<Uri> met, CancellationToken cancellationToken)
     {
         var fresh = new List<FeedItem>();
         foreach (var feed in section.Feeds)
@@ -204,10 +233,12 @@ public sealed partial class MorningPaper(
             var recent = items.Where(i => i.Published is null || i.Published >= since).OrderByDescending(i => i.Published).Take(PerFeed).ToList();
             foreach (var item in recent)
             {
-                if (!fresh.Exists(f => f.Link == item.Link) && !pool.Exists(c => c.Item.Link == item.Link)
+                if (!met.Contains(item.Link)
+                    && (!section.OnlyWithKeywords || Mentions(item, section.Keywords))
                     && await context.MeetAsync(item.Link.ToString(), RoutineContext.Fingerprint(item.Title), item.Title, cancellationToken).ConfigureAwait(false))
                 {
                     fresh.Add(item);
+                    met.Add(item.Link);
                 }
             }
         }
@@ -217,18 +248,136 @@ public sealed partial class MorningPaper(
     }
 
     /// <summary>
-    /// The items of a section the decider weighs: those mentioning one of the section's
-    /// keywords first, so that what the reader looks for is never crowded out by the
-    /// newest wire stories, then the newest.
+    /// The items of a section the decider weighs when the desk cannot choose: those mentioning
+    /// one of the section's keywords first, so that what the reader looks for is never crowded
+    /// out by the newest wire stories; then the newest, taking turns among the outlets so that
+    /// the busiest one never fills every place.
     /// </summary>
-    public static List<FeedItem> Shortlist(IEnumerable<FeedItem> fresh, PaperSettings.Section section) =>
-        [.. fresh.OrderByDescending(i => Mentions(i, section.Keywords)).ThenByDescending(i => i.Published).Take(Candidates)];
+    public static List<FeedItem> Shortlist(IEnumerable<FeedItem> fresh, PaperSettings.Section section, int most = Candidates) =>
+        [.. fresh
+            .GroupBy(i => (Mentions(i, section.Keywords), i.Source))
+            .SelectMany(g => g.OrderByDescending(i => i.Published).Select((item, turn) => (item, turn, wanted: g.Key.Item1)))
+            .OrderByDescending(x => x.wanted).ThenBy(x => x.turn).ThenByDescending(x => x.item.Published)
+            .Select(x => x.item)
+            .Take(most)];
 
-    /// <summary>Whether the title or summary contains one of the keywords, as words or the start of words.</summary>
+    /// <summary>How many items the desk passes to the decider: three per article, within what judging takes.</summary>
+    internal static int DeskSize(PaperSettings settings, PaperSettings.Section section) => Math.Clamp(settings.ArticlesOf(section) * 3, 4, Candidates);
+
+    /// <summary>
+    /// The section's desk: the local model reads every title the section gathered, with what
+    /// the paper told lately, and picks the few worth judging; an item that belongs to another
+    /// section is sent there. Without an answer the shortlist chooses instead.
+    /// </summary>
+    private async Task<List<(FeedItem Item, PaperSettings.Section To)>> DeskAsync(
+        RoutineContext context, PaperSettings settings, PaperSettings.Section section, List<FeedItem> fresh, IReadOnlyList<string> told,
+        CancellationToken cancellationToken)
+    {
+        if (fresh.Count == 0)
+        {
+            return [];
+        }
+
+        var most = DeskSize(settings, section);
+        fresh = fresh.Count > DeskReads ? Shortlist(fresh, section, DeskReads) : fresh;
+        context.Progress($"Choosing the news of {section.Name}");
+        try
+        {
+            var answer = await chat.AskAsync(context, new LocalAsk(settings.Model, Desk(settings), DeskPrompt(settings, section, fresh, told, most), DeskSchema(settings), MaxTokens: 1200), cancellationToken)
+                .ConfigureAwait(false);
+            var picks = JsonSerializer.Deserialize<DeskAnswer>(answer, JsonSerializerOptions.Web)?.Picks ?? [];
+            var chosen = picks
+                .Where(p => p.Item >= 1 && p.Item <= fresh.Count)
+                .DistinctBy(p => p.Item)
+                .Select(p => (Item: fresh[p.Item - 1], To: settings.Sections.FirstOrDefault(s => string.Equals(s.Name, p.Section?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? section))
+                .ToList();
+            var own = chosen.Where(c => c.To == section).Take(most).ToList();
+            var elsewhere = chosen.Where(c => c.To != section).ToList();
+            context.Write($"{section.Name}: the desk took {own.Count} of {fresh.Count}{(elsewhere.Count > 0 ? $" and sent {elsewhere.Count} to {string.Join(", ", elsewhere.Select(c => c.To.Name).Distinct())}" : string.Empty)}.");
+            return [.. own, .. elsewhere];
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"{section.Name}: the desk could not choose ({ex.Message}), the newest go on.");
+            return [.. Shortlist(fresh, section, most).Select(i => (i, section))];
+        }
+    }
+
+    internal static string DeskPrompt(PaperSettings settings, PaperSettings.Section section, IReadOnlyList<FeedItem> fresh, IReadOnlyList<string> told, int most)
+    {
+        var others = settings.Sections.Where(s => s != section).Select(s => $"- {s.Name}: {s.About}{(string.IsNullOrWhiteSpace(s.Only) ? string.Empty : $" Only if {s.Only.Trim()}.")}");
+        var items = fresh.Select((item, i) => $"[{i + 1}] {item.Source}: {item.Title}{(string.IsNullOrWhiteSpace(item.Summary) ? string.Empty : $" — {Clip(item.Summary, 120)}")}");
+        var looks = (section.Focus ?? []).Concat(section.Keywords is { Count: > 0 } k && !section.OnlyWithKeywords ? [$"news naming {string.Join(", ", k)}"] : []).ToList();
+        return $"""
+            The desk of the section {section.Name}: {section.About}{(string.IsNullOrWhiteSpace(section.Only) ? string.Empty : $" Only if {section.Only.Trim()}.")}
+            {(looks.Count > 0 ? $"It looks out for: {string.Join("; ", looks)}." : string.Empty)}
+
+            The other sections of the paper:
+            {(others.Any() ? string.Join('\n', others) : "- none")}
+
+            Already in the paper, in the last issues or today:
+            {(told.Count > 0 ? string.Join('\n', told.Select(t => $"- {t}")) : "- nothing yet")}
+
+            Today's items, numbered:
+            {string.Join('\n', items)}
+
+            Pick at most {most} items for {section.Name}, the most important first: real news of the last day or two that many people would care about.
+            Leave out opinions, interviews, comments and predictions, reviews, discounts and adverts, and statements of how things are.
+            Leave out a story already in the paper, unless the item brings a new fact about it; then pick only the item with the new fact.
+            Several items on the same story: pick the one that tells it best.
+            An item that belongs to one of the other sections instead: pick it with that section's name, it goes there. Leave out what belongs nowhere.
+            Give each pick's number in "item" and its section's name in "section".
+            """;
+    }
+
+    private static string Clip(string text, int most)
+    {
+        var flat = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return flat.Length <= most ? flat : flat[..most].TrimEnd() + "…";
+    }
+
+    private static string Desk(PaperSettings settings) => $"""
+        You are the editor of "{settings.Title}", a personal paper, choosing today's news for its sections. Answer only with the JSON asked.
+        Who reads it: {settings.Reader}
+        """;
+
+    private static string DeskSchema(PaperSettings settings) =>
+        """{"type":"object","properties":{"picks":{"type":"array","items":{"type":"object","properties":{"item":{"type":"integer"},"section":{"type":"string","enum":"""
+        + JsonSerializer.Serialize(settings.Sections.Select(s => s.Name))
+        + """}},"required":["item","section"]}}},"required":["picks"]}""";
+
+    private sealed record DeskAnswer(List<DeskPick>? Picks);
+
+    private sealed record DeskPick(int Item, string? Section);
+
+    /// <summary>The headlines of the last issues kept in the folder, the newest first.</summary>
+    public static List<string> RecentHeadlines(string folder, int issues)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return [];
+        }
+
+        return [.. Directory.EnumerateFiles(folder, "*.html")
+            .Select(f => (File: f, Match: IssueNumber().Match(Path.GetFileName(f))))
+            .Where(f => f.Match.Success)
+            .OrderByDescending(f => int.Parse(f.Match.Groups[1].Value, CultureInfo.InvariantCulture))
+            .Take(issues)
+            .SelectMany(f => PaperPage.HeadlinesOf(File.ReadAllText(f.File)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    /// <summary>
+    /// Whether the title or summary contains one of the keywords, as words or the start of
+    /// words; spaces and punctuation do not count, so "Tyler the Creator" finds "Tyler, The
+    /// Creator" and "Mrs. GREEN APPLE" finds "Mrs.GREEN APPLE".
+    /// </summary>
     public static bool Mentions(FeedItem item, IReadOnlyList<string>? keywords) =>
         keywords is { Count: > 0 }
-        && $"{item.Title} {item.Summary}".ToLowerInvariant() is var text
-        && keywords.Any(k => !string.IsNullOrWhiteSpace(k) && text.Contains(k.Trim().ToLowerInvariant(), StringComparison.Ordinal));
+        && Bare($"{item.Title} {item.Summary}") is var text
+        && keywords.Select(Bare).Any(k => k.Length > 0 && text.Contains(k, StringComparison.Ordinal));
+
+    private static string Bare(string text) => WordParts().Replace(text.ToLowerInvariant(), string.Empty);
 
     /// <summary>Links each item to the others telling the same story, by the words their titles share.</summary>
     private static void Relate(List<Candidate> pool)
@@ -277,7 +426,8 @@ public sealed partial class MorningPaper(
                     Yes(answers, "news"), Importance(answers), Yes(answers, "interest"), Yes(answers, "hopeful"),
                     answers.ContainsKey("priority") ? Yes(answers, "priority") : 0.5,
                     answers.ContainsKey("avoid") ? Yes(answers, "avoid") : 0,
-                    answers.ContainsKey("fits") ? Yes(answers, "fits") : 1);
+                    answers.ContainsKey("fits") ? Yes(answers, "fits") : 1,
+                    answers.ContainsKey("focus") ? Yes(answers, "focus") : 0);
                 judged++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -306,10 +456,15 @@ public sealed partial class MorningPaper(
             ["interest"] = new("boolean", $"Would this reader want to read it? The reader: {settings.Reader}"),
             ["hopeful"] = new("boolean", "Is this good news about something that matters: a solution, a step forward, rights won, help given, a reason for hope? Entertainment, shows and celebrities do not count."),
         };
-        var priorities = (settings.Priorities ?? []).Concat(section.Focus ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
-        if (priorities.Count > 0)
+        if (settings.Priorities is { Count: > 0 } priorities)
         {
             questions["priority"] = new("boolean", $"Is it mainly about one of these topics: {string.Join("; ", priorities)}?");
+        }
+
+        // The section's own topics weigh within the section, never on the front page.
+        if ((section.Focus ?? []).Where(f => !string.IsNullOrWhiteSpace(f)).ToList() is { Count: > 0 } focus)
+        {
+            questions["focus"] = new("boolean", $"Is it mainly about one of these topics: {string.Join("; ", focus)}?");
         }
 
         if (settings.Avoid is { Count: > 0 } avoid)
@@ -628,7 +783,8 @@ public sealed partial class MorningPaper(
     /// <param name="Priority">About the reader's priorities, or the section's focus; 0.5 when not asked.</param>
     /// <param name="Avoid">About a topic the reader never wants; 0 when not asked.</param>
     /// <param name="Fits">Meets the section's condition; 1 when it has none.</param>
-    private sealed record Judgement(double News, double Importance, double Interest, double Hopeful, double Priority = 0.5, double Avoid = 0, double Fits = 1)
+    /// <param name="Focus">About the section's own topics; 0 when it has none.</param>
+    private sealed record Judgement(double News, double Importance, double Interest, double Hopeful, double Priority = 0.5, double Avoid = 0, double Fits = 1, double Focus = 0)
     {
         public static readonly Judgement Unknown = new(0.6, 0.5, 0.5, 0);
     }
@@ -644,11 +800,15 @@ public sealed partial class MorningPaper(
 
         public Judgement Judgement { get; set; } = Judgement.Unknown;
 
-        /// <summary>How much it deserves a place in its section: importance, the reader's priorities and interest, how many outlets carry it.</summary>
-        public double Score => (Judgement.Importance * 0.35) + (Judgement.Priority * 0.25) + (Judgement.Interest * 0.25) + (Coverage * 0.15);
+        /// <summary>How much it deserves a place in its section: importance, the reader's priorities or the section's topics, interest, how many outlets carry it.</summary>
+        public double Score => (Judgement.Importance * 0.35) + (Math.Max(Judgement.Priority, Judgement.Focus) * 0.25) + (Judgement.Interest * 0.25) + (Coverage * 0.15);
 
-        /// <summary>How much it deserves to open the paper: the reader's priorities weigh most, then importance.</summary>
-        public double LeadScore => (Judgement.Priority * 0.4) + (Judgement.Importance * 0.3) + (Judgement.Interest * 0.15) + (Coverage * 0.15);
+        /// <summary>
+        /// How much it deserves to open the paper: importance weighs most, then the reader's
+        /// priorities and how many outlets carry it. A section's own topics do not count here,
+        /// so a club's daily chatter never opens the paper over the news of the day.
+        /// </summary>
+        public double LeadScore => (Judgement.Importance * 0.4) + (Judgement.Priority * 0.3) + (Coverage * 0.2) + (Judgement.Interest * 0.1);
 
         private double Coverage => Math.Min(Related.Count, 3) / 3.0;
     }
@@ -716,6 +876,9 @@ public sealed record PaperSettings(
     /// <summary>The most articles the section prints: its own or the paper's.</summary>
     public int ArticlesOf(Section section) => section.Articles is > 0 and <= 10 ? section.Articles.Value : PerSection;
 
+    /// <summary>How far back the section looks for news, in hours: its own or the paper's.</summary>
+    public int HoursBackOf(Section section) => section.HoursBack is > 0 and <= 24 * 7 ? section.HoursBack.Value : HoursBack;
+
     /// <summary>How long the section's articles are.</summary>
     public static string LengthOf(Section section) => Pick(section.Length, Lengths, "normal");
 
@@ -741,10 +904,13 @@ public sealed record PaperSettings(
     /// <param name="PictureAt">Beside the first story or above it.</param>
     /// <param name="Articles">The most articles it prints, instead of the paper's.</param>
     /// <param name="Length">How long its articles are: short, normal or long.</param>
+    /// <param name="HoursBack">How far back it looks for news, instead of the paper's: for outlets that write every few days.</param>
+    /// <param name="OnlyWithKeywords">Only news naming one of its keywords: without any, the section is left out that day.</param>
     public sealed record Section(
         string Name, string About, IReadOnlyList<Feed> Feeds,
         string? Only = null, IReadOnlyList<string>? Focus = null, IReadOnlyList<string>? Keywords = null, string? Style = null,
-        string? Width = null, int? Columns = null, string? Picture = null, string? PictureAt = null, int? Articles = null, string? Length = null);
+        string? Width = null, int? Columns = null, string? Picture = null, string? PictureAt = null, int? Articles = null, string? Length = null,
+        bool OnlyWithKeywords = false, int? HoursBack = null);
 
     public static PaperSettings Read(JsonElement json)
     {

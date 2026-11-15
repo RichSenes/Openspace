@@ -30,6 +30,10 @@ export interface PaperSection {
   /** Null: the paper's. */
   articles: number | null
   length: Length
+  /** Only news naming one of the keywords; without any, the section is left out that day. */
+  onlyWithKeywords: boolean
+  /** Null: the paper's. */
+  hoursBack: number | null
   /** Keys of the section the editor does not know. */
   rest: Record<string, unknown>
 }
@@ -73,7 +77,7 @@ export const LENGTHS: { value: Length; label: string; hint: string }[] = [
   { value: 'long', label: 'Long', hint: 'five to seven sentences' },
 ]
 
-const SECTION_KEYS = ['name', 'about', 'feeds', 'only', 'focus', 'keywords', 'style', 'width', 'columns', 'picture', 'pictureAt', 'articles', 'length']
+const SECTION_KEYS = ['name', 'about', 'feeds', 'only', 'focus', 'keywords', 'style', 'width', 'columns', 'picture', 'pictureAt', 'articles', 'length', 'onlyWithKeywords', 'hoursBack']
 const PAPER_KEYS = [
   'title',
   'subtitle',
@@ -123,6 +127,8 @@ function readSection(raw: unknown): PaperSection {
     pictureAt: oneOf(s.pictureAt, ['beside', 'above'], 'beside'),
     articles: whole(s.articles, 1, 10),
     length: oneOf(s.length, ['short', 'normal', 'long'], 'normal'),
+    onlyWithKeywords: s.onlyWithKeywords === true,
+    hoursBack: whole(s.hoursBack, 1, 168),
     rest: without(s, SECTION_KEYS),
   }
 }
@@ -178,6 +184,8 @@ function writeSection(s: PaperSection): Json {
   if (s.columns !== null) out.columns = s.columns
   if (s.picture !== null) out.picture = s.picture
   if (s.articles !== null) out.articles = s.articles
+  if (s.onlyWithKeywords) out.onlyWithKeywords = true
+  if (s.hoursBack !== null) out.hoursBack = s.hoursBack
   return out
 }
 
@@ -257,6 +265,7 @@ export function paperProblems(p: Paper): string[] {
     const feeds = s.feeds.filter((f) => f.url.trim())
     if (feeds.length === 0) problems.push(`${called} needs at least one source.`)
     if (feeds.some((f) => !isWebAddress(f.url.trim()))) problems.push(`${called} has a source that is not a web address.`)
+    if (s.onlyWithKeywords && s.keywords.length === 0) problems.push(`${called} prints only news naming its words, but has none.`)
   })
   return problems
 }

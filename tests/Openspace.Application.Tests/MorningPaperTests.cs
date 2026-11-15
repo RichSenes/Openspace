@@ -282,7 +282,7 @@ public sealed class MorningPaperTests : IDisposable
 
         Assert.Equal(12, shortlist.Count);
         Assert.Equal(["Lo sciopero generale di domani", "Families and the cost"], shortlist.Take(2).Select(i => i.Title));
-        Assert.Equal(12, MorningPaper.Shortlist(items, section with { Keywords = null }).Count(i => i.Source == "Wire"));
+        Assert.Equal(10, MorningPaper.Shortlist(items, section with { Keywords = null }).Count(i => i.Source == "Wire"));
     }
 
     [Fact]
@@ -481,6 +481,160 @@ public sealed class MorningPaperTests : IDisposable
     }
 
     [Fact]
+    public async Task The_desk_sends_an_item_to_the_section_it_belongs_to()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+             {"name":"World","about":"Far countries.","feeds":[{"name":"Globe","url":"https://globe.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Cat show on Sunday"), Item("Gazette", "Far away: tram strike in a capital")];
+        _feeds.Items["https://globe.example/feed"] = [Item("Globe", "Big strike at the border")];
+
+        var run = await RunAsync(routine);
+
+        var html = Html();
+        var world = html[html.IndexOf("<h2>World</h2>", StringComparison.Ordinal)..];
+        Assert.Contains("About Far away: tram strike in a capital", world, StringComparison.Ordinal);
+        Assert.Contains("City: the desk took 1 of 2 and sent 1 to World.", run.Log, StringComparison.Ordinal);
+        Assert.Contains("- World: Far countries.", _chat.Desks[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_desk_sees_the_last_issues_headlines_and_what_other_sections_took()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+             {"name":"Pets","about":"Animals.","feeds":[{"name":"Paws","url":"https://paws.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown"), Item("Gazette", "Cat show on Sunday")];
+        await RunAsync(routine);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        _chat.Desks.Clear();
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line: first riders")];
+        _feeds.Items["https://paws.example/feed"] = [Item("Paws", "Dog park reopens")];
+        await RunAsync(routine);
+
+        Assert.Contains("- About Tram line opens downtown", _chat.Desks[0], StringComparison.Ordinal);
+        Assert.Contains("- Tram line: first riders", _chat.Desks[1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_section_s_own_topics_never_open_the_paper_over_the_news_of_the_day()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","focus":["the cats of the town"],"feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Cat cafe opens"), Item("Gazette", "Big strike stops the city")];
+
+        await RunAsync(routine);
+
+        var html = Html();
+        var lead = html[html.IndexOf("class=\"lead ", StringComparison.Ordinal)..html.IndexOf("class=\"front-row\"", StringComparison.Ordinal)];
+        Assert.Contains("About Big strike stops the city", lead, StringComparison.Ordinal);
+        Assert.False(_decider.Questions[0].ContainsKey("priority"), "The section's topics are not the reader's priorities.");
+        Assert.Equal("Is it mainly about one of these topics: the cats of the town?", _decider.Questions[0]["focus"].Instructions);
+    }
+
+    [Fact]
+    public async Task A_section_only_for_its_keywords_prints_nothing_else_and_is_left_out_without_them()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+             {"name":"Music","about":"Artists.","keywords":["Caparezza"],"onlyWithKeywords":true,"feeds":[{"name":"Tunes","url":"https://tunes.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city")];
+        _feeds.Items["https://tunes.example/feed"] = [Item("Tunes", "Caparezza: a cat song and a tour"), Item("Tunes", "Another band, another cat tour")];
+
+        var run = await RunAsync(routine);
+
+        var prompts = string.Join("\n", _chat.Prompts);
+        Assert.Contains("Caparezza: a cat song", prompts, StringComparison.Ordinal);
+        Assert.DoesNotContain("Another band", prompts, StringComparison.Ordinal);
+        Assert.Contains("Music: 1 new items.", run.Log, StringComparison.Ordinal);
+
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Bridge reopens")];
+        _feeds.Items["https://tunes.example/feed"] = [Item("Tunes", "A third band's cat record")];
+        File.Delete(Directory.GetFiles(_folder, "*.html")[0]);
+        await RunAsync(routine);
+        Assert.DoesNotContain("<h2>Music</h2>", Html(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_section_may_look_further_back_than_the_paper()
+    {
+        var routine = Create(sections: """
+            [{"name":"City","about":"The town.","feeds":[{"name":"Gazette","url":"https://gazette.example/feed"}]},
+             {"name":"Rights","about":"Rights.","hoursBack":72,"feeds":[{"name":"Watch","url":"https://watch.example/feed"}]}]
+            """);
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city"), Item("Gazette", "Cat show last week", hoursAgo: 50)];
+        _feeds.Items["https://watch.example/feed"] = [Item("Watch", "Court frees the strike leaders", hoursAgo: 50)];
+
+        await RunAsync(routine);
+
+        var prompts = string.Join("\n", _chat.Prompts);
+        Assert.Contains("Court frees the strike leaders", prompts, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cat show last week", prompts, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_the_desk_the_shortlist_chooses_and_the_paper_prints()
+    {
+        var routine = Create();
+        _chat.DeskFails = true;
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Tram line opens downtown")];
+
+        var run = await RunAsync(routine);
+
+        Assert.Equal(RoutineRunStatus.Succeeded, run.Status);
+        Assert.Contains("City: the desk could not choose (The model is away.), the newest go on.", run.Log, StringComparison.Ordinal);
+        Assert.Contains("About Tram line opens downtown", Html(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Tyler, The Creator announces a tour", "Tyler the Creator")]
+    [InlineData("Mrs.GREEN APPLE: new single", "Mrs. GREEN APPLE")]
+    [InlineData("あいみょん、新曲を発表", "あいみょん")]
+    [InlineData("Lo sciopero generale di domani", "scioper")]
+    public void Keywords_are_found_whatever_the_spaces_and_punctuation(string title, string keyword) =>
+        Assert.True(MorningPaper.Mentions(Item("Tunes", title), [keyword]));
+
+    [Fact]
+    public void A_keyword_is_not_found_in_another_name() =>
+        Assert.False(MorningPaper.Mentions(Item("Tunes", "Bruno Martini wins the race"), ["Bruno Mars"]));
+
+    [Fact]
+    public void The_shortlist_takes_turns_among_outlets_so_the_busiest_never_fills_it()
+    {
+        var section = new PaperSettings.Section("Sport", "Sport.", []);
+        var items = Enumerable.Range(1, 20).Select(i => Item("Club", $"Club chatter {i}", hoursAgo: i)).ToList();
+        items.AddRange(Enumerable.Range(1, 3).Select(i => Item("Wire", $"League result {i}", hoursAgo: 10 + i)));
+
+        var shortlist = MorningPaper.Shortlist(items, section);
+
+        Assert.Equal(12, shortlist.Count);
+        Assert.Equal(3, shortlist.Count(i => i.Source == "Wire"));
+    }
+
+    [Fact]
+    public async Task A_printed_page_gives_back_its_headlines_but_not_its_index_or_opening()
+    {
+        var routine = Create(goodNews: """["City"]""", kanji: """{"enabled":true}""");
+        _feeds.Items["https://gazette.example/feed"] = [Item("Gazette", "Big strike stops the city", image: new Uri("https://img.example/strike.jpg")), Item("Gazette", "Bridge reopens"), Item("Gazette", "Cat & mouse show")];
+        await RunAsync(routine);
+
+        var headlines = PaperPage.HeadlinesOf(Html()).ToList();
+
+        Assert.Contains("About Big strike stops the city", headlines);
+        Assert.Contains("About Bridge reopens", headlines);
+        Assert.Contains("About Cat & mouse show", headlines);
+        Assert.DoesNotContain("A calm morning", headlines);
+        Assert.DoesNotContain("In this issue", headlines);
+        Assert.Equal(headlines, MorningPaper.RecentHeadlines(_folder, 3));
+    }
+
+    [Fact]
     public void Titles_sharing_their_main_words_tell_the_same_story()
     {
         Assert.True(MorningPaper.SameStory("Downtown tram line opens today", "Tram line opens downtown"));
@@ -525,6 +679,11 @@ public sealed class MorningPaperTests : IDisposable
                 answers["priority"] = new(Has("protest") || Has("rent") ? "true" : "false", 0.9, false);
             }
 
+            if (questions.ContainsKey("focus"))
+            {
+                answers["focus"] = new(Has("Cat") ? "true" : "false", 0.9, false);
+            }
+
             if (questions.ContainsKey("avoid"))
             {
                 answers["avoid"] = new(Has("show") ? "true" : "false", 0.9, false);
@@ -541,7 +700,13 @@ public sealed class MorningPaperTests : IDisposable
 
     private sealed class FakeChat : ILocalChat
     {
+        /// <summary>What the model was asked to write: articles, the opening note, the kanji.</summary>
         public List<string> Prompts { get; } = [];
+
+        /// <summary>What each section's desk was asked.</summary>
+        public List<string> Desks { get; } = [];
+
+        public bool DeskFails { get; set; }
 
         public string? Headline { get; set; }
 
@@ -553,7 +718,29 @@ public sealed class MorningPaperTests : IDisposable
 
         public Task<string> AskAsync(LocalAsk ask, CancellationToken cancellationToken)
         {
+            if (ask.User.StartsWith("The desk of the section", StringComparison.Ordinal))
+            {
+                Desks.Add(ask.User);
+                using (var schema = JsonDocument.Parse(ask.JsonSchema!))
+                {
+                    Assert.Contains("City", schema.RootElement.GetRawText(), StringComparison.Ordinal);
+                }
+
+                if (DeskFails)
+                {
+                    throw new HttpRequestException("The model is away.");
+                }
+
+                // Every item for its own section, but news from far away goes to World when there is one.
+                var own = ask.User["The desk of the section ".Length..ask.User.IndexOf(':', StringComparison.Ordinal)];
+                var world = ask.User.Contains("\n- World:", StringComparison.Ordinal);
+                var picks = ask.User.Split('\n').Where(l => l.StartsWith('['))
+                    .Select(l => new { item = int.Parse(l[1..l.IndexOf(']', StringComparison.Ordinal)], System.Globalization.CultureInfo.InvariantCulture), section = world && l.Contains("Far away", StringComparison.Ordinal) ? "World" : own });
+                return Task.FromResult(JsonSerializer.Serialize(new { picks }));
+            }
+
             Prompts.Add(ask.User);
+
             if (ask.User.StartsWith("The kanji of the day", StringComparison.Ordinal))
             {
                 return Task.FromResult(Kanji ?? """{"meaning":"day, sun","hint":"A window with the sun in it.","words":["each day"],"sentences":["I walk each day.","Model's Sunday."]}""");

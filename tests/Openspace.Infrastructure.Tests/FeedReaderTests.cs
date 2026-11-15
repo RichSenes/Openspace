@@ -31,6 +31,14 @@ public class FeedReaderTests
     }
 
     [Fact]
+    public void A_feed_with_blank_lines_before_its_declaration_is_read()
+    {
+        var items = Parse("\n  \r\n<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\"><channel><item><title>Tram line opens</title><link>https://news.example/tram</link></item></channel></rss>");
+
+        Assert.Equal("Tram line opens", Assert.Single(items).Title);
+    }
+
+    [Fact]
     public void Atom_entries_take_their_alternate_link()
     {
         var items = Parse("""

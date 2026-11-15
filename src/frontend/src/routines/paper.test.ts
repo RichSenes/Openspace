@@ -115,6 +115,18 @@ describe('the paper editor model', () => {
     expect(tidy.sections[0].feeds).toEqual([{ name: 'sport.example', url: 'https://sport.example/rss' }])
   })
 
+  it('keeps a section only for its words, and asks for words when it has none', () => {
+    const paper = readPaper(settings)!
+    const music = { ...paper.sections[0], name: 'Music', onlyWithKeywords: true, keywords: ['Caparezza', 'YOASOBI'] }
+    const written = JSON.parse(writePaper({ ...paper, sections: [music] }))
+    expect(written.sections[0].onlyWithKeywords).toBe(true)
+    expect(readPaper(writePaper({ ...paper, sections: [music] }))!.sections[0].onlyWithKeywords).toBe(true)
+    expect(JSON.parse(writePaper(paper)).sections[0]).not.toHaveProperty('onlyWithKeywords')
+    expect(paperProblems({ ...paper, sections: [{ ...music, keywords: [] }] })).toEqual(['Music prints only news naming its words, but has none.'])
+    expect(readPaper(writePaper({ ...paper, sections: [{ ...music, hoursBack: 72 }] }))!.sections[0].hoursBack).toBe(72)
+    expect(paper.sections[0].hoursBack).toBeNull()
+  })
+
   it('turns text boxes into lists', () => {
     expect(linesOf(' one\n\ntwo \n')).toEqual(['one', 'two'])
     expect(wordsOf('strike, rent , ')).toEqual(['strike', 'rent'])

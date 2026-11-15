@@ -304,20 +304,30 @@ routine without a channel delivers nothing; tests point the folder somewhere emp
 ### Kinds of routine
 
 - **Morning paper** (`morning-paper`): news of the last hours (`hoursBack`) from the
-  feeds of each section, never printed before; the decider keeps what the reader
+  feeds of each section, never printed before. Each section has a desk first: the
+  local model reads every title the section gathered, with the headlines of the last
+  three issues and what the other sections took today, and picks three items per
+  article to judge, leaving out opinions, adverts and stories already told unless
+  they bring a new fact; an item that belongs to another section is sent there (four
+  at most per section). Without an answer, the newest go on, taking turns among the
+  outlets. The decider then keeps what the reader
   (`reader`) would care about, `perSection` per section; the local model (`model`)
   writes them up in `language` following `rules`, from the items alone, and opens
   with a short note. The page is printed to PDF, numbered from the highest number
   kept in `folder`, saved with its HTML, and delivered through `channel`. A feed
   that fails is logged and skipped.
-  - `priorities`: topics the reader cares about most. The front page goes to the story
-    that is most about them, then the most important; in sections they count as much
-    as the reader's interest. Each section can add its own `focus`.
+  - `priorities`: topics the reader cares about most. The front page goes to the most
+    important story, then the one most about them and carried by most outlets; in
+    sections they count as much as the reader's interest. Each section can add its own
+    `focus`, which counts within the section and never for the front page.
   - `avoid`: topics never printed anywhere, good news included.
   - In each section, `only` is a condition every item must meet to be printed there
-    ("it happened in Italy"), `keywords` are words or starts of words that put an item
-    among the twelve the decider weighs before newer ones, and `style` says how to
-    write that section on top of `rules`.
+    ("it happened in Italy"), `keywords` are words or starts of words the desk looks
+    out for (and that come first when it cannot choose), and `style` says how to write
+    that section on top of `rules`. With `onlyWithKeywords`, the section prints only
+    news naming one of its keywords and is left out on days without any: a section for
+    the artists or games the reader follows. `hoursBack` in a section looks further
+    back than the paper, for outlets that write every few days.
   - The good news of the day comes from the sections in `goodNews`, and must matter
     (medium importance at least): shows and celebrities do not count.
   - Layout: `layout` gives the text `columns` of a full-width section (1 to 4), the size

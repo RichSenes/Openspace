@@ -101,7 +101,7 @@ public static partial class PaperPage
             var set = settings.Sections.FirstOrDefault(s => s.Name == section.Name) ?? new PaperSettings.Section(section.Name, string.Empty, []);
             var wanted = section.Width is null ? set : set with { Width = section.Width };
             var width = PaperSettings.WidthOf(wanted);
-            var columns = settings.ColumnsOf(wanted);
+            var columns = ColumnsFor(settings.ColumnsOf(wanted), section.Articles.Count - 1);
             var size = section.PictureSize ?? settings.PictureOf(wanted);
             var place = PaperSettings.PictureAtOf(wanted);
             var form = section.Form ?? PaperSettings.FormOf(wanted);
@@ -336,6 +336,25 @@ public static partial class PaperPage
 
     [GeneratedRegex(@"^\s*[Mm]\s*(-?[\d.]+)[,\s]+(-?[\d.]+)")]
     private static partial Regex PathStart();
+
+    /// <summary>
+    /// The columns for the stories after the first, so that none stays empty on a day with
+    /// less news: never more than the stories, and a number that shares them out evenly when
+    /// there is one (four stories in two columns, not three).
+    /// </summary>
+    public static int ColumnsFor(int columns, int stories)
+    {
+        var most = Math.Clamp(Math.Min(columns, stories), 1, 4);
+        for (var even = most; even >= 2; even--)
+        {
+            if (stories % even == 0)
+            {
+                return even;
+            }
+        }
+
+        return most;
+    }
 
     /// <summary>An explained story's questions, each followed by its answer.</summary>
     private static string Questions(PaperArticle article) =>

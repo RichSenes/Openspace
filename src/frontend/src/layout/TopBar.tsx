@@ -4,6 +4,7 @@ import { ReleaseBanner } from '../release/ReleaseBanner'
 import { MuteButton } from '../sounds/MuteButton'
 import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
+import type { NeedsYouTarget } from '../activity/needs'
 import './layout.css'
 
 export type View = 'building' | 'board' | 'rooms' | 'routines' | 'reports' | 'security' | 'agents' | 'settings'
@@ -29,6 +30,8 @@ interface Props {
   view: View
   onView: (view: View) => void
   link: LinkState
+  /** Opens what waits for the person where it is decided: its office, its view, its task. */
+  onOpen: (target: NeedsYouTarget) => void
 }
 
 /**
@@ -36,7 +39,7 @@ interface Props {
  * are up to. The strip shows only when one of them has something to say, and wraps on
  * narrow windows instead of pushing the views out of sight.
  */
-export function TopBar({ view, onView, link }: Props) {
+export function TopBar({ view, onView, link, onOpen }: Props) {
   return (
     <div className="top">
       <header className="topbar">
@@ -55,7 +58,7 @@ export function TopBar({ view, onView, link }: Props) {
           ))}
         </nav>
         <div className="topbar-end">
-          <NeedsYou />
+          <NeedsYou onOpen={onOpen} />
           <MuteButton />
           <span className={`link link-${link}`} title={`Connection to the Openspace server: ${LINK_LABEL[link]}`}>
             <span className="wide-only">{LINK_LABEL[link]}</span>

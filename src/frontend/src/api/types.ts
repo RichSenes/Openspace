@@ -585,6 +585,22 @@ export interface RoutineView {
 export type ProposalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Done' | 'Failed'
 
 /** Something a routine wants to do with the person's things: it waits for a yes. */
+/** What waits for the person, from every office: tasks, routines' proposals, failed routines. */
+export type NeedsYouKind = 'TaskToApprove' | 'TaskToReview' | 'TaskFailed' | 'Proposal' | 'RoutineFailed'
+
+export interface NeedsYouItem {
+  kind: NeedsYouKind
+  officeId: string
+  officeName: string
+  /** The task, the proposal or the routine. */
+  id: string
+  title: string
+  /** The routine of a proposal, what a failed run said; empty otherwise. */
+  detail: string
+  /** When it started waiting. */
+  since: string
+}
+
 export interface ProposalView {
   id: string
   routineId: string

@@ -42,6 +42,7 @@ import type {
   BackupView,
   QueueWait,
   VersionView,
+  NeedsYouItem,
 } from './types'
 
 export const keys = {
@@ -64,6 +65,7 @@ export const keys = {
   officeEpics: (officeId: string) => ['epics', officeId] as const,
   reports: ['reports'] as const,
   routines: ['routines'] as const,
+  needsYou: ['needs-you'] as const,
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
@@ -773,6 +775,15 @@ export function useBringOffer() {
 
 export function useRunRoutine() {
   return useWrite((id: string) => request<void>('POST', `/api/routines/${id}/run`), keys.routines)
+}
+
+/** Everything that waits for the person, from every office; the hub refreshes it as tasks and routines change. */
+export function useNeedsYou() {
+  return useQuery({
+    queryKey: keys.needsYou,
+    queryFn: () => request<NeedsYouItem[]>('GET', '/api/needs-you'),
+    refetchInterval: 60_000,
+  })
 }
 
 export function useDecideProposal() {

@@ -85,6 +85,14 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task What_needs_the_person_is_one_list_and_empty_in_a_quiet_building()
+    {
+        var items = await _http.GetFromJsonAsync<JsonElement>("/api/needs-you");
+
+        Assert.Equal(JsonValueKind.Array, items.ValueKind);
+    }
+
+    [Fact]
     public async Task A_board_test_names_the_boards_it_reads_when_it_has_no_reader_for_one()
     {
         using var response = await _http.PostAsJsonAsync("/api/job-boards/test", new { board = "monster:everything" });

@@ -71,6 +71,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
+| GET | `/api/needs-you` | What waits for the person, from every office: tasks to approve, to review and failed; routines' pending proposals and routines whose last run failed; by kind, the oldest first |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
 | GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, account over its limits, graphics card taken, no free seat) |

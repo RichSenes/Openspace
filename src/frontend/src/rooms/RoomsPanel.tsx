@@ -490,7 +490,7 @@ function LocalOnlyToggle({ office }: { office: OfficeView }) {
             })
           }
         />
-        <span>Keep this project on this machine: Openspace never pushes it or opens pull requests.</span>
+        <span>Keep the repository on this machine: Openspace never pushes it or opens pull requests. The desks' models still read the code.</span>
       </label>
       {keep.error && <p className="error">{keep.error.message}</p>}
     </div>
@@ -509,15 +509,6 @@ function ReserveModelsForm({ office }: { office: OfficeView }) {
   const toast = useToast()
   const models = parseReserve(text)
   const unknown = unknownModels(models, engines.data?.openCodeModels, engines.data?.claudeCode ? engines.data.claudeCodeModels : undefined)
-
-  if (office.localOnly) {
-    return (
-      <p className="hint">
-        Reserve models: none, because this project stays on this machine. Its tasks wait for their desk's account when it is over
-        its limits.
-      </p>
-    )
-  }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

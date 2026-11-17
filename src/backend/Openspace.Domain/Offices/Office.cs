@@ -122,11 +122,6 @@ public sealed class Office : AggregateRoot<OfficeId>
 
     public void KeepLocal(bool localOnly, DateTimeOffset now)
     {
-        if (localOnly && _reserveModels.Count > 0)
-        {
-            throw new DomainException("This office sends work to reserve models in the cloud: remove them before keeping it on this machine.");
-        }
-
         LocalOnly = localOnly;
         Raise(new OfficeLocalOnlySet(Id, localOnly, now));
     }
@@ -176,11 +171,6 @@ public sealed class Office : AggregateRoot<OfficeId>
         if (cleaned.Count > MaxReserveModels)
         {
             throw new DomainException($"An office has at most {MaxReserveModels} reserve models.");
-        }
-
-        if (cleaned.Count > 0 && LocalOnly)
-        {
-            throw new DomainException("This office keeps its work on this computer: its code cannot go to reserve models in the cloud.");
         }
 
         _reserveModels = cleaned;

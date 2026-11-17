@@ -273,16 +273,20 @@ public class OfficeTests
     }
 
     [Fact]
-    public void An_office_kept_on_this_machine_sends_nothing_to_reserve_models()
+    public void An_office_kept_on_this_machine_still_has_reserve_models()
     {
+        // Local only keeps the repository off remotes; the desks' models are online anyway.
         var local = ECorp();
         local.KeepLocal(true, Now);
-        Assert.Throws<DomainException>(() => local.SetReserveModels(["nvidia/qwen3-coder"], Now));
+        local.SetReserveModels(["claude-code/sonnet"], Now);
 
         var reserved = ECorp();
         reserved.SetReserveModels(["nvidia/qwen3-coder"], Now);
-        Assert.Throws<DomainException>(() => reserved.KeepLocal(true, Now));
-        Assert.False(reserved.LocalOnly);
+        reserved.KeepLocal(true, Now);
+
+        Assert.Equal(["claude-code/sonnet"], local.ReserveModels);
+        Assert.True(reserved.LocalOnly);
+        Assert.Equal(["nvidia/qwen3-coder"], reserved.ReserveModels);
     }
 
     [Fact]

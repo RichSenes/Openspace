@@ -29,6 +29,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/offices` | All offices with rooms and desks |
 | GET | `/api/offices/{id}` | One office |
 | POST | `/api/offices` | Open an office: `{ name }` |
+| PUT | `/api/offices/{id}/name` | Rename the office: `{ name }`; `422` when blank |
 | PUT | `/api/offices/{id}/theme` | Draw the office with another mood: `{ theme }`, one word such as `cozy` or `neonDistrict` |
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
 | PUT | `/api/offices/{id}/rooms/{roomId}/procedure` | Set the room's required procedure: `{ steps: [] }`; applies to tasks started from then on |

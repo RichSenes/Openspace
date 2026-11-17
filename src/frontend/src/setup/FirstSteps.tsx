@@ -11,7 +11,7 @@ const OPENS: Record<StepAction, { label: string; view: View }> = {
   office: { label: 'Open office', view: 'building' },
   agents: { label: 'Open Agents', view: 'agents' },
   rooms: { label: 'Set up rooms', view: 'rooms' },
-  repository: { label: 'Choose it in Rooms', view: 'rooms' },
+  repository: { label: 'Choose it in Office', view: 'office' },
   board: { label: 'Open the Board', view: 'board' },
 }
 

@@ -54,6 +54,13 @@ public sealed class OfficeCommands(
     }
 
     /// <summary>Draws the office with another mood.</summary>
+    public async Task RenameAsync(OfficeId officeId, string name, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.Rename(name, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ChangeThemeAsync(OfficeId officeId, string theme, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

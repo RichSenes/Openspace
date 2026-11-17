@@ -1,0 +1,155 @@
+/* The office's settings: the save stays in view, the parts side by side on wide screens. */
+.office-page {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 0 20px 32px;
+}
+
+.office-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 8px 16px;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.office-head h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.office-head p {
+  margin: 4px 0 0;
+}
+
+.office-failed {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.office-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 16px;
+  max-width: 1400px;
+}
+
+.office-part {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.office-part h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.office-part > p {
+  margin: 0;
+}
+
+.office-part .check-row > span {
+  display: grid;
+  gap: 2px;
+}
+
+.reserve-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reserve-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.reserve-order {
+  flex: none;
+  width: 18px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.reserve-name {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reserve-list .btn {
+  flex: none;
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+.reserve-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.reserve-add .field {
+  flex: 1 1 240px;
+}
+
+.office-part .check-row {
+  align-items: start;
+}
+
+.office-part .check-row input {
+  margin-top: 3px;
+}
+
+.office-part .repo-problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.reserve-add > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* Long paths stay inside their field instead of widening the page. */
+.office-page,
+.office-parts,
+.office-part,
+.office-part .field {
+  min-width: 0;
+}
+
+.office-part .input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .office-page {
+    padding: 0 12px 24px;
+  }
+}

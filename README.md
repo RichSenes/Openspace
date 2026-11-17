@@ -118,13 +118,14 @@ everything:
 ### Your first office
 
 1. **New office** in the sidebar, with the name of your project.
-2. In **Rooms**, set the office's repository: the folder of a git repository on
-   your computer (Openspace can initialise one).
+2. In **Office**, set the office's repository: the folder of a git repository on
+   your computer (Openspace can initialise one). Private folders, reserve models
+   and keeping the project on this computer are there too, with one save.
 3. Open a room for a part of the project ("Web", "API"), write what it is about
    in its context, and add a desk: a name, the OpenCode agent (`build` is
    OpenCode's own) and a model, or Claude Code.
-4. Optionally, in **Agents**, define a role (what the agent is, its rules, what it
-   may do without asking) and give it to the desk.
+4. Optionally, in **Agents**, add a ready-made role or define your own (what the
+   agent is, its rules, what it may do without asking) and give it to the desk.
 5. In **Board**, **New task** for the desk, or **Ask the supervisor** to split a
    request into tasks, then approve them.
 6. Watch it in **Building**. When the task is in review, open it on the board:

@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
-import { ApiError } from '../api/client'
 import {
-  INITIALIZABLE,
   useAddDesk,
   useChangeDeskAgent,
   useEngines,
@@ -10,13 +8,9 @@ import {
   useRenameDesk,
   useRoles,
   useSetDeskRole,
-  useSetRepository,
   useSetRoomProcedure,
   useUpdateRoomContext,
   useSetRoomCheck,
-  useSetPrivatePaths,
-  useKeepLocal,
-  useSetReserveModels,
 } from '../api/hooks'
 import type { DeskView, OfficeView, RoleView, RoomView } from '../api/types'
 import { LookDialog, Portrait } from '../building/LookDialog'
@@ -24,12 +18,13 @@ import { EngineFields } from '../engines/EngineFields'
 import { ENGINE_LABEL, type EngineChoice } from '../engines/engines'
 import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
-import { formatSteps, parseSteps } from './procedure'
-import { MAX_RESERVE_MODELS, parseReserve, unknownModels } from './reserve'
+import { parseSteps } from './procedure'
+import { roomChanges, roomFormOf, type RoomForm } from './roomForm'
 import { MoodPicker } from '../building/MoodPicker'
 import './rooms.css'
 
-export function RoomsPanel({ office }: { office: OfficeView }) {
+/** The office's rooms and their desks; the office's own settings are in Office. */
+export function RoomsPanel({ office, onOpenOffice }: { office: OfficeView; onOpenOffice: () => void }) {
   const [name, setName] = useState('')
   const openRoom = useOpenRoom(office.id)
   const toast = useToast()
@@ -48,13 +43,24 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
     <section className="rooms">
       <header className="rooms-head">
         <h1>Rooms of {office.name}</h1>
-        <p className="hint">Each room is an area of competence. Its desks are the agents that work there.</p>
+        <p className="hint">
+          Each room is an area of competence. Its desks are the agents that work there. The repository, private folders and reserve
+          models are in{' '}
+          <button type="button" className="link-button" onClick={onOpenOffice}>
+            Office
+          </button>
+          .
+        </p>
       </header>
 
-      <RepositoryForm office={office} />
-      <LocalOnlyToggle office={office} />
-      <PrivateFoldersForm key={(office.privatePaths ?? []).join('\n')} office={office} />
-      <ReserveModelsForm key={(office.reserveModels ?? []).join('\n')} office={office} />
+      {!office.repositoryPath && (
+        <div className="rooms-notice">
+          <p>Tasks of this office cannot start until its repository is set.</p>
+          <button type="button" className="btn btn-primary" onClick={onOpenOffice}>
+            Set it in Office
+          </button>
+        </div>
+      )}
 
       <form className="room-new" onSubmit={submit}>
         <label className="field">
@@ -80,73 +86,13 @@ export function RoomsPanel({ office }: { office: OfficeView }) {
   )
 }
 
-function RepositoryForm({ office }: { office: OfficeView }) {
-  const [path, setPath] = useState(office.repositoryPath ?? '')
-  const setRepository = useSetRepository(office.id)
-  const toast = useToast()
-
-  const save = (initialize: boolean) =>
-    setRepository.mutate(
-      { path, initialize },
-      { onSuccess: () => toast(initialize ? 'Git initialized and repository saved' : 'Repository saved') },
-    )
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    save(false)
-  }
-
-  const error = setRepository.error
-  const canInitialize = error instanceof ApiError && error.code !== undefined && INITIALIZABLE.has(error.code)
-
-  return (
-    <div className="repo">
-    <form className="room-new" onSubmit={submit}>
-      <label className="field">
-        <span>Repository folder (absolute path of the git repo agents work on)</span>
-        <input
-          className="input mono"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          placeholder="/home/you/repos/project"
-          required
-        />
-      </label>
-      <button type="submit" className="btn" disabled={path === (office.repositoryPath ?? '') || setRepository.isPending}>
-        Save repository
-      </button>
-    </form>
-      {error && (
-        <div className="repo-problem">
-          <p className="error">{error.message}</p>
-          {canInitialize && (
-            <button type="button" className="btn btn-primary" disabled={setRepository.isPending} onClick={() => save(true)}>
-              Initialize git here
-            </button>
-          )}
-        </div>
-      )}
-      {!office.repositoryPath && !error && (
-        <p className="hint">Until this is set, tasks of this office cannot start.</p>
-      )}
-    </div>
-  )
-}
-
 function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; room: RoomView }) {
-  const [context, setContext] = useState(room.context)
   const fresh = { name: '', agentName: 'build', model: '', roleId: '', engine: 'OpenCode' as const }
   const [desk, setDesk] = useState<{ name: string; roleId: string } & EngineChoice>(fresh)
   const engines = useEngines()
-  const updateContext = useUpdateRoomContext(officeId)
   const addDesk = useAddDesk(officeId)
   const roles = useRoles()
   const toast = useToast()
-
-  const saveContext = (e: FormEvent) => {
-    e.preventDefault()
-    updateContext.mutate({ roomId: room.id, context }, { onSuccess: () => toast('Context saved') })
-  }
 
   const submitDesk = (e: FormEvent) => {
     e.preventDefault()
@@ -165,29 +111,9 @@ function RoomCard({ officeId, theme, room }: { officeId: string; theme: string; 
     <article className="room-card">
       <h2>{room.name}</h2>
 
-      <MoodPicker officeId={officeId} officeTheme={theme} room={room} />
+      {room.kind !== 'Routines' && <MoodPicker officeId={officeId} officeTheme={theme} room={room} />}
 
-      <form className="stack" onSubmit={saveContext}>
-        <label className="field">
-          <span>Context for every agent in this room</span>
-          <textarea
-            className="input"
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            placeholder="Conventions, paths, what not to touch…"
-          />
-        </label>
-        <div className="row">
-          <button type="submit" className="btn" disabled={context === room.context || updateContext.isPending}>
-            Save context
-          </button>
-        </div>
-        {updateContext.error && <p className="error">{updateContext.error.message}</p>}
-      </form>
-
-      <ProcedureForm officeId={officeId} room={room} />
-
-      <CheckForm officeId={officeId} room={room} />
+      {room.kind !== 'Routines' && room.kind !== 'Guests' && <RoomSettings officeId={officeId} room={room} />}
 
       <section className="desks" aria-label={`Desks in ${room.name}`}>
         <h3 className="pixel desks-title">Desks</h3>
@@ -367,179 +293,71 @@ function EngineForm({ officeId, desk, onDone }: { officeId: string; desk: DeskVi
 }
 
 /** Steps every task of the room must follow; agents report each one and work waits for them. */
-function ProcedureForm({ officeId, room }: { officeId: string; room: RoomView }) {
-  const [text, setText] = useState(formatSteps(room.procedure))
-  const save = useSetRoomProcedure(officeId)
+/**
+ * What every agent of the room is told, the steps its work must report and the check run
+ * after merges: one form, one save, for the parts that changed.
+ */
+function RoomSettings({ officeId, room }: { officeId: string; room: RoomView }) {
+  const [form, setForm] = useState<RoomForm>(() => roomFormOf(room))
+  const context = useUpdateRoomContext(officeId)
+  const procedure = useSetRoomProcedure(officeId)
+  const check = useSetRoomCheck(officeId)
+  const [problem, setProblem] = useState<string>()
+  const [saving, setSaving] = useState(false)
   const toast = useToast()
-  const changed = formatSteps(parseSteps(text)) !== formatSteps(room.procedure)
+  const changed = roomChanges(room, form)
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
-    save.mutate({ roomId: room.id, steps: parseSteps(text) }, { onSuccess: () => toast('Procedure saved, for tasks started from now on') })
+    setSaving(true)
+    setProblem(undefined)
+    try {
+      if (changed.includes('context')) await context.mutateAsync({ roomId: room.id, context: form.context })
+      if (changed.includes('procedure')) await procedure.mutateAsync({ roomId: room.id, steps: parseSteps(form.procedure) })
+      if (changed.includes('check')) await check.mutateAsync({ roomId: room.id, command: form.check.trim() || null })
+      toast(changed.includes('procedure') ? `${room.name} saved: the procedure counts for tasks started from now on` : `${room.name} saved`)
+    } catch (error) {
+      setProblem((error as Error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <form className="stack" onSubmit={submit}>
       <label className="field">
-        <span>Required procedure: one step per line. Work does not reach review until the agent reports every step.</span>
+        <span>Context for every agent in this room</span>
+        <textarea className="input" value={form.context} onChange={(e) => setForm({ ...form, context: e.target.value })} placeholder="Conventions, paths, what not to touch…" />
+      </label>
+      <label className="field">
+        <span>Required procedure</span>
         <textarea
           className="input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          value={form.procedure}
+          onChange={(e) => setForm({ ...form, procedure: e.target.value })}
           placeholder={'Before changing a file, copy it to /backup/<date>/\nAdd every change to CHANGES.md'}
         />
+        <span className="hint">One step per line. Work does not reach review until the agent reports every step.</span>
       </label>
-      <div className="row">
-        <button type="submit" className="btn" disabled={!changed || save.isPending}>
-          Save procedure
-        </button>
-      </div>
-      {save.error && <p className="error">{save.error.message}</p>}
-    </form>
-  )
-}
-
-/** The command that tells whether the room's code still works, run after merges. */
-function CheckForm({ officeId, room }: { officeId: string; room: RoomView }) {
-  const [command, setCommand] = useState(room.check ?? '')
-  const save = useSetRoomCheck(officeId)
-  const toast = useToast()
-  const changed = command.trim() !== (room.check ?? '')
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    save.mutate(
-      { roomId: room.id, command: command.trim() || null },
-      { onSuccess: () => toast(command.trim() ? 'Check saved: it runs after merges' : 'Check removed') },
-    )
-  }
-
-  return (
-    <form className="stack" onSubmit={submit}>
       <label className="field">
-        <span>
-          Check after merging: a command that fails when the room&apos;s code is broken. It runs from the repository folder in a
-          fresh copy, so install what it needs first.
+        <span>Check after merging</span>
+        <input className="input mono" value={form.check} onChange={(e) => setForm({ ...form, check: e.target.value })} placeholder="cd src/web && npm ci && npm test" />
+        <span className="hint">
+          A command that fails when the room&apos;s code is broken. It runs from the repository folder in a fresh copy, so install what it needs
+          first.
         </span>
-        <input
-          className="input mono"
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-          placeholder="cd src/web && npm ci && npm test"
-        />
       </label>
       <div className="row">
-        <button type="submit" className="btn" disabled={!changed || save.isPending}>
-          Save check
+        <button type="submit" className="btn" disabled={changed.length === 0 || saving}>
+          {saving ? 'Saving…' : 'Save room'}
         </button>
+        {changed.length > 0 && !saving && (
+          <button type="button" className="btn btn-quiet" onClick={() => setForm(roomFormOf(room))}>
+            Undo changes
+          </button>
+        )}
       </div>
-      {save.error && <p className="error">{save.error.message}</p>}
-    </form>
-  )
-}
-
-/**
- * Folders of yours no agent of this office may touch: Openspace and both engines refuse
- * them, and every agent is told so. One absolute path per line.
- */
-function PrivateFoldersForm({ office }: { office: OfficeView }) {
-  const saved = (office.privatePaths ?? []).join('\n')
-  const [text, setText] = useState(saved)
-  const save = useSetPrivatePaths(office.id)
-  const toast = useToast()
-  const paths = text.split('\n').map((l) => l.trim()).filter(Boolean)
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    save.mutate(paths, { onSuccess: () => toast(paths.length ? `${paths.length} private ${paths.length === 1 ? 'folder' : 'folders'} saved` : 'No private folders now') })
-  }
-
-  return (
-    <form className="stack private-folders" onSubmit={submit}>
-      <label className="field">
-        <span>
-          Private folders: one absolute path per line. No agent of this office may open, list, read, search or change them;
-          Openspace refuses any request that names them without asking you, and each agent is told so.
-        </span>
-        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'/home/you/photos\n/home/you/ai/models'} />
-      </label>
-      <div className="row">
-        <button type="submit" className="btn" disabled={paths.join('\n') === saved || save.isPending}>
-          Save private folders
-        </button>
-      </div>
-      {save.error && <p className="error">{save.error.message}</p>}
-    </form>
-  )
-}
-
-/** Keeps the project on this machine: Openspace then never pushes it nor opens pull requests. */
-function LocalOnlyToggle({ office }: { office: OfficeView }) {
-  const keep = useKeepLocal(office.id)
-  const toast = useToast()
-  return (
-    <div className="stack">
-      <label className="check-row">
-        <input
-          type="checkbox"
-          checked={Boolean(office.localOnly)}
-          disabled={keep.isPending}
-          onChange={(e) =>
-            keep.mutate(e.target.checked, {
-              onSuccess: () => toast(e.target.checked ? `${office.name} stays on this machine` : `${office.name} can be pushed again`),
-            })
-          }
-        />
-        <span>Keep the repository on this machine: Openspace never pushes it or opens pull requests. The desks' models still read the code.</span>
-      </label>
-      {keep.error && <p className="error">{keep.error.message}</p>}
-    </div>
-  )
-}
-
-/**
- * OpenCode models that go on with a task, in this order, while its desk's account is over its
- * limits. Usually free cloud tiers, which may keep what they are sent: not for private code.
- */
-function ReserveModelsForm({ office }: { office: OfficeView }) {
-  const saved = (office.reserveModels ?? []).join('\n')
-  const [text, setText] = useState(saved)
-  const save = useSetReserveModels(office.id)
-  const engines = useEngines()
-  const toast = useToast()
-  const models = parseReserve(text)
-  const unknown = unknownModels(models, engines.data?.openCodeModels, engines.data?.claudeCode ? engines.data.claudeCodeModels : undefined)
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    save.mutate(models, {
-      onSuccess: () => toast(models.length ? `${models.length} reserve ${models.length === 1 ? 'model' : 'models'} saved` : 'No reserve models now'),
-    })
-  }
-
-  return (
-    <form className="stack private-folders" onSubmit={submit}>
-      <label className="field">
-        <span>
-          Reserve models: one per line, at most {MAX_RESERVE_MODELS}: an OpenCode provider/model, or Claude Code as
-          claude-code/sonnet. When a desk's account is over its limits, its tasks go on with the first one on another account that
-          is free, and go back to the desk when its account is. Free tiers may keep and train on what they are sent: use them only
-          for code you would publish.
-        </span>
-        <textarea className="input mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'nvidia/qwen3-coder\nclaude-code/sonnet'} />
-      </label>
-      {unknown.length > 0 && (
-        <p className="hint">
-          Nobody lists {unknown.join(', ')}: check the name, or connect that provider in OpenCode first.
-        </p>
-      )}
-      <div className="row">
-        <button type="submit" className="btn" disabled={models.join('\n') === saved || models.length > MAX_RESERVE_MODELS || save.isPending}>
-          Save reserve models
-        </button>
-      </div>
-      {models.length > MAX_RESERVE_MODELS && <p className="error">At most {MAX_RESERVE_MODELS} reserve models.</p>}
-      {save.error && <p className="error">{save.error.message}</p>}
+      {problem && <p className="error">{problem}</p>}
     </form>
   )
 }

@@ -102,6 +102,13 @@ internal static class OfficeEndpoints
             return Results.NoContent();
         });
 
+        offices.MapPut("/{officeId:guid}/name", async (
+            Guid officeId, NameRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.RenameAsync(new OfficeId(officeId), request.Name, ct);
+            return Results.NoContent();
+        });
+
         offices.MapPut("/{officeId:guid}/theme", async (
             Guid officeId, ThemeRequest request, OfficeCommands commands, CancellationToken ct) =>
         {

@@ -74,9 +74,15 @@ checks to try by hand, notes and actions; the Log tab shows the audit log and
 downloads its Markdown report. The Merge desk merges accepted work, brings one
 branch into another and pushes.
 
-**Rooms.** The office's repository, rooms and their context, procedure and check,
-desks with their name, role, engine and model, private folders, reserve models,
-keeping the project on this computer.
+**Rooms.** Rooms with their context, procedure and check (one save per room; the
+routines' and guests' rooms show only what applies to them), desks with their name,
+role, engine and model.
+
+**Office.** The office's own settings in one form with one save: name, repository
+(with "Initialize git here" when the folder is not a repository yet), keeping the
+project on this computer, private folders, and reserve models picked from the
+engines' lists and put in order. A part the server refuses says why under its
+field; the rest is saved.
 
 **Routines.** Each routine with its schedule, settings, runs and log, what it
 proposes (yes or no), and run now.

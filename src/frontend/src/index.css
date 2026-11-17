@@ -208,3 +208,15 @@ textarea.input {
   color: var(--mute);
   font-weight: 400;
 }
+
+/* A button inside a sentence: it reads as a link and does what it says. */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

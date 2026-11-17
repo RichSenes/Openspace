@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Hand } from 'lucide-react'
-import { keys, useActivity, useAnswerPermission, useDecideProposal, useNeedsYou, useOffices } from '../api/hooks'
+import { useActivity, useAnswerPermission, useDecideProposal, useNeedsYou, useOffices } from '../api/hooks'
 import type { NeedsYouItem } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import { waitingDesks, answersFor } from './activity'
@@ -23,7 +22,6 @@ export function NeedsYou({ onOpen }: { onOpen: (target: NeedsYouTarget) => void 
   const [now, setNow] = useState(0)
   const answer = useAnswerPermission()
   const decide = useDecideProposal()
-  const client = useQueryClient()
   const toast = useToast()
   const box = useRef<HTMLDivElement>(null)
   const count = asking.length + items.length
@@ -53,10 +51,7 @@ export function NeedsYou({ onOpen }: { onOpen: (target: NeedsYouTarget) => void 
     decide.mutate(
       { id: item.id, approve },
       {
-        onSuccess: () => {
-          void client.invalidateQueries({ queryKey: keys.needsYou })
-          toast(approve ? `Yes to ${item.title}` : `No to ${item.title}`)
-        },
+        onSuccess: () => toast(approve ? `Yes to ${item.title}` : `No to ${item.title}`),
       },
     )
 

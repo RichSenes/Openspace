@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readError, request } from './client'
+import { withoutItem } from '../activity/needs'
 import type {
   SecurityAuditProfile,
   SecurityAuditView,
@@ -108,6 +109,30 @@ function useWrite<TInput, TResult>(fn: (input: TInput) => Promise<TResult>, inva
   })
 }
 
+/**
+ * A write that settles something waiting for the person: its item leaves the "needs you" list at
+ * once, and the list is read again when the write is done, without waiting for the hub's event.
+ */
+function useSettle<TInput, TResult>(fn: (input: TInput) => Promise<TResult>, invalidate: readonly unknown[], settled: (input: TInput) => string | null) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onMutate: async (input: TInput) => {
+      const id = settled(input)
+      if (!id) return undefined
+      await client.cancelQueries({ queryKey: keys.needsYou })
+      const before = client.getQueryData<NeedsYouItem[]>(keys.needsYou)
+      client.setQueryData<NeedsYouItem[]>(keys.needsYou, (list) => withoutItem(list, id))
+      return { before }
+    },
+    onError: (_error, _input, context) => {
+      if (context?.before) client.setQueryData(keys.needsYou, context.before)
+    },
+    onSettled: () =>
+      Promise.all([client.invalidateQueries({ queryKey: invalidate }), client.invalidateQueries({ queryKey: keys.needsYou })]),
+  })
+}
+
 export function useOpenOffice() {
   return useWrite((name: string) => request<Created>('POST', '/api/offices', { name }), keys.offices)
 }
@@ -152,26 +177,29 @@ export function useCreateTask() {
 export type TaskCommand = 'accept' | 'retry' | 'stop' | 'discard'
 
 export function useTaskCommand() {
-  return useWrite(
+  return useSettle(
     (input: { taskId: string; command: TaskCommand }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/${input.command}`),
     keys.tasks,
+    (input) => (input.command === 'stop' ? null : input.taskId),
   )
 }
 
 export function useApproveTask() {
-  return useWrite(
+  return useSettle(
     (input: { taskId: string; deskId: string | null }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/approve`, { deskId: input.deskId }),
     keys.tasks,
+    (input) => input.taskId,
   )
 }
 
 export function useTaskText(kind: 'notes' | 'send-back') {
-  return useWrite(
+  return useSettle(
     (input: { taskId: string; text: string }) =>
       request<void>('POST', `/api/tasks/${input.taskId}/${kind}`, { text: input.text }),
     keys.tasks,
+    (input) => (kind === 'send-back' ? input.taskId : null),
   )
 }
 
@@ -474,9 +502,10 @@ function mergeJob(list: SupervisorJob[] | undefined, job: SupervisorJob): Superv
 }
 
 export function useApproveEpic() {
-  return useWrite(
+  return useSettle(
     (epicId: string) => request<{ approved: number }>('POST', `/api/epics/${epicId}/approve`, {}),
     keys.tasks,
+    () => null,
   )
 }
 
@@ -787,9 +816,10 @@ export function useNeedsYou() {
 }
 
 export function useDecideProposal() {
-  return useWrite(
+  return useSettle(
     (input: { id: string; approve: boolean }) => request<void>('POST', `/api/proposals/${input.id}/${input.approve ? 'approve' : 'reject'}`),
     keys.routines,
+    (input) => input.id,
   )
 }
 

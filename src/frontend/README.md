@@ -113,8 +113,10 @@ first, those to verify, the rejected) and the full report, and hand the findings
 supervisor, one or all at once, or let the audit do it by itself when it finishes.
 
 **Agents.** Roles: description, instructions (with an AI draft to review),
-preferred model, what the agent may do without asking, and which installed skills it
-may load (all of them, or the ones ticked).
+preferred model, what the agent may do without asking (a new role asks before
+commands), and which installed skills it may load (all of them, or the ones ticked).
+Ready-made roles (backend, frontend, mobile, database, tester, reviewer, security,
+writer) are added with one click and then adjusted like any other.
 
 **Settings.** Permissions, agents at work at once, who plans and reviews (Claude
 Code, or OpenCode models chosen for plans and for reviews), the Claude account's limits, sounds, the weather's town, the version, backups and
@@ -134,6 +136,10 @@ Across every view:
   failed (each opens on its office's Board with the task open), routines' proposals (yes
   and no right there) and routines whose last run failed. It refreshes as tasks and
   routines change; on a phone the list takes the screen's width.
+- Without offices, the page is a short path to the first one: an engine, the office,
+  rooms and desks, the repository, a first task, each with its button. A new office
+  (no tasks, no routines) keeps the path in a corner of the building until it is
+  hidden. The strip under the views warns when an engine the desks use is missing.
 - Confirmations are short toasts at the bottom; errors stay next to the form that
   caused them, with the server's reason.
 

@@ -1,4 +1,5 @@
 import { SupervisorStatus } from '../supervisor/SupervisorStatus'
+import { SetupCheck } from '../setup/SetupCheck'
 import { NeedsYou } from '../activity/NeedsYou'
 import { ReleaseBanner } from '../release/ReleaseBanner'
 import { MuteButton } from '../sounds/MuteButton'
@@ -65,7 +66,8 @@ export function TopBar({ view, onView, link, onOpen }: Props) {
           </span>
         </div>
       </header>
-      <div className="statusbar" aria-label="Accounts and graphics card">
+      <div className="statusbar" aria-label="Engines, accounts and graphics card">
+        <SetupCheck onOpen={() => onView('agents')} />
         <LimitPauses onOpen={() => onView('board')} />
         <GpuStatus onOpen={() => onView('board')} />
         <SupervisorStatus onOpen={() => onView('board')} />

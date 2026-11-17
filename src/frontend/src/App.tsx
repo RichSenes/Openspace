@@ -13,6 +13,7 @@ import { SettingsPanel } from './settings/SettingsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
 import { RoutinesPanel } from './routines/RoutinesPanel'
 import { SecurityPanel } from './security/SecurityPanel'
+import { FirstSteps } from './setup/FirstSteps'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
 
@@ -59,9 +60,8 @@ export default function App() {
               <p>Openspace could not reach its server: {offices.error.message}. Check that the API is running.</p>
             </div>
           ) : !office ? (
-            <div className="empty">
-              <h2>No offices yet</h2>
-              <p>An office is a project. Open one from the side panel to start furnishing it.</p>
+            <div className="first-steps-wrap">
+              <FirstSteps office={undefined} onSelect={setSelectedId} onView={setView} />
             </div>
           ) : view === 'board' ? (
             <Board key={`${office.id}-${focusTask ?? ''}`} office={office} initialTaskId={focusTask} />
@@ -76,7 +76,7 @@ export default function App() {
           ) : (
             <BuildingView
               office={office}
-              onOpenRooms={() => setView('rooms')}
+              onView={setView}
               onOpenRoutines={() => setView('routines')}
               onOpenTask={(taskId, officeId) => {
                 if (officeId) setSelectedId(officeId)

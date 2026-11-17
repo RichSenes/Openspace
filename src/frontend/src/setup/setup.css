@@ -1,0 +1,118 @@
+/* The first steps: a short numbered path, the next step open with its button. */
+.first-steps {
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: left;
+}
+
+.first-steps-wrap {
+  display: grid;
+  align-content: center;
+  min-height: 100%;
+  padding: 32px 16px;
+}
+
+.first-steps-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.first-steps-head h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.first-steps-head p {
+  margin: 4px 0 0;
+}
+
+.first-steps ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.first-steps li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: var(--radius);
+}
+
+.first-steps li.next {
+  background: var(--raised);
+}
+
+.first-step-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--mute);
+  border-radius: 50%;
+}
+
+.first-steps li.done .first-step-mark {
+  border-color: var(--st-running);
+  background: var(--st-running);
+  color: var(--bg);
+}
+
+.first-steps li.done strong {
+  color: var(--mute);
+  font-weight: 500;
+}
+
+.first-step-body {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.first-step-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+}
+
+.first-step-form .field {
+  flex: 1 1 220px;
+}
+
+/* Over the building: a card in a corner, out of the way of the rooms. */
+.first-steps.floating {
+  position: absolute;
+  z-index: 3;
+  left: 16px;
+  bottom: 72px;
+  width: min(380px, calc(100% - 32px));
+  max-height: calc(100% - 88px);
+  overflow: auto;
+  gap: 8px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.first-steps.floating li {
+  padding: 6px 8px;
+}
+
+.first-steps.floating .first-steps-head h2 {
+  font-size: 15px;
+}

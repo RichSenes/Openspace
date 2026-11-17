@@ -18,7 +18,8 @@ export const EMPTY_ROLE: RoleInput = {
   instructions: '',
   model: null,
   edit: 'Allow',
-  bash: 'Allow',
+  // Commands ask: Openspace lets the ones inside the task's copy go on their own.
+  bash: 'Ask',
   web: 'Allow',
   helpers: 'Deny',
   skills: null,

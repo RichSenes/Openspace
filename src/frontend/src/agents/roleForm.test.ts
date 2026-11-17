@@ -21,9 +21,16 @@ describe('permissionSummary', () => {
   })
 
   it('says when an agent works freely', () => {
-    expect(permissionSummary(EMPTY_ROLE)).toBe('Works freely')
-    expect(permissionSummary({ ...EMPTY_ROLE, helpers: 'Allow' })).toBe('Works freely · Can call in interns')
+    const free = { ...EMPTY_ROLE, bash: 'Allow' as const }
+    expect(permissionSummary(free)).toBe('Works freely')
+    expect(permissionSummary({ ...free, helpers: 'Allow' })).toBe('Works freely · Can call in interns')
     expect(permissionSummary({ ...EMPTY_ROLE, bash: 'Deny', helpers: 'Allow' })).toBe('Run commands: not allowed · Can call in interns')
+  })
+})
+
+describe('EMPTY_ROLE', () => {
+  it('starts a new role asking before commands', () => {
+    expect(permissionSummary(EMPTY_ROLE)).toBe('Run commands: asks you')
   })
 })
 

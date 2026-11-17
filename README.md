@@ -75,7 +75,9 @@ scripts/openspace start
 ```
 
 Then open <http://localhost:5173>. The first start builds the API and installs the
-page's packages, which takes a minute; the database is created on its own.
+page's packages, which takes a minute; the database is created on its own. The first
+page walks you through your first office: an engine, the office, its rooms and desks
+(Agents has ready-made roles to add with one click), the repository and a first task.
 
 ### Windows
 

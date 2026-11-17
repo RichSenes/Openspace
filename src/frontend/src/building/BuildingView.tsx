@@ -20,6 +20,8 @@ import { routineBubble, routineStateOf, withRoutines } from './routines'
 import { guestDesk, guestStateOf, isGuestDesk, withGuests } from './guests'
 import { GuestCard } from './GuestCard'
 import { usePersistentState } from '../usePersistentState'
+import { FirstSteps } from '../setup/FirstSteps'
+import type { View } from '../layout/TopBar'
 import './building.css'
 
 const lightsKey = (officeId: string) => `openspace.lights-off.${officeId}`
@@ -49,7 +51,8 @@ function useLightsOff(officeId: string): [boolean, (off: boolean) => void] {
 
 interface Props {
   office: OfficeView
-  onOpenRooms: () => void
+  /** Opens another view: the first steps of a new office lead to them. */
+  onView: (view: View) => void
   /** Shows the office's routines: a click on one of their dolls. */
   onOpenRoutines: () => void
   /** Shows a task on the Board. */
@@ -65,7 +68,7 @@ function cardPlace(pick: DeskPick, box: DOMRect | undefined): React.CSSPropertie
   return { left, top: Math.max(16, Math.min(pick.y - 40, height - 340)) }
 }
 
-export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }: Props) {
+export function BuildingView({ office, onView, onOpenRoutines, onOpenTask }: Props) {
   const tasks = useOfficeTasks(office.id)
   const activity = useActivity()
   const energy = useDeskContexts()
@@ -102,6 +105,9 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
   const noTasks = useMemo(() => [], [])
   const [arranging, setArranging] = useState(false)
   const [map, setMap] = usePersistentState<'yes' | 'no'>('openspace.minimap', 'yes')
+  // The offices whose first steps were put away, as their ids one after the other.
+  const [stepsHidden, setStepsHidden] = usePersistentState<string>('openspace.firstStepsHidden', '')
+  const isNew = tasks.data?.length === 0 && routines.data?.length === 0 && !stepsHidden.includes(office.id)
   const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS)
   const [selection, setSelection] = useState<Selection | null>(null)
   // While arranging, the routines room and the guest room show empty: who sits there places itself.
@@ -126,18 +132,17 @@ export function BuildingView({ office, onOpenRooms, onOpenRoutines, onOpenTask }
 
   if (office.rooms.length === 0) {
     return (
-      <div className="empty">
-        <h2>{office.name} is an empty floor</h2>
-        <p>Open a room for each area of competence, then add the desks of the agents who work there.</p>
-        <button type="button" className="btn btn-primary" onClick={onOpenRooms}>
-          Set up rooms
-        </button>
+      <div className="first-steps-wrap">
+        <FirstSteps office={office} onSelect={() => undefined} onView={onView} />
       </div>
     )
   }
 
   return (
     <div className={arranging ? 'building arranging' : 'building'} ref={wrapper}>
+      {isNew && !arranging && (
+        <FirstSteps office={office} onSelect={() => undefined} onView={onView} onHide={() => setStepsHidden(`${stepsHidden} ${office.id}`.trim())} />
+      )}
       <BuildingCanvas
         onPickDesk={(pick) => {
           if (pick && isGuestDesk(pick.deskId)) setPicked({ pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) })

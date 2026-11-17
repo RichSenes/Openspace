@@ -6,6 +6,7 @@ import { modelOptions } from '../engines/engines'
 import { EnginesCard } from '../engines/EnginesCard'
 import { DeskUsage } from './DeskUsage'
 import { useToast } from '../ui/toastContext'
+import { readyRolesLeft } from './readyRoles'
 import { CAPABILITIES, formFrom, HELPER_LABEL, PERMISSION_LABEL, permissionSummary, skillsSummary, toggleSkill } from './roleForm'
 import './agents.css'
 
@@ -42,12 +43,58 @@ export function AgentsPanel() {
               </li>
             ))}
           </ul>
+          <ReadyRoles roles={roles.data} onAdded={setSelected} />
         </nav>
 
         <RoleEditor key={current?.id ?? 'new'} role={current} onSaved={setSelected} onDeleted={() => setSelected('new')} />
       </div>
 
       <DeskUsage />
+    </section>
+  )
+}
+
+/** Roles that work as they are, added with one click and then open to adjust. */
+function ReadyRoles({ roles, onAdded }: { roles: RoleView[] | undefined; onAdded: (id: string) => void }) {
+  const save = useSaveRole()
+  const toast = useToast()
+  const left = readyRolesLeft(roles)
+  if (!roles || left.length === 0) return null
+  return (
+    <section className="ready-roles" aria-label="Ready-made roles">
+      <h2>Ready-made roles</h2>
+      <p className="hint">Instructions and permissions that work as they are: add one, then change what you like.</p>
+      <ul>
+        {left.map((role) => (
+          <li key={role.name}>
+            <div>
+              <span className="role-name">{role.name}</span>
+              <span className="hint">{role.description}</span>
+              <span className="hint">{permissionSummary(role)}</span>
+            </div>
+            <button
+              type="button"
+              className="btn"
+              disabled={save.isPending}
+              aria-label={`Add ${role.name}`}
+              onClick={() =>
+                save.mutate(
+                  { id: null, role },
+                  {
+                    onSuccess: ({ id }) => {
+                      toast(`${role.name} added`)
+                      onAdded(id)
+                    },
+                  },
+                )
+              }
+            >
+              <Plus size={16} aria-hidden /> Add
+            </button>
+          </li>
+        ))}
+      </ul>
+      {save.error && <p className="error">{save.error.message}</p>}
     </section>
   )
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readError, request } from './client'
 import { withoutItem } from '../activity/needs'
+import { pathsOf, type OfficeForm, type OfficePart } from '../office/officeForm'
 import type {
   SecurityAuditProfile,
   SecurityAuditView,
@@ -250,13 +251,6 @@ export function useCheckPullRequest() {
   )
 }
 
-export function useKeepLocal(officeId: string) {
-  return useWrite(
-    (localOnly: boolean) => request<void>('PUT', `/api/offices/${officeId}/local-only`, { localOnly }),
-    keys.offices,
-  )
-}
-
 /** Sets the tasks one waits for; refused when it would make a loop. */
 export function useSetDependencies() {
   return useWrite(
@@ -266,28 +260,40 @@ export function useSetDependencies() {
   )
 }
 
-export function useSetRepository(officeId: string) {
-  return useWrite(
-    (input: { path: string; initialize: boolean }) =>
-      request<void>('PUT', `/api/offices/${officeId}/repository`, input),
-    keys.offices,
-  )
+/** A part of the office's settings that could not be saved, with the server's reason. */
+export interface OfficeSaveFailure {
+  part: OfficePart
+  error: Error
 }
 
-/** Replaces the office's private folders: Openspace refuses every agent action that names them. */
-/** Sets the office's reserve models; refused for an office kept on this machine. */
-export function useSetReserveModels(officeId: string) {
-  return useWrite(
-    (models: string[]) => request<void>('PUT', `/api/offices/${officeId}/reserve-models`, { models }),
-    keys.offices,
-  )
-}
-
-export function useSetPrivatePaths(officeId: string) {
-  return useWrite(
-    (paths: string[]) => request<void>('PUT', `/api/offices/${officeId}/private-paths`, { paths }),
-    keys.offices,
-  )
+/**
+ * Saves the parts of the office's settings that changed, one after the other: a refused
+ * repository does not keep the rest from being saved. It gives back what failed.
+ */
+export function useSaveOffice(officeId: string) {
+  const client = useQueryClient()
+  const base = `/api/offices/${officeId}`
+  const save: Record<OfficePart, (form: OfficeForm, initialize: boolean) => Promise<void>> = {
+    repository: (f, initialize) => request<void>('PUT', `${base}/repository`, { path: f.repositoryPath.trim(), initialize }),
+    name: (f) => request<void>('PUT', `${base}/name`, { name: f.name }),
+    localOnly: (f) => request<void>('PUT', `${base}/local-only`, { localOnly: f.localOnly }),
+    privatePaths: (f) => request<void>('PUT', `${base}/private-paths`, { paths: pathsOf(f.privatePaths) }),
+    reserveModels: (f) => request<void>('PUT', `${base}/reserve-models`, { models: f.reserveModels }),
+  }
+  return useMutation({
+    mutationFn: async (input: { form: OfficeForm; parts: OfficePart[]; initialize?: boolean }) => {
+      const failed: OfficeSaveFailure[] = []
+      for (const part of input.parts) {
+        try {
+          await save[part](input.form, input.initialize ?? false)
+        } catch (error) {
+          failed.push({ part, error: error as Error })
+        }
+      }
+      return failed
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: keys.offices }),
+  })
 }
 
 export function useSetOfficeTheme(officeId: string) {

@@ -885,6 +885,18 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task An_office_is_renamed_and_a_blank_name_is_refused()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/name", new { name = "Shop website" })).EnsureSuccessStatusCode();
+        var blank = await _http.PutAsJsonAsync($"/api/offices/{officeId}/name", new { name = " " });
+
+        Assert.Equal("Shop website", (await GetAsync<JsonElement>($"/api/offices/{officeId}")).GetProperty("name").GetString());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, blank.StatusCode);
+    }
+
+    [Fact]
     public async Task An_office_kept_local_refuses_to_push()
     {
         var (officeId, _, _) = await FurnishAsync();

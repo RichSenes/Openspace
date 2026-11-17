@@ -13,6 +13,7 @@ import { SettingsPanel } from './settings/SettingsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
 import { RoutinesPanel } from './routines/RoutinesPanel'
 import { SecurityPanel } from './security/SecurityPanel'
+import { OfficePanel } from './office/OfficePanel'
 import { FirstSteps } from './setup/FirstSteps'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
@@ -66,7 +67,9 @@ export default function App() {
           ) : view === 'board' ? (
             <Board key={`${office.id}-${focusTask ?? ''}`} office={office} initialTaskId={focusTask} />
           ) : view === 'rooms' ? (
-            <RoomsPanel key={office.id} office={office} />
+            <RoomsPanel key={office.id} office={office} onOpenOffice={() => setView('office')} />
+          ) : view === 'office' ? (
+            <OfficePanel key={office.id} office={office} />
           ) : view === 'routines' ? (
             <RoutinesPanel key={office.id} office={office} />
           ) : view === 'reports' ? (

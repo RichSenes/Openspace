@@ -52,4 +52,14 @@ public class OfficeCommandsTests
         Assert.Equal("folder-missing", error.Code);
         Assert.Empty(_h.Workspaces.Initialized);
     }
+
+    [Fact]
+    public async Task An_office_takes_a_new_name_and_never_a_blank_one()
+    {
+        await _h.OfficeCommands().RenameAsync(_h.Office.Id, "  Shop website ", default);
+
+        Assert.Equal("Shop website", _h.Office.Name);
+        await Assert.ThrowsAsync<Domain.Common.DomainException>(() => _h.OfficeCommands().RenameAsync(_h.Office.Id, " ", default));
+        Assert.Equal(1, _h.UnitOfWork.Saves);
+    }
 }

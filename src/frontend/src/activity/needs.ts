@@ -37,3 +37,8 @@ export function waited(since: string, now: number): string {
   if (hours < 48) return `${hours} h`
   return `${Math.floor(hours / 24)} days`
 }
+
+/** The list without the item just settled (a task, a proposal); ids compared without case. */
+export function withoutItem(list: NeedsYouItem[] | undefined, id: string): NeedsYouItem[] | undefined {
+  return list?.filter((i) => i.id.toLowerCase() !== id.toLowerCase())
+}

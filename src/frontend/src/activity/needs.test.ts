@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NeedsYouItem } from '../api/types'
-import { grouped, targetOf, waited } from './needs'
+import { grouped, targetOf, waited, withoutItem } from './needs'
 
 const item = (kind: NeedsYouItem['kind'], title: string): NeedsYouItem => ({
   kind,
@@ -33,5 +33,11 @@ describe('what needs the person', () => {
     expect(waited('2026-11-17T10:00:00Z', since + 12 * 60_000)).toBe('12 min')
     expect(waited('2026-11-17T10:00:00Z', since + 5 * 3_600_000)).toBe('5 h')
     expect(waited('2026-11-17T10:00:00Z', since + 72 * 3_600_000)).toBe('3 days')
+  })
+
+  it('drops a settled item at once, whatever the case of its id', () => {
+    const list = [item('TaskToApprove', 'Privacy'), item('Proposal', 'Offer')]
+    expect(withoutItem(list, 'ID-PRIVACY')?.map((i) => i.title)).toEqual(['Offer'])
+    expect(withoutItem(undefined, 'id-Offer')).toBeUndefined()
   })
 })

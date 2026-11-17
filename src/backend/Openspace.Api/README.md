@@ -66,8 +66,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | POST | `/api/offices/{id}/push` | `{ branch }`: send one of your branches to its remote (origin when it follows none), after a fetch; `422` `behind-remote` when the remote has commits it lacks. Never forced |
 | POST | `/api/tasks/{id}/pull-request` | `{ target }`: push the accepted work's branch and open a GitHub pull request into the target, with the agent's summary and the checks to try by hand. Returns `{ url }` |
 | POST | `/api/tasks/{id}/pull-request/check` | `{ state }`: how the pull request stands on GitHub. Merged, the work counts as merged and the target here is fast-forwarded when it can be; closed, it can be merged again |
-| PUT | `/api/offices/{id}/reserve-models` | `{ models }`: up to four reserve models, in order: OpenCode's `provider/model`, or `claude-code/` and a Claude model; `422` for an office kept on this machine. See [Reserve models](#reserve-models) |
-| PUT | `/api/offices/{id}/local-only` | `{ localOnly }`: keep the project on this machine; push and pull requests are then refused |
+| PUT | `/api/offices/{id}/reserve-models` | `{ models }`: up to four reserve models, in order: OpenCode's `provider/model`, or `claude-code/` and a Claude model. See [Reserve models](#reserve-models) |
+| PUT | `/api/offices/{id}/local-only` | `{ localOnly }`: keep the repository on this machine; push and pull requests are then refused (reserve models still go on) |
 | GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
@@ -625,8 +625,9 @@ private folders to OpenCode's `build` agent, which takes over the session. A Cla
 with the desk's role, instructions and private folders. A
 reserve over its limits hands over to the next one; once the desk's account is
 back, the task returns to it the next time it is queued. Free tiers may keep what
-they are sent, so an office kept on this machine (`localOnly`) cannot have
-reserves, and one with reserves cannot be kept local until they are removed.
+they are sent: use them for code you would publish. An office kept on this
+machine (`localOnly`) can have reserves too: it keeps the repository off
+remotes, while its desks' models read the code anyway.
 
 ### Local models and the graphics card
 

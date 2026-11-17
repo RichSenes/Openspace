@@ -68,3 +68,69 @@
   display: flex;
   gap: 6px;
 }
+
+/* One kind of thing to decide: its heading with how many, then its cards. */
+.needs-you-group {
+  display: grid;
+  gap: 8px;
+}
+
+.needs-you-group + .needs-you-group {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.needs-you-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.needs-you-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.needs-you-why {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+/* A thing to decide: its words on the left, its buttons on the right; stacked when narrow. */
+.needs-you-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.needs-you-item .needs-you-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .needs-you-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* On a phone the button is not at the bar's end: the list takes the screen's width instead. */
+@media (max-width: 600px) {
+  .needs-you-panel {
+    position: fixed;
+    top: 56px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+    max-height: calc(100vh - 72px);
+  }
+}

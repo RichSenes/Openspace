@@ -36,6 +36,11 @@ export default function App() {
           setView(v)
         }}
         link={link}
+        onOpen={(target) => {
+          setSelectedId(target.officeId)
+          setFocusTask(target.taskId)
+          setView(target.view)
+        }}
       />
       <div className="body">
         <Sidebar offices={offices.data ?? []} selectedId={office?.id} onSelect={setSelectedId} />

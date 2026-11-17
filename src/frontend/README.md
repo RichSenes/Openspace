@@ -129,7 +129,11 @@ Across every view:
 - When a newer release is out, a banner says so with what changed, a link and
   "Remind me tomorrow" (remembered in this browser for that version). Openspace
   never updates itself.
-- "Needs you" in the top bar lists the agents waiting for your answer.
+- "Needs you" in the top bar counts everything that waits for you, from every office, and
+  lists it by kind: agents asking (answered right there), tasks to approve, to review and
+  failed (each opens on its office's Board with the task open), routines' proposals (yes
+  and no right there) and routines whose last run failed. It refreshes as tasks and
+  routines change; on a phone the list takes the screen's width.
 - Confirmations are short toasts at the bottom; errors stay next to the form that
   caused them, with the server's reason.
 

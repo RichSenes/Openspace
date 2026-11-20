@@ -27,3 +27,15 @@ export function pauseOf(engines: EnginesView | undefined, desk: Pick<DeskView, '
   const scope = desk ? scopeOf(desk) : null
   return scope ? engines?.pauses?.find((p) => p.scope === scope) : undefined
 }
+
+/** The same rule as the API's AgentProfile: lowercase words joined by single dashes, at most 64 characters. */
+const AGENT_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/** Why the API would refuse this OpenCode agent name, so the form says it before saving; undefined when it is fine. */
+export function agentNameProblem(name: string): string | undefined {
+  const trimmed = name.trim()
+  if (!trimmed) return 'Write the name of the OpenCode agent, for example build.'
+  if (trimmed.length > 64) return 'The agent name can be at most 64 characters.'
+  if (!AGENT_NAME.test(trimmed)) return 'Use only lowercase letters, digits and single dashes between them, for example code-review.'
+  return undefined
+}

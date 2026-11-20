@@ -4,8 +4,7 @@ import { useApproveEpic, useSupervisorJobs } from '../api/hooks'
 import { useToast } from '../ui/toastContext'
 import { jobsOf, outcomeOf } from './supervisorJobs'
 import './supervisor.css'
-
-const at = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+import { formatTime } from '../ui/dates'
 
 /**
  * The supervisor's plans for this office, on top of the Board: those running, and those
@@ -27,7 +26,7 @@ export function PlansStrip({ officeId, onShowEpic }: { officeId: string; onShowE
           <div className="plan-job-text">
             <span className="plan-job-what">{job.what}</span>
             <span className="hint">
-              {outcomeOf(job)} · asked at {at(job.startedAt)}
+              {outcomeOf(job)} · asked at {formatTime(job.startedAt)}
             </span>
           </div>
           {job.state === 'Done' && job.epicId && job.tasks > 0 && (

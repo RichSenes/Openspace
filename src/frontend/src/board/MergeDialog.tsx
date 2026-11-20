@@ -8,6 +8,7 @@ import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
 import { defaultMergeSource, defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
 import { awaitingMerge, checksDone } from './taskRules'
+import { formatMoment } from '../ui/dates'
 
 interface Props {
   office: OfficeView
@@ -16,8 +17,6 @@ interface Props {
   open: boolean
   onClose: () => void
 }
-
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 /**
  * Brings accepted work into one branch in a click, in the order it was accepted. What
@@ -203,7 +202,7 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
                           <span className="merge-text">
                             <span>{t.title}</span>
                             <span className="hint">
-                              {deskOf(t.id)} · accepted {when(t.statusChangedAt)}
+                              {deskOf(t.id)} · accepted {formatMoment(t.statusChangedAt)}
                               {checks.total > checks.done && ` · ${checks.total - checks.done} of ${checks.total} checks not tried by hand`}
                             </span>
                           </span>

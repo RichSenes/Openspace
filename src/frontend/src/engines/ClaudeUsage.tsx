@@ -3,9 +3,7 @@ import { useCheckClaudeUsage, useEngines, useGpu, useRetryGpu } from '../api/hoo
 import { gpuBadge } from './gpu'
 import type { ClaudeUsage, UsageWindow } from '../api/types'
 import './engines.css'
-
-const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : null
+import { formatMoment, formatTime } from '../ui/dates'
 
 const percent = (window: UsageWindow | null) => (window ? Math.round(window.used * 100) : null)
 
@@ -13,7 +11,7 @@ const percent = (window: UsageWindow | null) => (window ? Math.round(window.used
 function Meter({ label, window }: { label: string; window: UsageWindow | null }) {
   if (!window) return null
   const used = percent(window)!
-  const reset = when(window.resetsAt)
+  const reset = window.resetsAt ? formatMoment(window.resetsAt) : null
   return (
     <div className="usage">
       <span>
@@ -48,7 +46,7 @@ export function ClaudeUsageMeters() {
           <RefreshCw size={16} aria-hidden /> {check.isPending ? 'Checking…' : 'Check now'}
         </button>
         <span className="hint">
-          {usage ? `Read ${when(usage.seenAt)}. ` : ''}Checking asks Haiku for one word, a few tokens of your account.
+          {usage ? `Read ${formatMoment(usage.seenAt)}. ` : ''}Checking asks Haiku for one word, a few tokens of your account.
         </span>
       </div>
       {check.error && <p className="error">{check.error.message}</p>}
@@ -70,15 +68,13 @@ export function ClaudeMeter({ onOpen }: { onOpen: () => void }) {
     <button type="button" className={limited ? 'claude-meter claude-meter-limited' : 'claude-meter'} onClick={onOpen} title="Your Claude account: open Settings">
       {limited && <TriangleAlert size={14} aria-hidden />}
       <span>
-        Claude{paused ? `: desks paused until ${clock(paused)}` : limited ? ': limit reached' : ''}
+        Claude{paused ? `: desks paused until ${formatTime(paused)}` : limited ? ': limit reached' : ''}
         {fiveHours !== null && ` · 5h ${100 - fiveHours}% left`}
         {week !== null && ` · week ${100 - week}% left`}
       </span>
     </button>
   )
 }
-
-const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
 /** Other accounts over their limits, OpenCode providers' above all: Claude's shows in its meter. */
 export function LimitPauses({ onOpen }: { onOpen: () => void }) {
@@ -87,7 +83,7 @@ export function LimitPauses({ onOpen }: { onOpen: () => void }) {
   return (
     <button type="button" className="claude-meter claude-meter-limited" onClick={onOpen} title="Desks on these models wait in the queue">
       <TriangleAlert size={14} aria-hidden />
-      <span>{pauses.map((p) => `${p.label}: paused until ${new Date(p.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`).join(' · ')}</span>
+      <span>{pauses.map((p) => `${p.label}: paused until ${formatMoment(p.until)}`).join(' · ')}</span>
     </button>
   )
 }

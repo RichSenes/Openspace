@@ -7,8 +7,7 @@ import { usePersistentState } from '../usePersistentState'
 import { Markdown } from './Markdown'
 import { dayLabel, dayRange, LANGUAGES, today, type LanguageName } from './period'
 import './reports.css'
-
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+import { formatMoment } from '../ui/dates'
 
 /** Reports for people who were not there: of a day of the office, or of an epic. */
 export function ReportsPanel({ office }: { office: OfficeView }) {
@@ -101,7 +100,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             <span>A changelog for the people who use it</span>
             <p className="hint report-form-hint">
               What changed for them, in plain words, from the work accepted
-              {lastChangelog ? ` since the last one (${when(lastChangelog.createdAt)})` : ' so far'}.
+              {lastChangelog ? ` since the last one (${formatMoment(lastChangelog.createdAt)})` : ' so far'}.
             </p>
           </div>
           <button type="submit" className="btn" disabled={writing}>
@@ -122,7 +121,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
                 <button type="button" className="report-item" aria-current={r.id === open?.id ? 'true' : undefined} onClick={() => setOpenId(r.id)}>
                   <span className="report-title">{r.title}</span>
                   <span className="hint">
-                    {when(r.createdAt)} · {KIND_LABEL[r.kind]}
+                    {formatMoment(r.createdAt)} · {KIND_LABEL[r.kind]}
                     {!r.writtenByAi && ' · facts only'}
                   </span>
                 </button>
@@ -133,7 +132,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             <article className="report">
               <header className="report-actions">
                 <span className="hint">
-                  Written {when(open.createdAt)} for {open.requestedBy}
+                  Written {formatMoment(open.createdAt)} for {open.requestedBy}
                   {!open.writtenByAi && '. The AI was not available: this lists the recorded facts.'}
                 </span>
                 <div className="row">

@@ -25,6 +25,7 @@ import { StatusPill } from '../ui/StatusPill'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
 import { actionsFor, checksDone, compactTokens, currentReview, reviewVerdictOf, totalTokens } from './taskRules'
+import { formatMoment } from '../ui/dates'
 
 interface Props {
   task: WorkTaskView
@@ -35,9 +36,6 @@ interface Props {
   tasks?: readonly WorkTaskView[]
   onClose: () => void
 }
-
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClose }: Props) {
   const toast = useToast()
@@ -143,7 +141,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
               <dt>Asked by</dt>
               <dd>{task.requestedBy}</dd>
               <dt>Created</dt>
-              <dd>{when(task.createdAt)}</dd>
+              <dd>{formatMoment(task.createdAt)}</dd>
               {task.mergedInto ? (
                 <>
                   <dt>Merged into</dt>
@@ -228,7 +226,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
                   {[...task.notes].reverse().map((n, i) => (
                     <li key={task.notes.length - i} className={`note note-${n.authorKind.toLowerCase()}`}>
                       <span className="hint">
-                        {n.authorKind === 'Desk' ? deskName(n.deskId) : (n.authorName ?? 'Openspace')} · {when(n.writtenAt)}
+                        {n.authorKind === 'Desk' ? deskName(n.deskId) : (n.authorName ?? 'Openspace')} · {formatMoment(n.writtenAt)}
                       </span>
                       <p>{n.text}</p>
                     </li>
@@ -283,7 +281,7 @@ export function TaskDrawer({ task, desks, reviewerOn = false, tasks = [], onClos
                       <span className="check-text">
                         <span>{c.what}</span>
                         {c.how && <span className="hint">{c.how}</span>}
-                        {c.checkedAt && <span className="hint">Tried {when(c.checkedAt)}</span>}
+                        {c.checkedAt && <span className="hint">Tried {formatMoment(c.checkedAt)}</span>}
                       </span>
                     </label>
                   </li>

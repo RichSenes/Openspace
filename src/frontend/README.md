@@ -44,7 +44,7 @@ src/
   release/    The new version banner
   weather/    Words for the weather
   lab/        The sprite lab: open the page with ?lab
-  ui/         Toasts, dialogs, status pills
+  ui/         Toasts, dialogs, status pills, the one format for dates and times
 ```
 
 Pure logic lives in `.ts` files with a `.test.ts` next to them; components stay
@@ -76,7 +76,9 @@ branch into another and pushes.
 
 **Rooms.** Rooms with their context, procedure and check (one save per room; the
 routines' and guests' rooms show only what applies to them), desks with their name,
-role, engine and model.
+role, engine and model, one field per line with what each choice means under it. The
+OpenCode agent name is checked as you type (lowercase letters, digits and dashes, as
+the server wants it), so a wrong one never reaches the save.
 
 **Office.** The office's own settings in one form with one save: name, repository
 (with "Initialize git here" when the folder is not a repository yet), keeping the
@@ -148,6 +150,10 @@ Across every view:
   hidden. The strip under the views warns when an engine the desks use is missing.
 - Confirmations are short toasts at the bottom; errors stay next to the form that
   caused them, with the server's reason.
+- Dates and times have one format: "today at 15:30", "yesterday at 23:05", else
+  "Fri 30 Oct at 06:00", with the date and the clock (24 h or AM/PM) as the browser's
+  language writes them.
+- Fields have edges at 3:1 or more against every surface, as WCAG asks for controls.
 
 ## Run
 

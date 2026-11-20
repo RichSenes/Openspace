@@ -1,18 +1,12 @@
 import type { FeedLine } from '../api/types'
 import { KIND_LABEL } from '../board/auditLabels'
+import { formatDay, formatTime } from '../ui/dates'
 
 /** The time of a line, always the same width: the day goes in the heading above it. */
-export const feedTime = (at: string) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+export const feedTime = (at: string) => formatTime(at)
 
 /** The heading of a day: Today, Yesterday, else the date. */
-export function feedDay(at: string, now: Date): string {
-  const when = new Date(at)
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (when.toDateString() === now.toDateString()) return 'Today'
-  if (when.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return when.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
-}
+export const feedDay = (at: string, now: Date) => formatDay(at, now)
 
 /** Lines grouped by day, in the order they come (newest first). */
 export function byDay(lines: readonly FeedLine[], now: Date): { day: string; lines: FeedLine[] }[] {

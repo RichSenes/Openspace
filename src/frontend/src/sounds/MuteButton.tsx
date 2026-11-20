@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { Volume2, VolumeX } from 'lucide-react'
 import { useSaveSounds, useSounds } from '../api/hooks'
 import { audioReady, onAudioReady, unlockAudio } from './synth'
+import './sounds.css'
 
 /** Silences every sound at once or brings them back; until the page was clicked once, says sounds wait for that. */
 export function MuteButton() {
@@ -14,7 +15,7 @@ export function MuteButton() {
     return (
       <button
         type="button"
-        className="btn btn-quiet sound-blocked"
+        className="btn btn-quiet sound-waiting"
         aria-label="Click to turn sounds on"
         title="Browsers keep a page quiet until you click it"
         onClick={unlockAudio}

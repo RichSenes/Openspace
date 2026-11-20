@@ -11,6 +11,10 @@
   --panel: #1b1e26;
   --raised: #232731;
   --line: #333948;
+  /* Edges of inputs, selects and text boxes: WCAG 1.4.11 asks 3:1 for the edge of a
+     field. Against panel, bg and raised this is 3.6, 3.9 and 3.3 to 1; --line stays
+     for cards and dividers, which are decoration and may be quieter. */
+  --field-line: #6e7588;
 
   /* Text: ink and mute both pass WCAG AA on every surface above */
   --ink: #ece8df;
@@ -138,7 +142,7 @@ a.btn {
   width: 100%;
   min-height: 34px;
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius);
   background: var(--bg);
 }
@@ -148,10 +152,16 @@ textarea.input {
   min-height: 80px;
 }
 
-.error {
+.error,
+.field > .error {
   margin: 0;
   color: var(--danger);
   font-size: 13px;
+}
+
+/* A field the form refuses says so on its edge too, not only in the words under it. */
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
 }
 
 .hint {

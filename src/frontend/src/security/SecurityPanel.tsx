@@ -21,8 +21,7 @@ import { useToast } from '../ui/toastContext'
 import { auditorDesks, groupFindings, openFindings, PROFILES, runSummary, severitySummary } from './securityRules'
 import '../reports/reports.css'
 import './security.css'
-
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+import { formatMoment, formatTime } from '../ui/dates'
 
 /**
  * An office's security audits: the auditor desk reads the code for real holes with the
@@ -141,7 +140,7 @@ export function SecurityPanel({ office }: { office: OfficeView }) {
                     Run {a.run.number}
                     {a.run.profile && ` · ${a.run.profile}`}
                   </span>
-                  <span className="hint">{when(a.run.startedAt)}</span>
+                  <span className="hint">{formatMoment(a.run.startedAt)}</span>
                   <span className="hint">{runSummary(a)}</span>
                   {a.status && !a.run.hasReport && <StatusPill status={a.status} />}
                 </button>
@@ -170,7 +169,7 @@ function AuditRun({ office, audit, language }: { office: OfficeView; audit: Secu
     <article className="report">
       <header className="report-actions">
         <span className="hint">
-          Run {run.number} of {when(run.startedAt)}
+          Run {run.number}, {formatMoment(run.startedAt)}
           {audit.deskName && ` at ${audit.deskName}`}
           {run.sourceRef && ` · code at ${run.sourceRef.slice(0, 10)}`}
         </span>
@@ -180,7 +179,7 @@ function AuditRun({ office, audit, language }: { office: OfficeView; audit: Secu
       {planning ? (
         <p className="hint security-planning">
           The supervisor is planning {planning.what.toLowerCase().startsWith('fix') ? `"${planning.what}"` : "this run's findings"}, since{' '}
-          {new Date(planning.startedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}. Keep working: its tasks appear on
+          {formatTime(planning.startedAt)}. Keep working: its tasks appear on
           top of the Board, and you hear when they are ready.
         </p>
       ) : (

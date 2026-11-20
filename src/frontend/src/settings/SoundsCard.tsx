@@ -65,7 +65,7 @@ export function SoundsCard() {
 
   return (
     <section className="settings-card" aria-labelledby="sounds">
-      <h2 id="sounds">Sounds</h2>
+      <h3 id="sounds">Sounds</h3>
       <p className="hint">
         A sound when a moment needs you. They play in this page once you have clicked anywhere in it: browsers keep pages quiet until
         then.

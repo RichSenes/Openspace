@@ -7,8 +7,7 @@ import { usePersistentState } from '../usePersistentState'
 import { Markdown } from './Markdown'
 import { dayLabel, dayRange, LANGUAGES, today, type LanguageName } from './period'
 import './reports.css'
-
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+import { formatMoment } from '../ui/dates'
 
 /** Reports for people who were not there: of a day of the office, or of an epic. */
 export function ReportsPanel({ office }: { office: OfficeView }) {
@@ -60,29 +59,34 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
         <p className="hint">Written from the audit log for people who were not there. The AI only rewords what Openspace recorded.</p>
       </header>
 
+      <label className="field report-language">
+        <span>Language of the reports</span>
+        <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as LanguageName)}>
+          {LANGUAGES.map((l) => (
+            <option key={l.name} value={l.name}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="report-forms">
-        <label className="field">
-          <span>Language</span>
-          <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as LanguageName)}>
-            {LANGUAGES.map((l) => (
-              <option key={l.name} value={l.name}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <form className="report-form" onSubmit={writeDay}>
+        <form className="report-form" onSubmit={writeDay} aria-labelledby="report-day">
+          <h2 id="report-day">A day of work</h2>
+          <p className="hint">What the office did that day, task by task, for someone who was not there.</p>
           <label className="field">
-            <span>A day of work</span>
+            <span>Day</span>
             <input className="input" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} required />
           </label>
           <button type="submit" className="btn btn-primary" disabled={writing}>
-            <FileText size={16} /> Write day report
+            <FileText size={16} aria-hidden /> Write day report
           </button>
         </form>
-        <form className="report-form" onSubmit={writeEpic}>
+        <form className="report-form" onSubmit={writeEpic} aria-labelledby="report-epic">
+          <h2 id="report-epic">A request to the supervisor</h2>
+          <p className="hint">How one request went, from the plan to the last accepted task.</p>
           <label className="field">
-            <span>A request to the supervisor</span>
+            <span>Request</span>
             <select className="input" value={epicId} onChange={(e) => setEpicId(e.target.value)} required>
               <option value="">Choose an epic</option>
               {epics.data?.map((ep) => (
@@ -93,19 +97,17 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             </select>
           </label>
           <button type="submit" className="btn" disabled={writing || !epicId}>
-            <FileText size={16} /> Write epic report
+            <FileText size={16} aria-hidden /> Write epic report
           </button>
         </form>
-        <form className="report-form report-form-wide" onSubmit={writeChangelog}>
-          <div className="field">
-            <span>A changelog for the people who use it</span>
-            <p className="hint report-form-hint">
-              What changed for them, in plain words, from the work accepted
-              {lastChangelog ? ` since the last one (${when(lastChangelog.createdAt)})` : ' so far'}.
-            </p>
-          </div>
+        <form className="report-form" onSubmit={writeChangelog} aria-labelledby="report-changelog">
+          <h2 id="report-changelog">A changelog for the people who use it</h2>
+          <p className="hint">
+            What changed for them, in plain words, from the work accepted
+            {lastChangelog ? ` since the last one (${formatMoment(lastChangelog.createdAt)})` : ' so far'}.
+          </p>
           <button type="submit" className="btn" disabled={writing}>
-            <Megaphone size={16} /> Write changelog
+            <Megaphone size={16} aria-hidden /> Write changelog
           </button>
         </form>
       </div>
@@ -122,7 +124,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
                 <button type="button" className="report-item" aria-current={r.id === open?.id ? 'true' : undefined} onClick={() => setOpenId(r.id)}>
                   <span className="report-title">{r.title}</span>
                   <span className="hint">
-                    {when(r.createdAt)} · {KIND_LABEL[r.kind]}
+                    {formatMoment(r.createdAt)} · {KIND_LABEL[r.kind]}
                     {!r.writtenByAi && ' · facts only'}
                   </span>
                 </button>
@@ -133,7 +135,7 @@ export function ReportsPanel({ office }: { office: OfficeView }) {
             <article className="report">
               <header className="report-actions">
                 <span className="hint">
-                  Written {when(open.createdAt)} for {open.requestedBy}
+                  Written {formatMoment(open.createdAt)} for {open.requestedBy}
                   {!open.writtenByAi && '. The AI was not available: this lists the recorded facts.'}
                 </span>
                 <div className="row">

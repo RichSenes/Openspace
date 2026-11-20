@@ -1,14 +1,131 @@
+/* Settings: the index beside the section on wide screens, a row of links above it when narrow.
+   The rules follow the room Settings has, not the window: the office list takes some. */
+.settings-room {
+  container: settings / inline-size;
+}
+
 .settings {
   display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-areas:
+    'head head'
+    'index body';
+  align-items: start;
   align-content: start;
-  gap: 16px;
-  max-width: 760px;
+  gap: 16px 28px;
+  max-width: 1500px;
   padding: 16px 20px 64px;
+}
+
+.settings-head {
+  grid-area: head;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-index {
+  grid-area: index;
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-index button {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-index button:hover {
+  background: var(--panel);
+}
+
+.settings-index button[aria-current='true'] {
+  border-left-color: var(--accent);
+  background: var(--panel);
+}
+
+.settings-index .hint {
+  font-size: 12px;
+}
+
+.settings-body {
+  grid-area: body;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+/* Cards side by side when each still has room for its sentences. */
+.settings-cards,
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.settings-form > .error,
+.settings-form > .settings-actions {
+  grid-column: 1 / -1;
+}
+
+@container settings (max-width: 759px) {
+  .settings {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'head'
+      'index'
+      'body';
+    padding: 12px 12px 48px;
+  }
+
+  .settings-index {
+    top: 0;
+    z-index: 1;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 6px 0;
+    background: var(--bg);
+  }
+
+  .settings-index button {
+    flex: none;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+  }
+
+  .settings-index button[aria-current='true'] {
+    border-bottom-color: var(--accent);
+  }
+
+  /* Only the names: the one-line hints would make each link a paragraph. */
+  .settings-index .hint {
+    display: none;
+  }
 }
 
 .settings-head {
   display: grid;
   gap: 4px;
+}
+
+.settings-head p {
+  margin: 0;
 }
 
 .settings-head h1 {
@@ -31,17 +148,14 @@
   min-width: 0;
 }
 
-.settings-card legend {
-  float: left;
-  width: 100%;
-  padding: 0;
-}
-
-.settings-card h2 {
+.settings-card h3 {
+  margin: 0;
   font-size: 15px;
 }
 
-.choice {
+
+
+.setting-choice {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   gap: 8px;
@@ -49,11 +163,11 @@
   cursor: pointer;
 }
 
-.choice input {
+.setting-choice input {
   margin-top: 3px;
 }
 
-.choice > span {
+.setting-choice > span {
   display: grid;
   gap: 2px;
 }
@@ -145,4 +259,13 @@
   border-radius: var(--radius);
   background: var(--raised);
   overflow-wrap: anywhere;
+}
+
+.accounts dd {
+  display: grid;
+  gap: 2px;
+}
+
+.engine-missing {
+  color: var(--danger);
 }

@@ -45,7 +45,7 @@ src/
   release/    The new version banner
   weather/    Words for the weather
   lab/        The sprite lab: open the page with ?lab
-  ui/         Toasts, dialogs, status pills
+  ui/         Toasts, dialogs, status pills, the one format for dates and times
 ```
 
 Pure logic lives in `.ts` files with a `.test.ts` next to them; components stay
@@ -77,7 +77,9 @@ branch into another and pushes.
 
 **Rooms.** Rooms with their context, procedure and check (one save per room; the
 routines' and guests' rooms show only what applies to them), desks with their name,
-role, engine and model.
+role, engine and model, one field per line with what each choice means under it. The
+OpenCode agent name is checked as you type (lowercase letters, digits and dashes, as
+the server wants it), so a wrong one never reaches the save.
 
 **Office.** The office's own settings in one form with one save: name, repository
 (with "Initialize git here" when the folder is not a repository yet), keeping the
@@ -106,8 +108,8 @@ job pages), each place with **Test**; what the person looks for and does not wan
 Japanese, visa and the lowest salary; where the profile and the offer folders are; how many
 offers are judged and from how many stars they arrive; the bot and the language.
 
-**Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
-read them, copy them, download them.
+**Reports.** Reports of a day or of an epic, and changelogs, in a chosen language,
+each kind in its own card with what it tells: read them, copy them, download them.
 
 **The supervisor's plans** run in the background: asking for one (from the Board, or handing
 security findings over) never holds the page. While it plans, the status bar says so; when it
@@ -119,15 +121,19 @@ standard or deep, in a chosen language), follow its runs, read the findings (con
 first, those to verify, the rejected) and the full report, and hand the findings to the
 supervisor, one or all at once, or let the audit do it by itself when it finishes.
 
-**Agents.** Roles: description, instructions (with an AI draft to review),
+**Agents.** Roles (the engines are in Settings): description, instructions (with an AI draft to review),
 preferred model, what the agent may do without asking (a new role asks before
 commands), and which installed skills it may load (all of them, or the ones ticked).
 Ready-made roles (backend, frontend, mobile, database, tester, reviewer, security,
 writer) are added with one click and then adjusted like any other.
 
-**Settings.** Permissions, agents at work at once, who plans and reviews (Claude
-Code, or OpenCode models chosen for plans and for reviews), the Claude account's limits, sounds, the weather's town, the version, backups and
-Google accounts.
+**Settings.** Sections with an index beside them (a row of links on narrow screens),
+one shown at a time and remembered: *Engines* (whether OpenCode and Claude Code
+answer, where their keys live, the Claude account's limits), *How agents work*
+(permissions, agents at work at once, who plans and reviews: Claude Code, or OpenCode
+models chosen for plans and for reviews; one save), *Connections* (Google accounts,
+Telegram), *Look and sound* (sounds, the weather's town), *System* (version,
+backups). The engine warning in the top bar and the first steps open *Engines*.
 
 Across every view:
 
@@ -156,6 +162,10 @@ Across every view:
   hidden. The strip under the views warns when an engine the desks use is missing.
 - Confirmations are short toasts at the bottom; errors stay next to the form that
   caused them, with the server's reason.
+- Dates and times have one format: "today at 15:30", "yesterday at 23:05", else
+  "Fri 30 Oct at 06:00", with the date and the clock (24 h or AM/PM) as the browser's
+  language writes them.
+- Fields have edges at 3:1 or more against every surface, as WCAG asks for controls.
 
 ## Run
 

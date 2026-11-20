@@ -60,7 +60,7 @@ export function TopBar({ view, onView, link, onOpen }: Props) {
         </div>
       </header>
       <div className="statusbar" aria-label="Engines, accounts and graphics card">
-        <SetupCheck onOpen={() => onView('agents')} />
+        <SetupCheck onOpen={() => onView('settings')} />
         <LimitPauses onOpen={() => onView('board')} />
         <GpuStatus onOpen={() => onView('board')} />
         <SupervisorStatus onOpen={() => onView('board')} />

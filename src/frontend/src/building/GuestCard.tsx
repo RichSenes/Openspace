@@ -2,14 +2,13 @@ import { X } from 'lucide-react'
 import type { Guest, OfficeView } from '../api/types'
 import { guestDesk, guestName } from './guests'
 import { Portrait } from './LookDialog'
+import { formatTime } from '../ui/dates'
 
 const DOING: Record<Guest['state'], string> = {
   Working: 'Working',
   Reading: 'Reading the code',
   Idle: 'Waiting for its person',
 }
-
-const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
 /** Who a guest is: a session someone started outside Openspace, watched but never driven. */
 export function GuestCard({ guest, office, style, onClose }: { guest: Guest; office: OfficeView; style: React.CSSProperties; onClose: () => void }) {
@@ -28,7 +27,7 @@ export function GuestCard({ guest, office, style, onClose }: { guest: Guest; off
         </button>
       </header>
       <p>
-        <strong>{DOING[guest.state]}</strong>, here since {time(guest.since)}.
+        <strong>{DOING[guest.state]}</strong>, here since {formatTime(guest.since)}.
       </p>
       {where ? (
         <p className="hint">

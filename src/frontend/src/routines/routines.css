@@ -49,9 +49,11 @@
 
 .routine-list {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* Two routines side by side on wide screens, each still wide enough for its settings. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr));
+  align-items: start;
   gap: 16px;
-  max-width: 760px;
+  max-width: 1500px;
   margin: 0;
   padding: 0;
   list-style: none;

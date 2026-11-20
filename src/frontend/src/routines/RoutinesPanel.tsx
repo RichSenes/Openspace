@@ -29,7 +29,8 @@ import { readAgenda, readText, usesAccount, withAgenda, withText } from './setti
 import { offerProblem } from './offers'
 import { JobsEditor } from './JobsEditor'
 import { PaperEditor } from './PaperEditor'
-import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK, whenNear } from './schedule'
+import { describeSchedule, RUN_LABEL, scheduleFrom, settingsProblem, toggleDay, WEEK } from './schedule'
+import { formatMoment } from '../ui/dates'
 import './routines.css'
 
 const RUN_ICON: Record<RoutineRunStatus, typeof CircleCheck> = { Running: LoaderCircle, Succeeded: CircleCheck, Failed: CircleX }
@@ -117,7 +118,7 @@ function Proposals({ officeId }: { officeId: string }) {
           <header>
             <h3>{p.title}</h3>
             <span className="hint">
-              {p.routineName} · {whenNear(p.createdAt)}
+              {p.routineName} · {formatMoment(p.createdAt)}
             </span>
           </header>
           <Markdown text={p.body} />
@@ -180,7 +181,7 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
       <dl className="routine-facts">
         <div>
           <dt>Next run</dt>
-          <dd>{!routine.enabled ? 'None: it is off' : routine.nextRunAt ? whenNear(routine.nextRunAt) : '—'}</dd>
+          <dd>{!routine.enabled ? 'None: it is off' : routine.nextRunAt ? formatMoment(routine.nextRunAt) : '—'}</dd>
         </div>
         <div>
           <dt>{running ? 'Now' : 'Last run'}</dt>
@@ -192,7 +193,7 @@ function RoutineCard({ routine, onEdit }: { routine: RoutineView; onEdit: () => 
                 <span className={`run-state run-${last.status.toLowerCase()}`}>
                   <Icon size={14} aria-hidden /> {RUN_LABEL[last.status]}
                   {last.status === 'Running' ? ', started ' : ' '}
-                  {whenNear(last.startedAt)}
+                  {formatMoment(last.startedAt)}
                 </span>
                 {last.summary && <span className="run-summary">{last.summary}</span>}
               </>
@@ -406,7 +407,7 @@ function Runs({ routineId }: { routineId: string }) {
                   <Icon size={14} aria-hidden /> {RUN_LABEL[r.status]}
                 </span>
                 <span>
-                  {whenNear(r.startedAt)}
+                  {formatMoment(r.startedAt)}
                   {r.byHand && ', started by hand'}
                 </span>
                 {r.summary && <span className="run-summary">{r.summary}</span>}

@@ -3,6 +3,7 @@ import { useEngines, useSaveSettings, useSettings, useBackUp, useBackups } from 
 import type { Autonomy, SettingsView } from '../api/types'
 import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
+import { formatMoment } from '../ui/dates'
 import { GoogleCard } from './GoogleCard'
 import { SoundsCard } from './SoundsCard'
 import { WeatherCard } from './WeatherCard'
@@ -101,7 +102,6 @@ export function SettingsPanel() {
   )
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Copies of the database, taken every day by themselves; restored from the command line. */
 function Backups() {
@@ -116,7 +116,7 @@ function Backups() {
         Openspace copies its database once a day while it runs, and keeps the last 14 copies. Tasks, logs, reports and offices are all in
         it; your repositories are not.
       </p>
-      <p>{latest ? `Latest copy: ${when(latest.createdAt)}, ${(latest.size / 1_048_576).toFixed(1)} MB.` : 'No copy yet.'}</p>
+      <p>{latest ? `Latest copy: ${formatMoment(latest.createdAt)}, ${(latest.size / 1_048_576).toFixed(1)} MB.` : 'No copy yet.'}</p>
       <div className="row">
         <button type="button" className="btn" disabled={backUp.isPending} onClick={() => backUp.mutate(undefined, { onSuccess: () => toast('Database copied') })}>
           Back up now

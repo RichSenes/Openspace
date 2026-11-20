@@ -84,19 +84,13 @@
   background: var(--raised);
 }
 
+/* One field per line: a card is about 320 px wide, and two selects side by side cut
+   their options. */
 .desk-new {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-}
-
-.desk-new .field:first-child,
-.desk-new .advanced,
-.desk-new .row,
-.desk-new .error {
-  grid-column: 1 / -1;
 }
 
 .advanced {

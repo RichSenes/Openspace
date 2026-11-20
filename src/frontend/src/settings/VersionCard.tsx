@@ -1,3 +1,4 @@
+import { formatMoment } from '../ui/dates'
 import { useCheckVersion, useVersion } from '../api/hooks'
 import { useToast } from '../ui/toastContext'
 
@@ -29,7 +30,7 @@ export function VersionCard() {
       <p className="hint">
         Openspace looks for new releases on GitHub twice a day and tells you about them; it never updates itself. To update, run{' '}
         <code className="mono">git pull</code> and <code className="mono">scripts/openspace restart</code> in its folder.
-        {view.checkedAt && ` Last looked at ${new Date(view.checkedAt).toLocaleString()}.`}
+        {view.checkedAt && ` Last looked at ${formatMoment(view.checkedAt)}.`}
       </p>
       <div className="row">
         <button type="button" className="btn" disabled={check.isPending} onClick={look}>

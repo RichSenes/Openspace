@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EnginesView } from '../api/types'
-import { modelOptions, pauseOf, scopeOf } from './engines'
+import { agentNameProblem, modelOptions, pauseOf, scopeOf } from './engines'
 
 const engines: EnginesView = {
   openCode: true,
@@ -38,5 +38,23 @@ describe('scopeOf and pauseOf', () => {
     const engines = { pauses: [{ scope: 'opencode:opencode', label: 'OpenCode models of opencode', until: '2026-10-25T00:00:00Z' }] } as EnginesView
     expect(pauseOf(engines, { engine: 'OpenCode', model: 'opencode/deepseek-v4.1-flash-free' })?.until).toBe('2026-10-25T00:00:00Z')
     expect(pauseOf(engines, { engine: 'ClaudeCode', model: 'sonnet' })).toBeUndefined()
+  })
+})
+
+describe('agentNameProblem', () => {
+  it('accepts the names the API accepts', () => {
+    for (const name of ['build', 'plan', 'code-review', 'qa2', ' build ']) expect(agentNameProblem(name)).toBeUndefined()
+  })
+
+  it('refuses capitals, spaces, underscores and loose dashes, as the API does', () => {
+    for (const name of ['Build', 'code review', 'code_review', '-build', 'build-', 'code--review']) {
+      expect(agentNameProblem(name)).toMatch(/lowercase letters, digits and single dashes/)
+    }
+  })
+
+  it('asks for a name when empty and refuses one over 64 characters', () => {
+    expect(agentNameProblem('  ')).toMatch(/Write the name/)
+    expect(agentNameProblem('a'.repeat(65))).toMatch(/at most 64/)
+    expect(agentNameProblem('a'.repeat(64))).toBeUndefined()
   })
 })

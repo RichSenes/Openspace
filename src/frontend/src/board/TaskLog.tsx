@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Download } from 'lucide-react'
 import { useTaskLog } from '../api/hooks'
 import { filterLog, KIND_LABEL, type LogFilter } from './auditLabels'
-
-const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+import { formatTime } from '../ui/dates'
 
 /** Everything that happened on a task, newest first, with the evidence one click away. */
 export function TaskLog({ taskId }: { taskId: string }) {
@@ -41,7 +40,7 @@ export function TaskLog({ taskId }: { taskId: string }) {
         <ol className="log-list">
           {entries.map((e) => (
             <li key={e.id} className={`log-entry log-${e.kind.toLowerCase()}`}>
-              <span className="log-time mono">{time(e.at)}</span>
+              <span className="log-time mono">{formatTime(e.at, { seconds: true })}</span>
               <span className="log-kind pixel">{KIND_LABEL[e.kind]}</span>
               <div className="log-body">
                 {e.detail ? (

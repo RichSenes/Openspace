@@ -1,0 +1,10 @@
+/* Sounds waiting for the first click: useful once, so it sits in the quiet text colour
+   (mute passes AA on the top bar) and does not compete with what needs the person. */
+.sound-waiting {
+  color: var(--mute);
+  white-space: nowrap;
+}
+
+.sound-waiting:hover {
+  color: var(--ink);
+}

@@ -13,6 +13,7 @@ import { MergeDialog } from './MergeDialog'
 import { PlansStrip } from '../supervisor/PlansStrip'
 import { awaitingMerge, checksDone, COLUMNS, searchTasks, waitingFor, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
 import './board.css'
+import { formatMoment } from '../ui/dates'
 
 interface Props {
   office: OfficeView
@@ -135,7 +136,7 @@ export function Board({ office, initialTaskId }: Props) {
                           {task.status === 'Queued' && !waits?.get(task.id) && pauseOf(engines, desk) && (
                             <span className="card-review">
                               <Hourglass size={12} aria-hidden /> Paused until{' '}
-                              {new Date(pauseOf(engines, desk)!.until).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}:{' '}
+                              {formatMoment(pauseOf(engines, desk)!.until)}:{' '}
                               {pauseOf(engines, desk)!.label} over their limit
                             </span>
                           )}

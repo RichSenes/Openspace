@@ -30,9 +30,9 @@ comes (the interface study of phase 2 decides how phases 3–5 look).
 **S0.1 Constitution and development rules** · lane: none (a conversation)
 As the person, I want my rules and the development rules written down, so that every agent works
 by them.
-- The draft rules in brain.md are discussed one by one, changed or dropped.
-- The result is the first `Constitution.md`, kept as a template in the repository (generic) and
-  as the person's own vault note (personal).
+- Done: the rules were decided with the person and are in brain.md, *Development rules*.
+- The template ships with the vault (S1.1); the person's own copy, in their language, goes into
+  their vault when it exists.
 
 **S0.2 Models per function** · lane S · owns `Openspace.Api/Settings/ModelsEndpoints.cs`, `settings/ModelsSection.tsx`
 As the person, I want to choose the engine and model of each function, so that Opus goes where it
@@ -48,7 +48,8 @@ matters and local models do the rest.
 As an installation, I want a vault created with the standard structure, so that everyone starts
 from the same organised brain.
 - On start, if missing, the folder (default `~/.local/share/openspace/brain`, setting `Brain:Folder`) is
-  created with its folders and a README in each, and `git init` with a first commit.
+  created with its folders and a README in each, the constitution template with the development
+  rules of brain.md, and `git init` with a first commit.
 - Existing files are never overwritten.
 - Notes are read with their front matter into a `Note` (kind, status, scope, review, links).
 - Writes are atomic and committed with the author in the message.
@@ -92,18 +93,21 @@ is seen before it conflicts.
 
 **S1.6 Hold overlapping work** · lane Q · owns the dispatcher's overlap rule, depends on S1.5
 As the person, I want a queued task to wait when its files are being changed by another, so that
-merges stop conflicting.
+merges stop conflicting (constitution rule 6, on by default).
 - A queued task whose planned paths or room overlap a running task's changed files waits, with
   the reason shown as today's waits ("waits for Screens, who is changing src/web/cart.ts").
 - An office setting turns it off.
 - Before a merge, branches that touched the same files as another unmerged branch are flagged.
 - Tests on the dispatcher.
 
-**S1.7 Proposals in the inbox** · lane R · owns `Attention` additions, depends on S1.1
-As the person, I want decision proposals in the needs-you inbox, so that I accept, change or reject
-them where everything else waits.
-- New kind *Decision to accept* with Accept / Open / Reject; accepting sets `status: accepted` and
-  commits; rejecting sets `rejected`.
+**S1.7 Shiori accepts, the person reviews** · lane R · owns `Attention` additions, depends on S1.1
+As the person, I want proposals accepted by Shiori and shown to me afterwards, so that work goes on
+and I keep the last word.
+- A proposal is accepted (or sent back with a reason) by Shiori; until Shiori exists as a chat, a
+  rule accepts proposals whose scope is one office and that cite no conflicting accepted decision,
+  and leaves the rest proposed for the person.
+- New needs-you kind *Decision to review* with Fine / Open / Undo; undoing sets `status: rejected`,
+  commits, and adds a note to the proposing agent's journal.
 - Tests on the query and the commands.
 
 **S1.8 Reviews come back** · lane R · owns a routine kind `decision-reviews`, depends on S1.7

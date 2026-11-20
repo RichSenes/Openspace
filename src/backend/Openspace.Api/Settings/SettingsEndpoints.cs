@@ -11,15 +11,20 @@ using Openspace.Infrastructure.OpenCode;
 
 namespace Openspace.Api.Settings;
 
+/// <param name="ClaudeSupervises">
+/// Left out on a change, the planner's settings (this, SupervisorModel, DraftModel) stay as they
+/// are: Settings › Models sets them now.
+/// </param>
 /// <param name="SupervisorModel">Claude model for plans and drafts; empty for Claude Code's default.</param>
 /// <param name="DraftModel">OpenCode model for plans and drafts when Claude Code does not make them.</param>
+/// <param name="ClaudeReviews">Left out on a change, the reviewer's settings (this, ReviewModel, OpenCodeReviewModel) stay as they are.</param>
 /// <param name="OpenCodeReviewModel">OpenCode model that reviews finished work when Claude Code does not; none for no review.</param>
 public sealed record SettingsView(
     Autonomy Autonomy,
     int Seats,
-    bool ClaudeSupervises,
+    bool? ClaudeSupervises,
     string? SupervisorModel,
-    bool ClaudeReviews,
+    bool? ClaudeReviews,
     string? ReviewModel,
     string? DraftModel,
     string? OpenCodeReviewModel = null);
@@ -90,13 +95,20 @@ internal static class SettingsEndpoints
         section(AgentOptions.SectionName)["Autonomy"] = settings.Autonomy.ToString();
         section(QueueOptions.SectionName)["Seats"] = settings.Seats;
         var claude = section(ClaudeCodeOptions.SectionName);
-        claude["Supervise"] = settings.ClaudeSupervises;
-        claude["SupervisorModel"] = settings.SupervisorModel ?? string.Empty;
-        claude["Review"] = settings.ClaudeReviews;
-        claude["ReviewModel"] = settings.ReviewModel ?? string.Empty;
         var openCode = section(OpenCodeOptions.SectionName);
-        openCode["DraftModel"] = settings.DraftModel ?? string.Empty;
-        openCode["ReviewModel"] = settings.OpenCodeReviewModel ?? string.Empty;
+        if (settings.ClaudeSupervises is { } supervises)
+        {
+            claude["Supervise"] = supervises;
+            claude["SupervisorModel"] = settings.SupervisorModel ?? string.Empty;
+            openCode["DraftModel"] = settings.DraftModel ?? string.Empty;
+        }
+
+        if (settings.ClaudeReviews is { } reviews)
+        {
+            claude["Review"] = reviews;
+            claude["ReviewModel"] = settings.ReviewModel ?? string.Empty;
+            openCode["ReviewModel"] = settings.OpenCodeReviewModel ?? string.Empty;
+        }
     });
 
     /// <summary>Changes some sections of the settings file, keeping the rest, and swaps the file in whole.</summary>

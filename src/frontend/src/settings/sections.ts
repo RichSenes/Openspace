@@ -1,10 +1,11 @@
 /** The parts of Settings, grouped by what the person wants to do, in the order of the index. */
-export type SettingsSection = 'engines' | 'local' | 'agents' | 'connections' | 'look' | 'system'
+export type SettingsSection = 'engines' | 'local' | 'models' | 'agents' | 'connections' | 'look' | 'system'
 
 export const SECTIONS: { id: SettingsSection; label: string; hint: string }[] = [
   { id: 'engines', label: 'Engines', hint: 'What runs the agents, and your Claude account' },
   { id: 'local', label: 'Local AI', hint: 'Models on this machine and who comes first on the card' },
-  { id: 'agents', label: 'How agents work', hint: 'Permissions, how many at once, who plans and reviews' },
+  { id: 'models', label: 'Models', hint: 'Which engine and model does each job: Shiori, reviews, digests, journals' },
+  { id: 'agents', label: 'How agents work', hint: 'Permissions and how many work at once' },
   { id: 'connections', label: 'Connections', hint: 'Google accounts for the routines' },
   { id: 'look', label: 'Look and sound', hint: 'Sounds and the weather at the windows' },
   { id: 'system', label: 'System', hint: 'Version and backups' },

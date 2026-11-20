@@ -110,7 +110,7 @@ everything:
 - **A company model** (an OpenAI-compatible endpoint): add it as a provider in
   OpenCode's configuration, with its key in an environment variable, and give it a
   `limit.context` so Openspace knows how big its conversation can be.
-- **Without Claude Code**, choose in Settings → Supervisor and reviewer the OpenCode
+- **Without Claude Code**, choose in Settings → Models the OpenCode
   model that plans and the one that reviews finished work before you.
 - Keep Openspace's own outside calls off if you want none: `Releases:Enabled=false`,
   and no town for the weather.

@@ -16,8 +16,12 @@ public sealed class ClaudeCodeOptions
     /// <summary>Claude Code reviews finished work before a person does, when it is there.</summary>
     public bool Review { get; set; } = true;
 
-    /// <summary>Model for plans and drafts; null means Claude Code's default.</summary>
-    public string? SupervisorModel { get; set; }
+    /// <summary>
+    /// Model for plans and drafts, Shiori's; blank means Claude Code's default. Left unset it is
+    /// the <c>opus</c> alias, which Claude Code resolves to the latest Opus: a choice already
+    /// saved, blank included, is kept.
+    /// </summary>
+    public string? SupervisorModel { get; set; } = "opus";
 
     /// <summary>Model for reviews; null means Claude Code's default.</summary>
     public string? ReviewModel { get; set; }

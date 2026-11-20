@@ -1,16 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useEngines, useSaveSettings, useSettings, useBackUp, useBackups } from '../api/hooks'
-import type { Autonomy, SettingsView } from '../api/types'
+import type { Autonomy, SettingsChange, SettingsView } from '../api/types'
 import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
 import { formatMoment } from '../ui/dates'
 import { GoogleCard } from './GoogleCard'
 import { LocalAiSection } from './LocalAiSection'
+import { ModelsSection } from './ModelsSection'
 import { SoundsCard } from './SoundsCard'
 import { WeatherCard } from './WeatherCard'
 import { VersionCard } from './VersionCard'
 import { usePersistentState } from '../usePersistentState'
-import { isSection, onSectionRequest, SECTION_KEY, SECTIONS, type SettingsSection } from './sections'
+import { isSection, onSectionRequest, requestSettingsSection, SECTION_KEY, SECTIONS, type SettingsSection } from './sections'
 import './settings.css'
 
 const MAX_SEATS = 12
@@ -30,7 +31,7 @@ const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
 
 /**
  * What a person sets for the whole of Openspace, in sections with an index: the engines,
- * how agents work, connections, look and sound, the system. One section shows at a time.
+ * local AI, models per function, how agents work, connections, look and sound, the system. One section shows at a time.
  */
 export function SettingsPanel() {
   const settings = useSettings()
@@ -68,6 +69,7 @@ export function SettingsPanel() {
             </div>
           )}
           {section === 'local' && <LocalAiSection />}
+          {section === 'models' && <ModelsSection />}
           {section === 'agents' && (
             <>
               {settings.error && <p className="error">Could not read the settings: {settings.error.message}</p>}
@@ -135,48 +137,18 @@ function Backups() {
   )
 }
 
+/** Permissions and seats; who plans and reviews is in Settings › Models, and is left as it is here. */
 function SettingsForm({ saved }: { saved: SettingsView }) {
-  const [form, setForm] = useState(saved)
-  const engines = useEngines().data
+  const [form, setForm] = useState<SettingsChange>({ autonomy: saved.autonomy, seats: saved.seats })
   const save = useSaveSettings()
   const toast = useToast()
-  const claude = engines?.claudeCode ?? false
-  const set = (change: Partial<SettingsView>) => setForm({ ...form, ...change })
-  const changed = JSON.stringify(form) !== JSON.stringify(saved)
+  const set = (change: Partial<SettingsChange>) => setForm({ ...form, ...change })
+  const changed = form.autonomy !== saved.autonomy || form.seats !== saved.seats
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     save.mutate(form, { onSuccess: () => toast('Settings saved: they apply now') })
   }
-
-  const claudeModel = (value: string | null, onChange: (model: string | null) => void, label: string) => (
-    <label className="field">
-      <span>{label}</span>
-      <select className="input" value={value ?? ''} disabled={!claude} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">Claude Code&apos;s default</option>
-        {engines?.claudeCodeModels.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-
-  const openCodeModel = (value: string | null, onChange: (model: string | null) => void, label: string, none: string) => (
-    <label className="field">
-      <span>{label}</span>
-      <select className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">{none}</option>
-        {value && !engines?.openCodeModels.some((m) => m.id === value) && <option value={value}>{value} (not listed now)</option>}
-        {engines?.openCodeModels.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
 
   return (
     <form className="settings-form" onSubmit={submit}>
@@ -211,44 +183,20 @@ function SettingsForm({ saved }: { saved: SettingsView }) {
         <p className="hint">Each desk works on one task at a time; more seats let more desks work together, and spend your limits faster.</p>
       </section>
 
-      <section className="settings-card" aria-labelledby="supervisor">
-        <h3 id="supervisor">Supervisor and reviewer</h3>
-        {!claude && <p className="hint">Claude Code is not on this machine: OpenCode plans, and reviews when you choose a model for it below.</p>}
-        <label className="setting-choice">
-          <input type="checkbox" checked={claude && form.claudeSupervises} disabled={!claude} onChange={(e) => set({ claudeSupervises: e.target.checked })} />
-          <span>
-            <strong>Claude Code plans requests and drafts texts</strong>
-            <span className="hint">Otherwise OpenCode does, with the model below.</span>
-          </span>
-        </label>
-        {claudeModel(form.supervisorModel, (supervisorModel) => set({ supervisorModel }), 'Model for plans and drafts')}
-        <label className="setting-choice">
-          <input type="checkbox" checked={claude && form.claudeReviews} disabled={!claude} onChange={(e) => set({ claudeReviews: e.target.checked })} />
-          <span>
-            <strong>Claude Code reviews finished work before you</strong>
-            <span className="hint">It reads the changes, leaves its verdict as a note and lists what to try by hand.</span>
-          </span>
-        </label>
-        {claudeModel(form.reviewModel, (reviewModel) => set({ reviewModel }), 'Model for reviews')}
-        {openCodeModel(form.draftModel ?? null, (draftModel) => set({ draftModel }), 'OpenCode model for plans and drafts, when Claude Code does not make them', "OpenCode's default")}
-        {openCodeModel(
-          form.openCodeReviewModel ?? null,
-          (openCodeReviewModel) => set({ openCodeReviewModel }),
-          'OpenCode model for reviews, when Claude Code does not review',
-          'No review by OpenCode',
-        )}
-        <p className="hint">
-          With a model of your company&apos;s subscription (GitHub Copilot&apos;s, say, once signed in to it in OpenCode), plans and reviews stay
-          on what your company allows. An OpenCode reviewer reads the changes and the files, and runs nothing.
-        </p>
-      </section>
+      <p className="hint">
+        Who plans requests and who reviews finished work is chosen in{' '}
+        <button type="button" className="link-button" onClick={() => requestSettingsSection('models')}>
+          Models
+        </button>
+        .
+      </p>
 
       {save.error && <p className="error">{save.error.message}</p>}
       <div className="row settings-actions">
         <button type="submit" className="btn btn-primary" disabled={!changed || save.isPending}>
           Save settings
         </button>
-        <button type="button" className="btn btn-quiet" disabled={!changed} onClick={() => setForm(saved)}>
+        <button type="button" className="btn btn-quiet" disabled={!changed} onClick={() => setForm({ autonomy: saved.autonomy, seats: saved.seats })}>
           Undo changes
         </button>
       </div>

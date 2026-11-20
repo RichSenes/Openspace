@@ -52,6 +52,9 @@ builder.Services.PostConfigure<Openspace.Application.LocalModels.LocalModelOptio
 builder.Services.Configure<Openspace.Application.Brain.BrainOptions>(builder.Configuration.GetSection(Openspace.Application.Brain.BrainOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
+builder.Services.Configure<Openspace.Application.Functions.FunctionModelOptions>(builder.Configuration.GetSection(Openspace.Application.Functions.FunctionModelOptions.SectionName));
+// Shiori's choice is today's planner settings, read again on each reload.
+builder.Services.AddOptions<Openspace.Application.Functions.FunctionModelOptions>().PostConfigure<IConfiguration>(ModelChoices.FillShiori);
 builder.Services.Configure<Openspace.Infrastructure.Skills.SkillsOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Skills.SkillsOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Security.SecurityAuditOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Security.SecurityAuditOptions.SectionName));
 builder.Services.Configure<WorkspaceOptions>(options =>
@@ -95,6 +98,7 @@ app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();
 app.MapLocalAiEndpoints();
+app.MapModelsEndpoints();
 app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();
 app.MapBrainEndpoints();

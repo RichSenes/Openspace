@@ -49,6 +49,7 @@ builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueO
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
 // Lists set in Openspace leave blank items where appsettings.Local.json had more: they are dropped here.
 builder.Services.PostConfigure<Openspace.Application.LocalModels.LocalModelOptions>(Openspace.Application.LocalModels.LocalAiSettings.DropBlanks);
+builder.Services.Configure<Openspace.Application.Brain.BrainOptions>(builder.Configuration.GetSection(Openspace.Application.Brain.BrainOptions.SectionName));
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
 builder.Services.Configure<Openspace.Application.Functions.FunctionModelOptions>(builder.Configuration.GetSection(Openspace.Application.Functions.FunctionModelOptions.SectionName));
@@ -100,6 +101,7 @@ app.MapLocalAiEndpoints();
 app.MapModelsEndpoints();
 app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();
+app.MapBrainEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");

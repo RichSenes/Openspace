@@ -16,7 +16,8 @@ Openspace is and how to start it, see the [main README](../../../README.md).
 [Rounds, checks and tokens](#rounds-checks-and-tokens) · [Routines](#routines) ·
 [Agents going in circles](#agents-going-in-circles) · [Sounds](#sounds) ·
 [Private folders](#private-folders) · [Usage limits](#usage-limits) ·
-[Claude Code](#claude-code) · [Skills](#skills) · [Security audits](#security-audits) · [Guests](#guests)
+[Claude Code](#claude-code) · [Skills](#skills) · [Security audits](#security-audits) · [Guests](#guests) ·
+[Brain](#brain)
 
 Errors come back as problem details: 404 for what does not exist, 422 with a
 readable `detail` (and often a `code`) for what breaks a rule.
@@ -111,6 +112,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | POST | `/api/gpu/claim` | `{ holder }`: a program takes the card; local work gives way. Renew within `LocalModels:ClaimLease` |
 | DELETE | `/api/gpu/claim/{holder}` | The program gives the card back |
 | POST | `/api/gpu/retry` | Try loading the model again now, after a failure |
+| GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
+| GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel, openCodeReviewModel }` |
@@ -235,6 +238,8 @@ On startup it applies pending database migrations.
 | `Skills:Folder` | `~/.claude/skills` | Installed skills handed to the desks, read-only; blank for none |
 | `Skills:PluginsFolder` | `~/.local/share/openspace/skill-plugins` | The small plugins that hand skills to Claude Code desks (links only) |
 | `SecurityAudits:Folder` | `~/.local/share/openspace/security-audits` | Where audits keep their records, a `run-N` folder per office and run, outside every repository |
+| `Brain:Folder` | `~/.local/share/openspace/brain` | The brain's vault: Markdown notes with their own git, made on first start. See [Brain](#brain) |
+| `Brain:WatchDelay` | `00:00:00.5` | How long edits made outside Openspace settle before the index reads them again |
 
 `appsettings.json` holds non-secret defaults. Local overrides go in
 `appsettings.Local.json` (ignored by git) or environment variables, for example
@@ -773,3 +778,31 @@ tool), reads (that tool only looks: Read, Grep, Glob, web), or waits for its per
 reply ended its turn, or nothing happened for three minutes). In an office with private folders
 guests stay anonymous: no folder, no branch. Openspace only watches them: it cannot pause,
 answer or give them tasks.
+
+## Brain
+
+Shiori's vault (planned in [docs/brain.md](../../../docs/brain.md)) is a folder of Markdown
+notes, `Brain:Folder`, that Obsidian opens as a vault. On start `BrainService` creates what is
+missing of the standard structure and never overwrites a file that is there:
+`Constitution.md` (the founding rules, numbered), `Now.md`, and the folders `Decisions`,
+`Plans`, `Studies`, `Sessions`, `Digests`, `Offices`, `Inhabitants` and `Chronicle`, each with a
+README saying what goes in it. The folder is its own git repository (`git init`, a first
+commit by "Openspace", identity in its local settings only, never a remote).
+
+Every note has the same YAML front matter (`kind`, `status`, `title`, `offices`, `rooms`,
+`paths`, `review`, `supersedes`, `from`, `author`; what does not apply is left out) and links
+to others with `[[wikilinks]]`. Lists may be written in brackets or with dashes, as Obsidian
+does; fields Openspace does not know are kept as written. Openspace writes a note whole
+(a temporary file moved over it) and commits only that note, with its author as the commit's
+author and at the start of its message (`Screens: wrote Decisions/merge-order.md`); a write
+that changes nothing makes no commit. Paths are relative to the vault; `..`, absolute paths
+and hidden folders such as `.git` are refused.
+
+The notes are copied into an SQLite FTS5 table (`BrainNotes`) of Openspace's database,
+rebuilt on start and kept current by a file watcher, so edits made in Obsidian are found
+within a second; deleting the table loses nothing. The folders' READMEs are not indexed.
+Search ranks: superseded notes last; then all the words in the title before words only in the
+body; then the scope (for each of office, room and path asked, a note that names it beats one
+that applies everywhere, which beats one about others; paths are globs such as `src/web/**`);
+then the status (accepted, proposed, the rest); then the text's score; then the newest.
+

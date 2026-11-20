@@ -771,3 +771,75 @@
   justify-items: start;
   gap: 6px;
 }
+
+/*
+ * Narrow screens: the actions wrap from the left instead of floating beside the name, and
+ * the columns that need the person come first (Board orders them).
+ */
+@media (max-width: 1100px) {
+  .board-head {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* The office's name is already in the line above (the office switcher): kept only for
+     screen readers, as the page's heading. */
+  .board-head h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Phones: the columns stack and the page scrolls down, so no column hides off to the side. */
+@media (max-width: 760px) {
+  .board-head {
+    padding: 12px 16px;
+  }
+
+  .board-head .row {
+    width: 100%;
+  }
+
+  .board-search {
+    flex: 1 1 100%;
+  }
+
+  .board-search input {
+    width: 100%;
+  }
+
+  .board-head select {
+    max-width: 100%;
+  }
+
+  .board-main {
+    overflow-y: auto;
+  }
+
+  .columns {
+    flex: none;
+    flex-direction: column;
+    padding: 0 16px 16px;
+    overflow-x: visible;
+  }
+
+  .column,
+  .column-folded {
+    flex: none;
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .column-folded .column-head {
+    flex-direction: row;
+    writing-mode: horizontal-tb;
+  }
+
+  .cards {
+    overflow-y: visible;
+  }
+}

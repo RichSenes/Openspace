@@ -11,7 +11,9 @@ import { TaskDrawer } from './TaskDrawer'
 import { SupervisorDialog } from './SupervisorDialog'
 import { MergeDialog } from './MergeDialog'
 import { PlansStrip } from '../supervisor/PlansStrip'
-import { awaitingMerge, checksDone, COLUMNS, searchTasks, waitingFor, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { awaitingMerge, checksDone, searchTasks, waitingFor, withoutMerged, filterByEpic, groupByColumn, reviewVerdictOf, type EpicFilter } from './taskRules'
+import { boardColumns } from './columnOrder'
+import { NARROW, useMediaQuery } from '../ui/useMediaQuery'
 import './board.css'
 import { formatMoment } from '../ui/dates'
 
@@ -44,6 +46,8 @@ export function Board({ office, initialTaskId }: Props) {
   const groups = useMemo(() => groupByColumn(shown), [shown])
   const openTask = tasks.data?.find((t) => t.id === openTaskId)
   const toMerge = awaitingMerge(tasks.data ?? []).length
+  // Narrow screens show two or three columns at a time: the ones that need the person come first.
+  const columns = boardColumns(useMediaQuery(NARROW))
 
   return (
     <section className={openTask ? 'board has-drawer' : 'board'}>
@@ -87,7 +91,7 @@ export function Board({ office, initialTaskId }: Props) {
       {tasks.error && <p className="error board-error">Could not load tasks: {tasks.error.message}</p>}
 
       <div className="columns">
-        {COLUMNS.map((column) => {
+        {columns.map((column) => {
           const items = groups.get(column.status) ?? []
           // With a task open, empty columns fold to a strip so the others keep their width;
           // Done keeps its width while it has merged work to show.

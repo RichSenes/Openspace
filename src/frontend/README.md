@@ -24,7 +24,8 @@ over HTTP and keeps itself up to date through the SignalR hub.
 src/
   api/        Types, fetch client (problem details to readable errors), query hooks
   realtime/   The SignalR connection: merges pushed data, refetches what changed
-  layout/     Top bar, the strip of account and graphics card notices, office sidebar
+  layout/     Top bar and its More menu, the strip of account and graphics card notices,
+              office sidebar (a switcher on narrow screens)
   building/   The building: layout and floor plans, walls and doors, camera, minimap,
               stations, guests, the Arrange panel, agent cards and the activity feed
   art/        Pixel art: palette, themes, sprites, rooms and scenes, lighting, weather
@@ -148,6 +149,13 @@ Across every view:
   failed (each opens on its office's Board with the task open), routines' proposals (yes
   and no right there) and routines whose last run failed. It refreshes as tasks and
   routines change; on a phone the list takes the screen's width.
+- Below 1100 px the layout changes instead of shrinking. The office list folds into one
+  line with the current office and a "Switch office" button that opens the list over the
+  view. The tabs that do not fit go behind a "More" button (Escape or a click elsewhere
+  closes it, the arrows move inside it); the current view always keeps its tab. The Board
+  puts the columns that need you first (Review, Failed, Proposed), and on phones stacks
+  them so the page scrolls down, never sideways. The building's toolbar wraps, with its
+  hint on a line of its own, and the hint goes away on phones.
 - Without offices, the page is a short path to the first one: an engine, the office,
   rooms and desks, the repository, a first task, each with its button. A new office
   (no tasks, no routines) keeps the path in a corner of the building until it is

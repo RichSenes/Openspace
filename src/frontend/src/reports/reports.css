@@ -14,18 +14,45 @@
   font-size: 20px;
 }
 
+/* Three kinds of report, each in its own card with what it tells and its one button. */
+.report-language {
+  max-width: 260px;
+}
+
 .report-forms {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 16px;
-  align-items: end;
+  align-items: stretch;
 }
 
 .report-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.report-form h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.report-form p {
+  margin: 0;
+}
+
+.report-form .field {
+  align-self: stretch;
+}
+
+/* What follows the explanation sits at the bottom, so the three buttons line up. */
+.report-form > :nth-child(3) {
+  margin-top: auto;
 }
 
 .reports-body {
@@ -157,18 +184,7 @@
 }
 
 @media (max-width: 900px) {
-  .report-forms,
-  .report-form,
   .reports-body {
     grid-template-columns: 1fr;
   }
-}
-
-.report-form-hint {
-  margin: 0;
-}
-
-/* The changelog explains itself, so it takes a row of its own. */
-.report-form-wide {
-  grid-column: 1 / -1;
 }

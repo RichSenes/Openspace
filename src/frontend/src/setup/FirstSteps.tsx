@@ -4,12 +4,13 @@ import { useEngines, useOfficeTasks, useOpenOffice } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import type { View } from '../layout/TopBar'
 import { useToast } from '../ui/toastContext'
+import { requestSettingsSection } from '../settings/sections'
 import { firstSteps, type StepAction } from './setup'
 import './setup.css'
 
 const OPENS: Record<StepAction, { label: string; view: View }> = {
   office: { label: 'Open office', view: 'building' },
-  agents: { label: 'Open Agents', view: 'agents' },
+  engine: { label: 'Open Settings › Engines', view: 'settings' },
   rooms: { label: 'Set up rooms', view: 'rooms' },
   repository: { label: 'Choose it in Office', view: 'office' },
   board: { label: 'Open the Board', view: 'board' },
@@ -60,7 +61,10 @@ export function FirstSteps({ office, onSelect, onView, onHide }: Props) {
                 (step.action === 'office' ? (
                   <OpenOffice onOpened={onSelect} />
                 ) : (
-                  <button type="button" className={step === next ? 'btn btn-primary' : 'btn'} onClick={() => onView(OPENS[step.action].view)}>
+                  <button type="button" className={step === next ? 'btn btn-primary' : 'btn'} onClick={() => {
+                      if (step.action === 'engine') requestSettingsSection('engines')
+                      onView(OPENS[step.action].view)
+                    }}>
                     {OPENS[step.action].label}
                   </button>
                 ))}

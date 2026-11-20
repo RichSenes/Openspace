@@ -43,13 +43,13 @@ describe('setupProblems', () => {
 describe('firstSteps', () => {
   it('starts from the engine and the office', () => {
     const steps = firstSteps(engines(false, false), { office: undefined, tasks: 0 })
-    expect(steps.map((s) => s.action)).toEqual(['agents', 'office', 'rooms', 'repository', 'board'])
+    expect(steps.map((s) => s.action)).toEqual(['engine', 'office', 'rooms', 'repository', 'board'])
     expect(steps.every((s) => !s.done)).toBe(true)
   })
 
   it('ticks what a new office already has', () => {
     const steps = firstSteps(engines(true, false), { office: office(['OpenCode'], '/repos/shop'), tasks: 0 })
-    expect(steps.filter((s) => s.done).map((s) => s.action)).toEqual(['agents', 'office', 'rooms', 'repository'])
+    expect(steps.filter((s) => s.done).map((s) => s.action)).toEqual(['engine', 'office', 'rooms', 'repository'])
     expect(firstSteps(engines(true, true), { office: office([]), tasks: 1 }).find((s) => s.action === 'rooms')?.done).toBe(false)
   })
 })

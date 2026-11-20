@@ -13,7 +13,7 @@ export function VersionCard() {
     })
   return (
     <section className="settings-card" aria-labelledby="version">
-      <h2 id="version">Version</h2>
+      <h3 id="version">Version</h3>
       <p>
         This is Openspace {view.current}.
         {view.newer && view.latest && (

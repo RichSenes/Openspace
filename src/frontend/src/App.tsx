@@ -15,6 +15,7 @@ import { RoutinesPanel } from './routines/RoutinesPanel'
 import { SecurityPanel } from './security/SecurityPanel'
 import { OfficePanel } from './office/OfficePanel'
 import { FirstSteps } from './setup/FirstSteps'
+import { requestSettingsSection } from './settings/sections'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
 
@@ -48,7 +49,12 @@ export default function App() {
         <Sidebar offices={offices.data ?? []} selectedId={office?.id} onSelect={setSelectedId} />
         <main className="main">
           {view === 'agents' ? (
-            <AgentsPanel />
+            <AgentsPanel
+              onOpenEngines={() => {
+                requestSettingsSection('engines')
+                setView('settings')
+              }}
+            />
           ) : view === 'settings' ? (
             <SettingsPanel />
           ) : offices.isPending ? (

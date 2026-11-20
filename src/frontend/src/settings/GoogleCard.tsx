@@ -24,7 +24,7 @@ export function GoogleCard() {
 
   return (
     <section className="settings-card" aria-labelledby="google">
-      <h2 id="google">Google accounts</h2>
+      <h3 id="google">Google accounts</h3>
       <p className="hint">
         Routines read, label and archive mail, and keep reply drafts, in the accounts connected here. They never send mail. Each account&apos;s key stays
         in a file on this computer that only you can read.

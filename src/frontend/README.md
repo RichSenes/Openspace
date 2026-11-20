@@ -107,8 +107,8 @@ job pages), each place with **Test**; what the person looks for and does not wan
 Japanese, visa and the lowest salary; where the profile and the offer folders are; how many
 offers are judged and from how many stars they arrive; the bot and the language.
 
-**Reports.** Reports of a day or of an epic, and changelogs, in a chosen language:
-read them, copy them, download them.
+**Reports.** Reports of a day or of an epic, and changelogs, in a chosen language,
+each kind in its own card with what it tells: read them, copy them, download them.
 
 **The supervisor's plans** run in the background: asking for one (from the Board, or handing
 security findings over) never holds the page. While it plans, the status bar says so; when it
@@ -120,15 +120,19 @@ standard or deep, in a chosen language), follow its runs, read the findings (con
 first, those to verify, the rejected) and the full report, and hand the findings to the
 supervisor, one or all at once, or let the audit do it by itself when it finishes.
 
-**Agents.** Roles: description, instructions (with an AI draft to review),
+**Agents.** Roles (the engines are in Settings): description, instructions (with an AI draft to review),
 preferred model, what the agent may do without asking (a new role asks before
 commands), and which installed skills it may load (all of them, or the ones ticked).
 Ready-made roles (backend, frontend, mobile, database, tester, reviewer, security,
 writer) are added with one click and then adjusted like any other.
 
-**Settings.** Permissions, agents at work at once, who plans and reviews (Claude
-Code, or OpenCode models chosen for plans and for reviews), the Claude account's limits, sounds, the weather's town, the version, backups and
-Google accounts.
+**Settings.** Sections with an index beside them (a row of links on narrow screens),
+one shown at a time and remembered: *Engines* (whether OpenCode and Claude Code
+answer, where their keys live, the Claude account's limits), *How agents work*
+(permissions, agents at work at once, who plans and reviews: Claude Code, or OpenCode
+models chosen for plans and for reviews; one save), *Connections* (Google accounts,
+Telegram), *Look and sound* (sounds, the weather's town), *System* (version,
+backups). The engine warning in the top bar and the first steps open *Engines*.
 
 Across every view:
 

@@ -3,7 +3,6 @@ import { Plus, Sparkles } from 'lucide-react'
 import { useDeleteRole, useDraftRole, useEngines, useRoles, useSaveRole, useSkills } from '../api/hooks'
 import type { PermissionLevel, RoleInput, RoleView } from '../api/types'
 import { modelOptions } from '../engines/engines'
-import { EnginesCard } from '../engines/EnginesCard'
 import { DeskUsage } from './DeskUsage'
 import { useToast } from '../ui/toastContext'
 import { readyRolesLeft } from './readyRoles'
@@ -11,7 +10,7 @@ import { CAPABILITIES, formFrom, HELPER_LABEL, PERMISSION_LABEL, permissionSumma
 import './agents.css'
 
 /** Defines the kinds of agents desks can host: what they do, how, and what they may do alone. */
-export function AgentsPanel() {
+export function AgentsPanel({ onOpenEngines }: { onOpenEngines: () => void }) {
   const roles = useRoles()
   const [selected, setSelected] = useState<string | 'new'>('new')
   const current = roles.data?.find((r) => r.id === selected)
@@ -21,9 +20,13 @@ export function AgentsPanel() {
       <header className="agents-head">
         <h1>Agents</h1>
         <p className="hint">
-          A role tells an agent what it is for, how to work and what it may do without asking. Give roles to desks in Rooms.
+          A role tells an agent what it is for, how to work and what it may do without asking. Give roles to desks in Rooms. What runs
+          the agents is in{' '}
+          <button type="button" className="link-button" onClick={onOpenEngines}>
+            Settings › Engines
+          </button>
+          .
         </p>
-        <EnginesCard />
       </header>
 
       <div className="agents-body">

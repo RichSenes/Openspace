@@ -9,7 +9,7 @@ export function WeatherCard() {
   const saved = weather.data?.place ?? ''
   return (
     <section className="settings-card" aria-labelledby="weather">
-      <h2 id="weather">Weather at the windows</h2>
+      <h3 id="weather">Weather at the windows</h3>
       <p className="hint">
         The windows show the real weather of a town: clouds, fog, rain, snow and storms. Only the town&apos;s name and position go to Open-Meteo, a
         free weather service with no account; it is asked again every quarter of an hour.

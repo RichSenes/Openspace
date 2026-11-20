@@ -23,7 +23,7 @@ export function setupProblems(engines: EnginesView | undefined, offices: OfficeV
       {
         key: 'no-engine',
         text: 'No engine runs agents',
-        title: 'Neither OpenCode nor Claude Code answers: start opencode serve, or install Claude Code. Open Agents to see how.',
+        title: 'Neither OpenCode nor Claude Code answers: start opencode serve, or install Claude Code. Open Settings › Engines to see how.',
       },
     ]
   }
@@ -50,7 +50,7 @@ export function setupProblems(engines: EnginesView | undefined, offices: OfficeV
   return problems
 }
 
-export type StepAction = 'agents' | 'office' | 'rooms' | 'repository' | 'board'
+export type StepAction = 'engine' | 'office' | 'rooms' | 'repository' | 'board'
 
 export interface FirstStep {
   action: StepAction
@@ -73,7 +73,7 @@ export function firstSteps(engines: EnginesView | undefined, { office, tasks }: 
   const desks = office?.rooms.reduce((n, r) => n + r.desks.length, 0) ?? 0
   return [
     {
-      action: 'agents',
+      action: 'engine',
       title: 'An engine for the agents',
       detail: engines?.openCode
         ? engines.claudeCode

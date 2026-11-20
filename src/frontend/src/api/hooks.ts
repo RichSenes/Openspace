@@ -49,6 +49,9 @@ import type {
   LocalAiView,
   LocalModelSetting,
   ModelCheck,
+  ModelsSettings,
+  ModelsView,
+  SettingsChange,
 } from './types'
 
 export const keys = {
@@ -78,6 +81,7 @@ export const keys = {
   gpu: ['gpu'] as const,
   localAi: ['local-ai'] as const,
   settings: ['settings'] as const,
+  models: ['models'] as const,
   weather: ['weather'] as const,
   backups: ['backups'] as const,
   sounds: ['sounds'] as const,
@@ -542,6 +546,8 @@ export function useSaveLocalAi() {
     mutationFn: (settings: LocalAiSettings) => request<LocalAiView>('PUT', '/api/local-ai', settings),
     onSuccess: (view) => {
       client.setQueryData(keys.localAi, view)
+      // Settings › Models chooses among the local models.
+      void client.invalidateQueries({ queryKey: keys.models })
       void client.invalidateQueries({ queryKey: keys.gpu })
       void client.invalidateQueries({ queryKey: keys.engines })
     },
@@ -720,9 +726,27 @@ export function useSettings() {
 export function useSaveSettings() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (settings: SettingsView) => request<SettingsView>('PUT', '/api/settings', settings),
+    mutationFn: (settings: SettingsChange) => request<SettingsView>('PUT', '/api/settings', settings),
     onSuccess: (saved) => {
       client.setQueryData(keys.settings, saved)
+      void client.invalidateQueries({ queryKey: keys.engines })
+    },
+  })
+}
+
+/** Each function's engine and model, with the local models to choose from. */
+export function useModels() {
+  return useQuery({ queryKey: keys.models, queryFn: () => request<ModelsView>('GET', '/api/models') })
+}
+
+/** Saves Settings › Models; who plans and reviews changes too, so settings and engines are read again. */
+export function useSaveModels() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (models: ModelsSettings) => request<ModelsView>('PUT', '/api/models', models),
+    onSuccess: (view) => {
+      client.setQueryData(keys.models, view)
+      void client.invalidateQueries({ queryKey: keys.settings })
       void client.invalidateQueries({ queryKey: keys.engines })
     },
   })

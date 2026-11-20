@@ -251,6 +251,7 @@ export type Autonomy = 'Auto' | 'Ask'
 export interface SettingsView {
   autonomy: Autonomy
   seats: number
+  /** Read only here: Settings › Models sets who plans and reviews. */
   claudeSupervises: boolean
   supervisorModel: string | null
   claudeReviews: boolean
@@ -258,6 +259,38 @@ export interface SettingsView {
   draftModel: string | null
   /** OpenCode model that reviews finished work when Claude Code does not; null for no review. */
   openCodeReviewModel?: string | null
+}
+
+/** What How agents work changes: the planner and the reviewer are left as they are. */
+export type SettingsChange = Pick<SettingsView, 'autonomy' | 'seats'>
+
+export type ModelEngine = 'ClaudeCode' | 'OpenCode' | 'Local'
+
+/** A function on Claude Code or OpenCode, with a model for each; the OpenCode one stands in when Claude Code is missing. */
+export interface EngineChoice {
+  /** Null, for the reviewer only, means no review. */
+  engine: 'ClaudeCode' | 'OpenCode' | null
+  claudeModel: string | null
+  openCodeModel: string | null
+}
+
+export interface FunctionChoice {
+  engine: ModelEngine
+  /** Null for the engine's default; for Local, the first model of the list. */
+  model: string | null
+}
+
+export interface ModelsSettings {
+  shiori: EngineChoice
+  reviewer: EngineChoice
+  digests: FunctionChoice
+  journals: FunctionChoice
+}
+
+export interface ModelsView extends ModelsSettings {
+  /** The models of Settings › Local AI, named local/<id>. */
+  localModels: ModelOption[]
+  decider: { configured: boolean; command: string; url: string }
 }
 
 export type AuditKind = 'Lifecycle' | 'Step' | 'Read' | 'Change' | 'Command' | 'Search' | 'Permission' | 'Note' | 'Procedure' | 'Other'

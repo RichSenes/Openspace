@@ -230,7 +230,9 @@ Each project has its own README:
 [Frontend](src/frontend/README.md) ·
 [Tests](tests/README.md).
 The plan is in [docs/vision.md](docs/vision.md), the pixel art rules in
-[docs/art-style.md](docs/art-style.md).
+[docs/art-style.md](docs/art-style.md). The shared brain that comes next, Shiori, is
+planned in [docs/brain.md](docs/brain.md), split into stories in
+[docs/brain-stories.md](docs/brain-stories.md).
 
 ## Development
 

@@ -98,6 +98,7 @@ app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();
 app.MapLocalAiEndpoints();
+app.MapBrainSettingsEndpoints();
 app.MapModelsEndpoints();
 app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();

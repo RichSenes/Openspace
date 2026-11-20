@@ -790,3 +790,13 @@ export interface ModelCheck {
   fine: string[]
   problems: string[]
 }
+
+/** Where Shiori's vault is and what it holds. */
+export interface BrainSummary {
+  folder: string
+  /** The folder set for the next start; differs from folder until Openspace restarts. */
+  configured: string
+  notes: number
+  kinds: Record<string, number>
+  lastChange: string | null
+}

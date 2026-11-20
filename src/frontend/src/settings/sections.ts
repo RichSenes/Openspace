@@ -1,8 +1,9 @@
 /** The parts of Settings, grouped by what the person wants to do, in the order of the index. */
-export type SettingsSection = 'engines' | 'local' | 'models' | 'agents' | 'connections' | 'look' | 'system'
+export type SettingsSection = 'engines' | 'brain' | 'local' | 'models' | 'agents' | 'connections' | 'look' | 'system'
 
 export const SECTIONS: { id: SettingsSection; label: string; hint: string }[] = [
   { id: 'engines', label: 'Engines', hint: 'What runs the agents, and your Claude account' },
+  { id: 'brain', label: 'Brain', hint: 'Shiori\'s vault: where it is and what it holds' },
   { id: 'local', label: 'Local AI', hint: 'Models on this machine and who comes first on the card' },
   { id: 'models', label: 'Models', hint: 'Which engine and model does each job: Shiori, reviews, digests, journals' },
   { id: 'agents', label: 'How agents work', hint: 'Permissions and how many work at once' },

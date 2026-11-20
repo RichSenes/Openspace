@@ -269,3 +269,79 @@
 .engine-missing {
   color: var(--danger);
 }
+
+/* Local AI: each model a block of its own inside the card, its check under its button. */
+.local-ai .local-models {
+  grid-column: 1 / -1;
+}
+
+.local-numbers,
+.local-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px;
+}
+
+.local-model {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.local-model-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.local-model-head .btn {
+  margin-left: auto;
+}
+
+.local-check {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.local-check li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.local-holders {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.local-holders li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.local-holder-state {
+  padding-bottom: 8px;
+  color: var(--st-running);
+}
+
+@container settings (max-width: 759px) {
+  .local-holders li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .local-holders li .field:first-child {
+    grid-column: 1 / -1;
+  }
+}

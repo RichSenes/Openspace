@@ -104,6 +104,9 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | PUT | `/api/offices/{id}/desks/{deskId}/name` | Rename a desk: `{ name }` (unique within its room) |
 | PUT | `/api/offices/{id}/desks/{deskId}/agent` | What runs the desk's agent: `{ engine, agentName, model? }`; `engine` is `OpenCode` (model as `provider/model`) or `ClaudeCode` (model such as `sonnet` or `claude-sonnet-5-5`); applies from the desk's next task |
 | GET | `/api/engines` | What can run agents here: OpenCode and its models, Claude Code and its models, the Claude account's usage, which engine supervises and which reviews |
+| GET | `/api/local-ai` | The local models' settings (`enabled, serverUrl, models[], holders[], idleUnloadMinutes, yieldGraceMinutes, decider`), the card's memory (`cardMiB`, `usedMiB`) and the programs that come first running now |
+| PUT | `/api/local-ai` | Saves those settings in the settings file and applies them at once; `422` with the reason for a model name, command, address or time that cannot work |
+| POST | `/api/local-ai/check` | Looks at one model without loading it: `{ ok, fine[], problems[] }` about its command, the files its arguments name and the card's memory |
 | GET | `/api/gpu` | Who has the graphics card: `{ state, model, modelName, holders, detail, routineTurn, routinesWaiting, users }`. See [Local models](#local-models-and-the-graphics-card) |
 | POST | `/api/gpu/claim` | `{ holder }`: a program takes the card; local work gives way. Renew within `LocalModels:ClaimLease` |
 | DELETE | `/api/gpu/claim/{holder}` | The program gives the card back |
@@ -636,7 +639,9 @@ With `LocalModels:Enabled`, desks can name models served on this machine as
 `local/<id>` (the provider name is `LocalModels:Provider`). Each model says what
 starts its server, a command that stays in the foreground and answers an
 OpenAI-compatible API at `LocalModels:ServerUrl`, and how much graphics memory it
-needs. Keep real paths in `appsettings.Local.json`, which git ignores:
+needs. Set them in **Settings › Local AI** (written to the settings file, applied at
+once; a list there replaces the one below it, item by item), or keep real paths in
+`appsettings.Local.json`, which git ignores:
 
 ```json
 "LocalModels": {

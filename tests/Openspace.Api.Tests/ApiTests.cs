@@ -707,6 +707,36 @@ public sealed class ApiTests : IDisposable
         Assert.Contains("\"Seats\": 3", await File.ReadAllTextAsync(_app.SettingsPath), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Local_models_set_in_Openspace_apply_at_once_and_a_shorter_list_leaves_nothing_behind()
+    {
+        static object Model(string id) => new { id, name = id.ToUpperInvariant(), command = "/opt/llm/start.sh", arguments = new[] { "--port", "8080", " " }, memoryMiB = 8000, context = 32768 };
+        object Request(params object[] models) => new
+        {
+            enabled = false,
+            serverUrl = "http://127.0.0.1:8080",
+            models,
+            holders = new[] { new { name = "Image studio", match = "studio.py" } },
+            idleUnloadMinutes = 15,
+            yieldGraceMinutes = 3,
+            decider = new { command = "", arguments = Array.Empty<string>(), url = "http://127.0.0.1:8017" },
+        };
+
+        (await _http.PutAsJsonAsync("/api/local-ai", Request(Model("gemma"), Model("qwen-3")))).EnsureSuccessStatusCode();
+        (await _http.PutAsJsonAsync("/api/local-ai", Request(Model("gemma")))).EnsureSuccessStatusCode();
+        var view = await GetAsync<JsonElement>("/api/local-ai");
+        var models = await GetAsync<JsonElement>("/api/routine-models");
+        var refused = await _http.PutAsJsonAsync("/api/local-ai", Request(Model("Gemma 4"), Model("gemma")));
+
+        var settings = view.GetProperty("settings");
+        var model = Assert.Single(settings.GetProperty("models").EnumerateArray());
+        Assert.Equal(["--port", "8080"], model.GetProperty("arguments").EnumerateArray().Select(a => a.GetString()));
+        Assert.Equal(15, settings.GetProperty("idleUnloadMinutes").GetInt32());
+        Assert.Equal("Image studio", Assert.Single(settings.GetProperty("holders").EnumerateArray()).GetProperty("name").GetString());
+        Assert.Equal(["local/gemma"], models.EnumerateArray().Select(m => m.GetProperty("id").GetString()));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+    }
+
     [Theory]
     [InlineData(0, null)]
     [InlineData(13, null)]

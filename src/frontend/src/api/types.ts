@@ -718,3 +718,42 @@ export interface SupervisorJob {
   error: string | null
   endedAt: string | null
 }
+
+/** A model served on this machine, as Settings › Local AI sets it. */
+export interface LocalModelSetting {
+  id: string
+  name: string
+  command: string
+  arguments: string[]
+  memoryMiB: number
+  context: number
+}
+
+export interface GpuHolderSetting {
+  name: string
+  match: string
+}
+
+export interface LocalAiSettings {
+  enabled: boolean
+  serverUrl: string
+  models: LocalModelSetting[]
+  holders: GpuHolderSetting[]
+  idleUnloadMinutes: number
+  yieldGraceMinutes: number
+  decider: { command: string; arguments: string[]; url: string }
+}
+
+export interface LocalAiView {
+  settings: LocalAiSettings
+  /** The graphics card's memory; null when no driver tool reads it. */
+  cardMiB: number | null
+  usedMiB: number | null
+  holdersRunning: string[]
+}
+
+export interface ModelCheck {
+  ok: boolean
+  fine: string[]
+  problems: string[]
+}

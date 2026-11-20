@@ -21,17 +21,10 @@ internal sealed partial class GpuShiftService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try
-        {
-            if (await OpenCodeLocalProvider.WriteAsync(options.CurrentValue, stoppingToken).ConfigureAwait(false))
-            {
-                LogProviderWritten(logger, options.CurrentValue.OpenCodeConfigPath!);
-            }
-        }
-        catch (IOException ex)
-        {
-            LogProviderFailed(logger, ex);
-        }
+        await WriteProviderAsync(options.CurrentValue, stoppingToken).ConfigureAwait(false);
+
+        // Models changed from Settings reach OpenCode's provider file too (OpenCode reads it when it starts).
+        using var changes = options.OnChange(changed => _ = WriteProviderAsync(changed, stoppingToken));
 
         using var timer = new PeriodicTimer(Interval);
         do
@@ -40,6 +33,21 @@ internal sealed partial class GpuShiftService(
             await decider.StopIfIdleAsync(stoppingToken).ConfigureAwait(false);
         }
         while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
+    }
+
+    private async Task WriteProviderAsync(LocalModelOptions current, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await OpenCodeLocalProvider.WriteAsync(current, cancellationToken).ConfigureAwait(false))
+            {
+                LogProviderWritten(logger, current.OpenCodeConfigPath!);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogProviderFailed(logger, ex);
+        }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)

@@ -129,7 +129,9 @@ writer) are added with one click and then adjusted like any other.
 
 **Settings.** Sections with an index beside them (a row of links on narrow screens),
 one shown at a time and remembered: *Engines* (whether OpenCode and Claude Code
-answer, where their keys live, the Claude account's limits), *How agents work*
+answer, where their keys live, the Claude account's limits), *Local AI* (models on
+this machine with a check that loads nothing, the programs that come first on the
+graphics card, the small model for routines' questions; one save), *How agents work*
 (permissions, agents at work at once, who plans and reviews: Claude Code, or OpenCode
 models chosen for plans and for reviews; one save), *Connections* (Google accounts,
 Telegram), *Look and sound* (sounds, the weather's town), *System* (version,

@@ -47,6 +47,8 @@ builder.Services.AddSingleton(new Openspace.Application.Releases.AppVersion(Open
 builder.Services.Configure<Openspace.Application.Guests.GuestOptions>(builder.Configuration.GetSection(Openspace.Application.Guests.GuestOptions.SectionName));
 builder.Services.Configure<QueueOptions>(builder.Configuration.GetSection(QueueOptions.SectionName));
 builder.Services.Configure<Openspace.Application.LocalModels.LocalModelOptions>(builder.Configuration.GetSection(Openspace.Application.LocalModels.LocalModelOptions.SectionName));
+// Lists set in Openspace leave blank items where appsettings.Local.json had more: they are dropped here.
+builder.Services.PostConfigure<Openspace.Application.LocalModels.LocalModelOptions>(Openspace.Application.LocalModels.LocalAiSettings.DropBlanks);
 builder.Services.Configure<OpenCodeOptions>(builder.Configuration.GetSection(OpenCodeOptions.SectionName));
 builder.Services.Configure<ClaudeCodeOptions>(builder.Configuration.GetSection(ClaudeCodeOptions.SectionName));
 builder.Services.Configure<Openspace.Infrastructure.Skills.SkillsOptions>(builder.Configuration.GetSection(Openspace.Infrastructure.Skills.SkillsOptions.SectionName));
@@ -91,6 +93,7 @@ app.MapRoutineHelpEndpoints();
 app.MapGoogleEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();
+app.MapLocalAiEndpoints();
 app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);

@@ -147,6 +147,12 @@ a.btn {
   background: var(--bg);
 }
 
+/* One height for every one-line field, whatever its font: side by side, they line up. */
+input.input,
+select.input {
+  height: 38px;
+}
+
 textarea.input {
   resize: vertical;
   min-height: 80px;

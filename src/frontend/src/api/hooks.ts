@@ -45,6 +45,10 @@ import type {
   QueueWait,
   VersionView,
   NeedsYouItem,
+  LocalAiSettings,
+  LocalAiView,
+  LocalModelSetting,
+  ModelCheck,
 } from './types'
 
 export const keys = {
@@ -72,6 +76,7 @@ export const keys = {
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
   gpu: ['gpu'] as const,
+  localAi: ['local-ai'] as const,
   settings: ['settings'] as const,
   weather: ['weather'] as const,
   backups: ['backups'] as const,
@@ -525,6 +530,29 @@ export function useEngines() {
 }
 
 /** Who has the graphics card: it changes within seconds when a program takes it. */
+/** The local models' settings, with the card's memory and the programs that hold it now. */
+export function useLocalAi() {
+  return useQuery({ queryKey: keys.localAi, queryFn: () => request<LocalAiView>('GET', '/api/local-ai') })
+}
+
+/** Saves the local models' settings; they apply at once and the view comes back. */
+export function useSaveLocalAi() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (settings: LocalAiSettings) => request<LocalAiView>('PUT', '/api/local-ai', settings),
+    onSuccess: (view) => {
+      client.setQueryData(keys.localAi, view)
+      void client.invalidateQueries({ queryKey: keys.gpu })
+      void client.invalidateQueries({ queryKey: keys.engines })
+    },
+  })
+}
+
+/** Looks at one model without loading it: its command, its files, whether it fits the card. */
+export function useCheckLocalModel() {
+  return useMutation({ mutationFn: (model: LocalModelSetting) => request<ModelCheck>('POST', '/api/local-ai/check', model) })
+}
+
 export function useGpu() {
   return useQuery({
     queryKey: keys.gpu,

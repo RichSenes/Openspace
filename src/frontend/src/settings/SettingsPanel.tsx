@@ -5,6 +5,7 @@ import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
 import { formatMoment } from '../ui/dates'
 import { GoogleCard } from './GoogleCard'
+import { LocalAiSection } from './LocalAiSection'
 import { SoundsCard } from './SoundsCard'
 import { WeatherCard } from './WeatherCard'
 import { VersionCard } from './VersionCard'
@@ -66,6 +67,7 @@ export function SettingsPanel() {
               </section>
             </div>
           )}
+          {section === 'local' && <LocalAiSection />}
           {section === 'agents' && (
             <>
               {settings.error && <p className="error">Could not read the settings: {settings.error.message}</p>}

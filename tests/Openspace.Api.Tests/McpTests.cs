@@ -9,11 +9,14 @@ using Openspace.Domain.Work;
 namespace Openspace.Api.Tests;
 
 /// <summary>Talks to the real /mcp endpoint with the official MCP client, as OpenCode would.</summary>
-public sealed class McpTests : IAsyncDisposable
+public sealed class McpTests : IAsyncLifetime
 {
     private readonly OpenspaceApp _app = new();
 
-    public async ValueTask DisposeAsync() => await _app.DisposeAsync();
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    // xUnit 2 never calls IAsyncDisposable on a test class: through IAsyncLifetime the host and its temporary folders go.
+    public async Task DisposeAsync() => await _app.DisposeAsync();
 
     private async Task<McpClient> ConnectAsync(Guid? taskId)
     {

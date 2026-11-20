@@ -38,6 +38,11 @@ public static class DependencyInjection
             connectionString, sp.GetRequiredService<IOptions<BackupOptions>>(), sp.GetRequiredService<TimeProvider>()));
         services.AddHostedService<BackupService>();
 
+        // Shiori's vault: Markdown files with their own git, mirrored in the database for search.
+        services.AddSingleton<Application.Brain.IVault, Brain.FileVault>();
+        services.AddSingleton<Application.Brain.IBrainIndex>(sp => new Brain.BrainIndex(connectionString, sp.GetRequiredService<Application.Brain.IVault>()));
+        services.AddHostedService<BrainService>();
+
         // Claude Code sessions started outside Openspace come in as guests.
         services.AddSingleton<Application.Guests.IClaudeSessions, Guests.ClaudeSessionLogs>();
         services.AddHostedService<GuestService>();

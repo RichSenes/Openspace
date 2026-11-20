@@ -21,6 +21,7 @@ implements a port of `Openspace.Application` (see the table there).
 | `ClaudeCode/` | `ClaudeCodeRuntime` (`claude -p` in the task's working copy, following its stream, resuming the same conversation), `ClaudeCodeEvents`, `ClaudeCodePermissions` (the role's tools, the rest asked through Openspace), `ClaudeCodeUsage` (the account's limits), `AgentRuntimeRouter` (each session to its engine) |
 | `Git/` | `GitWorkspaceManager` (a worktree per task, diffs, commits, merges), `GitCli`, `GitHubPullRequests` (through `gh`) |
 | `Checks/` | `ShellCheckRunner`: a room's check command in a throwaway copy, with a timeout |
+| `Brain/` | `FileVault` (the vault's notes on disk, written whole, a commit per write in its own git), `VaultTemplate` (the structure a new vault starts with), `BrainIndex` (the notes in an FTS5 table), `VaultWatcher` (edits made outside Openspace); `Hosting/BrainService` puts them to work on start |
 | `Persistence/` | EF Core on SQLite: the repositories, the audit log, migrations, `SqliteBackups` |
 | `LocalModels/` | `LocalModelServer` (starts and stops the model's server), `LlamaServerApi`, `GpuProbe` (graphics memory and running programs), `OpenCodeLocalProvider` (the provider OpenCode reads), `DeciderClient` (yes/no questions on the processor) |
 | `Guests/` | `ClaudeSessionLogs`: the end of Claude Code's own session logs; only the folder, branch, time, how it was started and tool names are kept |

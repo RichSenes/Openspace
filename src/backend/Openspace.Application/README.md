@@ -30,6 +30,7 @@ ports, which `Openspace.Infrastructure` implements.
 | `Agents/` | `TaskRunner` (worktree, session and brief for each started task), `Briefing`, `AgentSetups` (engine, model, role and private folders of a desk's agent, or of a reserve), `AgentSignals` (what agents report: progress, tools, permissions, the end), `PermissionPolicy` and `PermissionRequests` (auto mode), `LoopGuard` (agents going in circles), `EngineLimits` (accounts over their limits), and the boards `ActivityBoard`, `ContextBoard` (energy), `InternBoard` |
 | `Review/` | `TaskReviewer` and `PendingReviews`: Claude reads finished work and leaves a note before a person does |
 | `Checks/` | `MergeChecks`: each room's check command on a merged branch |
+| `Brain/` | Shiori's vault: `Note` and `VaultFormat` (Markdown with YAML front matter, wikilinks), `VaultPath` (paths kept inside the vault), `BrainSearch` (words, then scope, status and recency; superseded last), `BrainOptions` |
 | `Reports/` | `ReportWriter` (a day, an epic or a changelog, from the audit log, in a chosen language), `ReportFacts`, `ChangelogFacts`, `ReportQueries` |
 | `LocalModels/` | `GpuArbiter` (who has the graphics card), `GpuShift` (loads, unloads, gives way), `LocalChat` (routines asking a local model through the arbiter) |
 | `Guests/` | `GuestWatcher` and `GuestBoard`: Claude Code sessions started outside Openspace, as guests of the office whose repository they work in |
@@ -84,6 +85,7 @@ Settings of each kind are described in the
 | `IWorkspaceManager` | `GitWorkspaceManager`: one git worktree per task |
 | `IPullRequests` | `GitHubPullRequests`, through `gh` |
 | `ICheckRunner` | `ShellCheckRunner` |
+| `IVault`, `IBrainIndex` | `FileVault` (the notes on disk, a commit per write), `BrainIndex` (SQLite FTS5) |
 | `IActivityPublisher`, `IDomainEventPublisher`, `IRoutineProgress` | SignalR in the API; null publishers when there is no hub |
 | `ILocalModelServer`, `ILocalModelApi`, `IGpuProbe`, `IDecider` | `LocalModelServer`, `LlamaServerApi`, `GpuProbe`, `DeciderClient` |
 | `IClaudeSessions` | `ClaudeSessionLogs`: the tail of Claude Code's own session logs |

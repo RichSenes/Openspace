@@ -205,6 +205,9 @@ More of what it does, in short:
   on the last; the Security view lists the runs, the report and the findings.
 - Sounds for the moments that matter, a daily database backup, private folders,
   offices kept on this computer only.
+- The shared brain, Shiori, starts as a vault of Markdown notes with its own git
+  (`~/.local/share/openspace/brain`, opens in Obsidian): the constitution, decisions,
+  plans and studies, searchable by words and by office, room and file.
 
 ## Repository layout
 
@@ -230,7 +233,7 @@ Each project has its own README:
 [Frontend](src/frontend/README.md) ·
 [Tests](tests/README.md).
 The plan is in [docs/vision.md](docs/vision.md), the pixel art rules in
-[docs/art-style.md](docs/art-style.md). The shared brain that comes next, Shiori, is
+[docs/art-style.md](docs/art-style.md). The shared brain, Shiori, is
 planned in [docs/brain.md](docs/brain.md), split into stories in
 [docs/brain-stories.md](docs/brain-stories.md).
 

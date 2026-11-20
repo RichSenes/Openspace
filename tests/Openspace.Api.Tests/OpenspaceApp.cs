@@ -25,6 +25,9 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
     /// <summary>Security audits started through the API keep their records here, never in the person's folder.</summary>
     public string AuditsFolder { get; } = Path.Combine(Path.GetTempPath(), $"openspace-audits-{Guid.NewGuid():N}");
 
+    /// <summary>The brain's vault is made here, never in the person's own vault.</summary>
+    public string BrainFolder { get; } = Path.Combine(Path.GetTempPath(), $"openspace-brain-{Guid.NewGuid():N}");
+
     private SqliteConnection KeepAlive()
     {
         _keepAlive ??= new SqliteConnection(_connectionString);
@@ -79,6 +82,10 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
 
             // Never GitHub: releases come from a made-up source, and only when asked.
             ["Releases:Enabled"] = "false",
+
+            // Never the person's vault; edits on disk are noticed quickly so tests need not wait long.
+            ["Brain:Folder"] = BrainFolder,
+            ["Brain:WatchDelay"] = "00:00:00.100",
         };
         foreach (var (key, value) in settings)
         {
@@ -110,11 +117,36 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
                 Directory.Delete(AuditsFolder, recursive: true);
             }
 
+            DeleteBrainFolder();
+
             if (Directory.Exists(SoundsFolder))
             {
                 Directory.Delete(SoundsFolder, recursive: true);
             }
         }
+    }
+
+    /// <summary>The asynchronous dispose does not pass through <see cref="Dispose(bool)"/>: the vault would stay behind.</summary>
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        DeleteBrainFolder();
+    }
+
+    private void DeleteBrainFolder()
+    {
+        if (!Directory.Exists(BrainFolder))
+        {
+            return;
+        }
+
+        // Git marks its objects read-only; clear that so the folder can go.
+        foreach (var file in Directory.EnumerateFiles(BrainFolder, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Directory.Delete(BrainFolder, recursive: true);
     }
 }
 

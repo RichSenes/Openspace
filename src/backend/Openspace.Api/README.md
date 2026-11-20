@@ -112,6 +112,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | POST | `/api/gpu/claim` | `{ holder }`: a program takes the card; local work gives way. Renew within `LocalModels:ClaimLease` |
 | DELETE | `/api/gpu/claim/{holder}` | The program gives the card back |
 | POST | `/api/gpu/retry` | Try loading the model again now, after a failure |
+| GET | `/api/brain/summary` | Where the vault is (`folder`, and `configured` for the next start), how many notes of each kind (folder READMEs left out), when one last changed |
+| PUT | `/api/brain/folder` | `{ folder }`: an absolute folder or one starting with `~`, kept in the settings file and opened at the next start; `422` otherwise |
 | GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
 | GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |

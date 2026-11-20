@@ -46,6 +46,7 @@ import type {
   VersionView,
   NeedsYouItem,
   LocalAiSettings,
+  BrainSummary,
   LocalAiView,
   LocalModelSetting,
   ModelCheck,
@@ -80,6 +81,7 @@ export const keys = {
   engines: ['engines'] as const,
   gpu: ['gpu'] as const,
   localAi: ['local-ai'] as const,
+  brainSummary: ['brain-summary'] as const,
   settings: ['settings'] as const,
   models: ['models'] as const,
   weather: ['weather'] as const,
@@ -534,6 +536,20 @@ export function useEngines() {
 }
 
 /** Who has the graphics card: it changes within seconds when a program takes it. */
+/** Where the brain's vault is and how many notes of each kind it holds. */
+export function useBrainSummary() {
+  return useQuery({ queryKey: keys.brainSummary, queryFn: () => request<BrainSummary>('GET', '/api/brain/summary') })
+}
+
+/** Keeps a new folder for the vault; Openspace opens it at its next start. */
+export function useMoveBrain() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (folder: string) => request<BrainSummary>('PUT', '/api/brain/folder', { folder }),
+    onSuccess: (summary) => client.setQueryData(keys.brainSummary, summary),
+  })
+}
+
 /** The local models' settings, with the card's memory and the programs that hold it now. */
 export function useLocalAi() {
   return useQuery({ queryKey: keys.localAi, queryFn: () => request<LocalAiView>('GET', '/api/local-ai') })

@@ -6,6 +6,7 @@ import { useToast } from '../ui/toastContext'
 import { formatMoment } from '../ui/dates'
 import { GoogleCard } from './GoogleCard'
 import { LocalAiSection } from './LocalAiSection'
+import { BrainSection } from './BrainSection'
 import { ModelsSection } from './ModelsSection'
 import { SoundsCard } from './SoundsCard'
 import { WeatherCard } from './WeatherCard'
@@ -68,6 +69,7 @@ export function SettingsPanel() {
               </section>
             </div>
           )}
+          {section === 'brain' && <BrainSection />}
           {section === 'local' && <LocalAiSection />}
           {section === 'models' && <ModelsSection />}
           {section === 'agents' && (

@@ -345,3 +345,13 @@
     grid-column: 1 / -1;
   }
 }
+
+.brain-folder {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Each kind and its count on one line of the list. */
+.brain-kind {
+  display: contents;
+}

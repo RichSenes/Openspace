@@ -5,8 +5,8 @@ shows the way). It covers why it exists, what is already in Openspace to build o
 designed, and the phases to get there. The work split into user stories is in
 [brain-stories.md](brain-stories.md).
 
-Status: draft to discuss. Nothing below is built yet; the founding rules in
-[Development rules](#development-rules) are proposals to decide together.
+Status: agreed. The founding rules were decided with the person (see
+[Development rules](#development-rules)); the building starts with phase 1.
 
 ## Why
 
@@ -54,8 +54,8 @@ for the person, and for whoever downloads Openspace, who gets the same experienc
 2. **Mechanism public, content private.** The vault lives outside the repository, under the
    person's data folder, and is never pushed anywhere by Openspace.
 3. **Everyone writes in their own area; the common area changes through proposals.** An agent
-   writes its journal freely; a decision, a rule or a shared note is proposed and approved (by the
-   person, or by Shiori when the constitution allows it).
+   writes its journal freely; a decision or a shared note is proposed, Shiori accepts it, and the
+   person reviews it afterwards and can undo it. Only the person changes the constitution.
 4. **Read before acting.** A briefing carries what applies to the task: rules, decisions on its
    files and room, who else is working nearby.
 5. **Every answer says where it comes from.** Shiori cites notes; a decision links the task or the
@@ -151,13 +151,14 @@ interface.
 | Area | Agents | Shiori | The person |
 |---|---|---|---|
 | Own journal | write | read | read, edit |
-| Decisions, plans, studies, office notes | propose | propose; accept when the constitution allows | accept, edit |
+| Decisions, plans, studies, office notes | propose | accept | review afterwards, undo, edit |
 | Constitution | read | propose | the only one who changes it |
 | Now | read | read | read (Openspace writes it) |
 | Sessions, digests, chronicle | read | write | read, edit |
 
-A proposal is a note with `status: proposed`; it appears in the needs-you inbox with
-"Accept", "Change" and "Reject".
+A proposal is a note with `status: proposed`. Shiori accepts it (or sends it back with a
+reason) and it reaches the person as *accepted, to review*: in the needs-you inbox with "Fine",
+"Change" and "Undo". Undoing sets `status: rejected` and tells the agent that proposed it.
 
 ### Now: who is changing what
 
@@ -165,8 +166,9 @@ Openspace already knows each running task's working copy. Every few seconds it r
 changed there (and the files a plan said it would touch) and writes `Now.md`. With it:
 
 - the briefing of a task lists the tasks in flight on the same files or room;
-- the dispatcher can **hold** a queued task whose files overlap a running one, saying why
-  (as it already says why tasks wait), instead of letting both run into a conflict;
+- the dispatcher **holds** a queued task whose files overlap a running one, saying why
+  (as it already says why tasks wait), instead of letting both run into a conflict; an office can
+  turn this off;
 - before a merge, overlapping branches are flagged.
 
 ### Agents and the brain
@@ -291,16 +293,27 @@ offices, a science lab whose brain sits in a dome with particles orbiting it, an
 ## Development rules
 
 Founding rules for everyone who changes a project through Openspace (agents and Claude alike),
-especially before production. Proposals to decide together, then written into the constitution:
+decided with the person and written as the first rules of the constitution. The repository ships
+them, in this generic form, as the template of a new vault:
 
-1. Read before acting: constitution, decisions in scope, *Now*.
-2. Every behaviour change comes with a test that fails without it; the test count only grows.
-3. Work in a task's own copy; never in the folder the person runs from.
-4. No secrets, personal data or real names in code, tests or documentation.
-5. A choice others must follow becomes a decision with its reasons.
-6. Production needs: green checks, a reviewer's verdict, the person's yes, and a way back.
-7. Interfaces are checked at several widths, with contrast to WCAG AA, before they are called done.
-8. When something is unclear, ask; when a resource of the person blocks a check, say so at once.
+1. Read before acting: the constitution, the decisions in scope, *Now*.
+2. Every behaviour change comes with a test that fails without it; the number of tests never
+   goes down. Interfaces are also checked at several widths and for WCAG AA contrast.
+3. Work only in the task's own copy. Outside it (the person's folders, the system, pushes,
+   deployments, keys) the person says yes first.
+4. No secrets, personal data or real names in code, tests or repository documents.
+5. A choice others must follow becomes a decision with its reasons. Shiori accepts proposals; the
+   person reviews them afterwards and can undo them.
+6. Two pieces of work on the same files do not run side by side: the second waits and says why.
+7. Production needs green checks, the reviewer's verdict, the person's explicit yes and a way back.
+8. When something is unclear, search the brain first, then ask Shiori, who answers or passes the
+   question to the person. Never guess on what cannot be undone.
+9. Personal data (mail, health, food) may be read by local models and by Claude on the person's
+   account, never by free online models.
+10. Notes are written in the person's language; code, commits and repository documents in English.
+11. No agent ever acts against the person: disagreements stay between agents.
+12. Personality changes how agents talk, never the quality of their work.
+13. One voice talks with the person: Shiori's.
 
 ## Phases
 
@@ -317,11 +330,11 @@ especially before production. Proposals to decide together, then written into th
 
 - **Quota**: Shiori on Opus all the time spends the Claude plan fast. Sessions should resume
   rather than restart, and work that does not need Opus goes elsewhere.
-- **Privacy**: once mail, health and food enter the vault, those notes must stay on local models
-  unless the person says otherwise; a per-folder "local only" flag may be needed.
+- **Privacy**: once mail, health and food enter the vault, rule 9 applies: a per-folder
+  "personal" flag tells Openspace which models may read those notes (local ones and Claude on the
+  person's account, never free online ones).
 - **Vault rot**: proposals, scopes and review dates keep it clean; a monthly tidy-up job may help.
 - **Edits from both sides**: Obsidian and Openspace writing the same note at once; the vault's
   git and short writes keep it safe, conflicts become proposals.
 - **Chatty agents**: limits on turns and an escalation path are part of the agreement protocol.
-- **Open**: the vault per installation or per person; how far Shiori may accept decisions alone;
-  which third world to start with.
+- **Open**: the vault per installation or per person; which third world to start with.

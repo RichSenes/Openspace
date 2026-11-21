@@ -12,6 +12,7 @@ const PART_LABEL: Record<OfficePart, string> = {
   name: 'Name',
   repository: 'Repository',
   localOnly: 'Kept on this machine',
+  holdOverlaps: 'Overlapping work',
   privatePaths: 'Private folders',
   reserveModels: 'Reserve models',
 }
@@ -103,6 +104,18 @@ export function OfficePanel({ office }: { office: OfficeView }) {
               )}
             </div>
           )}
+        </section>
+
+        <section className="office-part" aria-labelledby="office-overlaps">
+          <h2 id="office-overlaps">Work on the same files</h2>
+          <label className="check-row">
+            <input type="checkbox" checked={form.holdOverlaps} onChange={(e) => set('holdOverlaps', e.target.checked)} />
+            <span>
+              Hold a task while another changes its files
+              <span className="hint">A queued task that names files another desk is changing waits, and the board says for whom. Tasks that name no files never wait.</span>
+            </span>
+          </label>
+          {problemOf('holdOverlaps') && <p className="error">{problemOf('holdOverlaps')!.message}</p>}
         </section>
 
         <section className="office-part" aria-labelledby="office-machine">

@@ -10,13 +10,19 @@ public sealed record RepositoryProblem(string Code, string Message, bool CanInit
 /// <param name="Remotes">The repository's remotes, such as origin; none for a project kept on this machine.</param>
 /// <param name="Tracking">How each branch stands against its remote one, as of the last fetch.</param>
 /// <param name="PullRequests">Whether accepted work can go up as a pull request instead of a local merge.</param>
+/// <param name="Overlaps">Task branches not merged yet that touched the same files as another one: merging both likely conflicts.</param>
 public sealed record BranchList(
     string? Current,
     IReadOnlyList<string> Branches,
     int UncommittedChanges = 0,
     IReadOnlyList<string>? Remotes = null,
     IReadOnlyList<BranchTracking>? Tracking = null,
-    bool PullRequests = false);
+    bool PullRequests = false,
+    IReadOnlyList<BranchOverlap>? Overlaps = null);
+
+/// <summary>A task branch that touched files another unmerged branch of the office also touched.</summary>
+/// <param name="Files">The files both changed.</param>
+public sealed record BranchOverlap(Guid TaskId, string Title, Guid OtherTaskId, string OtherTitle, IReadOnlyList<string> Files);
 
 /// <param name="Upstream">The remote branch it follows, such as origin/main; null when it follows none.</param>
 /// <param name="Ahead">Commits it has that the remote branch lacks: what a push would send.</param>
@@ -39,6 +45,16 @@ public interface IWorkspaceManager
 
     /// <summary>Everything the agent changed, as a unified diff.</summary>
     Task<string> DiffAsync(string workspacePath, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The files changed in a task's working copy since it left the repository: committed there or
+    /// not, new files included, relative to the repository. Read only: nothing is staged. Empty
+    /// when the copy is gone.
+    /// </summary>
+    Task<IReadOnlyList<string>> ChangedFilesAsync(string repositoryPath, string workspacePath, CancellationToken cancellationToken);
+
+    /// <summary>The files a branch changed since it left <paramref name="targetBranch"/>, relative to the repository.</summary>
+    Task<IReadOnlyList<string>> BranchFilesAsync(string repositoryPath, string branch, string targetBranch, CancellationToken cancellationToken);
 
     /// <summary>Commits the changes on the task branch and removes the working copy. The branch stays.</summary>
     Task CommitAsync(string repositoryPath, string workspacePath, string message, CancellationToken cancellationToken);

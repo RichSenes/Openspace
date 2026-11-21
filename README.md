@@ -207,7 +207,9 @@ More of what it does, in short:
   offices kept on this computer only.
 - The shared brain, Shiori, starts as a vault of Markdown notes with its own git
   (`~/.local/share/openspace/brain`, opens in Obsidian): the constitution, decisions,
-  plans and studies, searchable by words and by office, room and file.
+  plans and studies, searchable by words and by office, room and file. `Now.md` says
+  who is changing which files; a queued task that names files another desk is changing
+  waits and says for whom, and the merge desk flags branches that touched the same files.
 
 ## Repository layout
 

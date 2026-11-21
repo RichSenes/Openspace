@@ -7,6 +7,7 @@ namespace Openspace.Application.Offices;
 /// <param name="PrivatePaths">Folders no agent of the office may touch in any way.</param>
 /// <param name="LocalOnly">The project stays on this machine: no push, no pull request.</param>
 /// <param name="ReserveModels">Models that go on with tasks while their desk's account is over its limits, in order: OpenCode's <c>provider/model</c> or <c>claude-code/</c> and a Claude model.</param>
+/// <param name="HoldOverlappingWork">A queued task waits while another task of the office changes the files it names.</param>
 /// <param name="Cuts">The pieces cut out of the building's rectangle, in tiles from its corner.</param>
 public sealed record OfficeView(
     Guid Id,
@@ -20,7 +21,8 @@ public sealed record OfficeView(
     IReadOnlyList<FloorCut> Cuts,
     IReadOnlyList<string> PrivatePaths,
     bool LocalOnly,
-    IReadOnlyList<string> ReserveModels)
+    IReadOnlyList<string> ReserveModels,
+    bool HoldOverlappingWork = true)
 {
     public static OfficeView From(Office office)
     {
@@ -37,7 +39,8 @@ public sealed record OfficeView(
             [.. office.Cuts],
             [.. office.PrivatePaths],
             office.LocalOnly,
-            [.. office.ReserveModels]);
+            [.. office.ReserveModels],
+            office.HoldOverlappingWork);
     }
 }
 

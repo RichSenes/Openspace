@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Openspace.Application.Brain;
+using Openspace.Application.Queue;
 
 namespace Openspace.Api.Tests;
 
@@ -122,5 +125,62 @@ public sealed class BrainApiTests : IDisposable
             Assert.True(DateTime.UtcNow < until, "The watcher did not see the new note in time.");
             await Task.Delay(50);
         }
+    }
+
+    [Fact]
+    public async Task Now_lists_who_is_changing_what()
+    {
+        Assert.Empty((await _http.GetFromJsonAsync<List<WorkInFlight>>("/api/brain/now", Json))!);
+        var work = new WorkInFlight(Guid.NewGuid(), Guid.NewGuid(), "Allsafe", "Web", "Screens", "Fix the total", ["src/web/cart.ts"]);
+        _app.Services.GetRequiredService<WorkInProgress>().Replace([new RunningWork(work, ["src/web/cart.ts"], [])]);
+
+        var now = (await _http.GetFromJsonAsync<List<WorkInFlight>>("/api/brain/now", Json))!;
+
+        var only = Assert.Single(now);
+        Assert.Equal((work.TaskId, "Screens", "Fix the total"), (only.TaskId, only.Desk, only.Title));
+        Assert.Equal(["src/web/cart.ts"], only.Paths);
+    }
+
+    [Fact]
+    public async Task Now_md_is_put_back_by_Openspace_in_one_commit()
+    {
+        // The vault is made on start; wait for it, then edit and commit the note by hand as a person might.
+        await SearchAsync("q=merge");
+        await File.WriteAllTextAsync(Path.Combine(_app.BrainFolder, "Now.md"), "# Now\n\nScreens is on the cart.\n");
+        await GitAsync("-c", "user.name=Darlene", "-c", "user.email=darlene@example.invalid", "commit", "--quiet", "--all", "--message", "By hand");
+        async Task RefreshAsync()
+        {
+            await using var scope = _app.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<NowKeeper>().RefreshAsync(default);
+        }
+
+        await RefreshAsync();
+        await RefreshAsync();
+        await RefreshAsync();
+
+        var note = (await _http.GetFromJsonAsync<NoteView>("/api/brain/notes/Now", Json))!;
+        Assert.Equal("Openspace", note.Author);
+        Assert.Contains(NowNote.Nobody, note.Body, StringComparison.Ordinal);
+        Assert.Equal(1, await CommitsOfNowAsync());
+    }
+
+    /// <summary>Commits Openspace made to Now.md when what it says changed.</summary>
+    private async Task<int> CommitsOfNowAsync() =>
+        (await GitAsync("log", "--format=%s", "--", "Now.md"))
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Count(l => l.Contains("who is changing what", StringComparison.Ordinal));
+
+    private async Task<string> GitAsync(params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = _app.BrainFolder,
+            RedirectStandardOutput = true,
+        };
+        using var git = System.Diagnostics.Process.Start(start)!;
+        var output = await git.StandardOutput.ReadToEndAsync();
+        await git.WaitForExitAsync();
+        Assert.Equal(0, git.ExitCode);
+        return output;
     }
 }

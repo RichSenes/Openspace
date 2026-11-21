@@ -83,7 +83,8 @@ the server wants it), so a wrong one never reaches the save.
 
 **Office.** The office's own settings in one form with one save: name, repository
 (with "Initialize git here" when the folder is not a repository yet), keeping the
-project on this computer, private folders, and reserve models picked from the
+project on this computer, holding a task while another desk changes the files it
+names (on by default), private folders, and reserve models picked from the
 engines' lists and put in order. A part the server refuses says why under its
 field; the rest is saved.
 

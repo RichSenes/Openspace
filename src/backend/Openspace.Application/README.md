@@ -26,7 +26,7 @@ ports, which `Openspace.Infrastructure` implements.
 | `Roles/` | `RoleCommands` (define, change, delete, draft instructions with AI, choose skills), `RoleQueries` |
 | `Security/` | `SecurityAudits`: the Security desk and role, audits as tasks with a run folder, runs, reports and findings, fixes proposed as tasks |
 | `Work/` | `WorkTaskCommands` (the life of a task: assign, approve, accept, send back, merge, catch up, pull requests, notes, dependencies), `WorkTaskQueries`, `Supervisor` (splits a request into proposed tasks), `EpicQueries`, `FeedQueries` (the activity feed), `UsageQueries` (tokens per desk), `AuditTrail` and `TaskReport` (the log and its Markdown report) |
-| `Queue/` | `QueueDispatcher` (who starts now), `QueueWaits` (why the others wait), `QueueOptions` |
+| `Queue/` | `QueueDispatcher` (who starts now), `QueueWaits` (why the others wait), `QueueOptions`, `WorkInProgress` (who is changing what, the real `IWorkInProgress`), `NowKeeper` (reads it from the working copies and writes `Now.md`), `PathTokens` and `PathOverlap` |
 | `Agents/` | `TaskRunner` (worktree, session and brief for each started task), `Briefing`, `AgentSetups` (engine, model, role and private folders of a desk's agent, or of a reserve), `AgentSignals` (what agents report: progress, tools, permissions, the end), `PermissionPolicy` and `PermissionRequests` (auto mode), `LoopGuard` (agents going in circles), `EngineLimits` (accounts over their limits), and the boards `ActivityBoard`, `ContextBoard` (energy), `InternBoard` |
 | `Review/` | `TaskReviewer` and `PendingReviews`: Claude reads finished work and leaves a note before a person does |
 | `Checks/` | `MergeChecks`: each room's check command on a merged branch |
@@ -48,6 +48,10 @@ there are free seats (`Queue:Seats`, one by default). A task waits while:
 
 - its desk is busy with another task (a desk works on one at a time);
 - a task it builds on is not accepted and merged yet;
+- it names files (in its title or description) that another running task of the office is
+  changing or names: rule 6 of the constitution, on unless the office turns
+  `HoldOverlappingWork` off. A task that names no files never waits on the room alone, so
+  offices split only by rooms do not stall; the merge desk flags what gets through;
 - its desk's account is over its limits and no reserve model is free;
 - it runs on a local model that is not loaded, or is in use, or the graphics card
   is lent to a program that comes first;

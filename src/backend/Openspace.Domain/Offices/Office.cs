@@ -59,6 +59,12 @@ public sealed class Office : AggregateRoot<OfficeId>
     public bool LocalOnly { get; private set; }
 
     /// <summary>
+    /// A queued task waits while another task of the office is changing the files it names
+    /// (constitution rule 6). On by default: two agents on the same files end in a merge conflict.
+    /// </summary>
+    public bool HoldOverlappingWork { get; private set; } = true;
+
+    /// <summary>
     /// OpenCode models, as <c>provider/model</c> and in order of preference, that take over a
     /// task while its desk's account is over its limits. They are usually free cloud tiers,
     /// which may keep what they are sent: an office kept on this machine has none.
@@ -124,6 +130,12 @@ public sealed class Office : AggregateRoot<OfficeId>
     {
         LocalOnly = localOnly;
         Raise(new OfficeLocalOnlySet(Id, localOnly, now));
+    }
+
+    public void HoldOverlaps(bool hold, DateTimeOffset now)
+    {
+        HoldOverlappingWork = hold;
+        Raise(new OfficeHoldOverlapsSet(Id, hold, now));
     }
 
     /// <summary>Replaces the private folders: absolute paths, kept without a trailing slash.</summary>

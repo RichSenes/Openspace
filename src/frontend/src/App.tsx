@@ -12,6 +12,7 @@ import { ReportsPanel } from './reports/ReportsPanel'
 import { SettingsPanel } from './settings/SettingsPanel'
 import { RoomsPanel } from './rooms/RoomsPanel'
 import { RoutinesPanel } from './routines/RoutinesPanel'
+import { ShioriPage } from './shiori/ShioriPage'
 import { SecurityPanel } from './security/SecurityPanel'
 import { OfficePanel } from './office/OfficePanel'
 import { FirstSteps } from './setup/FirstSteps'
@@ -57,6 +58,13 @@ export default function App() {
             />
           ) : view === 'settings' ? (
             <SettingsPanel />
+          ) : view === 'shiori' ? (
+            <ShioriPage
+              onOpenSettings={(section) => {
+                requestSettingsSection(section)
+                setView('settings')
+              }}
+            />
           ) : offices.isPending ? (
             <div className="empty">
               <p>Opening the building…</p>

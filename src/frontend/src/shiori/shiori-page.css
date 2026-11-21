@@ -1,0 +1,316 @@
+/* Shiori's page: the presence prototype's stage (presence.css) inside the shell, with the real session's parts. */
+
+.pr.sp {
+  height: 100%;
+  min-height: 420px;
+}
+
+.sp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(46vw, 420px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sp-tag {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--edge-hi);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sp-tag-mode {
+  border-color: var(--c, var(--mode));
+  color: var(--c, var(--mode));
+}
+
+.sp-pre {
+  white-space: pre-wrap;
+}
+
+/* --- Subtitles --- */
+.sp-cite {
+  display: inline-block;
+  line-height: 1.35;
+  vertical-align: baseline;
+}
+
+.sp-hello {
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.sp-failed {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pr.is-long .sp-failed {
+  justify-items: start;
+}
+
+.sp-failed .pr-who {
+  color: #f7a072;
+}
+
+.sp-failed-text {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.sp-notice {
+  border-color: rgba(247, 160, 114, 0.5);
+}
+
+/* --- Top actions --- */
+.sp .pr-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sp-end {
+  position: relative;
+}
+
+.sp-confirm {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--edge-hi);
+  background: rgba(9, 6, 15, 0.97);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.sp-confirm p {
+  margin: 0;
+}
+
+.sp-confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sp code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+/* --- Composer --- */
+.sp-field {
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 7.5em;
+  field-sizing: content;
+}
+
+.sp-field::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.pr-composer:focus-within {
+  border-color: var(--edge-hi);
+}
+
+.sp-problem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid rgba(247, 160, 114, 0.6);
+  background: rgba(9, 6, 15, 0.92);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.sp-problem span {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-problem-close {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.sp-ended {
+  padding: 8px 8px 8px 14px;
+  flex-wrap: wrap;
+}
+
+.sp-ended-text {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.sp-ended-text code + code {
+  margin-left: 6px;
+}
+
+.pr-seg-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* --- Drawers --- */
+.sp-drawer-left {
+  left: 16px;
+}
+
+.sp-drawer-right {
+  right: 16px;
+}
+
+.sp-new {
+  justify-self: start;
+}
+
+.sp-sessions {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sp-session {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--c);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-session:hover {
+  border-color: var(--edge-hi);
+  border-left-color: var(--c);
+}
+
+.sp-session.is-on {
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+  border-color: var(--c);
+}
+
+.sp-session.is-ended {
+  border-left-color: var(--edge-hi);
+}
+
+.sp-session:focus-visible {
+  outline: 2px solid var(--mode);
+  outline-offset: 2px;
+}
+
+.sp-session-title {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.sp-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sp-log-failed {
+  padding-left: 10px;
+  border-left: 2px solid #f7a072;
+}
+
+.sp-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.sp-done-mark {
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: #8fd282;
+}
+
+.sp-board-note {
+  margin-left: 6px;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sp-look {
+  z-index: 5;
+}
+
+/* The stage is shorter than a whole window inside the shell: the panels start under its header. */
+.sp .pr-drawer,
+.sp .pr-lab {
+  top: var(--sp-top, 70px);
+}
+
+.sp .pr-lab {
+  max-height: calc(100% - var(--sp-top, 70px) - 16px);
+}
+
+/* Nothing said is ever cut off: a subtitle taller than its room scrolls. */
+.sp .pr-subs-inner {
+  overflow: auto;
+}
+
+@media (max-width: 760px) {
+  .sp .sp-new span {
+    display: inline;
+  }
+
+  .sp-title {
+    max-width: 52vw;
+  }
+
+  .sp-confirm {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    left: 12px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+  }
+}

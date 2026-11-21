@@ -9,6 +9,7 @@ import { reportRoutineProgress } from './routineProgress'
 import { keys } from '../api/hooks'
 import type { DeskActivity, DeskContext, DeskInterns, Guest, OfficeGuests, QueueWait, SupervisorJob } from '../api/types'
 import { retryDelay } from './retry'
+import { listenToShiori } from '../shiori/liveStore'
 import { cueOfActivity, emitCue, type SoundEvent } from '../sounds/rules'
 
 export type LinkState = 'connecting' | 'live' | 'offline'
@@ -57,6 +58,7 @@ export function useBuildingHub(): LinkState {
     hub.on('TaskCue', (c: { taskId: string | null; officeId: string | null; deskId: string | null; cue: SoundEvent }) =>
       emitCue({ event: c.cue, officeId: c.officeId, deskId: c.deskId, key: `${c.taskId ?? c.officeId}:${c.cue}:${Date.now()}` }),
     )
+    listenToShiori(hub, client)
     hub.onreconnecting(() => {
       setState('connecting')
       emitCue({ event: 'offline', key: `offline:${Date.now()}` })

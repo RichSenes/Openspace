@@ -43,7 +43,7 @@ internal sealed partial class OpenspaceTools
         [Description("What was chosen and what was left out, in Markdown.")] string body,
         [Description("Why: what it solves and the options weighed.")] string reasons,
         CancellationToken cancellationToken,
-        [Description("The offices it applies to; yours when left out.")] string[]? offices = null,
+        [Description("The offices it applies to; yours when left out, every office with [\"*\"] (then the person decides, not Shiori).")] string[]? offices = null,
         [Description("The rooms it applies to; every room when left out.")] string[]? rooms = null,
         [Description("Globs of the files it is about, e.g. \"src/web/**\"; every file when left out.")] string[]? paths = null) =>
         RunAsync(async task =>

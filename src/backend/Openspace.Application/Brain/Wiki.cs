@@ -74,8 +74,8 @@ public sealed class Wiki(IVault vault, IVaultHistory history)
         return new WikiWrite(written, created);
     }
 
-    public async Task<IReadOnlyList<WikiReason>> WhyAsync(string file, string? office, CancellationToken cancellationToken) =>
-        WikiWhy.For(file, office, await vault.ListAsync(cancellationToken).ConfigureAwait(false));
+    public async Task<IReadOnlyList<WikiReason>> WhyAsync(string file, string? office, string? room, CancellationToken cancellationToken) =>
+        WikiWhy.For(file, office, await vault.ListAsync(cancellationToken).ConfigureAwait(false), room);
 
     /// <summary>The notes in their folders: folders first, then notes, each by name.</summary>
     public static WikiFolder Tree(IEnumerable<Note> notes)

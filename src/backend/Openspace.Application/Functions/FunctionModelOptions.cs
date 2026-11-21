@@ -46,4 +46,11 @@ public sealed class FunctionModelOptions
 
     /// <summary>Inhabitants' journals, the chronicle, the lines of the simulation: local, so they cost no quota.</summary>
     public FunctionModel Journals { get; set; } = new() { Engine = ModelEngine.Local };
+
+    /// <summary>
+    /// OpenCode models (<c>provider/model</c>) the person marks as free: such services may keep
+    /// what they are sent, so personal data never goes to them. Names ending in <c>-free</c> or
+    /// <c>:free</c> count as free without being listed.
+    /// </summary>
+    public List<string> FreeModels { get; set; } = [];
 }

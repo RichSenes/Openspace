@@ -123,7 +123,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/brain/notes/{path}/history?limit=` | The commits of the vault's git that changed the note, newest first: `[{ commit, author, date, summary }]` (50 by default, 500 at most; the author's name Openspace puts before the summary is left out); empty when there is no history yet |
 | GET | `/api/brain/notes/{path}/history/{commit}` | The note at that commit (a full or short hash): `{ commit: { commit, author, date, summary }, path, text, diff, previous, truncated }`; `text` is the whole file then (null when that commit deleted it), `diff` the unified diff from the version before (from nothing for the first), `previous` the commit of that version; text over 512 KB and diffs over 256 KB are cut and `truncated` says so; `404` for anything that is not a commit of the vault |
 | PUT | `/api/brain/notes/{path}` | `{ text, summary? }`: the person writes the whole file (front matter and Markdown), committed with `Operator:Name` as author and `summary` (else "wrote" or "edited" the note) as message; `201` for a new note, `200` otherwise, with the note as `GET` gives it. The only route that changes `Constitution.md`; `422` with code `brain-now` for `Now.md`, `brain-path` for a path outside the vault, `brain-too-long` over 1 MB; `400` without `text` |
-| GET | `/api/brain/why?path=&office=` | "Why is this so?": the accepted decisions whose `paths` cover a file of a repository (relative to its root), only those about `office` or every office when it is given: `[{ path, title, decided, offices, rooms, covering, from, review, modified }]`, newest first by the date their file name starts with; `covering` are the globs that matched, `from` the task, routine or session it came from; `400` without `path` |
+| GET | `/api/brain/why?path=&office=&room=` | "Why is this so?": the accepted decisions whose `paths` cover a file of a repository (relative to its root), only those about `office` or every office, and about `room` or every room, when they are given: `[{ path, title, decided, offices, rooms, covering, from, review, modified, general }]`, newest first by the date their file name starts with; `covering` are the globs that matched, `from` the task, routine or session it came from. With `office` or `room`, the accepted decisions with no paths whose scope fits follow, newest first, with `covering: []` and `general: true`; `400` without `path` |
 | POST | `/api/brain/decisions/{path}/{answer}` | The person's answer on a decision, `answer` one of `fine` (accepted by Shiori: reviewed), `undo` (accepted: rejected), `accept`, `reject` (proposed), `keep` (accepted: review in three months), `supersede`; optional `{ reason }` for undo and reject, written in the proposing desk's journal. Returns the note; `404` for no such note or answer, `422` with code `decision-status` when the answer does not fit its status |
 | GET | `/api/shiori/sessions` | Shiori's sessions, the most recently changed first: `[{ id, title, mode, note, messages, createdAt, updatedAt, endedAt, answering }]`. See [Shiori](#shiori) |
 | POST | `/api/shiori/sessions` | `{ title?, mode? }` (`brainstorm` by default, or `decide`, `organise`): opens a session and its note in `Sessions/`; `201` with the session |
@@ -135,8 +135,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel, openCodeReviewModel }` |
 | PUT | `/api/settings` | Change them (same body): written to the settings file and applied at once. Without `claudeSupervises` the planner's three fields are left as they are, without `claudeReviews` the reviewer's: Settings › Models sets them |
-| GET | `/api/models` | Each function's engine and model: `{ shiori, reviewer, digests, journals, localModels[], decider }`. `shiori` and `reviewer` are `{ engine, claudeModel, openCodeModel }` (`engine` `ClaudeCode` or `OpenCode`, null for no review), read from the planner's and reviewer's settings above; `digests` and `journals` are `{ engine, model }` with `engine` `ClaudeCode`, `OpenCode` or `Local` (model `local/<id>`), kept in the `Models` section; `decider` is only shown, Local AI sets it |
-| PUT | `/api/models` | Saves `{ shiori, reviewer, digests, journals }` in the settings file (Shiori to `ClaudeCode:Supervise`, `SupervisorModel`, `OpenCode:DraftModel`; the reviewer to `ClaudeCode:Review`, `ReviewModel`, `OpenCode:ReviewModel`) and applies them at once; `422` for a model name a desk would refuse, a local model not named `local/<id>`, Shiori without an engine or an OpenCode reviewer without a model |
+| GET | `/api/models` | Each function's engine and model: `{ shiori, reviewer, digests, journals, localModels[], decider, freeModels[] }`. `shiori` and `reviewer` are `{ engine, claudeModel, openCodeModel }` (`engine` `ClaudeCode` or `OpenCode`, null for no review), read from the planner's and reviewer's settings above; `digests` and `journals` are `{ engine, model }` with `engine` `ClaudeCode`, `OpenCode` or `Local` (model `local/<id>`), kept in the `Models` section; `decider` is only shown, Local AI sets it; `freeModels` are the OpenCode models (`provider/model`) the person marked as free (`Models:FreeModels`) |
+| PUT | `/api/models` | Saves `{ shiori, reviewer, digests, journals, freeModels? }` in the settings file (`freeModels` trimmed, blank ones dropped, each once; left as they are when not sent) (Shiori to `ClaudeCode:Supervise`, `SupervisorModel`, `OpenCode:DraftModel`; the reviewer to `ClaudeCode:Review`, `ReviewModel`, `OpenCode:ReviewModel`) and applies them at once; `422` for a model name a desk would refuse, a local model not named `local/<id>`, a free model not named `provider/model`, Shiori without an engine or an OpenCode reviewer without a model |
 | GET | `/api/version` | The version running and the latest release seen: `{ current, latest: { version, name, notes, url, publishedAt }, newer, checkedAt }`; `latest` is null until a release is found |
 | POST | `/api/version/check` | Look for a new release on GitHub now; `502` when GitHub does not answer |
 | GET | `/api/weather` | The town whose weather the windows show and its weather: `{ place, now: { place, sky, temperature, at } }`; `sky` is Clear, Cloudy, Fog, Drizzle, Rain, Snow or Storm; read from Open-Meteo at most every 15 minutes, the last reading kept if it cannot be reached |
@@ -177,7 +177,7 @@ the agent having to name it.
 | `brain_search` | `{ query, office?, room?, path?, kind? }`: notes of the [brain](#brain) that match, ten at most, with path, kind, status, scope and an excerpt; office and room default to the caller's, so its own notes come first |
 | `brain_read` | `{ note }`: one note in full, front matter included; an error for a missing note or a path outside the vault |
 | `brain_journal` | `{ text }`: appends a dated line to `Inhabitants/<desk>/journal.md` of the calling desk only (made with `kind: journal` the first time); entries of a day go under one `## yyyy-mm-dd` heading; the commit is signed by the desk |
-| `brain_propose` | `{ kind, title, body, reasons, offices?, rooms?, paths? }`: creates a new note with `status: proposed`, author the desk, `from: task <id>`: a decision in `Decisions/<date>-<slug>.md`, a plan in `Plans/`, a study in `Studies/`, a note in `Offices/<office>/<slug>.md`; never overwrites (a taken name gets `-2`); offices default to the caller's; rules and journals are refused |
+| `brain_propose` | `{ kind, title, body, reasons, offices?, rooms?, paths? }`: creates a new note with `status: proposed`, author the desk, `from: task <id>`: a decision in `Decisions/<date>-<slug>.md`, a plan in `Plans/`, a study in `Studies/`, a note in `Offices/<office>/<slug>.md`; never overwrites (a taken name gets `-2`); offices default to the caller's, and `["*"]` means every office (no `offices` in the front matter: the person decides, not Shiori); rules and journals are refused |
 | `brain_now` | Who else in the caller's office is working right now, and the files each is changing |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
@@ -483,7 +483,8 @@ offer's CV in answer to it.
   `channel`. Both are in `language` (Italian by default; Italian or English words
   around the opening). The opening lines come from the model of *Digests and
   summaries* (Settings › Models); an OpenCode model that may be a free online one
-  (named `…-free` or `…:free`, or OpenCode's default) never sees the calendar, and
+  (named `…-free` or `…:free`, listed in `Models:FreeModels`, or OpenCode's default)
+  never sees the calendar, and
   then, or when no model answers, a plain template opens it and the log says why.
   `title` replaces "Domani"/"Oggi".
 - **Job offers** (`job-offers`): the newest offers of the `boards`, honestly
@@ -869,15 +870,19 @@ Agents read the brain through the `brain_*` tools above, and their first brief (
 has a "Before you start" part right after the task: the constitution's numbered rules, one line
 each; the accepted decisions that apply where the task works (not about another office, and
 about its room or the files it names or is already changing, or open on both), files first,
-then room, then office, eight at most with title, first line and path; the work in flight in
-the same office that shares its room or files; and the request to leave a journal line and to
-propose lasting choices. The part is capped at 3,500 characters (decisions go first, then work,
-then the last rules, and it says so); with an empty or unreadable vault the brief is as before.
+then room, then office, eight at most with title, first line and path; the room's expert notes
+(accepted notes of kind `note` in `Offices/<office>/` about that room or every room), five at
+most, those whose author is a desk of the room with finished tasks there first, the most of them
+first (one query of the office's done tasks, made only when there are notes), then the newest,
+each with its author and that count; the work in flight in the same office that shares its room
+or files; and the request to leave a journal line and to propose lasting choices. The part is
+capped at 3,500 characters (decisions go first, then the notes, then work, then the last rules,
+and it says so); with an empty or unreadable vault the brief is as before.
 
 Until Shiori can talk, a rule accepts proposals for it (`AcceptorService`, on its own file watcher
 and every five minutes): a note with `status: proposed` is accepted, with `accepted_by: Shiori`
-and `reviewed: false` and a commit by "Shiori", when it is about one office or none, is not a
-rule, replaces no decision (`supersedes`) and shares no subject (same title, or same file name
+and `reviewed: false` and a commit by "Shiori", when it is about one office or none (but an agent's proposal for every office, `from: task …`
+with no offices, waits: "It is about every office"), is not a rule, replaces no decision (`supersedes`) and shares no subject (same title, or same file name
 without its date) with an accepted decision whose offices overlap. The rest stay proposed and
 reach **needs you** with the reason; what Shiori accepted reaches it too, to look at afterwards
 (Fine, Open, Undo). Undoing or rejecting sets `status: rejected` and adds a line under the day's
@@ -892,8 +897,9 @@ versions come from the vault's git (`GitVaultHistory`, `IVaultHistory`): fields 
 characters as separators, paths taken literally (`--literal-pathspecs`), only hashes accepted as
 commits, merges diffed against their first parent. The person edits through `PUT
 /api/brain/notes/{path}`, the one way the constitution changes (agents only propose, and rules
-are refused to them); `Now.md` is refused there because Openspace rewrites it. "Why" weighs only
-accepted decisions that name paths, with the same globs as search.
+are refused to them); `Now.md` is refused there because Openspace rewrites it. "Why" weighs
+accepted decisions that name paths, with the same globs as search, and, when the question names
+an office or room, the general ones without paths that apply there, after them.
 
 ## Shiori
 
@@ -929,4 +935,5 @@ Shiori's tools, named by the session's secret, and checked against the session's
 A tool the mode does not allow answers with an error saying which mode it needs (code
 `shiori-mode`). Ending a session proposes every decision item of the whiteboard not linked to a
 proposal yet (scoped to its office when it has one), so the acceptor and the person take them
-from there.
+from there, and writes its task items not done as a `## Next` section of unticked items
+(`- [ ] text (office)`) at the end of the note, where the `tomorrow` routine finds them.

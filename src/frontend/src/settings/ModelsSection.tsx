@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { useEngines, useModels, useSaveModels } from '../api/hooks'
 import type { EngineChoice, FunctionChoice, ModelEngine, ModelsSettings, ModelsView } from '../api/types'
 import { useToast } from '../ui/toastContext'
-import { changed, DEFAULT_MODEL, isUnknown, listOf, problemOf, runsOn, settingsOf, withEngine, type ModelLists } from './models'
+import { changed, DEFAULT_MODEL, freeModelsText, isUnknown, listOf, parseFreeModels, problemOf, runsOn, settingsOf, withEngine, type ModelLists } from './models'
 import { requestSettingsSection } from './sections'
 
 /**
@@ -17,7 +17,10 @@ export function ModelsSection() {
 }
 
 function ModelsForm({ view }: { view: ModelsView }) {
-  const [draft, setDraft] = useState<ModelsSettings>(() => settingsOf(view))
+  const [choices, setDraft] = useState<ModelsSettings>(() => settingsOf(view))
+  // The field keeps what is typed, blank lines included; the list sent is read from it.
+  const [freeText, setFreeText] = useState(() => freeModelsText(view.freeModels))
+  const draft: ModelsSettings = { ...choices, freeModels: parseFreeModels(freeText) }
   const engines = useEngines().data
   const save = useSaveModels()
   const toast = useToast()
@@ -89,6 +92,23 @@ function ModelsForm({ view }: { view: ModelsView }) {
         <OneEngine name="journals" choice={draft.journals} onChange={(journals) => set({ journals })} lists={lists} claude={claude} />
       </section>
 
+      <section className="settings-card" aria-labelledby="models-free">
+        <h3 id="models-free">Free models</h3>
+        <label className="field">
+          <span>OpenCode models you know are free, one per line</span>
+          <textarea
+            className="input mono"
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            placeholder={'opencode/some-model\nopenrouter/another-model'}
+            rows={3}
+            spellCheck={false}
+          />
+          <span className="hint">Models that may keep what they are sent. Mail, health and food never go to them.</span>
+        </label>
+        <p className="hint">Names ending in -free or :free count as free without being listed.</p>
+      </section>
+
       <section className="settings-card" aria-labelledby="models-decider">
         <h3 id="models-decider">Decider</h3>
         <p className="hint">The small model on the processor that answers routines&apos; typed questions: yes or no, one of a list, a score.</p>
@@ -114,7 +134,15 @@ function ModelsForm({ view }: { view: ModelsView }) {
         <button type="submit" className="btn btn-primary" disabled={!dirty || problem !== null || save.isPending}>
           Save models
         </button>
-        <button type="button" className="btn btn-quiet" disabled={!dirty} onClick={() => setDraft(settingsOf(view))}>
+        <button
+          type="button"
+          className="btn btn-quiet"
+          disabled={!dirty}
+          onClick={() => {
+            setDraft(settingsOf(view))
+            setFreeText(freeModelsText(view.freeModels))
+          }}
+        >
           Undo changes
         </button>
       </div>

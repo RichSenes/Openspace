@@ -60,10 +60,11 @@ internal static class WikiEndpoints
             return written.Created ? Results.Created($"/api/brain/notes/{written.Note.Path}", view) : Results.Ok(view);
         });
 
-        // "Why is this so?": accepted decisions whose paths cover a file of a repository, newest first.
-        group.MapGet("/why", async (string? path, string? office, Wiki wiki, CancellationToken ct) =>
+        // "Why is this so?": accepted decisions whose paths cover a file of a repository, newest
+        // first; with an office or room, the general decisions that apply there after them.
+        group.MapGet("/why", async (string? path, string? office, string? room, Wiki wiki, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(path)
                 ? Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "No file", detail: "Say which file: ?path=src/web/cart.ts")
-                : Results.Ok(await wiki.WhyAsync(path, office, ct)));
+                : Results.Ok(await wiki.WhyAsync(path, office, room, ct)));
     }
 }

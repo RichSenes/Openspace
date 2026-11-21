@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelsView } from '../api/types'
-import { changed, isUnknown, listOf, problemOf, runsOn, settingsOf, withEngine } from './models'
+import { changed, freeModelsText, isUnknown, listOf, parseFreeModels, problemOf, runsOn, settingsOf, withEngine } from './models'
 
 const saved: ModelsView = {
   shiori: { engine: 'ClaudeCode', claudeModel: 'opus', openCodeModel: 'github-copilot/gpt-5' },
@@ -9,6 +9,7 @@ const saved: ModelsView = {
   journals: { engine: 'Local', model: null },
   localModels: [{ id: 'local/gemma', name: 'Gemma' }],
   decider: { configured: false, command: '', url: 'http://127.0.0.1:8017/' },
+  freeModels: ['zen/grok-code'],
 }
 
 describe('models per function', () => {
@@ -43,5 +44,18 @@ describe('models per function', () => {
     expect(runsOn(saved.shiori, false, 'shiori')).toBe('OpenCode, until Claude Code is on this machine.')
     expect(runsOn(saved.reviewer, false, 'reviewer')).toBe('Nobody, until Claude Code is on this machine.')
     expect(runsOn({ ...saved.reviewer, engine: null }, true, 'reviewer')).toMatch(/yourself/)
+  })
+
+  it('reads free models one per line, trimmed and once each, and sees them change', () => {
+    expect(parseFreeModels(' zen/grok-code \n\nZEN/grok-code\nopenrouter/qwen\n')).toEqual(['zen/grok-code', 'openrouter/qwen'])
+    expect(parseFreeModels(freeModelsText(saved.freeModels))).toEqual(saved.freeModels)
+    expect(changed(saved, { ...settingsOf(saved), freeModels: parseFreeModels('zen/grok-code\n') })).toBe(false)
+    expect(changed(saved, { ...settingsOf(saved), freeModels: [] })).toBe(true)
+  })
+
+  it('refuses a free model that is not named provider/model', () => {
+    const draft = settingsOf(saved)
+    expect(problemOf({ ...draft, freeModels: ['openrouter/qwen'] })).toBeNull()
+    for (const wrong of ['grok', 'grok code/x', '/grok', 'zen/']) expect(problemOf({ ...draft, freeModels: [wrong] })).toContain(wrong)
   })
 })

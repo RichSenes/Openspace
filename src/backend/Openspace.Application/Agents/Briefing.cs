@@ -101,15 +101,18 @@ public static class Briefing
         + "If you made a lasting choice others must follow, propose it as a decision with brain_propose, with its reasons.";
 
     /// <summary>
-    /// The rules, the decisions in force where the task works, the work next to it, and what to
-    /// leave in the brain at the end. When it would run too long, the decisions go first, then
-    /// the work in flight, then the last rules, and it says what was cut and where to find it.
+    /// The rules, the decisions in force where the task works, the room's expert notes, the work
+    /// next to it, and what to leave in the brain at the end. When it would run too long, the
+    /// decisions go first, then the notes, then the work in flight, then the last rules, and it
+    /// says what was cut and where to find it.
     /// </summary>
     public static string BeforeYouStart(BrainBrief brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
         var rules = brain.Rules.Select(r => Shorten(r, 220)).ToList();
         var decisions = brain.Decisions.ToList();
+        var notes = brain.Notes.ToList();
+        var moreNotes = brain.MoreNotes;
         var nearby = brain.Nearby.Take(AgentBrain.BriefingWork).ToList();
         var moreDecisions = brain.MoreDecisions;
         var moreWork = brain.Nearby.Count - nearby.Count;
@@ -139,6 +142,16 @@ public static class Briefing
                 }
             }
 
+            if (notes.Count > 0 || moreNotes > 0)
+            {
+                text.AppendLine("Notes of this room, those of the desks that know it best first:");
+                notes.ForEach(n => text.AppendLine(CultureInfo.InvariantCulture, $"- {n.Title}{(n.Gist.Length > 0 ? ": " + n.Gist : "")} ({n.Path}{By(n)})"));
+                if (moreNotes > 0)
+                {
+                    text.AppendLine(CultureInfo.InvariantCulture, $"{moreNotes} more: brain_search with kind \"note\" finds {(moreNotes == 1 ? "it" : "them")}.");
+                }
+            }
+
             if (nearby.Count > 0 || moreWork > 0)
             {
                 text.AppendLine("Work in flight next to yours: do not undo it, and keep off its files where you can:");
@@ -158,13 +171,18 @@ public static class Briefing
         }
 
         var composed = Compose();
-        while (composed.Length > BeforeYouStartLimit && (decisions.Count > 0 || nearby.Count > 0 || rules.Count > 1))
+        while (composed.Length > BeforeYouStartLimit && (decisions.Count > 0 || notes.Count > 0 || nearby.Count > 0 || rules.Count > 1))
         {
             cut = true;
             if (decisions.Count > 0)
             {
                 decisions.RemoveAt(decisions.Count - 1);
                 moreDecisions++;
+            }
+            else if (notes.Count > 0)
+            {
+                notes.RemoveAt(notes.Count - 1);
+                moreNotes++;
             }
             else if (nearby.Count > 0)
             {
@@ -182,6 +200,10 @@ public static class Briefing
 
         return composed;
     }
+
+    private static string By(BriefNote note) => note.Author is null ? ""
+        : note.Seniority > 0 ? $", by {note.Author}, {note.Seniority} {(note.Seniority == 1 ? "task" : "tasks")} done in this room"
+        : $", by {note.Author}";
 
     private static string Shorten(string text, int max) => text.Length > max ? string.Concat(text.AsSpan(0, max).TrimEnd(), "…") : text;
 

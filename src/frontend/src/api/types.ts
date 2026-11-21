@@ -287,6 +287,8 @@ export interface ModelsSettings {
   reviewer: EngineChoice
   digests: FunctionChoice
   journals: FunctionChoice
+  /** OpenCode models (provider/model) marked as free: personal data never goes to them. */
+  freeModels: string[]
 }
 
 export interface ModelsView extends ModelsSettings {

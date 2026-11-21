@@ -81,6 +81,20 @@ public sealed class DecisionTests
     }
 
     [Fact]
+    public async Task An_agents_proposal_for_every_office_waits_for_the_person_and_says_why()
+    {
+        _vault.Put("Decisions/2015-06-24-tabs.md", Decision("proposed", "[]", "Tabs everywhere", "from: \"task 01a1\""));
+        _vault.Put("Decisions/2015-06-24-spaces.md", Decision("proposed", "[]", "Spaces in docs", "from: \"session 42\""));
+
+        Assert.Equal(["Decisions/2015-06-24-spaces.md"], await AcceptAsync());
+
+        var waiting = Assert.Single(await Needs().ListAsync(default), i => i.Kind == NeedsYouKind.DecisionToAccept);
+        Assert.Equal("Decisions/2015-06-24-tabs.md", waiting.Note);
+        Assert.StartsWith("It is about every office: Shiori accepts only what stays in one.", waiting.Detail, StringComparison.Ordinal);
+        Assert.Equal("Every office", waiting.OfficeName);
+    }
+
+    [Fact]
     public async Task A_decision_of_another_office_on_the_same_subject_is_no_clash_and_the_first_of_two_twins_wins()
     {
         _vault.Put("Decisions/2015-01-01-merge-order.md", Decision("accepted", "[Allsafe]"));

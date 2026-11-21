@@ -95,8 +95,34 @@ public class WikiWhyTests
     public void An_office_keeps_its_own_decisions_and_those_about_every_office()
     {
         Assert.Equal(
-            ["Decisions/2026-11-20-merge-order.md", "Decisions/2026-09-01-cart-totals.md"],
+            ["Decisions/2026-11-20-merge-order.md", "Decisions/2026-09-01-cart-totals.md", "Decisions/2026-10-04-everywhere.md"],
             WikiWhy.For("src/web/cart.ts", "allsafe", Notes).Select(r => r.Path));
+    }
+
+    [Fact]
+    public void Decisions_without_paths_follow_the_path_matches_as_general_when_the_office_or_room_fits()
+    {
+        Note[] notes =
+        [
+            .. Notes,
+            VaultFormat.Parse("Decisions/2026-11-01-web-reviews.md", "---\nkind: decision\nstatus: accepted\noffices: [E Corp]\nrooms: [Web]\n---\n# Web reviews\n"),
+            VaultFormat.Parse("Decisions/2026-11-02-api-reviews.md", "---\nkind: decision\nstatus: accepted\nrooms: [Api]\n---\n# Api reviews\n"),
+            VaultFormat.Parse("Decisions/2026-11-03-allsafe-only.md", "---\nkind: decision\nstatus: accepted\noffices: [Allsafe]\n---\n# Allsafe only\n"),
+            VaultFormat.Parse("Decisions/2026-11-04-old-general.md", "---\nkind: decision\nstatus: superseded\n---\n# Old\n"),
+        ];
+
+        var why = WikiWhy.For("src/web/cart.ts", "E Corp", notes, "Web");
+
+        Assert.Equal(
+            ["Decisions/2026-10-03-shop.md", "Decisions/2026-09-01-cart-totals.md", "Decisions/2026-11-01-web-reviews.md", "Decisions/2026-10-04-everywhere.md"],
+            why.Select(r => r.Path));
+        Assert.All(why.Take(2), r => Assert.False(r.General));
+        Assert.All(why.Skip(2), r => Assert.True(r.General));
+        Assert.All(why.Skip(2), r => Assert.Empty(r.Covering));
+        Assert.DoesNotContain(WikiWhy.For("src/web/cart.ts", null, notes), r => r.General);
+        Assert.Equal(
+            ["Decisions/2026-11-03-allsafe-only.md", "Decisions/2026-11-02-api-reviews.md", "Decisions/2026-10-04-everywhere.md"],
+            WikiWhy.For("README.md", null, notes, "api").Select(r => r.Path));
     }
 
     [Theory]

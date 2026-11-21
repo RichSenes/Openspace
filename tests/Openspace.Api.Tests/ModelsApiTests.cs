@@ -16,6 +16,10 @@ public sealed class ModelsApiTests : IDisposable
         Converters = { new JsonStringEnumConverter() },
     };
 
+    private static readonly string[] MarkedFree = [" zen/grok-code ", "", "ZEN/grok-code", "openrouter/qwen"];
+    private static readonly string[] OneFree = ["zen/grok-code"];
+    private static readonly string[] NotAnId = ["grok code"];
+
     private readonly OpenspaceApp _app = new();
     private readonly HttpClient _http;
 
@@ -33,7 +37,7 @@ public sealed class ModelsApiTests : IDisposable
 
     private sealed record Decider(bool Configured, string Command, string Url);
 
-    private sealed record Models(EngineChoice Shiori, EngineChoice Reviewer, FunctionChoice Digests, FunctionChoice Journals, List<JsonElement> LocalModels, Decider Decider);
+    private sealed record Models(EngineChoice Shiori, EngineChoice Reviewer, FunctionChoice Digests, FunctionChoice Journals, List<JsonElement> LocalModels, Decider Decider, List<string> FreeModels);
 
     private sealed record Settings(string Autonomy, int Seats, bool ClaudeSupervises, string? SupervisorModel, bool ClaudeReviews, string? ReviewModel, string? DraftModel, string? OpenCodeReviewModel = null);
 
@@ -53,6 +57,33 @@ public sealed class ModelsApiTests : IDisposable
         Assert.Equal(new FunctionChoice("Local", null), models.Journals);
         Assert.False(models.Decider.Configured);
         Assert.Empty(models.LocalModels);
+        Assert.Empty(models.FreeModels);
+    }
+
+    [Fact]
+    public async Task Free_models_are_saved_trimmed_once_each_kept_when_not_sent_and_checked()
+    {
+        var choices = (Shiori: new EngineChoice("ClaudeCode", null, null), Reviewer: new EngineChoice("ClaudeCode", null, null),
+            Digests: new FunctionChoice("ClaudeCode", "sonnet"), Journals: new FunctionChoice("Local", null));
+        (await _http.PutAsJsonAsync("/api/models", new
+        {
+            choices.Shiori, choices.Reviewer, choices.Digests, choices.Journals,
+            freeModels = MarkedFree,
+        }, Json)).EnsureSuccessStatusCode();
+        var options = _app.Services.GetRequiredService<IOptionsMonitor<FunctionModelOptions>>().CurrentValue;
+
+        Assert.Equal(["zen/grok-code", "openrouter/qwen"], (await GetAsync<Models>("/api/models")).FreeModels);
+        Assert.Equal(["zen/grok-code", "openrouter/qwen"], options.FreeModels);
+
+        // A client that knows nothing of free models leaves them as they are.
+        (await _http.PutAsJsonAsync("/api/models", Request(choices.Shiori, choices.Reviewer, choices.Digests, choices.Journals), Json)).EnsureSuccessStatusCode();
+        Assert.Equal(["zen/grok-code", "openrouter/qwen"], (await GetAsync<Models>("/api/models")).FreeModels);
+
+        (await _http.PutAsJsonAsync("/api/models", new { choices.Shiori, choices.Reviewer, choices.Digests, choices.Journals, freeModels = OneFree }, Json)).EnsureSuccessStatusCode();
+        Assert.Equal(["zen/grok-code"], (await GetAsync<Models>("/api/models")).FreeModels);
+
+        using var wrong = await _http.PutAsJsonAsync("/api/models", new { choices.Shiori, choices.Reviewer, choices.Digests, choices.Journals, freeModels = NotAnId }, Json);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, wrong.StatusCode);
     }
 
     [Fact]

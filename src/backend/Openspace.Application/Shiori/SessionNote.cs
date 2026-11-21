@@ -14,6 +14,9 @@ public static partial class SessionNote
 {
     public const string Folder = "Sessions";
 
+    /// <summary>The heading of what an ended session leaves for the next day.</summary>
+    public const string NextHeading = "## Next";
+
     /// <summary>Where a new session's note goes: <c>Sessions/2026-11-21-merge-order.md</c>.</summary>
     public static string PathFor(DateTimeOffset localNow, string title) =>
         $"{Folder}/{localNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-{Slug(title, "session")}.md";
@@ -73,6 +76,20 @@ public static partial class SessionNote
                 var office = item.Office is null ? string.Empty : $" ({item.Office})";
                 var note = item.Note is null ? string.Empty : $" → [[{DecisionRules.Link(item.Note)}]]";
                 body.AppendLine(CultureInfo.InvariantCulture, $"- [{(item.Done ? "x" : " ")}] {item.Text}{office}{note}");
+            }
+
+            body.AppendLine();
+        }
+
+        // The tasks still open when the session ends are what the next day starts from: the
+        // "tomorrow" routine reads unticked items under a "Next" heading of recent sessions.
+        var open = session.Board.Where(i => i.Kind == WhiteboardKind.Task && !i.Done).ToList();
+        if (session.EndedAt is not null && open.Count > 0)
+        {
+            body.AppendLine(NextHeading).AppendLine();
+            foreach (var item in open)
+            {
+                body.AppendLine(CultureInfo.InvariantCulture, $"- [ ] {item.Text}{(item.Office is null ? string.Empty : $" ({item.Office})")}");
             }
 
             body.AppendLine();

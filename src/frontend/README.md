@@ -139,7 +139,8 @@ graphics card, the small model for routines' questions; one save), *Models* (the
 engine and model of each function: Shiori, who plans requests today, and the reviewer,
 on Claude Code with an OpenCode model that stands in when it is missing; digests and
 journals on Claude Code, OpenCode or a local model; the decider shown, with a link to
-Local AI; models nobody lists flagged; one save), *How agents work* (permissions,
+Local AI; models nobody lists flagged; the OpenCode models the person knows are free,
+one per line, which never get mail, health or food; one save), *How agents work* (permissions,
 agents at work at once; one save), *Connections* (Google accounts,
 Telegram), *Look and sound* (sounds, the weather's town), *System* (version,
 backups). The engine warning in the top bar and the first steps open *Engines*.

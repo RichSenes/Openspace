@@ -258,6 +258,24 @@ public class ShioriSessionsTests
     }
 
     [Fact]
+    public async Task Ending_a_session_leaves_its_open_tasks_under_Next_for_tomorrow_morning()
+    {
+        var (sessions, session) = await OpenAsync();
+        await sessions.ChangeBoardAsync(session.Id, new(WhiteboardAction.Add, Kind: WhiteboardKind.Task, Text: "Write the merge script", Office: "E Corp"), default);
+        await sessions.ChangeBoardAsync(session.Id, new(WhiteboardAction.Add, Kind: WhiteboardKind.Task, Text: "Ask about Fridays"), default);
+        var done = await sessions.ChangeBoardAsync(session.Id, new(WhiteboardAction.Add, Kind: WhiteboardKind.Task, Text: "Read the old plan"), default);
+        await sessions.ChangeBoardAsync(session.Id, new(WhiteboardAction.Done, Item: done.Id), default);
+        await sessions.ChangeBoardAsync(session.Id, new(WhiteboardAction.Add, Kind: WhiteboardKind.Idea, Text: "Batch merges at night"), default);
+        Assert.DoesNotContain("## Next", _s.H.Vault.Notes[session.Note].Body, StringComparison.Ordinal);
+
+        await sessions.EndAsync(session.Id, default);
+
+        var body = _s.H.Vault.Notes[session.Note].Body;
+        Assert.Contains("## Next\n\n- [ ] Write the merge script (E Corp)\n- [ ] Ask about Fridays\n", body, StringComparison.Ordinal);
+        Assert.Equal(["Write the merge script (E Corp)", "Ask about Fridays"], Routines.Kinds.TomorrowMorning.OpenItems(body));
+    }
+
+    [Fact]
     public async Task The_acceptor_takes_the_proposals_of_an_ended_session_like_any_other()
     {
         var (sessions, session) = await OpenAsync();

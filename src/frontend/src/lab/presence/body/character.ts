@@ -21,15 +21,21 @@ export interface Pose {
   lean: number
   /** 0..1: how hot the colour runs (thoughts, warmth). */
   heat: number
+  /** 0..1: the upper lid lowered, cutting the top of the eye flat. */
+  lid: number
+  /** -1..1: the lid's slant; positive lowers the outer corners (soft, sad), negative the inner (intent). */
+  lidTilt: number
+  /** 0..1: eyes drawn a little larger, as when attentive. */
+  wide: number
 }
 
 export const POSES: Record<FaceState, Pose> = {
-  idle: { energy: 0.35, speed: 0.55, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0, heat: 0.15 },
-  listening: { energy: 0.55, speed: 0.75, eyes: 1, open: 1.2, pleased: 0, unsure: 0, lean: 1, heat: 0.1 },
-  thinking: { energy: 0.75, speed: 1.9, eyes: 0, open: 0.8, pleased: 0, unsure: 0, lean: 0, heat: 0.8 },
-  speaking: { energy: 0.8, speed: 1.1, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0.3, heat: 0.35 },
-  pleased: { energy: 0.9, speed: 0.9, eyes: 1, open: 1, pleased: 1, unsure: 0, lean: 0.2, heat: 0.55 },
-  unsure: { energy: 0.4, speed: 0.5, eyes: 1, open: 0.75, pleased: 0, unsure: 1, lean: 0, heat: 0.25 },
+  idle: { energy: 0.35, speed: 0.55, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0, heat: 0.15, lid: 0.18, lidTilt: 0.1, wide: 0 },
+  listening: { energy: 0.55, speed: 0.75, eyes: 1, open: 1.15, pleased: 0, unsure: 0, lean: 1, heat: 0.1, lid: 0, lidTilt: 0, wide: 1 },
+  thinking: { energy: 0.75, speed: 1.9, eyes: 0, open: 0.8, pleased: 0, unsure: 0, lean: 0, heat: 0.8, lid: 0.45, lidTilt: -0.4, wide: 0 },
+  speaking: { energy: 0.8, speed: 1.1, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0.3, heat: 0.35, lid: 0.08, lidTilt: 0, wide: 0.3 },
+  pleased: { energy: 0.9, speed: 0.9, eyes: 1, open: 1, pleased: 1, unsure: 0, lean: 0.2, heat: 0.55, lid: 0, lidTilt: 0, wide: 0.2 },
+  unsure: { energy: 0.4, speed: 0.5, eyes: 1, open: 0.85, pleased: 0, unsure: 1, lean: 0, heat: 0.25, lid: 0.35, lidTilt: 0.7, wide: 0 },
 }
 
 /** Moves every number of a pose toward a target; `k` per second, framerate independent. */
@@ -38,6 +44,49 @@ export function approach(from: Pose, to: Pose, dt: number, k = 5): Pose {
   const out = { ...from }
   for (const key of Object.keys(to) as (keyof Pose)[]) out[key] = from[key] + (to[key] - from[key]) * a
   return out
+}
+
+/** A pose that moves on springs: every number has a velocity, so changes overshoot and settle. */
+export interface PoseMotion {
+  pose: Pose
+  vel: Pose
+  state: FaceState
+}
+
+const zero = (p: Pose): Pose => Object.fromEntries(Object.keys(p).map((k) => [k, 0])) as unknown as Pose
+
+export function makePoseMotion(state: FaceState): PoseMotion {
+  return { pose: { ...POSES[state] }, vel: zero(POSES[state]), state }
+}
+
+/** How quickly each part answers: lids and eyes fast, the body's energy and speed slower. */
+const POSE_STIFF: Partial<Record<keyof Pose, number>> = { lid: 220, lidTilt: 160, open: 220, wide: 160, pleased: 120, unsure: 120, eyes: 60, lean: 50, energy: 40, speed: 30, heat: 25 }
+
+/**
+ * Advances a pose toward its state's. On a change of state the face first moves a little the
+ * other way (anticipation), then reaches the new pose with a small overshoot and settles.
+ */
+export function stepPose(m: PoseMotion, state: FaceState, dt: number, calm: boolean): PoseMotion {
+  const target = POSES[state]
+  const pose = { ...m.pose }
+  const vel = { ...m.vel }
+  const keys = Object.keys(target) as (keyof Pose)[]
+  if (state !== m.state && !calm) for (const k of keys) vel[k] -= (target[k] - pose[k]) * 2.2
+  const steps = Math.max(1, Math.ceil(dt / (1 / 120)))
+  const h = dt / steps
+  for (const k of keys) {
+    const stiff = calm ? 40 : (POSE_STIFF[k] ?? 80)
+    const damp = 2 * Math.sqrt(stiff) * 0.7
+    let x = pose[k]
+    let v = vel[k]
+    for (let i = 0; i < steps; i++) {
+      v += (stiff * (target[k] - x) - damp * v) * h
+      x += v * h
+    }
+    pose[k] = x
+    vel[k] = v
+  }
+  return { pose, vel, state }
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { FaceState } from '../../shiori/faceMachine'
 import type { Mode } from '../../shiori/modes'
-import { approach, blinkOpen, LOOKS, makeLife, POSES, stepLife, voiceLevel, type Pose } from './character'
+import { blinkOpen, LOOKS, makeLife, makePoseMotion, stepLife, stepPose, voiceLevel } from './character'
 import { BodyRenderer } from './renderer'
 import { bodyRotation, mix3, MODE_HEAT, project, RIGS } from './rig'
 import { rng, type SkinId } from './shapes'
@@ -50,7 +50,8 @@ export function ShioriBody(props: BodyProps) {
       return
     }
     const rand = rng(99)
-    let pose: Pose = { ...POSES.idle }
+    let motionPose = makePoseMotion(live.current.state)
+    let pose = motionPose.pose
     // The portrait: its own canvas at the art's size, and the face that moves it.
     const art = document.createElement('canvas')
     art.width = PORTRAIT_W
@@ -90,7 +91,10 @@ export function ShioriBody(props: BodyProps) {
       }
       if (ch.done) change = null
 
-      pose = approach(pose, POSES[p.state], dt, p.state === 'thinking' ? 3.5 : 5)
+      // A change of thought starts with a blink, as a face does.
+      if (p.state !== motionPose.state && life.blink === 0 && !calm) life = { ...life, blink: 0.16, nextBlink: 3 }
+      motionPose = stepPose(motionPose, p.state, dt, calm)
+      pose = motionPose.pose
       life = stepLife(life, dt, rand, LOOKS[p.state], p.state === 'idle' ? 0.45 : 0.15)
       const motion = calm ? 0.25 : 1
       phase += dt * pose.speed * motion
@@ -139,6 +143,9 @@ export function ShioriBody(props: BodyProps) {
           unsure: pose.unsure,
           lean: pose.lean,
           heat: pose.heat,
+          lid: pose.lid,
+          lidTilt: pose.lidTilt,
+          wide: pose.wide,
           gaze: life.gaze,
           rot,
           eyeRot,

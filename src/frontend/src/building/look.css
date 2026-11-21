@@ -38,8 +38,12 @@
 .look-part legend {
   padding: 0;
   margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .look-part:disabled {
@@ -58,23 +62,30 @@
   gap: 6px;
   min-height: 32px;
   padding: 4px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--raised);
+  background: var(--panel);
   color: var(--ink);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
 }
 
 .chip:hover:not(:disabled) {
-  border-color: var(--mute);
+  border-color: var(--edge-hi);
+  background: var(--raised);
 }
 
-/* The chosen chip: a thicker frame and a tick, not only a colour. */
+.chip:focus-visible {
+  outline-offset: -3px;
+}
+
+/* The chosen chip: a thicker frame, a tint and a tick, not only a colour. */
 .chip[aria-pressed='true'] {
   border: 2px solid var(--accent);
   padding: 3px 9px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
 }
 
 .chip:disabled {
@@ -85,7 +96,7 @@
   width: 12px;
   height: 12px;
   border: 1px solid var(--bg);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .look-actions {

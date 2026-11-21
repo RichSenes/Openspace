@@ -1,10 +1,11 @@
+/* A task's status in the HUD voice: a lit pixel and the word, mono and spaced. */
 .status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--pixel);
+  font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
@@ -12,9 +13,14 @@
 
 .status::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.status-running::before {
+  animation: blink 1.6s steps(2) infinite;
 }
 
 .status-proposed { color: var(--st-proposed); }

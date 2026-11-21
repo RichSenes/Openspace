@@ -11,7 +11,7 @@
 }
 
 .reports-head h1 {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 /* Three kinds of report, each in its own card with what it tells and its one button. */
@@ -35,11 +35,16 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .report-form h2 {
   margin: 0;
-  font-size: 15px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .report-form p {
@@ -75,15 +80,27 @@
   gap: 2px;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   text-align: left;
   cursor: pointer;
+  transition: border-color 120ms var(--steps), background 120ms var(--steps);
+}
+
+.report-item:hover {
+  border-color: var(--edge-hi);
+  background: var(--raised);
+}
+
+.report-item:focus-visible {
+  outline-offset: -2px;
 }
 
 .report-item[aria-current='true'] {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .report-title {
@@ -95,9 +112,11 @@
   display: grid;
   gap: 16px;
   padding: 20px 24px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   min-width: 0;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .report-actions {
@@ -118,7 +137,10 @@
 .markdown h2,
 .markdown h3 {
   margin: 1.2em 0 0.4em;
+  font-family: var(--sans);
   font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .markdown h1:first-child,
@@ -135,12 +157,13 @@
   font-family: var(--mono);
   font-size: 13px;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--raised);
 }
 
 .markdown a {
   color: var(--accent);
+  text-underline-offset: 2px;
 }
 
 .markdown p,
@@ -169,13 +192,19 @@
 
 .markdown th {
   background: var(--raised);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .markdown pre {
   overflow-x: auto;
   padding: 10px 12px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--raised);
+  background: var(--bg);
 }
 
 .markdown pre code {

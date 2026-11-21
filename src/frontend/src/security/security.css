@@ -48,12 +48,20 @@
 }
 
 .findings h2 {
-  font-size: 16px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .findings > summary {
   cursor: pointer;
   color: var(--mute);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .finding {
@@ -61,9 +69,18 @@
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--line);
+  border-left: 2px solid var(--edge-hi);
   border-radius: var(--radius);
   background: var(--raised);
   min-width: 0;
+}
+
+.finding:has(.severity-critical, .severity-high) {
+  border-left-color: var(--danger);
+}
+
+.finding:has(.severity-medium) {
+  border-left-color: var(--st-review);
 }
 
 .finding p {
@@ -93,9 +110,9 @@
 
 /* The severity is a word first; the colour only repeats it. */
 .finding-severity {
-  font-family: var(--pixel);
+  font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 

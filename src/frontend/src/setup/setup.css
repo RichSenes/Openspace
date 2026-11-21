@@ -5,10 +5,12 @@
   width: min(560px, 100%);
   margin: 0 auto;
   padding: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--panel);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
   text-align: left;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .first-steps-wrap {
@@ -28,12 +30,18 @@
 .first-steps-head h2 {
   margin: 0;
   font-family: var(--pixel);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .first-steps-head p {
   margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .first-steps ol {
@@ -49,21 +57,30 @@
   grid-template-columns: 22px minmax(0, 1fr);
   gap: 10px;
   padding: 10px 8px;
+  border: 1px solid transparent;
   border-radius: var(--radius);
 }
 
+/* The next step: lit in the accent, the way the presence lab lights the mode it is in. */
 .first-steps li.next {
-  background: var(--raised);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--edge));
+  background: color-mix(in srgb, var(--accent) 7%, var(--raised));
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.first-steps li.next .first-step-mark {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .first-step-mark {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
   border: 1px solid var(--mute);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .first-steps li.done .first-step-mark {
@@ -106,7 +123,7 @@
   overflow: auto;
   gap: 8px;
   padding: 14px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  animation: panel-in 220ms var(--steps) both;
 }
 
 .first-steps.floating li {
@@ -114,5 +131,5 @@
 }
 
 .first-steps.floating .first-steps-head h2 {
-  font-size: 15px;
+  font-size: 14px;
 }

@@ -5,40 +5,65 @@
 
 :root {
   color-scheme: dark;
+  accent-color: var(--accent);
 
-  /* Surfaces */
-  --bg: #14161c;
-  --panel: #1b1e26;
-  --raised: #232731;
-  --line: #333948;
-  /* Edges of inputs, selects and text boxes: WCAG 1.4.11 asks 3:1 for the edge of a
-     field. Against panel, bg and raised this is 3.6, 3.9 and 3.3 to 1; --line stays
-     for cards and dividers, which are decoration and may be quieter. */
-  --field-line: #6e7588;
+  /* Surfaces: a violet black, darkest at the back. Panels are dark glass on it. */
+  --bg: #07060d;
+  --chrome: #0b0914;
+  --panel: #100c1a;
+  --raised: #191330;
+  --hover: #211938;
+  /* Dark glass for what floats over the building: ink keeps 14:1 even over pure white. */
+  --glass: rgb(11 8 22 / 0.94);
+  --glass-blur: blur(6px);
 
-  /* Text: ink and mute both pass WCAG AA on every surface above */
-  --ink: #ece8df;
-  --mute: #a3a8b6;
+  /* Edges, 1 px and violet. --line divides and frames cards (decoration); --edge-hi is a
+     hovered or pressed edge. --field-line is the edge of inputs, selects and text boxes:
+     WCAG 1.4.11 asks 3:1, and it gives 3.9, 3.7, 3.5 and 3.2 to 1 on bg, panel, raised
+     and hover. */
+  --line: #2e2445;
+  --edge: #3d3160;
+  --edge-hi: #5b4a80;
+  --field-line: #73659c;
 
-  /* Actions */
-  --accent: #f2b84b;
-  --on-accent: #1a1406;
-  --danger: #f7768e;
+  /* Text: ink and mute pass WCAG AA on every surface above (mute 6.9:1 on hover). */
+  --ink: #ecebff;
+  --mute: #a7a3c8;
+
+  /* The accent follows the context: each view sets its own (layout.css), the building's
+     amber is the default. Every accent passes 4.5:1 as text on every surface and on its own
+     16-26 % tint, and --on-accent passes on every accent. */
+  --amber: #f2b84b;
+  --violet: #b69cff;
+  --teal: #5fd4b8;
+  --cyan: #6cc8f0;
+  --blue: #86a9ff;
+  --accent: var(--amber);
+  --on-accent: #120d05;
+  /* Something waits for the person: always amber, whatever the view. */
+  --attention: var(--amber);
+  --danger: #ff7a93;
 
   /* Task statuses */
   --st-proposed: #c3a6f7;
   --st-queued: #82a8f5;
   --st-running: #8fd282;
   --st-review: #f2b84b;
-  --st-failed: #f7768e;
-  --st-done: #a3a8b6;
+  --st-failed: #ff7a93;
+  --st-done: #a7a3c8;
 
   --pixel: 'Silkscreen', monospace;
   --sans: 'IBM Plex Sans', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --radius: 4px;
+  /* Corners are cut, not rounded: --cut on panels, --cut-sm on buttons and fields. */
+  --radius: 0px;
+  --cut: 10px;
+  --cut-sm: 6px;
   --gap: 16px;
+  --shadow: 0 14px 36px rgb(0 0 0 / 0.6);
+  /* Motion moves in steps, like the sprites. */
+  --steps: steps(5, end);
 
   font-family: var(--sans);
   font-size: 15px;
@@ -72,6 +97,11 @@ select {
   outline-offset: 2px;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--ink);
+}
+
 h1,
 h2,
 h3 {
@@ -79,19 +109,58 @@ h3 {
   font-weight: 600;
 }
 
-/* Buttons name their action; the primary one is the only filled one in a group. */
+/* Page titles speak in the pixel face; the rest of the headings stay in Plex to be read. */
+.shell h1 {
+  font-family: var(--pixel);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+/*
+ * The cut corner: a panel or a button loses its top-right and bottom-left corners. The
+ * clip also cuts the 1 px edge there, which is the look. Only on boxes that never let a
+ * child out (menus and popovers are their own boxes), and never with an outside focus
+ * ring: clipped boxes draw their ring inside.
+ */
+.btn,
+.input,
+.cut {
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut-sm)) 0,
+    100% var(--cut-sm),
+    100% 100%,
+    var(--cut-sm) 100%,
+    0 calc(100% - var(--cut-sm))
+  );
+}
+
+.cut-lg {
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+}
+
+/* Buttons name their action; the primary one is the only tinted one in a group. */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 34px;
   padding: 0 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--raised);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color 120ms var(--steps), background 120ms var(--steps), color 120ms var(--steps);
 }
 
 a.btn {
@@ -100,7 +169,12 @@ a.btn {
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--mute);
+  border-color: var(--edge-hi);
+  background: var(--raised);
+}
+
+.btn:focus-visible {
+  outline-offset: -2px;
 }
 
 .btn:disabled {
@@ -108,19 +182,29 @@ a.btn {
   cursor: not-allowed;
 }
 
+/* The primary action glows in the context's colour: its edge, its words and a tint of it. */
 .btn-primary {
   border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--accent);
   font-weight: 600;
 }
 
+a.btn-primary {
+  color: var(--accent);
+}
+
 .btn-primary:hover:not(:disabled) {
-  border-color: var(--ink);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 26%, var(--panel));
 }
 
 .btn-danger {
   color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 60%, var(--edge));
 }
 
 .btn-quiet {
@@ -128,14 +212,26 @@ a.btn {
   background: transparent;
 }
 
+.btn-quiet:hover:not(:disabled) {
+  border-color: var(--edge);
+  background: var(--raised);
+}
+
 .field {
   display: grid;
   gap: 4px;
 }
 
+/* Field labels speak in the mono voice; they are sentences, so they keep their case. */
 .field > span {
   color: var(--mute);
   font-size: 13px;
+}
+
+.field > span:not(.hint, .error) {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
 }
 
 .input {
@@ -147,10 +243,28 @@ a.btn {
   background: var(--bg);
 }
 
+.input:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--field-line) 60%, var(--ink));
+}
+
+.input:focus-visible {
+  border-color: var(--accent);
+  outline-offset: -2px;
+}
+
+.input::placeholder {
+  color: var(--mute);
+  opacity: 1;
+}
+
 /* One height for every one-line field, whatever its font: side by side, they line up. */
 input.input,
 select.input {
   height: 38px;
+}
+
+select.input option {
+  background: var(--panel);
 }
 
 textarea.input {
@@ -181,6 +295,16 @@ textarea.input {
   letter-spacing: 0.04em;
 }
 
+/* A small label in the HUD voice: mono, upper case, spaced. */
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
 .mono {
   font-family: var(--mono);
   font-size: 13px;
@@ -192,6 +316,21 @@ textarea.input {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* A light that blinks in two steps: live things, cursors, waiting dots. */
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A panel arriving: it drops into place and lights up in a few steps. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -222,7 +361,11 @@ textarea.input {
 
 .token-table thead th {
   color: var(--mute);
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* A button inside a sentence: it reads as a link and does what it says. */

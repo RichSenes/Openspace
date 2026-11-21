@@ -20,7 +20,7 @@
 .settings-head {
   grid-area: head;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
 }
 
 .settings-index {
@@ -47,9 +47,14 @@
   background: var(--panel);
 }
 
+.settings-index button:focus-visible {
+  outline-offset: -2px;
+}
+
 .settings-index button[aria-current='true'] {
   border-left-color: var(--accent);
-  background: var(--panel);
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 12%, transparent), transparent);
+  color: var(--accent);
 }
 
 .settings-index .hint {
@@ -66,7 +71,11 @@
 
 .settings-section-title {
   margin: 0;
-  font-size: 18px;
+  font-family: var(--pixel);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* Cards side by side when each still has room for its sentences. */
@@ -129,7 +138,7 @@
 }
 
 .settings-head h1 {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .settings-form {
@@ -146,11 +155,17 @@
   border-radius: var(--radius);
   background: var(--panel);
   min-width: 0;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .settings-card h3 {
   margin: 0;
-  font-size: 15px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 
@@ -184,6 +199,8 @@
 }
 
 .accounts dt {
+  font-family: var(--mono);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -256,6 +273,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--raised);
   overflow-wrap: anywhere;

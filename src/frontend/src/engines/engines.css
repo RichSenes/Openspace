@@ -5,6 +5,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .engines-card ul {
@@ -27,16 +28,19 @@
   min-width: 220px;
 }
 
+/* A meter of pixel cells: the fill is cut into 4 px steps with a 1 px gap. */
 .usage-bar {
-  height: 8px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
+  height: 10px;
+  padding: 1px;
+  border: 1px solid var(--edge);
+  border-radius: 0;
   background: var(--bg);
 }
 
 .usage-bar > div {
   height: 100%;
-  background: var(--accent);
+  background: repeating-linear-gradient(to right, var(--accent) 0 4px, transparent 4px 5px);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .claude-usage {
@@ -49,13 +53,19 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: none;
+  background: var(--panel);
   color: var(--mute);
-  font-size: 13px;
+  font-family: var(--mono);
+  font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}
+
+.claude-meter:focus-visible {
+  outline-offset: -3px;
 }
 
 .claude-meter:hover {
@@ -64,16 +74,18 @@
 
 .claude-meter-limited {
   border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
   color: var(--ink);
 }
 
 /* The graphics card: the icon and the words tell the state, the border only adds to them. */
 .gpu-waiting {
-  border-color: var(--accent);
+  border-color: var(--attention);
   color: var(--ink);
 }
 
 .gpu-trouble {
   border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
   color: var(--ink);
 }

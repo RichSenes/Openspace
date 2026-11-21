@@ -16,13 +16,13 @@
   align-items: end;
   gap: 8px 16px;
   padding: 16px 0 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--edge);
   background: var(--bg);
 }
 
 .office-head h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .office-head p {
@@ -49,11 +49,16 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .office-part h2 {
   margin: 0;
-  font-size: 16px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .office-part > p {
@@ -86,7 +91,8 @@
 .reserve-order {
   flex: none;
   width: 18px;
-  color: var(--mute);
+  color: var(--accent);
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 

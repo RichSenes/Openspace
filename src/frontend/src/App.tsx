@@ -32,7 +32,7 @@ export default function App() {
   const [focusTask, setFocusTask] = useState<string>()
 
   return (
-    <div className="shell">
+    <div className="shell" data-view={view}>
       <TopBar
         view={view}
         onView={(v) => {

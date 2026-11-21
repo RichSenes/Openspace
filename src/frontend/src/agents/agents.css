@@ -11,7 +11,7 @@
 }
 
 .agents-head h1 {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .agents-body {
@@ -39,19 +39,27 @@
   gap: 2px;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   text-align: left;
   cursor: pointer;
+  transition: border-color 120ms var(--steps), background 120ms var(--steps);
 }
 
 .role-item:hover {
-  border-color: var(--line);
+  border-color: var(--edge-hi);
+  background: var(--raised);
+}
+
+.role-item:focus-visible {
+  outline-offset: -2px;
 }
 
 .role-item[aria-current='true'] {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .role-name {
@@ -62,12 +70,18 @@
   display: grid;
   gap: 16px;
   padding: 20px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 
 .role-editor h2 {
-  font-size: 17px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .role-grid {
@@ -93,6 +107,8 @@
   display: grid;
   gap: 8px;
   padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
   border-radius: var(--radius);
   background: var(--raised);
 }
@@ -115,6 +131,11 @@
 
 .permissions legend {
   margin-bottom: 8px;
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 860px) {
@@ -132,7 +153,11 @@
 }
 
 .desk-usage h2 {
-  font-size: 15px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .skill-list {
@@ -142,8 +167,9 @@
   max-height: 280px;
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius);
+  background: var(--bg);
 }
 
 .skill-option {
@@ -178,7 +204,12 @@
 
 .ready-roles h2 {
   margin: 0;
-  font-size: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
 }
 
 .ready-roles p {
@@ -200,6 +231,7 @@
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .ready-roles li > div {

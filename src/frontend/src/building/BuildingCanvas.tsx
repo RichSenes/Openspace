@@ -46,7 +46,7 @@ import { centredOn, inkOf, mapSize, mapView, minimapPixels, type MapAgent, type 
 const FPS = 5
 
 const COLORS = {
-  ground: 0x14161c,
+  ground: 0x07060d,
   roomEdge: 0x0b0c10,
   label: 0xece8df,
   mute: 0xa3a8b6,

@@ -64,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<RoutineQueries>();
         services.AddScoped<ProposalCommands>();
         services.AddScoped<Attention.NeedsYouQueries>();
+        services.AddSingleton<Attention.DecisionAcceptor>();
+        services.AddScoped<Attention.DecisionCommands>();
         services.AddScoped<IChatAnswers, ChatAnswers>();
         services.AddScoped<KanjiCourse>();
         services.AddScoped<IRoutineKind, Routines.Kinds.MorningPaper>();
@@ -74,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IRoutineKind, Routines.Kinds.JobOffers>();
         services.AddScoped<IRoutineKind, Routines.Kinds.CvMaker>();
         services.AddScoped<IRoutineKind, Routines.Kinds.Maintenance>();
+        services.AddScoped<IRoutineKind, Routines.Kinds.DecisionReviews>();
         services.AddScoped<OfferInbox>();
         return services;
     }

@@ -74,7 +74,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/offices/{id}/branches` | `{ current, branches, overlaps }`: branches work can be merged into (task branches hidden); `overlaps` lists pairs of unmerged task branches (in review or accepted) that changed the same files since leaving `current`, `[{ taskId, title, otherTaskId, otherTitle, files }]`: merging both will likely conflict |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
-| GET | `/api/needs-you` | What waits for the person, from every office: tasks to approve, to review and failed; routines' pending proposals and routines whose last run failed; by kind, the oldest first |
+| GET | `/api/needs-you` | What waits for the person, from every office: tasks to approve, to review and failed; routines' pending proposals and routines whose last run failed; the brain's decisions accepted by Shiori to review, proposals left for the person (`detail` says why) and decisions due for review (`note` is the note's path); by kind, the oldest first |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
 | GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, another desk changing the files it names, account over its limits, graphics card taken, no free seat) |
@@ -118,6 +118,7 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
 | GET | `/api/brain/now` | Who is changing what right now: `[{ taskId, officeId, office, room, desk, title, paths }]`, one per running task; `paths` (relative to the repository) are the files changed in its working copy, then those its title and description name. See [Brain](#brain) |
 | GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
+| POST | `/api/brain/decisions/{path}/{answer}` | The person's answer on a decision, `answer` one of `fine` (accepted by Shiori: reviewed), `undo` (accepted: rejected), `accept`, `reject` (proposed), `keep` (accepted: review in three months), `supersede`; optional `{ reason }` for undo and reject, written in the proposing desk's journal. Returns the note; `404` for no such note or answer, `422` with code `decision-status` when the answer does not fit its status |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel, openCodeReviewModel }` |
@@ -444,7 +445,16 @@ offer's CV in answer to it.
   Before noon it starts from today, after noon from tomorrow, so a Sunday evening
   recap is about the week to come. The local model opens it with two sentences on
   what the week looks like, or it goes without them. It only reads; without
-  `account` it leaves the agenda out.
+  `account` it leaves the agenda out. What it sends is kept in the brain as
+  `Digests/<year>-W<week>.md` (ISO week of the run, `kind: digest`, by Shiori) and
+  added to the month's `Digests/<year>-<month>.md` under a `## [[<year>-W<week>]]`
+  heading (a week written again replaces its own part), so the month needs no
+  routine of its own; a vault that cannot be written leaves a line in the log.
+- **Decision reviews** (`decision-reviews`): every run (daily unless the schedule
+  says otherwise) lists the accepted decisions of its office, or of every office,
+  whose `review` date has come; once it has looked they wait under **needs you**
+  (Keep moves the date three months on, Supersede retires the decision), and
+  `channel`, when set, gets the list. Nothing due, nothing sent.
 - **Job offers** (`job-offers`): the newest offers of the `boards`, honestly
   identified; boards that turn automatic readers away are left out. `japan-dev` is
   Japan Dev, read through its public list page and each offer's schema.org posting.
@@ -832,3 +842,13 @@ then room, then office, eight at most with title, first line and path; the work 
 the same office that shares its room or files; and the request to leave a journal line and to
 propose lasting choices. The part is capped at 3,500 characters (decisions go first, then work,
 then the last rules, and it says so); with an empty or unreadable vault the brief is as before.
+
+Until Shiori can talk, a rule accepts proposals for it (`AcceptorService`, on its own file watcher
+and every five minutes): a note with `status: proposed` is accepted, with `accepted_by: Shiori`
+and `reviewed: false` and a commit by "Shiori", when it is about one office or none, is not a
+rule, replaces no decision (`supersedes`) and shares no subject (same title, or same file name
+without its date) with an accepted decision whose offices overlap. The rest stay proposed and
+reach **needs you** with the reason; what Shiori accepted reaches it too, to look at afterwards
+(Fine, Open, Undo). Undoing or rejecting sets `status: rejected` and adds a line under the day's
+heading of `Inhabitants/<desk>/journal.md` for the desk that proposed it (`- 14:05 · Shiori: the
+person undid [[Decisions/…|Title]]. Why: …`).

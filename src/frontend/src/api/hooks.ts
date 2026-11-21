@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { readError, request } from './client'
-import { withoutItem } from '../activity/needs'
+import { notePath, withoutItem } from '../activity/needs'
 import { pathsOf, type OfficeForm, type OfficePart } from '../office/officeForm'
 import type {
   SecurityAuditProfile,
@@ -45,6 +45,8 @@ import type {
   QueueWait,
   VersionView,
   NeedsYouItem,
+  BrainNoteView,
+  DecisionVerb,
   LocalAiSettings,
   BrainSummary,
   LocalAiView,
@@ -887,6 +889,25 @@ export function useNeedsYou() {
     queryKey: keys.needsYou,
     queryFn: () => request<NeedsYouItem[]>('GET', '/api/needs-you'),
     refetchInterval: 60_000,
+  })
+}
+
+/** The person's answer on a decision of the brain; the item leaves the list at once. */
+export function useAnswerDecision() {
+  return useSettle(
+    (input: { id: string; path: string; verb: DecisionVerb }) =>
+      request<BrainNoteView>('POST', `/api/brain/decisions/${notePath(input.path)}/${input.verb}`),
+    keys.needsYou,
+    (input) => input.id,
+  )
+}
+
+/** One note of the brain, read only when asked for. */
+export function useBrainNote(path: string | null) {
+  return useQuery({
+    queryKey: ['brain-note', path],
+    queryFn: () => request<BrainNoteView>('GET', `/api/brain/notes/${notePath(path ?? '')}`),
+    enabled: path !== null,
   })
 }
 

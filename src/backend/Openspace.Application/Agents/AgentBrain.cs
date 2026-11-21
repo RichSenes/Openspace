@@ -41,10 +41,6 @@ public sealed partial class AgentBrain(
         ["note"] = "Offices",
     };
 
-    // One journal write at a time: an append reads the note and writes it back, and two at
-    // once (an agent and its helpers) would lose one of them.
-    private static readonly SemaphoreSlim Journals = new(1, 1);
-
     public async Task<string> SearchAsync(
         WorkTaskId taskId, string query, string? office, string? room, string? path, string? kind, CancellationToken cancellationToken)
     {
@@ -87,30 +83,8 @@ public sealed partial class AgentBrain(
     {
         var caller = await CallerAsync(taskId, cancellationToken).ConfigureAwait(false);
         var line = Guard(text, "A journal entry", 2000).ReplaceLineEndings(" ");
-        var desk = caller.Desk.Name;
-        var path = $"Inhabitants/{FolderName(desk)}/journal.md";
-        var now = clock.GetLocalNow();
-        var day = $"## {now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
-        var entry = $"- {now.ToString("HH:mm", CultureInfo.InvariantCulture)} · {caller.Task.Title}: {line}\n";
-
-        await Journals.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var journal = await vault.ReadAsync(path, cancellationToken).ConfigureAwait(false)
-                ?? new Note(path, "journal", null, $"{desk}'s journal", [], [], [], null, null, null, desk, $"# {desk}'s journal\n", []);
-            var body = journal.Body.Length == 0 || journal.Body.EndsWith('\n') ? journal.Body : journal.Body + "\n";
-
-            // Entries of the same day go under one heading, so the journal reads day by day.
-            var lastDay = DayHeading().Matches(body).LastOrDefault()?.Value.TrimEnd();
-            body += lastDay == day ? entry : $"\n{day}\n\n{entry}";
-            await vault.WriteAsync(journal with { Body = body }, desk, cancellationToken, "wrote in its journal").ConfigureAwait(false);
-        }
-        finally
-        {
-            Journals.Release();
-        }
-
-        return path;
+        return await Journals.AppendAsync(
+            vault, caller.Desk.Name, clock.GetLocalNow(), $"{caller.Task.Title}: {line}", caller.Desk.Name, "wrote in its journal", cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Creates a new note with <c>status: proposed</c>; it never changes an existing one.</summary>
@@ -139,7 +113,7 @@ public sealed partial class AgentBrain(
         var text = Guard(body, "A proposal's body", 20000);
         var why = Guard(reasons, "A proposal's reasons", 4000);
         var stem = what == "note"
-            ? $"{folder}/{FolderName(caller.Office.Name)}/{Slug(name)}"
+            ? $"{folder}/{Journals.FolderName(caller.Office.Name)}/{Slug(name)}"
             : $"{folder}/{clock.GetLocalNow().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-{Slug(name)}";
 
         // A proposal only ever adds: a name already taken gets a number.
@@ -323,13 +297,6 @@ public sealed partial class AgentBrain(
         return parts.Count == 0 ? "" : $" ({string.Join(", ", parts)})";
     }
 
-    /// <summary>A name as one folder of the vault: no slashes, no leading dot.</summary>
-    private static string FolderName(string name)
-    {
-        var safe = new string([.. name.Select(c => c is '/' or '\\' or ':' || char.IsControl(c) ? '-' : c)]).Trim().TrimStart('.');
-        return safe.Length > 0 ? safe : "Desk";
-    }
-
     /// <summary>A title as a file name: lowercase words joined by dashes, accents dropped.</summary>
     private static string Slug(string title)
     {
@@ -388,8 +355,6 @@ public sealed partial class AgentBrain(
     [LoggerMessage(Level = LogLevel.Warning, Message = "The brain could not be read for the briefing of task {TaskId}: it goes out without it")]
     private static partial void LogBrainUnreadable(ILogger logger, Exception exception, Guid taskId);
 
-    [GeneratedRegex(@"^##[ \t]+\d{4}-\d{2}-\d{2}[ \t]*$", RegexOptions.Multiline)]
-    private static partial Regex DayHeading();
 
     [GeneratedRegex(@"^\s{0,3}(\d{1,3})[.)][ \t]+(\S.*)$")]
     private static partial Regex NumberedLine();

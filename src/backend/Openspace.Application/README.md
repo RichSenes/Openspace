@@ -71,7 +71,8 @@ settings, `RunAsync`) and works through its `RoutineContext`.
 | `mail` | Sorts new mail under labels, archives what can be, proposes replies as drafts, adds dates to the calendar or tasks |
 | `newsletters` | A paper of the week's newsletters, by topic |
 | `followup` | Mail sent and never answered, with a reminder drafted on a yes; mail waiting for the person |
-| `weekly` | A recap of the week: calendar, tasks, proposals waiting, routines' runs |
+| `weekly` | A recap of the week: calendar, tasks, proposals waiting, routines' runs; kept in the brain as the week's and the month's digest |
+| `decision-reviews` | The brain's accepted decisions whose review date has come, in the inbox and in its message |
 | `job-offers` | Offers from job boards and companies' own pages, judged against the person's profile, never proposed twice |
 | `cv` | The CV in several languages, and one tailored to each offer the person said yes to |
 | `maintenance` | Every project's dependencies against advisories and registries, system updates, unpushed work; tasks for the offices' agents |

@@ -13,7 +13,9 @@ public sealed class WeeklyRecapTests
     private readonly FakeAgenda _agenda = new();
     private readonly FakeChat _chat = new();
 
-    private WeeklyRecap Kind() => new(_agenda, _h.Routines, _chat);
+    private readonly InMemoryVault _vault = new();
+
+    private WeeklyRecap Kind() => new(_agenda, _h.Routines, _chat, _vault);
 
     private Routine Create(string account = "sam@example.com", string language = "English")
     {
@@ -109,6 +111,22 @@ public sealed class WeeklyRecapTests
             """.ReplaceLineEndings("\n"),
             text);
         Assert.Contains("Not done yet, due Friday 26 June: Renew the library card", _chat.Asked.Single(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task What_it_sends_is_kept_in_the_vault_as_the_week_and_the_month_digest()
+    {
+        var routine = Create();
+        SundayEvening();
+
+        var run = await RunAsync(routine);
+
+        var (_, text, _) = Assert.Single(_h.Outbox.Sent);
+        var week = (await _vault.ReadAsync("Digests/2015-W26.md", default))!;
+        Assert.Equal(("digest", "Shiori", "routine Week"), (week.Kind, week.Author, week.From));
+        Assert.Equal($"# 2015-W26\n\n{text}\n", week.Body);
+        Assert.Contains($"## [[2015-W26]]\n\n{text}", (await _vault.ReadAsync("Digests/2015-06.md", default))!.Body, StringComparison.Ordinal);
+        Assert.Contains("Kept in the brain as Digests/2015-W26.md", run.Log, StringComparison.Ordinal);
     }
 
     [Fact]

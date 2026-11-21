@@ -621,7 +621,15 @@ export type ProposalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Done' | 'Fai
 
 /** Something a routine wants to do with the person's things: it waits for a yes. */
 /** What waits for the person, from every office: tasks, routines' proposals, failed routines. */
-export type NeedsYouKind = 'TaskToApprove' | 'TaskToReview' | 'TaskFailed' | 'Proposal' | 'RoutineFailed'
+export type NeedsYouKind =
+  | 'TaskToApprove'
+  | 'TaskToReview'
+  | 'TaskFailed'
+  | 'Proposal'
+  | 'RoutineFailed'
+  | 'DecisionToReview'
+  | 'DecisionToAccept'
+  | 'DecisionDue'
 
 export interface NeedsYouItem {
   kind: NeedsYouKind
@@ -634,6 +642,23 @@ export interface NeedsYouItem {
   detail: string
   /** When it started waiting. */
   since: string
+  /** The note's path in the brain's vault, for decisions. */
+  note?: string | null
+}
+
+/** What the person can say about a decision from the inbox. */
+export type DecisionVerb = 'fine' | 'undo' | 'accept' | 'reject' | 'keep' | 'supersede'
+
+/** One note of the brain's vault, as the API shows it. */
+export interface BrainNoteView {
+  path: string
+  kind: string | null
+  status: string | null
+  title: string
+  offices: string[]
+  author: string | null
+  review: string | null
+  body: string
 }
 
 export interface ProposalView {

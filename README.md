@@ -210,6 +210,9 @@ More of what it does, in short:
   plans and studies, searchable by words and by office, room and file. `Now.md` says
   who is changing which files; a queued task that names files another desk is changing
   waits and says for whom, and the merge desk flags branches that touched the same files.
+  Shiori accepts agents' proposals that stay in one office and contradict nothing; you
+  review them afterwards under **needs you** and can undo them. Decisions come back when their review
+  date comes, and the weekly recap is kept there as weekly and monthly digests.
 
 ## Repository layout
 

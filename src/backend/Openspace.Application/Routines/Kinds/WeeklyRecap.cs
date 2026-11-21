@@ -11,9 +11,10 @@ namespace Openspace.Application.Routines.Kinds;
 /// Once a week, one message: the days ahead from the person's agenda (events, tasks due), the
 /// tasks left behind, what the office's routines still wait for a yes on, and how they did in
 /// the past week. A local model opens it with a couple of sentences that put it in order; when
-/// it cannot, the message goes without them. It reads, never changes anything.
+/// it cannot, the message goes without them. It reads, never changes anything, but keeps a copy of
+/// what it sent in the brain's vault: the week's digest and its month's.
 /// </summary>
-public sealed class WeeklyRecap(IAgenda agenda, IRoutineRepository routines, ILocalChat chat) : IRoutineKind
+public sealed class WeeklyRecap(IAgenda agenda, IRoutineRepository routines, ILocalChat chat, Brain.IVault vault) : IRoutineKind
 {
     public string Key => "weekly";
 
@@ -133,6 +134,17 @@ public sealed class WeeklyRecap(IAgenda agenda, IRoutineRepository routines, ILo
         }
 
         await context.DeliverAsync(text.ToString(), null, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await Digests.WriteAsync(vault, DateOnly.FromDateTime(local.DateTime), text.ToString(), $"routine {context.Routine.Name}", words.Culture, cancellationToken).ConfigureAwait(false);
+            context.Write($"Kept in the brain as {Digests.WeekPath(DateOnly.FromDateTime(local.DateTime))}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // The message went out: a vault that cannot be written does not make the run fail.
+            context.Write($"The digest could not be kept in the brain ({ex.Message}).");
+        }
+
         var events = ahead.Count(e => e.IsEvent);
         return (entries is null ? "No agenda" : $"{events} events and {ahead.Count - events} tasks ahead, {behind.Count} left behind")
             + $"; {waiting.Sum(w => w.Count)} proposals waiting.";

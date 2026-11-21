@@ -1,6 +1,4 @@
 import { cityScene } from './city'
-import { kyotoScene } from './kyoto'
-import { libraryScene } from './library'
 import { machineScene } from './machine'
 import { spaceScene } from './space'
 import { EARTH_HOURS, EARTH_SKIES, type WorldDef, type WorldId } from './types'
@@ -43,43 +41,8 @@ export const WORLDS: Record<WorldId, WorldDef> = {
     hours: EARTH_HOURS,
     create: (w, h) => cityScene('tokyo', w, h),
   },
-  kyoto: {
-    id: 'kyoto',
-    label: 'Kyoto',
-    line: 'A pagoda on the hill, maples, a vermilion gate and stone lanterns; the calm one',
-    palette: [
-      [0, 0, 0],
-      [0.08, 0.06, 0.14],
-      [0.22, 0.2, 0.36],
-      [0.42, 0.5, 0.72],
-      [0.85, 0.3, 0.2],
-      [1.0, 0.55, 0.3],
-      [1.0, 0.82, 0.55],
-      [0.96, 0.95, 0.98],
-    ],
-    skies: EARTH_SKIES,
-    hours: EARTH_HOURS,
-    create: kyotoScene,
-  },
-  library: {
-    id: 'library',
-    label: 'Endless library',
-    line: 'Towers of shelves rising and hanging in the dark, lanterns, paper cranes; it rearranges itself',
-    // Cool colours for Shiori, so she stands apart from the warm wood.
-    palette: [
-      [0, 0, 0],
-      [0.04, 0.05, 0.12],
-      [0.1, 0.16, 0.34],
-      [0.2, 0.36, 0.7],
-      [0.35, 0.62, 0.95],
-      [0.6, 0.85, 1.0],
-      [1.0, 0.75, 0.45],
-      [0.92, 0.97, 1.0],
-    ],
-    skies: { Clear: 'Still', Cloudy: 'Dust', Fog: 'Haze', Drizzle: 'A few pages', Rain: 'Drifting pages', Snow: 'Ash', Storm: 'Shift' },
-    hours: { dawn: 'Morning light', day: 'Great lamp', dusk: 'Lamps lit', night: 'Candles only' },
-    create: libraryScene,
-  },
+
+
   space: {
     id: 'space',
     label: 'Space',
@@ -118,4 +81,4 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   },
 }
 
-export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'kyoto', 'library', 'space', 'machine']
+export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'space', 'machine']

@@ -79,27 +79,13 @@ public sealed class DecisionCommands(IVault vault, TimeProvider clock)
             return;
         }
 
-        // The same folder name the desks' own journal tool makes from a desk's name.
         var desk = note.Author.Trim();
-        var folder = new string([.. desk.Select(c => c is '/' or '\\' or ':' || char.IsControl(c) ? '-' : c)]).Trim().TrimStart('.');
-        if (folder.Length == 0)
-        {
-            return;
-        }
-
-        var path = $"Inhabitants/{folder}/journal.md";
-        var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
-        var day = $"## {now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
         var what = verb == DecisionVerb.Undo ? "the person undid" : "the person did not accept";
-        var why = string.IsNullOrWhiteSpace(reason) ? "No reason given." : $"Why: {reason.Trim().ReplaceLineEndings(" ")}";
-        var entry = $"- {now.ToString("HH:mm", CultureInfo.InvariantCulture)} · {DecisionRules.Shiori}: {what} [[{DecisionRules.Link(note.Path)}|{note.Title}]]. {why}\n";
-
-        var journal = await vault.ReadAsync(path, cancellationToken).ConfigureAwait(false)
-            ?? new Note(path, "journal", null, $"{desk}'s journal", [], [], [], null, null, null, desk, $"# {desk}'s journal\n", []);
-        var body = journal.Body.Length == 0 || journal.Body.EndsWith('\n') ? journal.Body : journal.Body + "\n";
-        var lastDay = body.Split('\n').LastOrDefault(l => l.StartsWith("## ", StringComparison.Ordinal))?.TrimEnd();
-        body += lastDay == day ? entry : $"\n{day}\n\n{entry}";
-        await vault.WriteAsync(journal with { Body = body }, DecisionRules.Shiori, cancellationToken, $"told {desk} about {note.Path}").ConfigureAwait(false);
+        var why = string.IsNullOrWhiteSpace(reason) ? "No reason given." : $"Why: {reason.Trim()}";
+        var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+        await Journals.AppendAsync(
+            vault, desk, now, $"{DecisionRules.Shiori}: {what} [[{DecisionRules.Link(note.Path)}|{note.Title}]]. {why}", DecisionRules.Shiori,
+            $"told {desk} about {note.Path}", cancellationToken).ConfigureAwait(false);
     }
 
     private static bool IsAccepted(Note note) => string.Equals(note.Status, NoteStatus.Accepted, StringComparison.OrdinalIgnoreCase);

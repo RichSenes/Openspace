@@ -1,5 +1,5 @@
-import { BLIT_FS, POINT_FS, POINT_VS, POST_FS, QUAD_VS, SPRITE_FS, SPRITE_VS } from './shaders'
-import { buildSkin, KIND, SKIN_INDEX, type PointSet, type SkinId } from './shapes'
+import { BLIT_FS, POINT_FS, POINT_VS, POST_FS, QUAD_VS } from './shaders'
+import { buildSkin, KIND, PORTRAIT_UNITS, SKIN_INDEX, type PointSet, type SkinId } from './shapes'
 
 /** Everything a frame needs from the page; the renderer keeps no state of its own about Shiori. */
 export interface FrameUniforms {
@@ -30,8 +30,8 @@ export interface FrameUniforms {
   glitch: number
   /** Present: the worm trails, as xyz per point. */
   worms?: Float32Array
-  /** A drawn body (the portrait): its canvas and where it goes on screen, 0..1 of width and height. */
-  sprite?: { canvas: HTMLCanvasElement; x0: number; y0: number; x1: number; y1: number }
+  /** The portrait's drawing, which its points take their light from. */
+  sprite?: HTMLCanvasElement
   wormLength: number
 }
 
@@ -132,7 +132,6 @@ export class BodyRenderer {
   private points: Prog
   private post: Prog
   private blit: Prog
-  private sprite: Prog
   private spriteTex: WebGLTexture
   private glyphs: WebGLTexture
   private body: { vao: WebGLVertexArrayObject; count: number; skin: SkinId } | null = null
@@ -150,7 +149,6 @@ export class BodyRenderer {
     this.points = compile(gl, POINT_VS, POINT_FS)
     this.post = compile(gl, QUAD_VS, POST_FS)
     this.blit = compile(gl, QUAD_VS, BLIT_FS)
-    this.sprite = compile(gl, SPRITE_VS, SPRITE_FS)
     this.spriteTex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, this.spriteTex)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
@@ -278,31 +276,21 @@ export class BodyRenderer {
     u3('uHot', f.hot)
     u3('uEye', f.eye)
     u1('uWorm', 0)
-    if (this.body!.count) {
-      gl.bindVertexArray(this.body!.vao)
-      gl.drawArrays(gl.POINTS, 0, this.body!.count)
-    }
     if (f.sprite) {
-      const S = this.sprite
-      const sp = f.sprite
-      gl.useProgram(S.p)
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, this.spriteTex)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sp.canvas)
-      gl.uniform1i(S.u.uSprite, 0)
-      // Whole art pixels on the target, so the drawing never shimmers.
-      const snap = (v: number, n: number) => Math.round(v * n) / n
-      gl.uniform4f(S.u.uRect, snap(sp.x0, w) * 2 - 1, 1 - snap(sp.y1, h) * 2, snap(sp.x1, w) * 2 - 1, 1 - snap(sp.y0, h) * 2)
-      gl.uniform2f(S.u.uArt, sp.canvas.width, sp.canvas.height)
-      gl.uniform1f(S.u.uTime, f.time)
-      gl.uniform1f(S.u.uEnergy, f.energy)
-      gl.uniform1f(S.u.uHeat, f.heat)
-      gl.uniform3f(S.u.uCool, f.cool[0], f.cool[1], f.cool[2])
-      gl.uniform3f(S.u.uHot, f.hot[0], f.hot[1], f.hot[2])
-      gl.bindVertexArray(this.empty)
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-      gl.useProgram(P.p)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f.sprite)
+      gl.uniform1i(P.u.uSprite, 0)
+      // One art pixel of the portrait on the target: its height spans PORTRAIT_UNITS of body space.
+      gl.uniform1f(P.u.uArtPx, Math.max(1, ((PORTRAIT_UNITS * f.bodyScale * f.scale * h) / 2 / f.sprite.height) * (pixel ? 1 : 1.05)))
     }
+    if (this.body!.count) {
+      if (f.sprite && pixel) gl.blendEquation(gl.MAX)
+      gl.bindVertexArray(this.body!.vao)
+      gl.drawArrays(gl.POINTS, 0, this.body!.count)
+      gl.blendEquation(gl.FUNC_ADD)
+    }
+
     if (f.skin === 'swarm' && f.worms && this.worm) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.worm.buf)
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, f.worms.subarray(0, this.worm.count * 3))
@@ -362,6 +350,6 @@ export class BodyRenderer {
     }
     gl.deleteTexture(this.glyphs)
     gl.deleteTexture(this.spriteTex)
-    for (const p of [this.points, this.post, this.blit, this.sprite]) gl.deleteProgram(p.p)
+    for (const p of [this.points, this.post, this.blit]) gl.deleteProgram(p.p)
   }
 }

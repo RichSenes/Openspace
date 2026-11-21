@@ -79,27 +79,32 @@ export const RIGS: Record<SkinId, SkinRig> = {
   },
   portrait: {
     label: 'Portrait',
-    line: 'Her face, drawn in pixels and projected as a hologram',
-    bodyScale: 1,
-    lift: 0,
+    line: 'Her face, drawn in pixels, made of light like the others',
+    bodyScale: 0.86,
+    lift: -0.02,
     eyeCenter: [0, 0, 0],
     eyeSize: [0, 0, 0],
-    cool: [0.42, 0.68, 1.0],
-    hot: [1.0, 0.45, 0.6],
+    cool: [0.4, 0.5, 1.0],
+    hot: [1.0, 0.42, 0.74],
     eye: [1, 1, 1],
     eyesTurn: true,
-    // In art pixels of the portrait (x, y); z unused.
+    // In body space: the bun, the mouth, the pendant (the drawing is 2.2 units tall).
     parts: [
-      { name: 'CORTEX', at: [64, 15, 0] },
-      { name: 'VOICE', at: [70, 87, 0] },
-      { name: 'CORE', at: [64, 115, 0] },
+      { name: 'CORTEX', at: [0, 0.9, 0.1] },
+      { name: 'VOICE', at: [0.07, 0.0, 0.3] },
+      { name: 'CORE', at: [0, -0.34, 0.15] },
     ],
   },
+
 
 }
 
 /** Body rotation for a skin: creatures drift around, a head follows the gaze. */
 export function bodyRotation(skin: SkinId, phase: number, time: number, _gaze: [number, number], lean: number): { rot: Float32Array; eyeRot: Float32Array } {
+  if (skin === 'portrait') {
+    const rot = rotation(_gaze[0] * 0.22 + Math.sin(time * 0.21) * 0.08, -_gaze[1] * 0.06 + lean * 0.05)
+    return { rot, eyeRot: rot }
+  }
   if (skin === 'medusa') return { rot: rotation(phase * 0.08, 0.18 + 0.05 * Math.sin(time * 0.3)), eyeRot: IDENTITY }
   return { rot: rotation(phase * 0.12, 0.25 * Math.sin(phase * 0.07) + lean * 0.12), eyeRot: IDENTITY }
 }

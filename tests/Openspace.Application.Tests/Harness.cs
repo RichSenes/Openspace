@@ -80,6 +80,10 @@ internal sealed class Harness
     /// <summary>A person answers every request unless a test says otherwise.</summary>
     public Autonomy Autonomy { get; set; } = Autonomy.Ask;
 
+    public InMemoryVault Vault { get; } = new();
+
+    public FakeWorkInProgress Work { get; } = new();
+
     public Office Office { get; }
 
     public Room Room { get; }
@@ -115,8 +119,8 @@ internal sealed class Harness
     }
 
     public TaskRunner Runner(int seats = 1) => new(
-        new QueueDispatcher(Tasks, Offices, Limits, Gpu, Waits, new Brain.NoWorkInProgress(), UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
-        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, Clock, NullLogger<TaskRunner>.Instance);
+        new QueueDispatcher(Tasks, Offices, Limits, Gpu, Waits, Work, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
+        Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, BrainTools(), Clock, NullLogger<TaskRunner>.Instance);
 
     public Routines.RoutineRunner RoutineRunner() =>
         new(Routines, Offices, Progress, [OffersKind], RoutineRequests, Outbox, UnitOfWork, Clock, NullLogger<Routines.RoutineRunner>.Instance);
@@ -133,7 +137,10 @@ internal sealed class Harness
 
     public AgentSignals Signals() => new(
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Context, Interns, Audit, Publisher, Reviews, Permissions,
-        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, Clock);
+        new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, BrainTools(), Clock);
+
+    public AgentBrain BrainTools() =>
+        new(Offices, Tasks, Vault, new InMemoryBrainIndex(Vault), new Brain.BrainSearch(new InMemoryBrainIndex(Vault)), Work, Clock, NullLogger<AgentBrain>.Instance);
 
     public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance, Reviews);
 

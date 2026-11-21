@@ -3,7 +3,7 @@ import { isSection, onSectionRequest, requestSettingsSection, SECTIONS } from '.
 
 describe('settings sections', () => {
   it('starts from the engines and ends with the system', () => {
-    expect(SECTIONS.map((s) => s.id)).toEqual(['engines', 'local', 'models', 'agents', 'connections', 'look', 'system'])
+    expect(SECTIONS.map((s) => s.id)).toEqual(['engines', 'brain', 'local', 'models', 'agents', 'connections', 'look', 'system'])
     expect(isSection('look')).toBe(true)
     expect(isSection('permissions')).toBe(false)
   })

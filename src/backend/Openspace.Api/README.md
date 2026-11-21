@@ -113,6 +113,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | POST | `/api/gpu/claim` | `{ holder }`: a program takes the card; local work gives way. Renew within `LocalModels:ClaimLease` |
 | DELETE | `/api/gpu/claim/{holder}` | The program gives the card back |
 | POST | `/api/gpu/retry` | Try loading the model again now, after a failure |
+| GET | `/api/brain/summary` | Where the vault is (`folder`, and `configured` for the next start), how many notes of each kind (folder READMEs left out), when one last changed |
+| PUT | `/api/brain/folder` | `{ folder }`: an absolute folder or one starting with `~`, kept in the settings file and opened at the next start; `422` otherwise |
 | GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
 | GET | `/api/brain/now` | Who is changing what right now: `[{ taskId, officeId, office, room, desk, title, paths }]`, one per running task; `paths` (relative to the repository) are the files changed in its working copy, then those its title and description name. See [Brain](#brain) |
 | GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
@@ -152,13 +154,18 @@ the agent having to name it.
 
 | Tool | What it does |
 | --- | --- |
-| `get_task` | Returns the brief again: room rules, request, team notes |
+| `get_task` | Returns the brief again: room rules, request, what the brain says (see below), team notes |
 | `add_task_note` | `{ text }`: a note on the task signed by the desk |
 | `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
 | `complete_step` | `{ step, evidence }`: reports a step of the task's required procedure as done |
 | `add_manual_check` | `{ what, how }`: lists something a person must try by hand before merging, and how |
 | `wait_for_person` | `{ question }`: the agent waits, spending nothing, until the person does or decides something (close an app, say) and answers "Done, go on" or "Stop" |
 | `permission` | Called by Claude Code itself before a tool its role does not allow outright |
+| `brain_search` | `{ query, office?, room?, path?, kind? }`: notes of the [brain](#brain) that match, ten at most, with path, kind, status, scope and an excerpt; office and room default to the caller's, so its own notes come first |
+| `brain_read` | `{ note }`: one note in full, front matter included; an error for a missing note or a path outside the vault |
+| `brain_journal` | `{ text }`: appends a dated line to `Inhabitants/<desk>/journal.md` of the calling desk only (made with `kind: journal` the first time); entries of a day go under one `## yyyy-mm-dd` heading; the commit is signed by the desk |
+| `brain_propose` | `{ kind, title, body, reasons, offices?, rooms?, paths? }`: creates a new note with `status: proposed`, author the desk, `from: task <id>`: a decision in `Decisions/<date>-<slug>.md`, a plan in `Plans/`, a study in `Studies/`, a note in `Offices/<office>/<slug>.md`; never overwrites (a taken name gets `-2`); offices default to the caller's; rules and journals are refused |
+| `brain_now` | Who else in the caller's office is working right now, and the files each is changing |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
 error the agent can read. There is no authentication: the endpoint is meant for
@@ -817,3 +824,11 @@ list in memory for the queue, the briefing and the agents' tools, and rewrites t
 office by office, desk by desk, task by task, only when its text changes: no times in it, so
 no commit every few seconds. Edits made by hand are replaced on the next change.
 
+Agents read the brain through the `brain_*` tools above, and their first brief (and `get_task`)
+has a "Before you start" part right after the task: the constitution's numbered rules, one line
+each; the accepted decisions that apply where the task works (not about another office, and
+about its room or the files it names or is already changing, or open on both), files first,
+then room, then office, eight at most with title, first line and path; the work in flight in
+the same office that shares its room or files; and the request to leave a journal line and to
+propose lasting choices. The part is capped at 3,500 characters (decisions go first, then work,
+then the last rules, and it says so); with an empty or unreadable vault the brief is as before.

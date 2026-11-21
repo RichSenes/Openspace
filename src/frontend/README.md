@@ -130,7 +130,9 @@ writer) are added with one click and then adjusted like any other.
 
 **Settings.** Sections with an index beside them (a row of links on narrow screens),
 one shown at a time and remembered: *Engines* (whether OpenCode and Claude Code
-answer, where their keys live, the Claude account's limits), *Local AI* (models on
+answer, where their keys live, the Claude account's limits), *Brain* (where Shiori's
+vault is, what it holds by kind, "Open in Obsidian", a new folder for the next start),
+*Local AI* (models on
 this machine with a check that loads nothing, the programs that come first on the
 graphics card, the small model for routines' questions; one save), *Models* (the
 engine and model of each function: Shiori, who plans requests today, and the reviewer,

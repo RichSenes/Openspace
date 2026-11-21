@@ -557,3 +557,54 @@ internal sealed class FakePullRequests : IPullRequests
 
     public Task<PullRequestState> StateAsync(string repositoryPath, string url, CancellationToken cancellationToken) => Task.FromResult(State);
 }
+
+/// <summary>A vault held in memory: notes by path, and who wrote each write.</summary>
+internal sealed class InMemoryVault : Brain.IVault
+{
+    public Dictionary<string, Brain.Note> Notes { get; } = new(StringComparer.Ordinal);
+
+    public List<(string Path, string Author, string? Summary)> Writes { get; } = [];
+
+    public string Folder => "/vault";
+
+    /// <summary>Adds a note as if the person had written it in Obsidian.</summary>
+    public void Put(string path, string text) => Notes[path] = Brain.VaultFormat.Parse(path, text);
+
+    public Task EnsureAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<Brain.Note>> ListAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Brain.Note>>([.. Notes.Values.OrderBy(n => n.Path, StringComparer.Ordinal)]);
+
+    public Task<Brain.Note?> ReadAsync(string path, CancellationToken cancellationToken) =>
+        Task.FromResult(Notes.GetValueOrDefault(Brain.VaultPath.Normalize(path)));
+
+    public Task WriteAsync(Brain.Note note, string author, CancellationToken cancellationToken, string? summary = null)
+    {
+        var path = Brain.VaultPath.Normalize(note.Path);
+        Notes[path] = Brain.VaultFormat.Parse(path, Brain.VaultFormat.Write(note));
+        Writes.Add((path, author, summary));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>An index that reads the in-memory vault each time: words are found anywhere in a note.</summary>
+internal sealed class InMemoryBrainIndex(InMemoryVault vault) : Brain.IBrainIndex
+{
+    public Task RebuildAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task RefreshAsync(IReadOnlyCollection<string> paths, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<Brain.IndexedNote>> FindAsync(IReadOnlyList<string> words, string? kind, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Brain.IndexedNote>>([.. vault.Notes.Values
+            .Where(n => kind is null || string.Equals(n.Kind, kind, StringComparison.OrdinalIgnoreCase))
+            .Where(n => words.All(w => $"{n.Title} {n.Body}".Contains(w, StringComparison.OrdinalIgnoreCase)))
+            .Select(n => new Brain.IndexedNote(n.Path, n.Title, n.Kind, n.Status, n.Offices, n.Rooms, n.Paths, n.Review, n.Modified, 0, n.Body.ReplaceLineEndings(" ").Trim()))]);
+}
+
+/// <summary>Work in flight as a test sets it.</summary>
+internal sealed class FakeWorkInProgress : Brain.IWorkInProgress
+{
+    public List<Brain.WorkInFlight> Items { get; } = [];
+
+    public IReadOnlyList<Brain.WorkInFlight> Current() => Items;
+}

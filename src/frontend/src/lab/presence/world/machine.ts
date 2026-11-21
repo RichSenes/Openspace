@@ -28,6 +28,10 @@ export interface Machine {
   floor: number
   socket: { x: number; y: number; w: number; h: number }
   traces: Trace[]
+  /** A finer, fainter layer of traces under the main one. */
+  fine: Trace[]
+  /** Small parts soldered everywhere: resistors, capacitors. */
+  parts: { x: number; y: number; w: number; h: number; c: number }[]
   chips: Chip[]
   columns: number[]
 }
@@ -38,30 +42,39 @@ export function makeMachine(w: number, h: number, seed = 61): Machine {
   const r = rng(seed)
   const floor = Math.round(h * 0.9)
   const socket = { x: Math.round(w * 0.32), y: Math.round(h * 0.8), w: Math.round(w * 0.36), h: floor - Math.round(h * 0.8) - 1 }
-  const traces: Trace[] = []
-  for (let i = 0; i < Math.round(w / 9); i++) {
-    let x = Math.floor((r() * w) / GRID) * GRID
-    let y = Math.floor((r() * floor) / GRID) * GRID
-    const points: [number, number][] = [[x, y]]
-    let horizontal = r() < 0.6
-    let length = 0
-    for (let k = 0; k < 6 + Math.floor(r() * 8); k++) {
-      const step = (2 + Math.floor(r() * 10)) * GRID * (r() < 0.5 ? -1 : 1)
-      const nx = horizontal ? Math.max(0, Math.min(w - 1, x + step)) : x
-      const ny = horizontal ? y : Math.max(0, Math.min(floor - 2, y + step))
-      length += Math.abs(nx - x) + Math.abs(ny - y)
-      x = nx
-      y = ny
-      points.push([x, y])
-      horizontal = !horizontal
+  const route = (count: number, minSteps: number, maxStep: number, grid: number) => {
+    const out: Trace[] = []
+    for (let i = 0; i < count; i++) {
+      let x = Math.floor((r() * w) / grid) * grid
+      let y = Math.floor((r() * floor) / grid) * grid
+      const points: [number, number][] = [[x, y]]
+      let horizontal = r() < 0.6
+      let length = 0
+      for (let k = 0; k < minSteps + Math.floor(r() * 8); k++) {
+        const step = (2 + Math.floor(r() * maxStep)) * grid * (r() < 0.5 ? -1 : 1)
+        const nx = horizontal ? Math.max(0, Math.min(w - 1, x + step)) : x
+        const ny = horizontal ? y : Math.max(0, Math.min(floor - 2, y + step))
+        length += Math.abs(nx - x) + Math.abs(ny - y)
+        x = nx
+        y = ny
+        points.push([x, y])
+        horizontal = !horizontal
+      }
+      out.push({ points, length, seed: r() })
     }
-    traces.push({ points, length, seed: r() })
+    return out
   }
+  const traces = route(Math.round(w / 4), 6, 10, GRID)
+  const fine = route(Math.round(w / 2.5), 4, 6, 2)
+  const parts = Array.from({ length: Math.round((w * floor) / 260) }, () => {
+    const vertical = r() < 0.5
+    return { x: Math.floor(r() * w), y: Math.floor(r() * floor), w: vertical ? 1 : 2 + Math.floor(r() * 2), h: vertical ? 2 + Math.floor(r() * 2) : 1, c: Math.floor(r() * 3) }
+  })
   // Chips stay off the middle, where Shiori stands.
   const chips: Chip[] = []
-  for (let i = 0; i < 40 && chips.length < 9; i++) {
-    const cw = 14 + Math.floor(r() * 18)
-    const ch = 10 + Math.floor(r() * 12)
+  for (let i = 0; i < 120 && chips.length < 22; i++) {
+    const cw = 8 + Math.floor(r() * 18)
+    const ch = 6 + Math.floor(r() * 12)
     const x = Math.floor(r() * (w - cw))
     const y = Math.floor(r() * (floor * 0.85 - ch))
     const middle = x + cw > w * 0.3 && x < w * 0.7 && y < floor * 0.8
@@ -69,7 +82,7 @@ export function makeMachine(w: number, h: number, seed = 61): Machine {
     if (!middle && !overlaps) chips.push({ x, y, w: cw, h: ch, led: r() })
   }
   const columns = Array.from({ length: Math.floor(w / 5) }, () => r())
-  return { w, h, floor, socket, traces, chips, columns }
+  return { w, h, floor, socket, traces, fine, parts, chips, columns }
 }
 
 /** The point at distance d along a trace. */
@@ -113,6 +126,19 @@ function board(m: Machine, hour: Hour): HTMLCanvasElement {
   g.putImageData(img, 0, 0)
   g.fillStyle = hour === 'day' ? '#0c2a22' : '#081c17'
   for (let y = 1; y < m.floor; y += 6) for (let x = 1; x < m.w; x += 6) g.fillRect(x, y, 1, 1)
+  g.fillStyle = hour === 'day' ? '#0a2a22' : '#08201a'
+  for (const t of m.fine)
+    for (let i = 1; i < t.points.length; i++) {
+      const [ax, ay] = t.points[i - 1]
+      const [bx, by] = t.points[i]
+      g.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax) + 1, Math.abs(by - ay) + 1)
+    }
+  for (const p of m.parts) {
+    g.fillStyle = ['#2a3a34', '#3a2a1a', '#1a2a3a'][p.c]
+    g.fillRect(p.x, p.y, p.w, p.h)
+    g.fillStyle = '#4a6a5a'
+    g.fillRect(p.x, p.y, 1, 1)
+  }
   g.fillStyle = hour === 'day' ? '#145040' : '#0f3a30'
   for (const t of m.traces) {
     for (let i = 1; i < t.points.length; i++) {
@@ -248,6 +274,18 @@ export function drawMachine(g: CanvasRenderingContext2D, m: Machine, base: HTMLC
       g.fillRect(s.x + Math.floor(hash1(i * 5 + Math.floor(t * 8)) * s.w), s.y - 1 - Math.floor(hash1(i * 3 + t) * 4), 1, 1)
     }
   }
+
+  // Behind Shiori the board falls quiet and dark, so she always reads first.
+  const qx = m.w / 2
+  const qy = m.floor * 0.42
+  const rx = m.w * 0.2
+  const ry = m.floor * 0.42
+  g.fillStyle = GROUND[weather.hour][0]
+  for (let y = Math.max(0, Math.round(qy - ry)); y < Math.min(m.floor, qy + ry); y++)
+    for (let x = Math.max(0, Math.round(qx - rx)); x < Math.min(m.w, qx + rx); x++) {
+      const d = Math.hypot((x - qx) / rx, (y - qy) / ry)
+      if (d < 1 && bayerAt(x, y) < (1 - d) ** 0.7 * 0.88) g.fillRect(x, y, 1, 1)
+    }
 
   // The bus beneath: lanes of bits flowing to the right.
   g.fillStyle = '#020605'

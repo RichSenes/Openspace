@@ -153,3 +153,73 @@
     padding: 0 12px 24px;
   }
 }
+
+/* A new office: its name, then where it starts from, each choice with its explanation under it. */
+.new-office {
+  display: grid;
+  gap: 12px;
+}
+
+.new-office-starts {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.new-office-starts legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.new-office-start {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.new-office-start:has(input:checked) {
+  background: var(--raised);
+}
+
+.new-office-start input[type='radio'] {
+  margin-top: 3px;
+}
+
+.new-office-start > span {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.new-office-file {
+  margin-top: 2px;
+}
+
+.office-export {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.new-office,
+.new-office .field {
+  min-width: 0;
+}
+
+.new-office .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.new-office .btn {
+  white-space: normal;
+  text-align: left;
+}

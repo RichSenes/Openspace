@@ -1,8 +1,7 @@
-import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ChevronDown, Plus } from 'lucide-react'
-import { useOpenOffice } from '../api/hooks'
 import type { OfficeView } from '../api/types'
-import { useToast } from '../ui/toastContext'
+import { NewOfficeForm } from '../office/NewOfficeForm'
 import { useDismiss } from '../ui/useDismiss'
 
 interface Props {
@@ -24,23 +23,6 @@ export function Sidebar({ offices, selectedId, onSelect }: Props) {
   useDismiss(open, close, box, button)
   const current = offices.find((o) => o.id === selectedId)
   const [adding, setAdding] = useState(false)
-  const [name, setName] = useState('')
-  const openOffice = useOpenOffice()
-  const toast = useToast()
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    openOffice.mutate(name, {
-      onSuccess: ({ id }) => {
-        toast(`${name.trim()} opened`)
-        setName('')
-        setAdding(false)
-        setOpen(false)
-        onSelect(id)
-      },
-    })
-  }
-
   return (
     <aside className={open ? 'sidebar open' : 'sidebar'} ref={box}>
       <button
@@ -80,21 +62,14 @@ export function Sidebar({ offices, selectedId, onSelect }: Props) {
         </ul>
 
         {adding ? (
-          <form className="sidebar-form" onSubmit={submit}>
-            <label className="field">
-              <span>Office name</span>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
-            </label>
-            {openOffice.error && <p className="error">{openOffice.error.message}</p>}
-            <div className="row">
-              <button type="submit" className="btn btn-primary" disabled={openOffice.isPending}>
-                Open office
-              </button>
-              <button type="button" className="btn btn-quiet" onClick={() => setAdding(false)}>
-                Cancel
-              </button>
-            </div>
-          </form>
+          <NewOfficeForm
+            onOpened={(id) => {
+              setAdding(false)
+              setOpen(false)
+              onSelect(id)
+            }}
+            onCancel={() => setAdding(false)}
+          />
         ) : (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Plus size={16} /> New office

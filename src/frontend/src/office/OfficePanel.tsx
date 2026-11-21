@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react'
 import { ApiError } from '../api/client'
-import { INITIALIZABLE, useEngines, useSaveOffice, type OfficeSaveFailure } from '../api/hooks'
+import { exportOfficeSetup, INITIALIZABLE, useEngines, useSaveOffice, type OfficeSaveFailure } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import { useToast } from '../ui/toastContext'
 import { changedParts, formOf, move, pathsOf, reserveChoices, type OfficeForm, type OfficePart } from './officeForm'
 import { MAX_RESERVE_MODELS, unknownModels } from './reserve'
+import { setupFileName } from './setupFile'
 import './office.css'
 
 const PART_LABEL: Record<OfficePart, string> = {
@@ -145,8 +146,53 @@ export function OfficePanel({ office }: { office: OfficeView }) {
         </section>
 
         <ReserveModels models={form.reserveModels} onChange={(m) => set('reserveModels', m)} problem={problemOf('reserveModels')} />
+
+        <ExportSetup officeId={office.id} name={office.name} />
       </div>
     </form>
+  )
+}
+
+/** Saves the office's setup as a file, to open a copy of it elsewhere or start from it again. */
+function ExportSetup({ officeId, name }: { officeId: string; name: string }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const toast = useToast()
+
+  const download = async () => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      const setup = await exportOfficeSetup(officeId)
+      const url = URL.createObjectURL(new Blob([JSON.stringify(setup, null, 2)], { type: 'application/json' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = setupFileName(name)
+      link.click()
+      URL.revokeObjectURL(url)
+      toast(`${link.download} saved`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The setup could not be read.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="office-part office-export" aria-labelledby="office-export">
+      <h2 id="office-export">Setup file</h2>
+      <p className="hint">
+        Rooms with their context, procedure and check, desks, the roles they use, routines and the settings on this page, in one file. Open it as a
+        new office from <em>New office</em>, here or on another computer.
+      </p>
+      <button type="button" className="btn" disabled={busy} onClick={() => void download()}>
+        <Download size={16} aria-hidden /> {busy ? 'Exporting…' : 'Export the setup'}
+      </button>
+      <span className="hint">
+        Never in the file: the repository and its code, private folders, tasks, Google accounts and Telegram keys.
+      </span>
+      {error && <p className="error">{error}</p>}
+    </section>
   )
 }
 

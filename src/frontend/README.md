@@ -143,9 +143,18 @@ on Claude Code with an OpenCode model that stands in when it is missing; digests
 journals on Claude Code, OpenCode or a local model; the decider shown, with a link to
 Local AI; models nobody lists flagged; the OpenCode models the person knows are free,
 one per line, which never get mail, health or food; one save), *How agents work* (permissions,
-agents at work at once; one save), *Connections* (Google accounts,
-Telegram), *Look and sound* (sounds, the weather's town), *System* (version,
+agents at work at once; one save), *Connections* (Telegram and Google, each a guided
+setup in numbered steps: bots added with their BotFather token and checked, the group found
+with a bot or typed, each bot's topic and a test message; the OAuth client made with links to
+Google Cloud, its file chosen in the page, accounts connected and checked), *Look and sound* (sounds, the weather's town), *System* (version,
 backups). The engine warning in the top bar and the first steps open *Engines*.
+
+A new office (*New office* in the side panel, or the first steps) starts empty, from a
+template (web app, library, personal assistant, documentation: rooms with context and
+procedure, desks with ready-made roles, routines) or from an office file. *Office* exports
+the setup to such a file: rooms, desks, the roles they use, routines and the office's
+settings, never the repository, private folders, tasks, accounts or keys. Routine forms pick
+the Telegram bot from the ones set up, with a link to *Settings › Connections*.
 
 Across every view:
 

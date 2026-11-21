@@ -41,7 +41,11 @@ on [Claude Code](https://claude.com/claude-code) with your own account.
   may be articles, briefs, a main story with briefs or a story explained by questions,
   and the space can follow the news: the big story gets the room, quiet sections go in
   brief. Job offers arrive one per message with yes and no buttons; a yes brings the
-  offer's CV in answer to that message.
+  offer's CV in answer to that message. Telegram and Google are set up step by step in
+  *Settings › Connections*, with a test for each; routines pick their bot from a list.
+- **Office templates.** A new office starts empty, from a template (web app, library,
+  personal assistant, documentation) with rooms, ready-made roles and routines, or from
+  a file exported from another office, never with its repository, accounts or keys.
 
 ![The board: proposed, queued, running, in review, failed and done tasks](docs/screenshots/board.png)
 

@@ -208,10 +208,19 @@ There is no path: install engines → open an office → point it at a repositor
 6. **Settings › Local AI**: models, start/stop, test, GPU holders. *(P1 for anyone without the
    config file)*
 7. **Guided Telegram and Google**, with channels chosen from a list in routines. *(P2)*
+   **Done:** *Settings › Connections* walks through Telegram (bot token checked with
+   Telegram, group found with a bot or typed, topic per bot, test message) and Google (links
+   to Google Cloud, client file chosen in the page, accounts connected and checked); tokens and
+   secrets go to the private files and never come back. Every routine form picks its bot
+   from the list, with a link to set Telegram up.
 8. **Responsive pass** below 1100 px: collapsible office list, scrollable tabs with a
    *More* menu, board with the columns that need you first, building toolbar that wraps.
    *(P2)*
 9. **Office templates** and export/import. *(P2)*
+   **Done:** a new office starts empty, from a template (web app, library, personal
+   assistant, documentation) or from an office file; *Office › Setup file* exports rooms,
+   desks, roles, routines and settings, never the repository, private folders, tasks,
+   accounts or keys. Floor plans and desk looks are not in the file yet.
 10. Small fixes: field borders to 3:1, radio alignment, cut selects, agent-name hint,
    sound prompt in a quiet colour, one date format, safer role defaults. *(P2/P3)*
 

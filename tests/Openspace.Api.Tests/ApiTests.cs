@@ -159,6 +159,50 @@ public sealed class ApiTests : IDisposable
         Assert.Single(all);
     }
 
+    [Fact]
+    public async Task An_office_opens_from_a_template_file_and_its_setup_comes_back_as_a_file()
+    {
+        // The shape the interface sends for a template: names for enums, days and times as words.
+        var setup = new
+        {
+            format = "openspace-office",
+            version = 1,
+            name = "Template",
+            theme = "cozy",
+            localOnly = false,
+            holdOverlappingWork = true,
+            reserveModels = Array.Empty<string>(),
+            roles = new[] { new { name = "Writer", description = "Writes docs", instructions = "Short sentences.", model = (string?)null, permissions = new { edit = "Allow", bash = "Ask", web = "Deny", helpers = "Deny" }, skills = (string[]?)null } },
+            rooms = new[] { new { name = "Docs", context = "Plain English.", procedure = new[] { "Read first" }, check = (string?)null, mood = (string?)null, desks = new[] { new { name = "Writer", agentName = "writer", model = (string?)null, engine = "OpenCode", role = "Writer" } } } },
+            routines = new[] { new { name = "Decisions", kind = "decision-reviews", schedule = new { days = new[] { "Monday" }, at = "09:00", everyWeeks = 1 }, settings = (object?)null, enabled = false, askFirst = false } },
+        };
+
+        var created = await PostAsync<Created>("/api/offices/import", new { setup, name = "Allsafe docs" });
+        var back = await GetAsync<JsonElement>($"/api/offices/{created.Id}/setup");
+        var refused = await _http.PostAsJsonAsync("/api/offices/import", new { setup = new { format = "zip", version = 1, name = "x" } });
+
+        Assert.Equal("Allsafe docs", back.GetProperty("name").GetString());
+        Assert.Equal("Docs", back.GetProperty("rooms")[0].GetProperty("name").GetString());
+        Assert.Equal("Writer", back.GetProperty("rooms")[0].GetProperty("desks")[0].GetProperty("role").GetString());
+        Assert.Equal("Ask", back.GetProperty("roles")[0].GetProperty("permissions").GetProperty("bash").GetString());
+        var routine = back.GetProperty("routines")[0];
+        Assert.Equal(("decision-reviews", false), (routine.GetProperty("kind").GetString(), routine.GetProperty("enabled").GetBoolean()));
+        Assert.Equal(JsonValueKind.Object, routine.GetProperty("settings").ValueKind);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Telegram_s_setup_names_bots_and_refuses_a_malformed_token_before_calling_telegram()
+    {
+        var status = await GetAsync<JsonElement>("/api/telegram");
+        var bad = await _http.PostAsJsonAsync("/api/telegram/bots", new { name = "PAPER", token = "not-a-token" });
+
+        Assert.Equal(0, status.GetProperty("bots").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("chat").ValueKind);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, bad.StatusCode);
+        Assert.Equal("telegram-token", (await bad.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
     private sealed record Spot(int X, int Y);
 
     private sealed record PlacedDesk(Guid Id, Spot? Spot);

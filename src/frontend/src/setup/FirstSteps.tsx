@@ -1,9 +1,8 @@
-import { useState, type FormEvent } from 'react'
 import { Check, X } from 'lucide-react'
-import { useEngines, useOfficeTasks, useOpenOffice } from '../api/hooks'
+import { useEngines, useOfficeTasks } from '../api/hooks'
 import type { OfficeView } from '../api/types'
 import type { View } from '../layout/TopBar'
-import { useToast } from '../ui/toastContext'
+import { NewOfficeForm } from '../office/NewOfficeForm'
 import { requestSettingsSection } from '../settings/sections'
 import { firstSteps, type StepAction } from './setup'
 import './setup.css'
@@ -78,28 +77,5 @@ export function FirstSteps({ office, onSelect, onView, onHide }: Props) {
 }
 
 function OpenOffice({ onOpened }: { onOpened: (id: string) => void }) {
-  const [name, setName] = useState('')
-  const open = useOpenOffice()
-  const toast = useToast()
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    open.mutate(name, {
-      onSuccess: ({ id }) => {
-        toast(`${name.trim()} opened`)
-        onOpened(id)
-      },
-    })
-  }
-  return (
-    <form className="first-step-form" onSubmit={submit}>
-      <label className="field">
-        <span>Office name, usually the project&apos;s</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Shop website" required />
-      </label>
-      <button type="submit" className="btn btn-primary" disabled={open.isPending}>
-        Open office
-      </button>
-      {open.error && <p className="error">{open.error.message}</p>}
-    </form>
-  )
+  return <NewOfficeForm onOpened={onOpened} nameLabel="Office name, usually the project's" />
 }

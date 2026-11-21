@@ -12,5 +12,14 @@ internal static class CharacterEndpoints
 
         characters.MapGet("/", (Guid officeId, CharacterQueries queries, CancellationToken ct) =>
             queries.GetAsync(new OfficeId(officeId), ct));
+
+        // The chronicle covers every office: a day's lines, written the first time they are asked.
+        var chronicle = app.MapGroup("/api/chronicle").WithTags("Characters");
+        chronicle.MapGet("/{day}", (DateOnly day, string? language, Chronicle writer, CancellationToken ct) =>
+            writer.DayAsync(day, Language(language), ct));
+        chronicle.MapPost("/{day}", (DateOnly day, string? language, Chronicle writer, CancellationToken ct) =>
+            writer.WriteAsync(day, Language(language), ct));
     }
+
+    private static string Language(string? language) => string.IsNullOrWhiteSpace(language) ? "English" : language.Trim();
 }

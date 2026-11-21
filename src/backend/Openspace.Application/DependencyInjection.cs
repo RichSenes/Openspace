@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<OfficeCommands>();
         services.AddScoped<OfficeQueries>();
         services.AddScoped<Characters.CharacterQueries>();
+        services.AddScoped<Characters.Chronicle>();
         services.AddScoped<WorkTaskCommands>();
         services.AddScoped<WorkTaskQueries>();
         services.AddScoped<FeedQueries>();

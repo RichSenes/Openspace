@@ -18,7 +18,7 @@ public static partial class PaperPage
 {
     public static string Render(
         PaperSettings settings, CultureInfo culture, int number, DateOnly day, PaperOpening opening,
-        PaperLead? front, PaperLead? goodNews, IReadOnlyList<PaperSection> sections, PaperKanji? kanji = null)
+        PaperLead? front, PaperLead? goodNews, IReadOnlyList<PaperSection> sections, PaperKanji? kanji = null, IReadOnlyList<string>? chronicle = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(culture);
@@ -187,6 +187,18 @@ public static partial class PaperPage
         }
 
         html.Append(inRow ? "</div>\n</div>\n" : "</div>\n");
+
+        if (chronicle is { Count: > 0 })
+        {
+            // Office life: lines about the inhabitants, from what happened in Openspace yesterday.
+            html.Append(CultureInfo.InvariantCulture, $"<section class=\"chronicle\"><h2>{E(ChronicleTitle(culture))}</h2><ul>\n");
+            foreach (var line in chronicle)
+            {
+                html.Append(CultureInfo.InvariantCulture, $"  <li>{E(line)}</li>\n");
+            }
+
+            html.Append("</ul></section>\n");
+        }
 
         if (kanji is not null)
         {
@@ -420,6 +432,21 @@ public static partial class PaperPage
                 : $"{E(outlet.Key)} ({string.Join(", ", outlet.Select((item, i) => $"<a href=\"{E(item.Link.ToString())}\">{i + 1}</a>"))})"));
 
     private static string E(string text) => WebUtility.HtmlEncode(text);
+
+    /// <summary>The heading of the office's chronicle, in the paper's language.</summary>
+    public static string ChronicleTitle(CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(culture);
+        return culture.TwoLetterISOLanguageName switch
+        {
+            "it" => "Vita d'ufficio",
+            "ja" => "オフィスの日々",
+            "es" => "Vida de oficina",
+            "fr" => "La vie du bureau",
+            "de" => "Aus dem Büro",
+            _ => "Office life",
+        };
+    }
 
     private static string Capitalised(string text, CultureInfo culture) =>
         text.Length == 0 ? text : string.Concat(char.ToUpper(text[0], culture).ToString(), text.AsSpan(1));

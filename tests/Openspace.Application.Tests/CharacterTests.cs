@@ -217,6 +217,113 @@ public class CharacterTests
         Assert.Null(await TieAsync(_h.Desk, screens));
     }
 
+    private sealed class Engines : Functions.IEngineText
+    {
+        public string? Answer { get; set; }
+
+        public List<string> Asked { get; } = [];
+
+        public System.Threading.Tasks.Task<string> AskAsync(Functions.ModelEngine engine, string? model, string instructions, string text, CancellationToken cancellationToken)
+        {
+            Asked.Add(text);
+            return Answer is null ? throw new InvalidOperationException("No engine here") : System.Threading.Tasks.Task.FromResult(Answer);
+        }
+    }
+
+    private sealed class NoChat : LocalModels.ILocalChat
+    {
+        public System.Threading.Tasks.Task<string> AskAsync(LocalModels.LocalAsk ask, CancellationToken cancellationToken) => throw new TimeoutException("The card is busy.");
+    }
+
+    private readonly Engines _engines = new();
+
+    /// <summary>The chronicle on Claude Code, so the fake engine writes it; local models stay off.</summary>
+    private Chronicle Chronicle() => new(
+        _h.Offices, _h.Tasks, _h.Audit, _h.Vault, new NoChat(), _engines,
+        new LiveOptions<Functions.FunctionModelOptions>(() => new() { Journals = new() { Engine = Functions.ModelEngine.ClaudeCode, Model = "haiku" } }),
+        new LiveOptions<LocalModels.LocalModelOptions>(() => new()), _h.Clock);
+
+    private DateOnly Today => DateOnly.FromDateTime(_h.Clock.GetUtcNow().UtcDateTime);
+
+    private void ADayOfWork()
+    {
+        var screens = Plain("Screens");
+        Finished(screens, merged: true, title: "Add the header");
+        var failed = Task(_h.Desk, "Tidy the icons");
+        failed.Fail("It broke.", _h.Clock.GetUtcNow());
+        Log(failed);
+    }
+
+    [Fact]
+    public async Task The_chronicle_is_written_by_the_model_from_facts_and_kept_in_the_vault()
+    {
+        ADayOfWork();
+        _engines.Answer = "- Screens had a good day: the header is in.\n\nFrontend's icons will have to wait.";
+
+        var day = await Chronicle().WriteAsync(Today, "English", default);
+
+        Assert.True(day.ByModel);
+        Assert.Equal(["Screens had a good day: the header is in.", "Frontend's icons will have to wait."], Assert.Single(day.Sections).Lines);
+        Assert.Contains("Screens: “Add the header” was merged.", _engines.Asked.Single(), StringComparison.Ordinal);
+        Assert.Contains("Frontend: “Tidy the icons” failed.", _engines.Asked.Single(), StringComparison.Ordinal);
+        var note = _h.Vault.Notes[Characters.Chronicle.PathOf(Today)];
+        Assert.Contains("## E Corp", note.Body, StringComparison.Ordinal);
+        Assert.Contains("- Screens had a good day: the header is in.", note.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_a_model_the_chronicle_tells_the_plain_facts()
+    {
+        ADayOfWork();
+
+        var day = await Chronicle().WriteAsync(Today, "English", default);
+
+        Assert.False(day.ByModel);
+        Assert.Contains("Screens: “Add the header” was merged.", Assert.Single(day.Sections).Lines);
+    }
+
+    [Fact]
+    public async Task A_day_already_written_is_read_back_from_the_vault_without_asking_again()
+    {
+        ADayOfWork();
+        await Chronicle().WriteAsync(Today, "English", default);
+
+        var again = await Chronicle().DayAsync(Today, "English", default);
+
+        Assert.Single(_engines.Asked, _ => true);
+        Assert.Equal("E Corp", Assert.Single(again.Sections).Office);
+        Assert.Contains("Screens: “Add the header” was merged.", again.Sections[0].Lines);
+    }
+
+    [Fact]
+    public async Task A_quiet_day_has_no_lines_and_a_birthday_is_news()
+    {
+        var quiet = await Chronicle().WriteAsync(Today, "English", default);
+        Assert.True(quiet.IsEmpty);
+
+        _h.Office.SetDeskBirthday(_h.Desk.Id, Birthday.On(Today.Month, Today.Day), _h.Clock.GetUtcNow());
+        var party = await Chronicle().WriteAsync(Today, "English", default);
+
+        Assert.Equal(["It is Frontend's birthday."], Assert.Single(party.Sections).Lines);
+    }
+
+    [Fact]
+    public void The_paper_prints_the_chronicle_under_its_own_heading_unless_turned_off()
+    {
+        var day = new ChronicleDay(Today, "Chronicle/x.md", [new("E Corp", ["Screens had a good day."]), new("Allsafe", ["Quiet."])], false);
+        var lines = Routines.Kinds.MorningPaper.ChronicleLines(day);
+        Assert.Equal(["E Corp: Screens had a good day.", "Allsafe: Quiet."], lines);
+
+        var settings = Routines.Kinds.PaperSettings.Read(System.Text.Json.JsonDocument.Parse(new Routines.Kinds.MorningPaper(null!, null!, null!, null!, null!, null!).DefaultSettings).RootElement);
+        var html = Routines.Kinds.PaperPage.Render(settings, System.Globalization.CultureInfo.GetCultureInfo("it-IT"), 1, Today,
+            new Routines.Kinds.PaperOpening("Buongiorno", ""), null, null, [], chronicle: lines);
+        Assert.Contains("<h2>Vita d&#39;ufficio</h2>", html, StringComparison.Ordinal);
+        Assert.Contains("<li>E Corp: Screens had a good day.</li>", html, StringComparison.Ordinal);
+
+        Assert.True(Routines.Kinds.MorningPaper.WantsChronicle(System.Text.Json.JsonDocument.Parse("{}").RootElement));
+        Assert.False(Routines.Kinds.MorningPaper.WantsChronicle(System.Text.Json.JsonDocument.Parse("{\"chronicle\":false}").RootElement));
+    }
+
     [Fact]
     public async Task Another_desks_events_do_not_move_its_mood()
     {

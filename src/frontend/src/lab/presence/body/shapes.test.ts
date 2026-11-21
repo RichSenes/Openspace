@@ -45,8 +45,19 @@ describe('skins', () => {
 })
 
 describe('the portrait', () => {
-  it('has no points: it is drawn, not built', () => {
-    expect(buildSkin('portrait').count).toBe(0)
+  it('is one point per art pixel, each reading its own place in the drawing', () => {
+    const s = buildSkin('portrait')
+    expect(s.count).toBe(128 * 176)
+    expect(s.data[2]).toBeCloseTo(0.5 / 128, 6)
+    expect(s.data[3]).toBeCloseTo(0.5 / 176, 6)
+    const last = (s.count - 1) * 4
+    expect(s.data[last + 2]).toBeCloseTo(1 - 0.5 / 128, 6)
+  })
+
+  it('curves forward at the face and lies flatter at the edges', () => {
+    const s = buildSkin('portrait')
+    const at = (i: number, j: number) => s.pos[(j * 128 + i) * 3 + 2]
+    expect(at(64, 60)).toBeGreaterThan(at(5, 60))
   })
 })
 

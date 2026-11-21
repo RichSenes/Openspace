@@ -156,9 +156,35 @@ export function medusa(bell = 1500, tentacles = 30, perTentacle = 80, eyes = 110
   return b.build()
 }
 
-/** The points of a point body; the portrait has none. */
+/** The portrait's height in body space; its width follows the drawing's proportions. */
+export const PORTRAIT_UNITS = 2.2
+
+/**
+ * The portrait's points: one per art pixel of a `w`×`h` drawing, on a surface curved like a
+ * head over shoulders. `data.zw` is where each point reads its light in the drawing.
+ */
+export function portraitPoints(w: number, h: number): PointSet {
+  const b = new Builder()
+  const r = rng(51)
+  const H = PORTRAIT_UNITS
+  const W = (H * w) / h
+  for (let j = 0; j < h; j++)
+    for (let i = 0; i < w; i++) {
+      const u = (i + 0.5) / w
+      const v = (j + 0.5) / h
+      const x = (u - 0.5) * W
+      const y = (0.5 - v) * H
+      const head = Math.max(0, 1 - (x / 0.5) ** 2 - ((y - 0.45) / 0.7) ** 2)
+      const torso = Math.max(0, 1 - (x / 1.0) ** 2) * (y < -0.1 ? 1 : 0)
+      const z = 0.32 * Math.sqrt(head) + 0.16 * Math.sqrt(torso)
+      b.add([x, y, z], [KIND.body, r(), u, v])
+    }
+  return b.build()
+}
+
+/** The points of a body. */
 export function buildSkin(id: SkinId): PointSet {
   if (id === 'medusa') return medusa()
-  if (id === 'portrait') return new Builder().build()
+  if (id === 'portrait') return portraitPoints(128, 176)
   return swarm()
 }

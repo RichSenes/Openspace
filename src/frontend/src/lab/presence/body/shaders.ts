@@ -62,6 +62,8 @@ uniform vec2 uGaze, uOffset;
 uniform mat3 uRot, uEyeRot;
 uniform vec3 uEyeC, uCool, uHot, uEye;
 uniform vec3 uEyeSize; // x: half width, y: half height, z: half distance between the eyes
+uniform sampler2D uSprite; // the portrait, drawn at its art size: its points take their light from it
+uniform float uArtPx;      // one art pixel of the portrait, in target pixels
 out vec3 vColor;
 out float vDash;
 ${NOISE}
@@ -111,6 +113,7 @@ vec3 strandAt(vec3 root, float s, float seed, float inner, out float sig){
 }
 
 void main(){
+  float pLum = 0.0;
   float kind = aData.x;
   float seed = aData.y;
   vec3 body;
@@ -136,7 +139,19 @@ void main(){
       alpha = eye ? 1.0 : 0.55 + 0.45 * aData.z;
     }
   } else {
-    body = aPos;
+    // The portrait as a cloud of points: one per art pixel, lit by the drawing underneath, on a
+    // gently curved surface so turning gives depth. The membrane breathes like the others.
+    vec4 c = textureLod(uSprite, aData.zw, 0.0);
+    pLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+    n = snoise(aPos * 5.0 + vec3(0.0, 0.0, uPhase * 0.5));
+    body = aPos + vec3(0.0, 0.0, 0.012 * n * (0.5 + uEnergy));
+    body.x += snoise(vec3(aPos.y * 30.0, uTime * 6.0, 0.0)) * 0.006 * uVoice;
+    // The base comes apart: its points drift up and out and fade.
+    float fade = smoothstep(0.78, 1.0, aData.w);
+    float drift = fract(seed * 7.0 + uTime * (0.08 + seed * 0.1));
+    body.y += fade * drift * 0.45;
+    body.x += fade * (seed - 0.5) * 0.5 * drift;
+    alpha = step(0.5, c.a) * (1.0 - fade * drift);
   }
 
   vec3 v = uRot * (body * uBodyScale);
@@ -176,6 +191,16 @@ void main(){
   if (uWorm > 0.5) {
     col = mix(uHot, vec3(1.0), 0.35 * (1.0 - aData.z));
     size *= 1.0 + 0.9 * (1.0 - aData.z);
+  }
+  if (uSkin > 1.5) {
+    // Contrast, so features stay dark against the skin; the glow adds the rest.
+    float k = smoothstep(0.06, 0.98, pLum);
+    bright = (0.1 + 0.95 * k) * (0.7 + 0.35 * depth) * (0.6 + 0.5 * uEnergy);
+    // Smooth: soft dots a little larger where she is lit. Pixel: whole pixels with no gaps; they
+    // overlap, so the renderer keeps the brightest instead of adding them up.
+    size = uPixel > 0.5 ? ceil(uArtPx) : uArtPx * (0.9 + 0.5 * k);
+    if (uPixel > 0.5) bright *= 0.42;
+    col = mix(uCool, uHot, clamp(uHeat * 0.4 + n * 0.2 + (1.0 - k) * 0.25, 0.0, 1.0)) + vec3(0.25, 0.3, 0.4) * k * k;
   }
   float rim = eye ? smoothstep(0.55, 0.95, length(aData.zw)) : 0.0;
   col = mix(col, uEye, m);
@@ -286,54 +311,4 @@ uniform sampler2D uTex;
 uniform vec2 uRes;
 out vec4 o;
 void main(){ o = texture(uTex, gl_FragCoord.xy / uRes); }
-`
-
-/** The portrait as a quad, in clip space. */
-export const SPRITE_VS = /* glsl */ `#version 300 es
-precision highp float;
-uniform vec4 uRect;
-out vec2 vUv;
-void main(){
-  vec2 c = vec2(gl_VertexID & 1, gl_VertexID >> 1);
-  vUv = vec2(c.x, 1.0 - c.y);
-  gl_Position = vec4(mix(uRect.xy, uRect.zw, c), 0.0, 1.0);
-}
-`
-
-/**
- * The portrait as a hologram: its brightness carried in the body's colours, a scan line on every
- * other art row, a band of light sweeping down, a faint flicker, and the base dissolving.
- */
-export const SPRITE_FS = /* glsl */ `#version 300 es
-precision highp float;
-in vec2 vUv;
-uniform sampler2D uSprite;
-uniform vec2 uArt;
-uniform float uTime, uEnergy, uHeat;
-uniform vec3 uCool, uHot;
-out vec4 o;
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-void main(){
-  vec2 px = floor(vUv * uArt);
-  vec4 c = texture(uSprite, (px + 0.5) / uArt);
-  if (c.a < 0.5) discard;
-  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-  vec3 tint = mix(uCool, uHot, clamp(uHeat * 0.35, 0.0, 1.0));
-  // Contrast first, so features stay dark against the skin; then kept well below white,
-  // since the glow and the screen blend add their own light.
-  float k = smoothstep(0.08, 0.98, l);
-  vec3 col = tint * (0.06 + 0.42 * k) + vec3(0.5, 0.7, 1.0) * k * k * 0.12;
-  // A little of her own colours shows through: lips, jade, gold.
-  col = mix(col, c.rgb * 0.55, 0.18);
-  float row = mod(px.y, 2.0);
-  col *= row < 1.0 ? 1.0 : 0.55;
-  float band = vUv.y - fract(uTime * 0.18);
-  col += tint * exp(-band * band * 4000.0) * 0.18;
-  col *= 0.9 + 0.1 * sin(uTime * 37.0 + px.y * 0.7) * (0.5 + 0.5 * uEnergy);
-  // The base comes apart in rows, as the projection loses her.
-  float fade = smoothstep(0.84, 1.0, vUv.y);
-  if (hash(vec2(px.y, floor(uTime * 8.0))) < fade * 1.2 && hash(px) < fade * 1.4) discard;
-  col *= 1.0 - fade * 0.6;
-  o = vec4(col * (0.8 + 0.25 * uEnergy), 1.0);
-}
 `

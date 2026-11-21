@@ -110,9 +110,7 @@ export function ShioriBody(props: BodyProps) {
         c.height = H
       }
       const rig = RIGS[shownSkin]
-      // The portrait stands where the bodies float, its base just above the subtitles.
-      let sprite: { canvas: HTMLCanvasElement; x0: number; y0: number; x1: number; y1: number } | undefined
-      let artBox = { x: 0, y: 0, k: 1 }
+      let sprite: HTMLCanvasElement | undefined
       if (shownSkin === 'portrait') {
         face = stepFace(face, dt, p.state, rand, calm)
         // Pixel art moves at its own pace: the drawing changes at most 24 times a second.
@@ -120,12 +118,7 @@ export function ShioriBody(props: BodyProps) {
           drawPortrait(artG, expressionOf(face), time * motion)
           lastArt = time
         }
-        const sh = p.focus.size * 2.55
-        const sw = (sh * PORTRAIT_W) / PORTRAIT_H
-        const k = sh / PORTRAIT_H
-        const bottom = p.focus.y * rect.height + p.focus.size * 1.15 - face.breath * k
-        artBox = { x: p.focus.x * rect.width - sw / 2, y: bottom - sh, k }
-        sprite = { canvas: art, x0: artBox.x / rect.width, y0: artBox.y / rect.height, x1: (artBox.x + sw) / rect.width, y1: bottom / rect.height }
+        sprite = art
       }
       const scale = (p.focus.size * 2) / rect.height / 0.8
       const offset: [number, number] = [p.focus.x * 2 - 1, 1 - p.focus.y * 2]
@@ -164,8 +157,7 @@ export function ShioriBody(props: BodyProps) {
           wormLength: WORM_LENGTH,
           sprite,
         },
-        // The portrait keeps its own tones: eight colours are too few for a face.
-        { pixel: p.pixel, palette: p.pixel && shownSkin !== 'portrait' ? p.palette : [] },
+        { pixel: p.pixel, palette: p.pixel ? p.palette : [] },
         WORMS,
       )
 
@@ -179,7 +171,7 @@ export function ShioriBody(props: BodyProps) {
       for (let i = 0; i < els.length; i++) {
         const el = els[i] as HTMLElement
         const part = rig.parts[i % rig.parts.length]
-        const at = shownSkin === 'portrait' ? { x: artBox.x + part.at[0] * artBox.k, y: artBox.y + part.at[1] * artBox.k, depth: 0.5 } : project(part.at, rot, rig, view)
+        const at = project(part.at, rot, rig, view)
         // Tags alternate sides and keep their own row, so they never pile up.
         const side = i % 2 === 0 ? 1 : -1
         const cx = p.focus.x * rect.width

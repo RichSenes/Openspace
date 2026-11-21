@@ -115,6 +115,7 @@ Plans/                     longer plans, with their phases
 Studies/                   research: libraries, projects, options compared
 Sessions/                  conversations with Shiori and their whiteboards
 Digests/                   weekly and monthly summaries
+Agenda/                    the next day's agenda, one note per day
 Offices/<office>/          overview, conventions, glossary of that project
 Inhabitants/<name>/        profile.md (role, traits, look), journal.md
 Chronicle/                 social events, for the paper and the wiki

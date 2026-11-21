@@ -72,6 +72,7 @@ settings, `RunAsync`) and works through its `RoutineContext`.
 | `newsletters` | A paper of the week's newsletters, by topic |
 | `followup` | Mail sent and never answered, with a reminder drafted on a yes; mail waiting for the person |
 | `weekly` | A recap of the week: calendar, tasks, proposals waiting, routines' runs; kept in the brain as the week's and the month's digest |
+| `tomorrow` | The next day's agenda: calendar events and tasks due, what waits for the person, work queued per office, open points of Shiori's sessions; kept in the brain as `Agenda/<date>.md`, opened by the digests model unless it is a free online one |
 | `decision-reviews` | The brain's accepted decisions whose review date has come, in the inbox and in its message |
 | `job-offers` | Offers from job boards and companies' own pages, judged against the person's profile, never proposed twice |
 | `cv` | The CV in several languages, and one tailored to each offer the person said yes to |

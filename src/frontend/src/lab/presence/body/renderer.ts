@@ -14,6 +14,10 @@ export interface FrameUniforms {
   unsure: number
   lean: number
   heat: number
+  /** Creature eyes: the upper lid, its slant, and a little extra size. */
+  lid?: number
+  lidTilt?: number
+  wide?: number
   gaze: [number, number]
   rot: Float32Array
   eyeRot: Float32Array
@@ -258,6 +262,9 @@ export class BodyRenderer {
     u1('uOpen', f.open)
     u1('uPleased', f.pleased)
     u1('uUnsure', f.unsure)
+    u1('uLid', f.lid ?? 0)
+    u1('uLidTilt', f.lidTilt ?? 0)
+    u1('uWide', f.wide ?? 0)
     u1('uLean', f.lean)
     u1('uHeat', f.heat)
     u1('uAspect', w / h)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FACE_STATES } from '../../shiori/faceMachine'
-import { approach, BLINK, blinkOpen, LOOKS, makeLife, POSES, stepLife, voiceLevel } from './character'
+import { approach, BLINK, blinkOpen, LOOKS, makeLife, makePoseMotion, POSES, stepLife, stepPose, voiceLevel } from './character'
 import { rng } from './shapes'
 
 describe('poses', () => {
@@ -60,5 +60,34 @@ describe('life between states', () => {
       expect(v).toBeGreaterThanOrEqual(0)
       expect(v).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('poses on springs', () => {
+  it('gives the creatures lids: lowered and slanted when unsure, raised and wide when listening', () => {
+    expect(POSES.unsure.lid).toBeGreaterThan(POSES.idle.lid)
+    expect(POSES.unsure.lidTilt).toBeGreaterThan(0.5)
+    expect(POSES.listening.lid).toBe(0)
+    expect(POSES.listening.wide).toBe(1)
+  })
+
+  it('moves a little the other way first, then overshoots and settles', () => {
+    let m = makePoseMotion('idle')
+    const start = m.pose.pleased
+    let least = Infinity
+    let most = -Infinity
+    for (let i = 0; i < 240; i++) {
+      m = stepPose(m, 'pleased', 1 / 60, false)
+      if (i < 6) least = Math.min(least, m.pose.pleased)
+      most = Math.max(most, m.pose.pleased)
+    }
+    expect(least).toBeLessThan(start)
+    expect(most).toBeGreaterThan(1)
+    expect(m.pose.pleased).toBeCloseTo(1, 2)
+  })
+
+  it('skips the anticipation with calm motion', () => {
+    const m = stepPose(makePoseMotion('idle'), 'pleased', 1 / 60, true)
+    expect(m.pose.pleased).toBeGreaterThanOrEqual(0)
   })
 })

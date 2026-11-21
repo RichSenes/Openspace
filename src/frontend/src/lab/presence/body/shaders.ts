@@ -56,7 +56,7 @@ precision highp float;
 in vec3 aPos;
 in vec4 aData;
 in vec2 aExtra;
-uniform float uSkin, uPhase, uTime, uEnergy, uVoice, uEyes, uOpen, uPleased, uUnsure, uLean, uHeat;
+uniform float uSkin, uPhase, uTime, uEnergy, uVoice, uEyes, uOpen, uPleased, uUnsure, uLean, uHeat, uLid, uLidTilt, uWide;
 uniform float uAspect, uScale, uPoint, uPixel, uWorm, uLift, uBodyScale;
 uniform vec2 uGaze, uOffset;
 uniform mat3 uRot, uEyeRot;
@@ -168,6 +168,11 @@ void main(){
     float tilt = side * 0.38 * uUnsure;
     q = mat2(cos(tilt), -sin(tilt), sin(tilt), cos(tilt)) * (q * (1.0 - 0.25 * uUnsure));
     q = mix(q, aExtra * vec2(1.0, 1.15), uPleased);
+    // The upper lid: a slanted line; points above it gather on it, so the top of the eye goes flat.
+    // Positive tilt drops the outer corner (soft, sad); negative drops the inner one (intent).
+    float lidLine = 1.0 - 2.0 * uLid * (1.0 - uPleased) - uLidTilt * q.x * side * 0.6;
+    q.y = min(q.y, lidLine * uOpen);
+    q *= 1.0 + 0.18 * uWide;
     vec3 local = vec3(side * uEyeSize.z + q.x * uEyeSize.x + uGaze.x * 0.08,
                       q.y * uEyeSize.y - uGaze.y * 0.06 - 0.03 * uUnsure, 0.0);
     local.z -= local.x * local.x * 0.6;

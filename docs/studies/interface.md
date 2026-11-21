@@ -584,6 +584,11 @@ body's colours, breathing with the same noise, turning with her gaze, its base d
 points; then the same glow, ASCII dissolve and glitch. In pixel mode the points are whole pixels
 and overlaps keep the brightest instead of adding up. The swarm stays the default body.
 
+**The creatures got the same treatment** (swarm, medusa): their poses move on springs with a
+little anticipation (a move the other way first), an overshoot and a settle; a blink when the
+state changes; and real upper lids on their eyes, a slanted line the points gather on, so they
+rest half-lidded, open wide when listening, droop at the outer corners when unsure.
+
 Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader
 is Ashima Arts' (MIT).
 

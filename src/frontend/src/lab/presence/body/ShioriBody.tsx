@@ -6,6 +6,8 @@ import { BodyRenderer } from './renderer'
 import { bodyRotation, mix3, MODE_HEAT, project, RIGS } from './rig'
 import { rng, type SkinId } from './shapes'
 import { changeAt, type Change } from './transition'
+import { expressionOf, makeFace, stepFace } from '../portrait/face'
+import { drawPortrait, PORTRAIT_H, PORTRAIT_W } from '../portrait/portrait'
 import { makeWorms, stepWorms, wormPositions } from './worms'
 
 export interface BodyProps {
@@ -49,6 +51,13 @@ export function ShioriBody(props: BodyProps) {
     }
     const rand = rng(99)
     let pose: Pose = { ...POSES.idle }
+    // The portrait: its own canvas at the art's size, and the face that moves it.
+    const art = document.createElement('canvas')
+    art.width = PORTRAIT_W
+    art.height = PORTRAIT_H
+    const artG = art.getContext('2d', { willReadFrequently: true })!
+    let face = makeFace(live.current.state)
+    let lastArt = -1
     let life = makeLife()
     let worms = makeWorms(WORMS, WORM_LENGTH)
     const wormBuf = new Float32Array(WORMS * WORM_LENGTH * 3)
@@ -101,6 +110,23 @@ export function ShioriBody(props: BodyProps) {
         c.height = H
       }
       const rig = RIGS[shownSkin]
+      // The portrait stands where the bodies float, its base just above the subtitles.
+      let sprite: { canvas: HTMLCanvasElement; x0: number; y0: number; x1: number; y1: number } | undefined
+      let artBox = { x: 0, y: 0, k: 1 }
+      if (shownSkin === 'portrait') {
+        face = stepFace(face, dt, p.state, rand, calm)
+        // Pixel art moves at its own pace: the drawing changes at most 24 times a second.
+        if (time - lastArt > 1 / 24) {
+          drawPortrait(artG, expressionOf(face), time * motion)
+          lastArt = time
+        }
+        const sh = p.focus.size * 2.55
+        const sw = (sh * PORTRAIT_W) / PORTRAIT_H
+        const k = sh / PORTRAIT_H
+        const bottom = p.focus.y * rect.height + p.focus.size * 1.15 - face.breath * k
+        artBox = { x: p.focus.x * rect.width - sw / 2, y: bottom - sh, k }
+        sprite = { canvas: art, x0: artBox.x / rect.width, y0: artBox.y / rect.height, x1: (artBox.x + sw) / rect.width, y1: bottom / rect.height }
+      }
       const scale = (p.focus.size * 2) / rect.height / 0.8
       const offset: [number, number] = [p.focus.x * 2 - 1, 1 - p.focus.y * 2]
       const { rot, eyeRot } = bodyRotation(shownSkin, phase, time * motion, life.gaze, pose.lean)
@@ -136,8 +162,10 @@ export function ShioriBody(props: BodyProps) {
           glitch: ch.glitch,
           worms: wormBuf,
           wormLength: WORM_LENGTH,
+          sprite,
         },
-        { pixel: p.pixel, palette: p.pixel ? p.palette : [] },
+        // The portrait keeps its own tones: eight colours are too few for a face.
+        { pixel: p.pixel, palette: p.pixel && shownSkin !== 'portrait' ? p.palette : [] },
         WORMS,
       )
 
@@ -151,7 +179,7 @@ export function ShioriBody(props: BodyProps) {
       for (let i = 0; i < els.length; i++) {
         const el = els[i] as HTMLElement
         const part = rig.parts[i % rig.parts.length]
-        const at = project(part.at, rot, rig, view)
+        const at = shownSkin === 'portrait' ? { x: artBox.x + part.at[0] * artBox.k, y: artBox.y + part.at[1] * artBox.k, depth: 0.5 } : project(part.at, rot, rig, view)
         // Tags alternate sides and keep their own row, so they never pile up.
         const side = i % 2 === 0 ? 1 : -1
         const cx = p.focus.x * rect.width

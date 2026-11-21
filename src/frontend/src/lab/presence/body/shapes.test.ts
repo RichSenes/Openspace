@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildSkin, bustSection, fibonacciSphere, hairAt, KIND, noseAt, rng, type SkinId } from './shapes'
+import { buildSkin, fibonacciSphere, KIND, rng, type SkinId } from './shapes'
 
-const SKINS: SkinId[] = ['swarm', 'medusa', 'scanline']
+const SKINS: SkinId[] = ['swarm', 'medusa']
 
 describe('skins', () => {
   it.each(SKINS)('%s has matching attribute arrays and both eyes', (id) => {
@@ -44,42 +44,9 @@ describe('skins', () => {
   })
 })
 
-describe('the bust', () => {
-  it('has a skull, a narrower neck and shoulders that slope out wide', () => {
-    const skull = bustSection(0.5)!
-    const neck = bustSection(-0.05)!
-    const slope = bustSection(-0.3)!
-    const shoulders = bustSection(-0.6)!
-    expect(neck.rx).toBeLessThan(skull.rx)
-    expect(slope.rx).toBeGreaterThan(neck.rx)
-    expect(shoulders.rx).toBeGreaterThan(slope.rx)
-    expect(shoulders.rx).toBeGreaterThan(skull.rx * 2)
-    expect(bustSection(0.9)).toBeNull()
-  })
-
-  it('lies close on the skull instead of standing off it like a helmet', () => {
-    const skull = bustSection(0.8)!
-    const hair = hairAt(0.8, -Math.PI / 2, 0)!
-    expect(hair.depth - skull.back).toBeLessThan(0.03)
-  })
-
-  it('has long hair parted in the middle that frames the face and falls below the shoulders', () => {
-    const front = Math.PI / 2
-    const back = -Math.PI / 2
-    expect(hairAt(0.4, front, 0)).toBeNull()
-    expect(hairAt(0.55, front, 0)).toBeNull()
-    expect(hairAt(0.7, front + 0.4, 0)).not.toBeNull()
-    expect(hairAt(0.7, front, 0)).toBeNull()
-    expect(hairAt(0.4, back, 0)).not.toBeNull()
-    expect(hairAt(-0.4, back, 0)).not.toBeNull()
-    expect(hairAt(-0.7, back, 0)).toBeNull()
-    expect(hairAt(-0.5, back, 0.1)).toBeNull()
-  })
-
-  it('has a face in front: a nose with its tip at mid height, a chin narrower than the skull', () => {
-    expect(noseAt(0.3)).toBeGreaterThan(noseAt(0.4))
-    expect(noseAt(0.5)).toBe(0)
-    expect(bustSection(0.08)!.rx).toBeLessThan(bustSection(0.5)!.rx * 0.6)
+describe('the portrait', () => {
+  it('has no points: it is drawn, not built', () => {
+    expect(buildSkin('portrait').count).toBe(0)
   })
 })
 

@@ -572,6 +572,16 @@ of plum blossom embroidered on one shoulder, a slim sash knotted at the side), t
 crossed through the bun, jade earrings and a pendant, and the jaw's shadow on the neck. Tokyo's tower is now a small dark-red silhouette far
 behind the skyline, which stays as it was; space's giant glides instead of stepping.
 
+**The portrait is alive** (approved 2026-11-22, then animated): one expression per state made of
+the face's parts (lids, cheeks, brows and their tilt, mouth corners, opening and width, gaze,
+head turn), reached through slightly under-damped springs so every change overshoots a little
+and settles; a blink when her thought changes; eyes that move first and a head that follows part
+of the way; one-pixel breathing; a mouth that opens and shapes vowels while she speaks. In
+`?lab=presence` it replaces the scanline bust: the portrait is drawn at its art size up to 24
+times a second and projected as a hologram (tinted brightness with feature contrast, scan lines,
+a faint sweep and flicker, the base coming apart), then the same glow, ASCII dissolve and glitch
+as the other bodies. In pixel mode it keeps its own tones instead of the world's eight colours.
+
 Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader
 is Ashima Arts' (MIT).
 

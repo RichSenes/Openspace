@@ -15,7 +15,7 @@ import { WorldBackdrop } from './world/WorldBackdrop'
 import { WORLD_ORDER, WORLDS } from './world/worlds'
 import './presence.css'
 
-const SKINS: SkinId[] = ['swarm', 'medusa', 'scanline']
+const SKINS: SkinId[] = ['portrait', 'swarm', 'medusa']
 const STORE = 'openspace.lab.presence'
 const TICK = 50
 
@@ -27,7 +27,7 @@ interface Prefs {
   world: WorldId
 }
 
-const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'Rain', world: 'city' }
+const DEFAULTS: Prefs = { skin: 'portrait', pixel: 3, hour: 'auto', sky: 'Rain', world: 'city' }
 
 function loadPrefs(): Prefs {
   try {

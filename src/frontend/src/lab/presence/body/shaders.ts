@@ -110,23 +110,6 @@ vec3 strandAt(vec3 root, float s, float seed, float inner, out float sig){
   return q;
 }
 
-vec3 bustAt(vec3 p, float line, float seed, float hair, out float alpha, out float scan){
-  vec3 q = p;
-  q.x += snoise(vec3(line * 40.0, uTime * 9.0, 0.0)) * 0.035 * uVoice;
-  // Hair sways, more toward its tips.
-  float loose = hair * clamp(0.6 - p.y, 0.0, 1.4);
-  q.x += loose * (sin(uTime * 0.9 + p.y * 4.0) * 0.018 + snoise(vec3(p.y * 3.0, uTime * 0.4, seed)) * 0.01);
-  q.z += loose * cos(uTime * 0.7 + p.y * 3.0) * 0.012;
-  alpha = 1.0;
-  if (p.y < -0.5) {
-    float drop = snoise(vec3(seed * 50.0, line * 20.0, uPhase * 0.6));
-    alpha = smoothstep(-0.25, 0.25, drop + (p.y + 0.5) * 2.2 + 0.6);
-  }
-  float band = line - fract(uPhase * 0.3);
-  scan = exp(-band * band * 500.0) * uHeat;
-  return q;
-}
-
 void main(){
   float kind = aData.x;
   float seed = aData.y;
@@ -153,23 +136,11 @@ void main(){
       alpha = eye ? 1.0 : 0.55 + 0.45 * aData.z;
     }
   } else {
-    float scan;
-    body = bustAt(aPos, aData.z, seed, eye ? 0.0 : aExtra.x, alpha, scan);
-    glow = scan * 2.0;
-    vDash = 1.0;
+    body = aPos;
   }
 
   vec3 v = uRot * (body * uBodyScale);
   v.y += uLift;
-
-  // A surface seen from behind is dimmer; the bust hides its back like a solid head.
-  vec3 nrm = uRot * normalize(vec3(aPos.x, uSkin > 1.5 ? 0.0 : aPos.y, aPos.z) + 1e-4);
-  float facing = nrm.z;
-  // Seen edge-on, dashes pile up at the outline: let them fade there.
-  bool isHair = uSkin > 1.5 && !eye && aExtra.x > 0.5;
-  // Hair fades toward its outline too, so the head never reads as a hood.
-  if (isHair) alpha *= smoothstep(-0.45, 0.05, facing) * mix(0.35, 1.0, smoothstep(-0.1, 0.6, facing));
-  else if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing) * mix(0.3, 1.0, clamp(facing, 0.0, 1.0));
 
   float m = 0.0;
   if (eye) {
@@ -179,8 +150,6 @@ void main(){
     float tilt = side * 0.38 * uUnsure;
     q = mat2(cos(tilt), -sin(tilt), sin(tilt), cos(tilt)) * (q * (1.0 - 0.25 * uUnsure));
     q = mix(q, aExtra * vec2(1.0, 1.15), uPleased);
-    // A head has almond eyes: the disc pinched at its corners.
-    if (uSkin > 1.5) q.y *= mix(1.0, sqrt(max(0.0, 1.0 - q.x * q.x)) * 1.1, 1.0 - uPleased);
     vec3 local = vec3(side * uEyeSize.z + q.x * uEyeSize.x + uGaze.x * 0.08,
                       q.y * uEyeSize.y - uGaze.y * 0.06 - 0.03 * uUnsure, 0.0);
     local.z -= local.x * local.x * 0.6;
@@ -188,7 +157,7 @@ void main(){
     m = smoothstep(0.0, 1.0, clamp(uEyes * 1.7 - seed * 0.7, 0.0, 1.0));
     v = mix(v, target, m);
     alpha = mix(alpha * 0.6, 1.0, m);
-    if (uSkin < 1.5) vDash = mix(vDash, 0.0, m);
+    vDash = mix(vDash, 0.0, m);
   }
 
   float persp = 3.0 / (3.0 - v.z);
@@ -198,7 +167,6 @@ void main(){
   float depth = clamp(v.z * 0.5 + 0.5, 0.0, 1.0);
   float bright = (0.28 + 0.72 * depth) * (0.55 + 0.6 * uEnergy);
   float size = uPoint * (0.7 + 0.6 * depth);
-  if (uSkin > 1.5) { size *= 1.9; bright *= 0.46; }
   if (uSkin > 0.5 && uSkin < 1.5) {
     if (kind > 0.5 && kind < 1.5) { size *= 0.75; bright *= 0.7; }
     else if (!eye) bright *= 0.62;
@@ -210,23 +178,9 @@ void main(){
     size *= 1.0 + 0.9 * (1.0 - aData.z);
   }
   float rim = eye ? smoothstep(0.55, 0.95, length(aData.zw)) : 0.0;
-  // Hair: the body's colours, warmer and dimmer, so it reads apart from the face.
-  if (isHair) {
-    // Strands: each thin column of hair has its own brightness.
-    float strand = fract(sin(floor(aData.w * 38.0) * 12.9898) * 43758.5453);
-    col = mix(col, uHot, 0.45);
-    bright *= 0.3 + 0.55 * strand;
-  }
   col = mix(col, uEye, m);
-  if (uSkin > 1.5 && eye) {
-    // An iris that follows the gaze, inside a dim eye.
-    float iris = smoothstep(0.5, 0.3, length(aData.zw - uGaze * vec2(0.35, -0.3)));
-    bright = mix(bright, 0.14 + 0.5 * iris, m);
-    size = mix(size, uPoint * 1.05, m);
-  } else {
-    bright = mix(bright, 0.42 + 0.5 * rim, m);
-    size = mix(size, uPoint * 0.95, m);
-  }
+  bright = mix(bright, 0.42 + 0.5 * rim, m);
+  size = mix(size, uPoint * 0.95, m);
   if (uPixel > 0.5) size = max(1.0, floor(size + 0.5));
   gl_PointSize = size;
   vColor = col * bright * alpha;
@@ -332,4 +286,54 @@ uniform sampler2D uTex;
 uniform vec2 uRes;
 out vec4 o;
 void main(){ o = texture(uTex, gl_FragCoord.xy / uRes); }
+`
+
+/** The portrait as a quad, in clip space. */
+export const SPRITE_VS = /* glsl */ `#version 300 es
+precision highp float;
+uniform vec4 uRect;
+out vec2 vUv;
+void main(){
+  vec2 c = vec2(gl_VertexID & 1, gl_VertexID >> 1);
+  vUv = vec2(c.x, 1.0 - c.y);
+  gl_Position = vec4(mix(uRect.xy, uRect.zw, c), 0.0, 1.0);
+}
+`
+
+/**
+ * The portrait as a hologram: its brightness carried in the body's colours, a scan line on every
+ * other art row, a band of light sweeping down, a faint flicker, and the base dissolving.
+ */
+export const SPRITE_FS = /* glsl */ `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uSprite;
+uniform vec2 uArt;
+uniform float uTime, uEnergy, uHeat;
+uniform vec3 uCool, uHot;
+out vec4 o;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void main(){
+  vec2 px = floor(vUv * uArt);
+  vec4 c = texture(uSprite, (px + 0.5) / uArt);
+  if (c.a < 0.5) discard;
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  vec3 tint = mix(uCool, uHot, clamp(uHeat * 0.35, 0.0, 1.0));
+  // Contrast first, so features stay dark against the skin; then kept well below white,
+  // since the glow and the screen blend add their own light.
+  float k = smoothstep(0.08, 0.98, l);
+  vec3 col = tint * (0.06 + 0.42 * k) + vec3(0.5, 0.7, 1.0) * k * k * 0.12;
+  // A little of her own colours shows through: lips, jade, gold.
+  col = mix(col, c.rgb * 0.55, 0.18);
+  float row = mod(px.y, 2.0);
+  col *= row < 1.0 ? 1.0 : 0.55;
+  float band = vUv.y - fract(uTime * 0.18);
+  col += tint * exp(-band * band * 4000.0) * 0.18;
+  col *= 0.9 + 0.1 * sin(uTime * 37.0 + px.y * 0.7) * (0.5 + 0.5 * uEnergy);
+  // The base comes apart in rows, as the projection loses her.
+  float fade = smoothstep(0.84, 1.0, vUv.y);
+  if (hash(vec2(px.y, floor(uTime * 8.0))) < fade * 1.2 && hash(px) < fade * 1.4) discard;
+  col *= 1.0 - fade * 0.6;
+  o = vec4(col * (0.8 + 0.25 * uEnergy), 1.0);
+}
 `

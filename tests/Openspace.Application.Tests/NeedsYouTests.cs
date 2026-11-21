@@ -9,7 +9,7 @@ public sealed class NeedsYouTests
 {
     private readonly Harness _h = new();
 
-    private NeedsYouQueries Needs() => new(_h.Offices, _h.Tasks, _h.Routines);
+    private NeedsYouQueries Needs() => new(_h.Offices, _h.Tasks, _h.Routines, new InMemoryVault(), _h.Clock);
 
     private Routine AddRoutine(string name, bool enabled = true)
     {

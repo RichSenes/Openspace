@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NeedsYouItem } from '../api/types'
-import { grouped, targetOf, waited, withoutItem } from './needs'
+import { decisionAnswers, grouped, isDecision, notePath, targetOf, waited, withoutItem } from './needs'
 
 const item = (kind: NeedsYouItem['kind'], title: string): NeedsYouItem => ({
   kind,
@@ -39,5 +39,23 @@ describe('what needs the person', () => {
     const list = [item('TaskToApprove', 'Privacy'), item('Proposal', 'Offer')]
     expect(withoutItem(list, 'ID-PRIVACY')?.map((i) => i.title)).toEqual(['Offer'])
     expect(withoutItem(undefined, 'id-Offer')).toBeUndefined()
+  })
+
+  it('puts the brain\'s decisions after the rest, in their own groups', () => {
+    const groups = grouped([item('DecisionDue', 'Merge order'), item('DecisionToAccept', 'Tabs'), item('Proposal', 'Offer'), item('DecisionToReview', 'Queue')])
+    expect(groups.map((g) => g.heading)).toEqual(['Routines ask', 'Shiori accepted, to review', 'Decisions to accept', 'Decisions to look at again'])
+  })
+
+  it('gives each kind of decision its own answers, and none to the rest', () => {
+    expect(decisionAnswers('DecisionToReview').map((a) => [a.verb, a.label])).toEqual([['fine', 'Fine'], ['undo', 'Undo']])
+    expect(decisionAnswers('DecisionToAccept').map((a) => a.verb)).toEqual(['accept', 'reject'])
+    expect(decisionAnswers('DecisionDue').map((a) => a.verb)).toEqual(['keep', 'supersede'])
+    expect(decisionAnswers('Proposal')).toEqual([])
+    expect(isDecision('DecisionDue')).toBe(true)
+    expect(isDecision('TaskFailed')).toBe(false)
+  })
+
+  it('keeps the slashes of a note\'s path and escapes the rest', () => {
+    expect(notePath('Decisions/2026-11-20 merge #2.md')).toBe('Decisions/2026-11-20%20merge%20%232.md')
   })
 })

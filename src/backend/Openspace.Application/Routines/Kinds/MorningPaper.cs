@@ -17,7 +17,8 @@ namespace Openspace.Application.Routines.Kinds;
 /// of the day: one never explained, with its readings, strokes, words and sentences.
 /// </summary>
 public sealed partial class MorningPaper(
-    ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer, IWebImages images, IKanjiBook kanjiBook) : IRoutineKind
+    ILocalChat chat, IDecider decider, IFeedReader feeds, IPdfPrinter printer, IWebImages images, IKanjiBook kanjiBook,
+    Characters.Chronicle? chronicle = null) : IRoutineKind
 {
     public string Key => "morning-paper";
 
@@ -45,6 +46,7 @@ public sealed partial class MorningPaper(
           "layout": { "columns": 2, "frontPicture": "medium", "pictures": "medium" },
           "goodNews": ["World"],
           "kanji": { "enabled": false, "fromGrade": 1 },
+          "chronicle": true,
           "sections": [
             {
               "name": "World", "about": "What happened in the world.",
@@ -216,7 +218,8 @@ public sealed partial class MorningPaper(
         Directory.CreateDirectory(folder);
         var number = NextNumber(folder);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(context.Now, context.Clock.LocalTimeZone).DateTime);
-        var html = PaperPage.Render(settings, culture, number, today, opening, front, goodNews, sections, kanji);
+        var gossip = await ChronicleAsync(context, settings, today, cancellationToken).ConfigureAwait(false);
+        var html = PaperPage.Render(settings, culture, number, today, opening, front, goodNews, sections, kanji, gossip);
 
         var name = $"{Slug(settings.Title)}-N{number:000}-{today:yyyy-MM-dd}";
         await File.WriteAllTextAsync(Path.Combine(folder, name + ".html"), html, cancellationToken).ConfigureAwait(false);
@@ -228,6 +231,42 @@ public sealed partial class MorningPaper(
         var caption = $"{settings.Title} · N. {number} · {today.ToString("dddd d MMMM yyyy", culture)}\n{front?.Article.Headline ?? opening.Title}";
         await context.DeliverAsync(caption, pdf, cancellationToken).ConfigureAwait(false);
         return $"N. {number}: {count} articles in {sections.Count} sections{(kanji is null ? string.Empty : $", kanji {kanji.Entry.Literal}")}.";
+    }
+
+    /// <summary>
+    /// Yesterday's office life from the chronicle, one line per event, the office named when
+    /// there are several; nothing when it was quiet or the settings say <c>"chronicle": false</c>.
+    /// </summary>
+    private async Task<IReadOnlyList<string>?> ChronicleAsync(RoutineContext context, PaperSettings settings, DateOnly today, CancellationToken cancellationToken)
+    {
+        if (chronicle is null || !WantsChronicle(context.Settings))
+        {
+            return null;
+        }
+
+        try
+        {
+            context.Progress("Reading the office chronicle");
+            var day = await chronicle.DayAsync(today.AddDays(-1), settings.Language, cancellationToken).ConfigureAwait(false);
+            return ChronicleLines(day);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            context.Write($"The office chronicle is left out: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>On unless the settings turn it off.</summary>
+    public static bool WantsChronicle(JsonElement settings) =>
+        settings.ValueKind != JsonValueKind.Object || !settings.TryGetProperty("chronicle", out var value) || value.ValueKind != JsonValueKind.False;
+
+    /// <summary>The day's lines for the paper, each prefixed by its office when there are several.</summary>
+    public static IReadOnlyList<string> ChronicleLines(Characters.ChronicleDay day)
+    {
+        ArgumentNullException.ThrowIfNull(day);
+        var several = day.Sections.Count(s => s.Lines.Count > 0) > 1;
+        return [.. day.Sections.SelectMany(s => s.Lines.Select(l => several ? $"{s.Office}: {l}" : l))];
     }
 
     /// <summary>The section's news since <paramref name="since"/> that the paper never printed.</summary>

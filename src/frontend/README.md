@@ -38,6 +38,8 @@ src/
   agents/     Roles, their instructions and permissions
   routines/   Routines, their runs, proposals, the paper's kanji
   reports/    Reports and changelogs
+  characters/ The character monitor: traits, birthdays, shifts, trust, seniority,
+              mood and relationships of the inhabitants
   security/   Security audits: runs, reports, findings, fixes
   engines/    OpenCode and Claude Code, usage limits, the graphics card
   settings/   Settings, weather, version, backups, Google accounts
@@ -127,6 +129,12 @@ offers are judged and from how many stars they arrive; the bot and the language.
 
 **Reports.** Reports of a day or of an epic, and changelogs, in a chosen language,
 each kind in its own card with what it tells: read them, copy them, download them.
+
+**Characters.** One card per inhabitant (every desk is one): its traits, fixed at birth; its
+birthday, which you can change; its shift and its trust per kind of action; its seniority and
+whether it is its room's expert; its mood with the week's line and every change with its reason;
+its relationships with the events that made them. All numbers come from what happened in
+Openspace, and agents never see them.
 
 **The supervisor's plans** run in the background: asking for one (from the Board, or handing
 security findings over) never holds the page. While it plans, the status bar says so; when it

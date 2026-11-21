@@ -70,6 +70,12 @@ A project. It holds its rooms and their desks, and says how agents may treat it.
   Code).
 - An optional role, and a look (`DeskLook`: skin, hair, hairstyle, clothes,
   accessory, outfit or costume).
+- A `Personality` of two or three `Trait`s, fixed at creation and never bundled
+  with the role, and a `Birthday` (day and month, never a year). Both are chosen
+  or picked from the desk's id; desks stored before traits get those of their id.
+- `TrustSettings`: per `TrustedAction`, does it alone, does it and tells, or asks
+  first; what is never set is today's behaviour (alone). A `Shift`: day, night or
+  around the clock.
 
 ## Role
 

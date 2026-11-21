@@ -14,6 +14,7 @@ import { RoomsPanel } from './rooms/RoomsPanel'
 import { RoutinesPanel } from './routines/RoutinesPanel'
 import { ShioriPage } from './shiori/ShioriPage'
 import { SecurityPanel } from './security/SecurityPanel'
+import { CharactersPanel } from './characters/CharactersPanel'
 import { OfficePanel } from './office/OfficePanel'
 import { FirstSteps } from './setup/FirstSteps'
 import { onOpenSettings, requestSettingsSection } from './settings/sections'
@@ -90,6 +91,8 @@ export default function App() {
             <RoutinesPanel key={office.id} office={office} />
           ) : view === 'reports' ? (
             <ReportsPanel key={office.id} office={office} />
+          ) : view === 'characters' ? (
+            <CharactersPanel key={office.id} office={office} />
           ) : view === 'security' ? (
             <SecurityPanel key={office.id} office={office} />
           ) : (

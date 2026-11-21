@@ -352,11 +352,20 @@ public sealed class Office : AggregateRoot<OfficeId>
     }
 
     /// <param name="roleId">Must name an existing role; checked by the application, which sees all roles.</param>
-    public Desk AddDesk(RoomId roomId, string name, AgentProfile agent, DateTimeOffset now, RoleId? roleId = null)
+    /// <param name="personality">Its traits, fixed from now on; null picks them from the desk's id.</param>
+    /// <param name="birthday">Its birthday; null picks one from the desk's id.</param>
+    public Desk AddDesk(
+        RoomId roomId, string name, AgentProfile agent, DateTimeOffset now, RoleId? roleId = null, Personality? personality = null, Birthday? birthday = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
         var desk = FindRoom(roomId).AddDesk(name, agent);
         desk.GiveRole(roleId);
+        if (personality is { IsEmpty: false })
+        {
+            desk.BeBorn(personality);
+        }
+
+        desk.CelebrateOn(birthday);
         Raise(new DeskAdded(Id, roomId, desk.Id, agent, now));
         return desk;
     }
@@ -386,6 +395,27 @@ public sealed class Office : AggregateRoot<OfficeId>
     {
         FindDesk(deskId).Dress(look);
         Raise(new DeskDressed(Id, deskId, now));
+    }
+
+    /// <summary>Sets the day a desk celebrates; null gives it back the day picked from its id. Traits never change.</summary>
+    public void SetDeskBirthday(DeskId deskId, Birthday? birthday, DateTimeOffset now)
+    {
+        FindDesk(deskId).CelebrateOn(birthday);
+        Raise(new DeskBirthdaySet(Id, deskId, now));
+    }
+
+    /// <summary>Puts a desk on the day shift, the night shift, or around the clock.</summary>
+    public void SetDeskShift(DeskId deskId, Shift shift, DateTimeOffset now)
+    {
+        FindDesk(deskId).WorkOn(shift);
+        Raise(new DeskShiftSet(Id, deskId, shift, now));
+    }
+
+    /// <summary>Sets how far a desk is trusted with one kind of action.</summary>
+    public void SetDeskTrust(DeskId deskId, TrustedAction action, TrustLevel level, DateTimeOffset now)
+    {
+        FindDesk(deskId).Entrust(action, level);
+        Raise(new DeskTrustSet(Id, deskId, action, level, now));
     }
 
     public bool UsesRole(RoleId roleId) => _rooms.Exists(r => r.Desks.Any(d => d.RoleId == roleId));

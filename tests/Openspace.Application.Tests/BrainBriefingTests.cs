@@ -204,6 +204,24 @@ public class BrainBriefingTests
     }
 
     [Fact]
+    public async Task The_rooms_expert_is_named_and_comes_first()
+    {
+        var senior = _h.Office.AddDesk(_h.Room.Id, "Screens", AgentProfile.Create("frontend-dev"), Harness.Start);
+        Finished(senior);
+        Finished(senior);
+        Finished(senior);
+        Finished(_h.Desk);
+        _h.Vault.Put("Offices/E Corp/icons.md", OfficeNote("Icons", "Use the sprite.", "Frontend"));
+        _h.Vault.Put("Offices/E Corp/forms.md", OfficeNote("Forms", "Validate on blur.", "Screens", "rooms: [Web]"));
+
+        var text = await BriefAsync(Task());
+
+        Assert.Contains("(Offices/E Corp/forms.md, by Screens, the room's expert, 3 tasks done in this room)", text, StringComparison.Ordinal);
+        Assert.Contains("(Offices/E Corp/icons.md, by Frontend, 1 task done in this room)", text, StringComparison.Ordinal);
+        Assert.True(text.IndexOf("- Forms", StringComparison.Ordinal) < text.IndexOf("- Icons", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Expert_notes_are_cut_after_the_decisions_when_the_brief_runs_long()
     {
         _h.Vault.Put("Constitution.md", "# Constitution\n\n" + string.Join('\n', Enumerable.Range(1, 11).Select(i => $"{i}. Rule {i}: " + new string('x', 150))) + "\n");

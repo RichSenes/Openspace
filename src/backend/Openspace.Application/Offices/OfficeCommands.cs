@@ -115,6 +115,29 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task SetDeskShiftAsync(OfficeId officeId, DeskId deskId, Shift shift, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetDeskShift(deskId, shift, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sets how far a desk is trusted with one kind of action. Applies from its next request.</summary>
+    public async Task SetDeskTrustAsync(OfficeId officeId, DeskId deskId, TrustedAction action, TrustLevel level, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetDeskTrust(deskId, action, level, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sets the day a desk celebrates; null gives it back the one picked from its id.</summary>
+    public async Task SetDeskBirthdayAsync(OfficeId officeId, DeskId deskId, Birthday? birthday, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetDeskBirthday(deskId, birthday, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task SetDeskRoleAsync(OfficeId officeId, DeskId deskId, RoleId? roleId, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
@@ -195,7 +218,9 @@ public sealed class OfficeCommands(
         string? model,
         RoleId? roleId,
         CancellationToken cancellationToken,
-        AgentEngine engine = AgentEngine.OpenCode)
+        AgentEngine engine = AgentEngine.OpenCode,
+        Personality? personality = null,
+        Birthday? birthday = null)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         if (roleId is { } role)
@@ -203,7 +228,7 @@ public sealed class OfficeCommands(
             await roles.GetAsync(role, cancellationToken).ConfigureAwait(false);
         }
 
-        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model, engine), clock.GetUtcNow(), roleId);
+        var desk = office.AddDesk(roomId, name, AgentProfile.Create(agentName, model, engine), clock.GetUtcNow(), roleId, personality, birthday);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return desk.Id;
     }

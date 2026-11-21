@@ -260,22 +260,25 @@ public sealed partial class AgentBrain(
         // Seniority is only counted when there are notes to weigh: one query for the office's
         // finished tasks, counted by the room's desks, instead of a lookup per note.
         var deskNames = room.Desks.ToDictionary(d => d.Id, d => d.Name);
-        var done = (await tasks.ListAsync(office.Id, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false))
-            .Where(t => t.DeskId is { } id && deskNames.ContainsKey(id))
-            .GroupBy(t => deskNames[t.DeskId!.Value], StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        var finished = await tasks.ListAsync(office.Id, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false);
+        var seniors = Characters.Seniority.Of(office, finished)
+            .Where(s => s.Room == room.Id && s.Done > 0)
+            .GroupBy(s => deskNames[s.Desk], StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (Done: g.Sum(s => s.Done), Expert: g.Any(s => s.Expert)), StringComparer.OrdinalIgnoreCase);
 
         var weighed = new List<(BriefNote Note, DateTimeOffset Modified)>();
         foreach (var n in found)
         {
             var note = await vault.ReadAsync(n.Path, cancellationToken).ConfigureAwait(false);
             var author = Blank(note?.Author);
-            var seniority = author is not null && done.TryGetValue(author, out var count) ? count : 0;
-            weighed.Add((new BriefNote(n.Path, n.Title, Gist(note?.Body ?? n.Excerpt, n.Title), author, seniority), n.Modified));
+            var (seniority, expert) = author is not null && seniors.TryGetValue(author, out var count) ? count : (0, false);
+            weighed.Add((new BriefNote(n.Path, n.Title, Gist(note?.Body ?? n.Excerpt, n.Title), author, seniority, expert), n.Modified));
         }
 
+        // The expert first, then the other seniors, the most senior first.
         var ordered = weighed
-            .OrderByDescending(x => x.Note.Seniority)
+            .OrderByDescending(x => x.Note.Expert)
+            .ThenByDescending(x => x.Note.Seniority)
             .ThenByDescending(x => x.Modified)
             .ThenBy(x => x.Note.Path, StringComparer.Ordinal)
             .Select(x => x.Note)
@@ -440,7 +443,8 @@ public sealed record BriefDecision(string Path, string Title, string Gist);
 /// <summary>A note of the office about the room, as the briefing names it.</summary>
 /// <param name="Author">The inhabitant who wrote it, when the note says so.</param>
 /// <param name="Seniority">How many of the room's tasks its author finished; 0 for anyone else.</param>
-public sealed record BriefNote(string Path, string Title, string Gist, string? Author, int Seniority);
+/// <param name="Expert">Its author is the room's expert: it finished the most of the room's tasks.</param>
+public sealed record BriefNote(string Path, string Title, string Gist, string? Author, int Seniority, bool Expert = false);
 
 /// <param name="Doing">Which task, at which desk, changing which files.</param>
 /// <param name="Shared">The files it shares with the task being briefed.</param>

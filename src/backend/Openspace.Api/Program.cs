@@ -94,6 +94,7 @@ app.UseStatusCodePages();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapOfficeEndpoints();
+app.MapCharacterEndpoints();
 app.MapTaskEndpoints();
 app.MapRoleEndpoints();
 app.MapEpicEndpoints();

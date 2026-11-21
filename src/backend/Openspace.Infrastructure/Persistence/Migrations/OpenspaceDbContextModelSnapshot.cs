@@ -663,15 +663,43 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                     b2.Property<Guid>("Id")
                                         .HasColumnType("TEXT");
 
+                                    b2.Property<string>("ChosenBirthday")
+                                        .HasMaxLength(5)
+                                        .HasColumnType("TEXT")
+                                        .HasColumnName("Birthday");
+
                                     b2.Property<string>("Name")
                                         .IsRequired()
                                         .HasColumnType("TEXT");
+
+                                    b2.Property<string>("Personality")
+                                        .IsRequired()
+                                        .ValueGeneratedOnAdd()
+                                        .HasMaxLength(100)
+                                        .HasColumnType("TEXT")
+                                        .HasColumnName("Traits")
+                                        .HasDefaultValueSql("''");
 
                                     b2.Property<Guid?>("RoleId")
                                         .HasColumnType("TEXT");
 
                                     b2.Property<Guid>("RoomId")
                                         .HasColumnType("TEXT");
+
+                                    b2.Property<string>("Shift")
+                                        .IsRequired()
+                                        .ValueGeneratedOnAdd()
+                                        .HasMaxLength(10)
+                                        .HasColumnType("TEXT")
+                                        .HasDefaultValue("Always");
+
+                                    b2.Property<string>("Trust")
+                                        .IsRequired()
+                                        .ValueGeneratedOnAdd()
+                                        .HasMaxLength(200)
+                                        .HasColumnType("TEXT")
+                                        .HasColumnName("Trust")
+                                        .HasDefaultValueSql("''");
 
                                     b2.HasKey("Id");
 

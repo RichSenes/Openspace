@@ -202,7 +202,7 @@ public static class Briefing
     }
 
     private static string By(BriefNote note) => note.Author is null ? ""
-        : note.Seniority > 0 ? $", by {note.Author}, {note.Seniority} {(note.Seniority == 1 ? "task" : "tasks")} done in this room"
+        : note.Seniority > 0 ? $", by {note.Author}, {(note.Expert ? "the room's expert, " : "")}{note.Seniority} {(note.Seniority == 1 ? "task" : "tasks")} done in this room"
         : $", by {note.Author}";
 
     private static string Shorten(string text, int max) => text.Length > max ? string.Concat(text.AsSpan(0, max).TrimEnd(), "…") : text;

@@ -317,6 +317,16 @@ export interface BranchList {
   tracking?: BranchTracking[]
   /** Whether accepted work can go up as a pull request instead of a local merge. */
   pullRequests?: boolean
+  /** Pairs of unmerged branches that touched the same files: merging both may conflict. */
+  overlaps?: BranchOverlap[]
+}
+
+export interface BranchOverlap {
+  taskId: string
+  title: string
+  otherTaskId: string
+  otherTitle: string
+  files: string[]
 }
 
 export interface BranchTracking {

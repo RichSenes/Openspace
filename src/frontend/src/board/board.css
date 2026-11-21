@@ -843,3 +843,17 @@
     overflow-y: visible;
   }
 }
+
+/* Two branches that touched the same files: merging both at once may conflict. */
+.merge-overlap {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+  color: var(--st-review);
+  font-size: 13px;
+}
+
+.merge-overlap svg {
+  flex: none;
+  margin-top: 2px;
+}

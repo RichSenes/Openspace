@@ -5,8 +5,11 @@ import { ToastProvider } from './ui/Toasts'
 import './index.css'
 import App from './App.tsx'
 import { SpriteLab } from './lab/SpriteLab'
+import { ShioriLab } from './lab/shiori/ShioriLab'
 
 console.info('Hello, friend.')
+
+const lab = new URLSearchParams(location.search).get('lab')
 
 const queryClient = new QueryClient({
   // Freshness comes from SignalR, not from refetching on focus.
@@ -17,7 +20,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        {new URLSearchParams(location.search).has('lab') ? <SpriteLab /> : <App />}
+        {lab === 'shiori' ? <ShioriLab /> : lab !== null ? <SpriteLab /> : <App />}
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

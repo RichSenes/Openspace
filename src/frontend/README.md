@@ -45,6 +45,7 @@ src/
   release/    The new version banner
   weather/    Words for the weather
   lab/        The sprite lab: open the page with ?lab
+              Shiori's chat, face and whiteboard in three directions: ?lab=shiori
   ui/         Toasts, dialogs, status pills, the one format for dates and times
 ```
 

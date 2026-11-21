@@ -13,8 +13,8 @@
   --panel: #100c1a;
   --raised: #191330;
   --hover: #211938;
-  /* Dark glass for what floats over the building: still 13:1 for ink over pure white. */
-  --glass: rgb(11 8 22 / 0.9);
+  /* Dark glass for what floats over the building: ink keeps 14:1 even over pure white. */
+  --glass: rgb(11 8 22 / 0.94);
   --glass-blur: blur(6px);
 
   /* Edges, 1 px and violet. --line divides and frames cards (decoration); --edge-hi is a

@@ -314,3 +314,41 @@ wood and metal): the lid faces the viewer on the left, where desks keep their mo
 sticker on it and the screen's glow at its edge, and no keyboard on the table. On its chest a
 visitor's badge (`VISITOR_BADGE`) hangs on a lanyard in `string`, a card in `gear.light`
 with a yellow stripe. Guests look like agents otherwise, picked from their id.
+
+## Visual language of the interface
+
+The chrome around the building speaks the same language as the presence lab: a violet-black
+ground, panels of dark glass with 1 px violet edges and cut corners, small mono labels, the
+pixel face for titles and an accent that follows the context. Themes change the world, its
+palette and its light, never this technique. The tokens live in
+`src/frontend/src/index.css`; component files use them and add nothing of their own colour.
+
+| Token | Value | Use |
+|---|---|---|
+| `--bg`, `--chrome`, `--panel`, `--raised`, `--hover` | `#07060d` to `#211938` | from the back to what is under the pointer |
+| `--glass` + `--glass-blur` | `rgb(11 8 22 / 0.94)`, `blur(6px)` | anything floating over the building: feed, agent card, menus, dialogs, toasts |
+| `--line`, `--edge`, `--edge-hi` | `#2e2445`, `#3d3160`, `#5b4a80` | dividers and card edges, panel and button edges, hovered edges (decoration) |
+| `--field-line` | `#73659c` | edges of inputs and selects: 3.2 to 3.9:1 on every surface (WCAG 1.4.11) |
+| `--ink`, `--mute` | `#ecebff`, `#a7a3c8` | text: 14:1 and 6.9:1 or more on every surface, glass over white included |
+| `--accent` | per view | amber (building, rooms, office), violet (board, reports), teal (routines), cyan (security), blue (agents, settings); set on `.shell[data-view]` in `layout.css` |
+| `--attention` | amber | what waits for the person, whatever the view |
+| `--on-accent` | `#120d05` | text on a filled accent (8:1 or more on every accent) |
+| `--cut`, `--cut-sm` | `10px`, `6px` | the cut corners of panels and of buttons, fields and chips |
+| `--steps` | `steps(5, end)` | transitions move in steps, like the sprites |
+
+Rules:
+
+- **Corners are cut, not rounded** (`--radius` is 0): `clip-path` cuts the top-right and
+  bottom-left corners. `.btn`, `.input` and `.cut` get the small cut, `.cut-lg` the large one.
+  Only on boxes that never let a child out; a clipped box draws its focus ring inside
+  (`outline-offset` negative).
+- **Type**: page and panel titles in Silkscreen, upper case and spaced (14 or 16 px, the sizes
+  where it stays sharp); small labels, legends, tabs and statuses in IBM Plex Mono, 11 to 12 px,
+  upper case, `letter-spacing` 0.12 to 0.14em (`.label`); field labels in mono but in their own
+  case, because they are sentences; body text and card titles in IBM Plex Sans.
+- **The accent lights what is chosen**: its edge, its words and a 8 to 26 % tint of it, as the
+  presence lab's mode switch does. The primary button is the only tinted one in a group. Every
+  accent passes 4.5:1 as text on its own tint.
+- **Light is small**: a 4 to 6 px square with a glow marks a live thing (connection, running
+  task, the activity feed), blinking in two steps. Nothing else glows.
+- **Motion** is short and stepped (`panel-in`, `blink`); `prefers-reduced-motion` stops it all.

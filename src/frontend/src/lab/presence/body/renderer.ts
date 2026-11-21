@@ -32,8 +32,6 @@ export interface FrameUniforms {
   worms?: Float32Array
   /** The portrait's drawing, which its points take their light from. */
   sprite?: HTMLCanvasElement
-  /** Pixel mode, small: one point per stride×stride art pixels, averaged. */
-  stride?: number
   wormLength: number
 }
 
@@ -285,10 +283,9 @@ export class BodyRenderer {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f.sprite)
       gl.generateMipmap(gl.TEXTURE_2D)
       gl.uniform1i(P.u.uSprite, 0)
-      gl.uniform1f(P.u.uStride, f.stride ?? 1)
-      gl.uniform2f(P.u.uArt, f.sprite.width, f.sprite.height)
       // One art pixel of the portrait on the target: its height spans PORTRAIT_UNITS of body space.
-      gl.uniform1f(P.u.uArtPx, Math.max(1, ((PORTRAIT_UNITS * f.bodyScale * f.scale * h) / 2 / f.sprite.height) * (f.stride ?? 1) * (pixel ? 1 : 1.05)))
+      // The same size in every drawing mode: only how it is rasterised changes.
+      gl.uniform1f(P.u.uArtPx, (PORTRAIT_UNITS * f.bodyScale * f.scale * h) / 2 / f.sprite.height)
     }
     if (this.body!.count) {
       if (f.sprite && pixel) gl.blendEquation(gl.MAX)

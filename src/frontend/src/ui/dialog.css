@@ -1,14 +1,27 @@
 .dialog {
   width: min(520px, calc(100vw - 32px));
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--panel);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
   color: var(--ink);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+}
+
+.dialog[open] {
+  animation: panel-in 220ms var(--steps) both;
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 0.6);
+  background: rgb(4 2 8 / 0.72);
 }
 
 .dialog-head {
@@ -20,7 +33,11 @@
 }
 
 .dialog-head h2 {
-  font-size: 16px;
+  font-family: var(--pixel);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .dialog form {
@@ -49,6 +66,11 @@
 .plan-list li {
   display: grid;
   gap: 2px;
+}
+
+.plan-list li::marker {
+  color: var(--accent);
+  font-family: var(--mono);
 }
 
 .plan-task {

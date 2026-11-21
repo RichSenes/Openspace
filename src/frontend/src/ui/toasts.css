@@ -9,13 +9,34 @@
   pointer-events: none;
 }
 
+/* A confirmation in the HUD's glass, with a lit pixel before it. */
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 8px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
-  background: var(--raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
-  animation: toast-in 160ms ease-out;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut-sm)) 0,
+    100% var(--cut-sm),
+    100% 100%,
+    var(--cut-sm) 100%,
+    0 calc(100% - var(--cut-sm))
+  );
+  animation: toast-in 200ms var(--steps);
+}
+
+.toast::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
 }
 
 @keyframes toast-in {

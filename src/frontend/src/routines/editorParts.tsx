@@ -15,7 +15,7 @@ export function Part({ id, title, children }: { id: string; title: string; child
   )
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="field">
       <span>{label}</span>

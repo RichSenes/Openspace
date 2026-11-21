@@ -8,6 +8,9 @@ internal static class GoogleEndpoints
 {
     public const string CallbackPath = "/api/google/callback";
 
+    /// <param name="Json">The file's text, as Google gave it to download.</param>
+    public sealed record ClientRequest(string Json);
+
     public static void MapGoogleEndpoints(this IEndpointRouteBuilder app)
     {
         var google = app.MapGroup("/api/google").WithTags("Google");
@@ -44,6 +47,26 @@ internal static class GoogleEndpoints
             catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
             {
                 return Page("Not connected", ex.Message);
+            }
+        });
+
+        // The OAuth client file the person chose in the page: checked, kept, never sent back.
+        google.MapPut("/client", async (ClientRequest request, IGoogleAccounts accounts, CancellationToken ct) =>
+        {
+            await accounts.SaveClientAsync(request.Json, ct);
+            return Results.NoContent();
+        });
+
+        google.MapPost("/accounts/{email}/check", async (string email, IGoogleAccounts accounts, CancellationToken ct) =>
+        {
+            try
+            {
+                await accounts.CheckAsync(email, ct);
+                return Results.NoContent();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
             }
         });
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AgentsPanel } from './agents/AgentsPanel'
 import { useOffices } from './api/hooks'
 import { Board } from './board/Board'
@@ -15,7 +15,7 @@ import { RoutinesPanel } from './routines/RoutinesPanel'
 import { SecurityPanel } from './security/SecurityPanel'
 import { OfficePanel } from './office/OfficePanel'
 import { FirstSteps } from './setup/FirstSteps'
-import { requestSettingsSection } from './settings/sections'
+import { onOpenSettings, requestSettingsSection } from './settings/sections'
 import { usePersistentState } from './usePersistentState'
 import './layout/layout.css'
 
@@ -29,6 +29,8 @@ export default function App() {
   const office = offices.data?.find((o) => o.id === selectedId) ?? offices.data?.[0]
   /** A task to open on the Board, picked elsewhere (an agent in the building). */
   const [focusTask, setFocusTask] = useState<string>()
+  // A view (a routine's form, say) can send the person to a part of Settings.
+  useEffect(() => onOpenSettings(() => setView('settings')), [setView])
 
   return (
     <div className="shell">

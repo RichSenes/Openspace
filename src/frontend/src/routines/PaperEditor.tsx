@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, CircleCheck, CircleX, LoaderCircle, Plus, Trash2 } from 'lucide-react'
+import { openSettings } from '../settings/sections'
 import { useCreateRoutine, usePaperPreview, useRoutineChannels, useRoutineModels, useTestFeed, useUpdateRoutine, type FeedTest } from '../api/hooks'
 import type { RoutineView, Weekday } from '../api/types'
 import { useToast } from '../ui/toastContext'
@@ -745,7 +746,12 @@ function Delivery({ paper, onChange }: { paper: Paper; onChange: (next: (p: Pape
         label="Telegram"
         hint={
           channels.data && known.length === 0
-            ? 'No bots set up yet: the paper is only kept in its folder.'
+            ? <>
+              {'No bots set up yet: the paper is only kept in its folder. '}
+              <button type="button" className="link-button" onClick={() => openSettings('connections')}>
+                Set up Telegram in Settings › Connections
+              </button>
+            </>
             : 'The bot that sends the PDF every morning, in its topic of your group.'
         }
       >

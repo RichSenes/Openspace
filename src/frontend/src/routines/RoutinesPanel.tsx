@@ -25,7 +25,9 @@ import { Dialog } from '../ui/Dialog'
 import { useToast } from '../ui/toastContext'
 import { asksForKanji, GRADES, gradeLabel, readKanji, withKanji } from './kanji'
 import { runNews } from './progress'
-import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
+import { readAgenda, readText, usesAccount, usesChannel, withAgenda, withText } from './settings'
+import { ChannelField } from './ChannelField'
+import { openSettings } from '../settings/sections'
 import { offerProblem } from './offers'
 import { JobsEditor } from './JobsEditor'
 import { PaperEditor } from './PaperEditor'
@@ -532,6 +534,7 @@ function RoutineForm({ officeId, routine, onDone, onPage }: { officeId: string; 
         {days.length === 0 && '. Pick days to run only on those.'}
       </p>
       {kind === 'morning-paper' && <KanjiChoiceField settings={settings} onChange={setSettings} />}
+      {usesChannel(settings, chosen?.defaultSettings) && <ChannelField settings={settings} onChange={setSettings} />}
       {usesAccount(kind) && <AccountField settings={settings} onChange={setSettings} />}
       {kind === 'mail' && <AgendaField settings={settings} onChange={setSettings} />}
       <details className="routine-advanced">
@@ -600,7 +603,14 @@ function AccountField({ settings, onChange }: { settings: string; onChange: (set
         ))}
         {missing && <option value={account}>{account} (not connected)</option>}
       </select>
-      {google.data && accounts.length === 0 && <span className="hint">No account connected yet: connect one in Settings, under Google accounts.</span>}
+      {google.data && accounts.length === 0 && (
+        <span className="hint">
+          No account connected yet.{' '}
+          <button type="button" className="link-button" onClick={() => openSettings('connections')}>
+            Connect one in Settings › Connections
+          </button>
+        </span>
+      )}
     </label>
   )
 }

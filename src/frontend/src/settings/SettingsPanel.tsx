@@ -5,6 +5,7 @@ import { ClaudeUsageMeters } from '../engines/ClaudeUsage'
 import { useToast } from '../ui/toastContext'
 import { formatMoment } from '../ui/dates'
 import { GoogleCard } from './GoogleCard'
+import { TelegramCard } from './TelegramCard'
 import { LocalAiSection } from './LocalAiSection'
 import { BrainSection } from './BrainSection'
 import { ModelsSection } from './ModelsSection'
@@ -80,14 +81,8 @@ export function SettingsPanel() {
           )}
           {section === 'connections' && (
             <div className="settings-cards">
+              <TelegramCard />
               <GoogleCard />
-              <section className="settings-card" aria-labelledby="telegram">
-                <h3 id="telegram">Telegram</h3>
-                <p className="hint">
-                  Routines write to Telegram with bots named in <code className="mono">~/.config/openspace/telegram.env</code> and the group in{' '}
-                  <code className="mono">telegram.json</code>, next to it. A guided setup will come here.
-                </p>
-              </section>
             </div>
           )}
           {section === 'look' && (

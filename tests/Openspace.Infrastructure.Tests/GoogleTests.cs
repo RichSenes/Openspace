@@ -148,6 +148,45 @@ public sealed class GoogleTests : IDisposable
     }
 
     [Fact]
+    public async Task Checking_an_account_asks_google_again_even_with_a_token_in_memory()
+    {
+        var (accounts, email) = await ConnectedAsync();
+
+        await accounts.CheckAsync(email, default);
+        _google.RefuseRefresh = true;
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => accounts.CheckAsync(email, default));
+
+        Assert.Equal(2, _google.Calls.Count(c => c.Body.Contains("grant_type=refresh_token", StringComparison.Ordinal)));
+        Assert.Contains("connect the account again", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_client_file_chosen_in_the_page_is_kept_for_the_person_only_and_a_wrong_one_is_refused()
+    {
+        var file = Path.Combine(_folder, GoogleAccounts.ClientFile);
+        File.Delete(file);
+        Assert.False((await Accounts().StatusAsync(default)).ClientReady);
+
+        await Accounts().SaveClientAsync("""{"installed":{"client_id":"other-made-up.apps.example","client_secret":"other-made-up-secret"}}""", default);
+
+        Assert.True((await Accounts().StatusAsync(default)).ClientReady);
+        Assert.Contains("other-made-up.apps.example", await File.ReadAllTextAsync(file), StringComparison.Ordinal);
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+        }
+
+        foreach (var wrong in new[] { "", "not json", """{"type":"service_account","private_key":"x"}""", """{"installed":{"client_id":"made-up"}}""" })
+        {
+            var error = await Assert.ThrowsAsync<Application.RejectedException>(() => Accounts().SaveClientAsync(wrong, default));
+            Assert.Equal("google-client", error.Code);
+        }
+
+        Assert.Contains("other-made-up.apps.example", await File.ReadAllTextAsync(file), StringComparison.Ordinal);
+        Assert.Contains("service account", GoogleAccounts.ClientProblem("""{"type":"service_account"}""")!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Disconnecting_gives_the_key_back_and_forgets_it()
     {
         var (accounts, email) = await ConnectedAsync();

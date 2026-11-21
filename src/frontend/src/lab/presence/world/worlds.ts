@@ -1,5 +1,6 @@
 import { cityScene } from './city'
 import { kyotoScene } from './kyoto'
+import { libraryScene } from './library'
 import { machineScene } from './machine'
 import { spaceScene } from './space'
 import { EARTH_HOURS, EARTH_SKIES, type WorldDef, type WorldId } from './types'
@@ -60,6 +61,24 @@ export const WORLDS: Record<WorldId, WorldDef> = {
     hours: EARTH_HOURS,
     create: kyotoScene,
   },
+  library: {
+    id: 'library',
+    label: 'Endless library',
+    line: 'Shelves in every direction, some upside down, lanterns and sliding doors; where a bookmark lives',
+    palette: [
+      [0, 0, 0],
+      [0.1, 0.03, 0.04],
+      [0.28, 0.08, 0.06],
+      [0.5, 0.18, 0.1],
+      [0.85, 0.4, 0.18],
+      [1.0, 0.65, 0.3],
+      [1.0, 0.85, 0.55],
+      [0.98, 0.95, 0.88],
+    ],
+    skies: { Clear: 'Still', Cloudy: 'Dust', Fog: 'Haze', Drizzle: 'A few pages', Rain: 'Falling pages', Snow: 'Ash', Storm: 'Shift' },
+    hours: { dawn: 'Morning light', day: 'Great lamp', dusk: 'Lamps lit', night: 'Candles only' },
+    create: libraryScene,
+  },
   space: {
     id: 'space',
     label: 'Space',
@@ -98,4 +117,4 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   },
 }
 
-export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'kyoto', 'space', 'machine']
+export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'kyoto', 'library', 'space', 'machine']

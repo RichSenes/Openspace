@@ -3,6 +3,7 @@ import { along, makeMachine, PACE } from './machine'
 import { bayerAt, fbm, valueNoise } from './pixels'
 import { makeSpace, sunAt } from './space'
 import { KYOTO_LIGHTS, makeKyoto } from './kyoto'
+import { makeLibrary, tierShift } from './library'
 import { HOURS, SKIES } from './types'
 import { WORLD_ORDER, WORLDS } from './worlds'
 
@@ -125,5 +126,25 @@ describe('Kyoto', () => {
     const k = makeKyoto(400, 300)
     expect(k.ridges).toHaveLength(3)
     for (const r of k.ridges) expect(r).toHaveLength(400)
+  })
+})
+
+describe('the endless library', () => {
+  it('stacks tiers of shelves down to the floor, some upside down', () => {
+    const lib = makeLibrary(400, 300)
+    expect(lib.tiers.length).toBeGreaterThan(5)
+    expect(lib.tiers.some((t) => t.flipped)).toBe(true)
+    expect(lib.tiers.some((t) => !t.flipped)).toBe(true)
+    for (const t of lib.tiers) expect(t.books.length).toBeGreaterThan(20)
+  })
+
+  it('slides its tiers sideways, and up or down only in a shift', () => {
+    const lib = makeLibrary(400, 300)
+    const tier = lib.tiers[0]
+    expect(tierShift(tier, 0, 10, false).dy).toBe(0)
+    const heights = new Set<number>()
+    for (let t = 0; t < 60; t += 0.5) heights.add(tierShift(tier, 0, t, true).dy)
+    expect(heights.size).toBeGreaterThan(3)
+    expect(tierShift(tier, 0, 10, false).dx).toBeGreaterThan(tierShift(tier, 0, 0, false).dx)
   })
 })

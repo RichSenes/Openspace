@@ -18,6 +18,7 @@ public sealed partial class TaskRunner(
     ActivityBoard activity,
     AgentSignals signals,
     LoopGuard loops,
+    AgentBrain brain,
     TimeProvider clock,
     ILogger<TaskRunner> logger)
 {
@@ -81,7 +82,9 @@ public sealed partial class TaskRunner(
                 task.AdoptProcedure(room.Procedure);
                 task.AttachRun(AgentRun.Create(sessionId, workspace.Path, workspace.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                message = Briefing.ForNewTask(office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false));
+                message = Briefing.ForNewTask(
+                    office, room, desk, task, await BeforeAsync(task, cancellationToken).ConfigureAwait(false),
+                    await brain.BriefAsync(office, room, task, cancellationToken).ConfigureAwait(false));
             }
             else if (freshStart is not null || runtime.EngineOf(task.Run.SessionId) != setup.Engine)
             {
@@ -93,9 +96,10 @@ public sealed partial class TaskRunner(
                 task.AttachRun(AgentRun.Create(sessionId, task.Run.WorkspacePath, task.Run.Branch), clock.GetUtcNow());
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 var before = await BeforeAsync(task, cancellationToken).ConfigureAwait(false);
+                var fromBrain = await brain.BriefAsync(office, room, task, cancellationToken).ConfigureAwait(false);
                 message = freshStart is not null
-                    ? Briefing.ForFreshStart(office, room, desk, task, before, freshStart)
-                    : Briefing.ForTakeOver(office, room, desk, task, before);
+                    ? Briefing.ForFreshStart(office, room, desk, task, before, freshStart, fromBrain)
+                    : Briefing.ForTakeOver(office, room, desk, task, before, fromBrain);
             }
             else
             {

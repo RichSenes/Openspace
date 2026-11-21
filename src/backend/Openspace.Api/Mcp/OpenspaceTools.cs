@@ -14,7 +14,7 @@ namespace Openspace.Api.Mcp;
 /// <c>X-Openspace-Task</c> header, which Openspace sets when it connects the agent.
 /// </summary>
 [McpServerToolType]
-internal sealed class OpenspaceTools(AgentSignals signals, IHttpContextAccessor httpContext)
+internal sealed partial class OpenspaceTools(AgentSignals signals, AgentBrain brain, IHttpContextAccessor httpContext)
 {
     public const string TaskHeader = "X-Openspace-Task";
 

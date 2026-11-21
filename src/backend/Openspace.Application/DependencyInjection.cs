@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<AgentSetups>();
         services.AddScoped<TaskRunner>();
         services.AddScoped<AgentSignals>();
+        services.AddScoped<AgentBrain>();
         services.AddSingleton<Brain.BrainSearch>();
         services.AddSingleton<Brain.IWorkInProgress, Brain.NoWorkInProgress>();
         services.AddSingleton<ActivityBoard>();

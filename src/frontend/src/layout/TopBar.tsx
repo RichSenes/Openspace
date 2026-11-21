@@ -12,10 +12,11 @@ import { useDismiss } from '../ui/useDismiss'
 import { fitTabs, type TabSplit } from './tabFit'
 import './layout.css'
 
-export type View = 'building' | 'board' | 'rooms' | 'routines' | 'reports' | 'security' | 'office' | 'agents' | 'settings'
+export type View = 'building' | 'shiori' | 'board' | 'rooms' | 'routines' | 'reports' | 'security' | 'office' | 'agents' | 'settings'
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'building', label: 'Building' },
+  { id: 'shiori', label: 'Shiori' },
   { id: 'board', label: 'Board' },
   { id: 'rooms', label: 'Rooms' },
   { id: 'routines', label: 'Routines' },

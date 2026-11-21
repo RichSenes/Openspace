@@ -55,6 +55,11 @@ import type {
   ModelsSettings,
   ModelsView,
   SettingsChange,
+  ShioriEnding,
+  ShioriMode,
+  ShioriSessionSummary,
+  ShioriSessionView,
+  TranscriptEntry,
 } from './types'
 
 export const keys = {
@@ -96,6 +101,8 @@ export const keys = {
   securityAudits: (officeId: string) => ['security-audits', officeId] as const,
   securityFindings: (officeId: string, run: number) => ['security-audits', officeId, run, 'findings'] as const,
   securityReport: (officeId: string, run: number) => ['security-audits', officeId, run, 'report'] as const,
+  shioriSessions: ['shiori', 'sessions'] as const,
+  shioriSession: (id: string) => ['shiori', 'sessions', id] as const,
 }
 
 interface Created {
@@ -1062,4 +1069,56 @@ export function usePaperPreview(settings: string, enabled: boolean) {
     placeholderData: (previous) => previous,
     staleTime: Infinity,
   })
+}
+
+export function useShioriSessions() {
+  return useQuery({ queryKey: keys.shioriSessions, queryFn: () => request<ShioriSessionSummary[]>('GET', '/api/shiori/sessions') })
+}
+
+export function useShioriSession(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.shioriSession(id ?? ''),
+    queryFn: () => request<ShioriSessionView>('GET', `/api/shiori/sessions/${id}`),
+    enabled: !!id,
+    // The hub tells the answer as it is written; reading again now and then covers a lost connection.
+    refetchInterval: (query) => (query.state.data?.answering ? 5000 : false),
+  })
+}
+
+/** Writes to a session put what the server answers into the cache at once; the hub tells the rest. */
+function useShioriWrite<TInput, TResult>(fn: (input: TInput) => Promise<TResult>, view: (result: TResult, input: TInput) => ShioriSessionView | null) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (result, input) => {
+      const v = view(result, input)
+      if (v) client.setQueryData(keys.shioriSession(v.id), v)
+      return client.invalidateQueries({ queryKey: keys.shioriSessions, exact: true })
+    },
+  })
+}
+
+export function useCreateShioriSession() {
+  return useShioriWrite(
+    (input: { title: string | null; mode: ShioriMode }) => request<ShioriSessionView>('POST', '/api/shiori/sessions', input),
+    (v) => v,
+  )
+}
+
+export function useSendShioriMessage() {
+  return useMutation({
+    mutationFn: (input: { sessionId: string; text: string }) =>
+      request<TranscriptEntry>('POST', `/api/shiori/sessions/${input.sessionId}/messages`, { text: input.text }),
+  })
+}
+
+export function useSetShioriMode() {
+  return useShioriWrite(
+    (input: { sessionId: string; mode: ShioriMode }) => request<ShioriSessionView>('PUT', `/api/shiori/sessions/${input.sessionId}/mode`, { mode: input.mode }),
+    (v) => v,
+  )
+}
+
+export function useEndShioriSession() {
+  return useShioriWrite((sessionId: string) => request<ShioriEnding>('POST', `/api/shiori/sessions/${sessionId}/end`), (e) => e.session)
 }

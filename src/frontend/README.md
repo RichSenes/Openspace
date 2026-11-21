@@ -44,6 +44,9 @@ src/
   sounds/     Built-in sounds, your own files, the rules of when they play
   release/    The new version banner
   weather/    Words for the weather
+  shiori/     Shiori's page: her sessions over the API and the hub, the streamed answer as
+              subtitles, face state from real events, Conversation, Board and Sessions
+              drawers, the look (body, drawing, world, hour, weather) kept per browser
   lab/        The sprite lab: open the page with ?lab
               Shiori's chat, face and whiteboard in three directions: ?lab=shiori
               Shiori at the centre of four worlds, three bodies, pixel or smooth: ?lab=presence
@@ -70,6 +73,16 @@ sketches the whole building; the Activity panel follows the office live.
 **Arrange** lets you draw rooms and the building by hand: sizes, desks, furniture,
 doors, windows and the building's shape. Nobody walks while you arrange or when
 the system asks for reduced motion.
+
+**Shiori.** Shiori at the centre of her world, as in `?lab=presence`, talking for
+real: write and press Enter, her answer streams in as subtitles under her (a long
+one becomes a card and she steps back), cited notes show as chips. Her face
+listens while you type, thinks until the first words arrive and speaks while they
+stream. The mode switch, the Conversation and Board drawers and the Sessions
+drawer (resume one, start a new one, read the ended ones) work on the saved
+sessions; End writes the session's note and turns the board's decisions into
+proposals. A failed answer says why and where to fix it. Body, drawing, world,
+hour and weather are chosen under the palette button and kept in this browser.
 
 **Board.** Tasks in columns by status, searchable, filtered by epic. Ask the
 supervisor to split a request into tasks and approve them. A queued task says why

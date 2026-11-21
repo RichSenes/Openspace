@@ -839,3 +839,70 @@ export interface BrainSummary {
   kinds: Record<string, number>
   lastChange: string | null
 }
+
+/** How Shiori works in a session: what she may create. */
+export type ShioriMode = 'Brainstorm' | 'Decide' | 'Organise'
+
+/** Who a line of a session's transcript comes from. */
+export type TranscriptRole = 'Person' | 'Shiori' | 'Mode' | 'Failed' | 'Ended'
+
+export interface TranscriptEntry {
+  role: TranscriptRole
+  text: string
+  /** The mode in force when it was said. */
+  mode: ShioriMode
+  at: string
+}
+
+export type WhiteboardKind = 'Idea' | 'Doubt' | 'Decision' | 'Task'
+
+export interface WhiteboardItem {
+  id: string
+  kind: WhiteboardKind
+  text: string
+  done: boolean
+  office: string | null
+  /** The proposal made from it, once there is one. */
+  note: string | null
+}
+
+export interface ShioriSessionView {
+  id: string
+  title: string
+  mode: ShioriMode
+  /** The session's note in the vault. */
+  note: string
+  transcript: TranscriptEntry[]
+  board: WhiteboardItem[]
+  createdAt: string
+  updatedAt: string
+  endedAt: string | null
+  answering: boolean
+}
+
+export interface ShioriSessionSummary {
+  id: string
+  title: string
+  mode: ShioriMode
+  note: string
+  messages: number
+  createdAt: string
+  updatedAt: string
+  endedAt: string | null
+  answering: boolean
+}
+
+/** Pushed whenever a session's mode, "answering" or end changes; error says why an answer failed. */
+export interface ShioriState {
+  sessionId: string
+  mode: ShioriMode
+  answering: boolean
+  ended: boolean
+  error: string | null
+}
+
+/** What ending a session left: the session, and the decisions proposed from its board. */
+export interface ShioriEnding {
+  session: ShioriSessionView
+  proposed: string[]
+}

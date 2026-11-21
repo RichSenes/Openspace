@@ -1,6 +1,6 @@
 import type { Sky } from '../../../api/types'
 import { rng } from '../body/shapes'
-import { bayerAt, disc, ditherBands, glyph, hash1 } from './pixels'
+import { bayerAt, disc, ditherBands, glyph, hash1, LayerCache, wavesAcross } from './pixels'
 import type { Hour, Scene, Weather } from './types'
 
 export { HOURS, hourOf, SKIES } from './types'
@@ -237,18 +237,28 @@ function bolt(g: CanvasRenderingContext2D, city: City, n: number) {
   }
 }
 
-/** Fog: a dithered band that drifts, denser at its middle. */
+/** Fog: a dithered band that drifts, denser at its middle. Drawn once, then scrolled. */
+const fogCache = new LayerCache()
 function fog(g: CanvasRenderingContext2D, city: City, colour: string, t: number, centre: number, density: number) {
-  g.fillStyle = colour
-  const span = city.h * 0.22
-  const drift = t * 3
-  for (let y = Math.max(0, Math.round(centre - span)); y < Math.min(city.h, centre + span); y++) {
-    const k = (1 - Math.abs(y - centre) / span) * density
-    for (let x = 0; x < city.w; x++) {
-      const wisp = 0.55 + 0.25 * Math.sin((x + drift) * 0.045 + y * 0.09) + 0.2 * Math.sin((x - drift * 0.6) * 0.11 - y * 0.05)
-      if (bayerAt(x, y) < k * wisp) g.fillRect(x, y, 1, 1)
+  const span = Math.round(city.h * 0.22)
+  const top = Math.max(0, Math.round(centre - span))
+  const hgt = Math.min(city.h, Math.round(centre + span)) - top
+  const f1 = wavesAcross(city.w, 0.045)
+  const f2 = wavesAcross(city.w, 0.11)
+  const layer = fogCache.get(`fog${density}`, `${colour}:${top}`, city.w, hgt, (c) => {
+    c.fillStyle = colour
+    for (let y = 0; y < hgt; y++) {
+      const yy = y + top
+      const k = (1 - Math.abs(yy - centre) / span) * density
+      for (let x = 0; x < city.w; x++) {
+        const wisp = 0.55 + 0.25 * Math.sin(x * f1 + yy * 0.09) + 0.2 * Math.sin(x * f2 - yy * 0.05)
+        if (bayerAt(x, yy) < k * wisp) c.fillRect(x, y, 1, 1)
+      }
     }
-  }
+  })
+  const dx = Math.round(t * 3) % city.w
+  g.drawImage(layer, dx, top)
+  g.drawImage(layer, dx - city.w, top)
 }
 
 /** Clouds as dithered lenses that drift; thicker and darker in bad weather. */

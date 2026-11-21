@@ -115,12 +115,14 @@ export function ShioriBody(props: BodyProps) {
       }
       const rig = RIGS[shownSkin]
       let sprite: HTMLCanvasElement | undefined
+      let spriteFresh = false
       if (shownSkin === 'portrait') {
         face = stepFace(face, dt, p.state, rand, calm)
         // Pixel art moves at its own pace: the drawing changes at most 24 times a second.
         if (time - lastArt > 1 / 24) {
           drawPortrait(artG, expressionOf(face), time * motion)
           lastArt = time
+          spriteFresh = true
         }
         sprite = art
       }
@@ -163,6 +165,7 @@ export function ShioriBody(props: BodyProps) {
           worms: wormBuf,
           wormLength: WORM_LENGTH,
           sprite,
+          spriteFresh,
         },
         { pixel: p.pixel, palette: p.pixel ? p.palette : [] },
         WORMS,

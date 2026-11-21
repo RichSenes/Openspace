@@ -1,5 +1,5 @@
 import { rng } from '../body/shapes'
-import { BITS, bayerAt, ditherBands, glyph, hash1 } from './pixels'
+import { BITS, bayerAt, ditherBands, glyph, hash1, LayerCache } from './pixels'
 import type { Hour, Scene, Weather } from './types'
 
 /**
@@ -176,6 +176,8 @@ function board(m: Machine, hour: Hour): HTMLCanvasElement {
   return c
 }
 
+const quiet = new LayerCache()
+
 /** One frame of the machine over its board. */
 export function drawMachine(g: CanvasRenderingContext2D, m: Machine, base: HTMLCanvasElement, time: number, calm: boolean, weather: Weather) {
   const t = calm ? 0 : time
@@ -276,16 +278,22 @@ export function drawMachine(g: CanvasRenderingContext2D, m: Machine, base: HTMLC
   }
 
   // Behind Shiori the board falls quiet and dark, so she always reads first.
-  const qx = m.w / 2
-  const qy = m.floor * 0.42
-  const rx = m.w * 0.2
-  const ry = m.floor * 0.42
-  g.fillStyle = GROUND[weather.hour][0]
-  for (let y = Math.max(0, Math.round(qy - ry)); y < Math.min(m.floor, qy + ry); y++)
-    for (let x = Math.max(0, Math.round(qx - rx)); x < Math.min(m.w, qx + rx); x++) {
-      const d = Math.hypot((x - qx) / rx, (y - qy) / ry)
-      if (d < 1 && bayerAt(x, y) < (1 - d) ** 0.7 * 0.88) g.fillRect(x, y, 1, 1)
-    }
+  g.drawImage(
+    quiet.get('quiet', weather.hour, m.w, m.floor, (c) => {
+      const qx = m.w / 2
+      const qy = m.floor * 0.42
+      const rx = m.w * 0.2
+      const ry = m.floor * 0.42
+      c.fillStyle = GROUND[weather.hour][0]
+      for (let y = Math.max(0, Math.round(qy - ry)); y < Math.min(m.floor, qy + ry); y++)
+        for (let x = Math.max(0, Math.round(qx - rx)); x < Math.min(m.w, qx + rx); x++) {
+          const d = Math.hypot((x - qx) / rx, (y - qy) / ry)
+          if (d < 1 && bayerAt(x, y) < (1 - d) ** 0.7 * 0.88) c.fillRect(x, y, 1, 1)
+        }
+    }),
+    0,
+    0,
+  )
 
   // The bus beneath: lanes of bits flowing to the right.
   g.fillStyle = '#020605'

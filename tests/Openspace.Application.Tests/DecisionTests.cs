@@ -217,17 +217,19 @@ public sealed class DigestTests
     private string Text(string path) => Brain.VaultFormat.Write(_vault.Notes[path]);
 
     [Fact]
-    public async Task A_week_writes_its_digest_and_adds_itself_to_the_month_replacing_its_own_part_when_written_again()
+    public async Task A_week_writes_its_digest_and_adds_itself_to_the_month_replacing_its_own_part_and_leaving_other_routines_parts()
     {
         var culture = System.Globalization.CultureInfo.GetCultureInfo("en-GB");
         await Digests.WriteAsync(_vault, new DateOnly(2026, 11, 15), "Week one.", "routine Week", culture, default);
         await Digests.WriteAsync(_vault, new DateOnly(2026, 11, 22), "Week two.", "routine Week", culture, default);
         await Digests.WriteAsync(_vault, new DateOnly(2026, 11, 15), "Week one, again.", "routine Week", culture, default);
 
-        Assert.Equal("---\nkind: digest\nfrom: routine Week\nauthor: Shiori\n---\n# 2026-W46\n\nWeek one, again.\n", Text("Digests/2026-W46.md"));
+        await Digests.WriteAsync(_vault, new DateOnly(2026, 11, 15), "The shop's week.", "routine Shop week", culture, default);
+
+        Assert.Equal("---\nkind: digest\nfrom: routine Week\nauthor: Shiori\n---\n# 2026-W46\n\n## Week\n\nWeek one, again.\n\n## Shop week\n\nThe shop's week.\n", Text("Digests/2026-W46.md"));
         var month = (await _vault.ReadAsync("Digests/2026-11.md", default))!;
         Assert.Equal(("digest", "November 2026"), (month.Kind, month.Title));
-        Assert.Equal("# November 2026\n\n## [[2026-W46]]\n\nWeek one, again.\n\n## [[2026-W47]]\n\nWeek two.\n", month.Body);
+        Assert.Equal("# November 2026\n\n## [[2026-W46]] · Week\n\nWeek one, again.\n\n## [[2026-W47]] · Week\n\nWeek two.\n\n## [[2026-W46]] · Shop week\n\nThe shop's week.\n", month.Body);
         Assert.All(_vault.Writes, w => Assert.Equal("Shiori", w.Author));
     }
 }

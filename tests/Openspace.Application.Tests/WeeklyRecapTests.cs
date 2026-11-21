@@ -124,8 +124,8 @@ public sealed class WeeklyRecapTests
         var (_, text, _) = Assert.Single(_h.Outbox.Sent);
         var week = (await _vault.ReadAsync("Digests/2015-W26.md", default))!;
         Assert.Equal(("digest", "Shiori", "routine Week"), (week.Kind, week.Author, week.From));
-        Assert.Equal($"# 2015-W26\n\n{text}\n", week.Body);
-        Assert.Contains($"## [[2015-W26]]\n\n{text}", (await _vault.ReadAsync("Digests/2015-06.md", default))!.Body, StringComparison.Ordinal);
+        Assert.Equal($"# 2015-W26\n\n## Week\n\n{text}\n", week.Body);
+        Assert.Contains($"## [[2015-W26]] · Week\n\n{text}", (await _vault.ReadAsync("Digests/2015-06.md", default))!.Body, StringComparison.Ordinal);
         Assert.Contains("Kept in the brain as Digests/2015-W26.md", run.Log, StringComparison.Ordinal);
     }
 

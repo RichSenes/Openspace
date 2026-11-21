@@ -29,16 +29,26 @@ public static class Digests
     {
         ArgumentNullException.ThrowIfNull(vault);
         var week = WeekName(day);
-        var weekBody = $"# {week}\n\n{text.Trim()}\n";
-        await vault.WriteAsync(Digest(WeekPath(day), weekBody, from), DecisionRules.Shiori, cancellationToken, $"wrote the digest of {week}").ConfigureAwait(false);
+        var name = SourceName(from);
+
+        // One part per routine, so two offices' recaps of the same week sit side by side.
+        var weekPath = WeekPath(day);
+        var existing = await vault.ReadAsync(weekPath, cancellationToken).ConfigureAwait(false);
+        var weekBody = WithSection(existing?.Body ?? $"# {week}\n", $"## {name}", text.Trim());
+        var weekNote = existing is null ? Digest(weekPath, weekBody, from) : existing with { Body = weekBody };
+        await vault.WriteAsync(weekNote, DecisionRules.Shiori, cancellationToken, $"wrote the digest of {week}").ConfigureAwait(false);
 
         var monthPath = MonthPath(day);
         var month = await vault.ReadAsync(monthPath, cancellationToken).ConfigureAwait(false);
         var heading = $"# {Capital(day.ToString("MMMM yyyy", culture))}";
-        var body = WithSection(month?.Body ?? $"{heading}\n", $"## [[{week}]]", text.Trim());
+        var body = WithSection(month?.Body ?? $"{heading}\n", $"## [[{week}]] · {name}", text.Trim());
         var note = month is null ? Digest(monthPath, body, from) : month with { Body = body };
         await vault.WriteAsync(note, DecisionRules.Shiori, cancellationToken, $"added {week} to the digest of {Path.GetFileNameWithoutExtension(monthPath)}").ConfigureAwait(false);
     }
+
+    /// <summary>"Week" from "routine Week": the name a part of the digest is headed with.</summary>
+    private static string SourceName(string from) =>
+        from.StartsWith("routine ", StringComparison.Ordinal) ? from["routine ".Length..] : from;
 
     /// <summary>The body with this section's text in place of what it had, or added at the end.</summary>
     public static string WithSection(string body, string heading, string text)

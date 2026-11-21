@@ -31,3 +31,22 @@ export function remoteStanding(list: BranchList | undefined, branch: string): { 
   if (tracking.ahead > 0) return { text: `${branch} is ${tracking.ahead} commit${tracking.ahead === 1 ? '' : 's'} ahead of ${tracking.upstream}.`, canPush: true }
   return { text: `${branch} is up to date with ${tracking.upstream}, as of the last fetch.`, canPush: false }
 }
+
+/**
+ * "Touches the same files as Fix the cart: src/web/cart.ts and 2 more", for each task that shares
+ * files with another branch waiting to be merged; nothing for the others.
+ */
+export function overlapNote(list: BranchList | undefined, taskId: string): string | null {
+  const id = taskId.toLowerCase()
+  const pairs = (list?.overlaps ?? []).flatMap((o) =>
+    o.taskId.toLowerCase() === id ? [{ other: o.otherTitle, files: o.files }] : o.otherTaskId.toLowerCase() === id ? [{ other: o.title, files: o.files }] : [],
+  )
+  if (pairs.length === 0) return null
+  return pairs
+    .map(({ other, files }) => {
+      const shown = files.slice(0, 2).join(', ')
+      const more = files.length > 2 ? ` and ${files.length - 2} more` : ''
+      return `Touches the same files as ${other}: ${shown}${more}`
+    })
+    .join(' · ')
+}

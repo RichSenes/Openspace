@@ -22,7 +22,7 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         var all = await tasks.ListAsync(officeId, null, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
-        var log = await LogSinceAsync(audit, all, now - Mood.Window, cancellationToken).ConfigureAwait(false);
+        var log = await LogSinceAsync(audit, all, now - Relationships.Window, cancellationToken).ConfigureAwait(false);
         var events = LifeEvents.From(all, log);
         var seniority = Seniority.Of(office, all);
 
@@ -42,7 +42,11 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
         var experts = seniority.Where(s => s.Expert)
             .Select(s => new RoomExpertView(s.Room.Value, office.Rooms.First(r => r.Id == s.Room).Name, s.Desk.Value, office.Locate(s.Desk).Desk.Name, s.Done))
             .ToList();
-        return new CharacterBoardView(office.Id.Value, office.Name, characters, experts);
+        var names = office.Rooms.SelectMany(r => r.Desks).ToDictionary(d => d.Id, d => d.Name);
+        var relationships = Relationships.Of(all, log, names, now)
+            .Select(r => new RelationshipView(r.First.Value, names[r.First], r.Second.Value, names[r.Second], r.Affinity, r.History))
+            .ToList();
+        return new CharacterBoardView(office.Id.Value, office.Name, characters, experts, relationships);
     }
 
     /// <summary>The lifecycle and change lines of these tasks from <paramref name="since"/> on, oldest first.</summary>
@@ -75,7 +79,12 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
     }
 }
 
-public sealed record CharacterBoardView(Guid OfficeId, string OfficeName, IReadOnlyList<CharacterView> Characters, IReadOnlyList<RoomExpertView> Experts);
+/// <param name="Relationships">Between desks only, from the last month's real events, the strongest first.</param>
+public sealed record CharacterBoardView(
+    Guid OfficeId, string OfficeName, IReadOnlyList<CharacterView> Characters, IReadOnlyList<RoomExpertView> Experts, IReadOnlyList<RelationshipView> Relationships);
+
+/// <param name="Affinity">From -100 to 100: the sum of the history's changes.</param>
+public sealed record RelationshipView(Guid FirstId, string FirstName, Guid SecondId, string SecondName, int Affinity, IReadOnlyList<TieEvent> History);
 
 /// <param name="Mood">From 0 to 100, with every change of the last week and its reason.</param>
 public sealed record CharacterView(

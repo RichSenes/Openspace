@@ -112,6 +112,111 @@ public class CharacterTests
         Assert.Equal(8, Mood.ChangeOf(LifeEventKind.Merged, [Trait.Sunny, Trait.Shy]));
     }
 
+    private async Task<RelationshipView?> TieAsync(Desk a, Desk b) =>
+        (await Queries().GetAsync(_h.Office.Id, default)).Relationships
+            .SingleOrDefault(r => new[] { r.FirstId, r.SecondId }.Order().SequenceEqual(new[] { a.Id.Value, b.Id.Value }.Order()));
+
+    [Fact]
+    public async Task Two_desks_on_the_same_files_within_days_grow_closer()
+    {
+        var screens = Plain("Screens");
+        var one = Task(_h.Desk, "Add the header");
+        Changed(one, "header.tsx");
+        Changed(one, "menu.tsx");
+        var two = Task(screens, "Restyle the header");
+        Changed(two, "header.tsx");
+
+        var tie = await TieAsync(_h.Desk, screens);
+
+        Assert.Equal(Relationships.SameFilesChange, tie!.Affinity);
+        Assert.Equal("Frontend and Screens both worked on header.tsx", Assert.Single(tie.History).Text);
+    }
+
+    [Fact]
+    public async Task Files_touched_weeks_apart_or_by_one_desk_make_no_tie()
+    {
+        var screens = Plain("Screens");
+        Changed(Task(_h.Desk, "Add the header"), "header.tsx");
+        Changed(Task(_h.Desk, "Fix the header"), "header.tsx");
+        _h.Clock.Advance(TimeSpan.FromDays(10));
+        Changed(Task(screens, "Restyle the header"), "header.tsx");
+
+        Assert.Null(await TieAsync(_h.Desk, screens));
+    }
+
+    [Fact]
+    public async Task Work_that_goes_in_where_another_desk_failed_is_remembered()
+    {
+        var screens = Plain("Screens");
+        var failed = Task(_h.Desk, "Fix the cart");
+        Changed(failed, "cart.ts");
+        failed.Fail("Tests fail.", _h.Clock.GetUtcNow());
+        Log(failed);
+        _h.Clock.Advance(TimeSpan.FromDays(5));
+        var fix = Task(screens, "Make the cart work");
+        Changed(fix, "cart.ts");
+        fix.SubmitForReview(_h.Clock.GetUtcNow());
+        fix.Accept(_h.Clock.GetUtcNow());
+        fix.RecordMerge("main", _h.Clock.GetUtcNow());
+        Log(fix);
+
+        var tie = await TieAsync(_h.Desk, screens);
+
+        var fixed_ = Assert.Single(tie!.History, e => e.Kind == TieKind.FixedFailure);
+        Assert.Equal("Screens's “Make the cart work” went in where Frontend's “Fix the cart” had failed", fixed_.Text);
+        Assert.Equal(Relationships.FixChange, tie.Affinity);
+    }
+
+    [Fact]
+    public async Task A_merge_conflict_between_two_desks_cools_them()
+    {
+        var screens = Plain("Screens");
+        var first = Task(screens, "Rename the routes");
+        Changed(first, "routes.ts");
+        first.SubmitForReview(_h.Clock.GetUtcNow());
+        first.Accept(_h.Clock.GetUtcNow());
+        first.RecordMerge("main", _h.Clock.GetUtcNow());
+        Log(first);
+        _h.Clock.Advance(TimeSpan.FromDays(4));
+        var second = Task(_h.Desk, "Add a route");
+        Changed(second, "routes.ts");
+        second.SubmitForReview(_h.Clock.GetUtcNow());
+        second.Accept(_h.Clock.GetUtcNow());
+        second.ReopenToCatchUp(NoteAuthor.Human("elliot"), "It conflicts.", _h.Clock.GetUtcNow());
+        Log(second);
+
+        var tie = await TieAsync(_h.Desk, screens);
+
+        Assert.Equal(Relationships.ConflictChange, tie!.Affinity);
+        Assert.Contains("no longer merged after Screens's “Rename the routes” went in", Assert.Single(tie.History).Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Notes_left_on_another_desks_work_count_as_a_review_and_the_person_is_never_in_a_tie()
+    {
+        var screens = Plain("Screens");
+        var task = Task(_h.Desk, "Add the header");
+        task.AddNote(NoteAuthor.FromDesk(screens.Id), "The header misses its aria label.", _h.Clock.GetUtcNow());
+        task.AddNote(NoteAuthor.Human("elliot"), "Looks fine to me.", _h.Clock.GetUtcNow());
+
+        var board = await Queries().GetAsync(_h.Office.Id, default);
+
+        var tie = Assert.Single(board.Relationships);
+        Assert.Equal((TieKind.Reviewed, Relationships.ReviewChange), (Assert.Single(tie.History).Kind, tie.Affinity));
+        Assert.Equal("Screens left notes on Frontend's “Add the header”", tie.History[0].Text);
+    }
+
+    [Fact]
+    public async Task Relationships_forget_after_a_month()
+    {
+        var screens = Plain("Screens");
+        Changed(Task(_h.Desk, "Add the header"), "header.tsx");
+        Changed(Task(screens, "Restyle the header"), "header.tsx");
+        _h.Clock.Advance(Relationships.Window + TimeSpan.FromDays(1));
+
+        Assert.Null(await TieAsync(_h.Desk, screens));
+    }
+
     [Fact]
     public async Task Another_desks_events_do_not_move_its_mood()
     {

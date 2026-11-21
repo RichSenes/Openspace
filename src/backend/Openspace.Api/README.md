@@ -69,14 +69,15 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | POST | `/api/tasks/{id}/pull-request` | `{ target }`: push the accepted work's branch and open a GitHub pull request into the target, with the agent's summary and the checks to try by hand. Returns `{ url }` |
 | POST | `/api/tasks/{id}/pull-request/check` | `{ state }`: how the pull request stands on GitHub. Merged, the work counts as merged and the target here is fast-forwarded when it can be; closed, it can be merged again |
 | PUT | `/api/offices/{id}/reserve-models` | `{ models }`: up to four reserve models, in order: OpenCode's `provider/model`, or `claude-code/` and a Claude model. See [Reserve models](#reserve-models) |
+| PUT | `/api/offices/{id}/hold-overlaps` | `{ hold }`: whether a queued task waits while another task of the office changes the files it names (on by default; `holdOverlappingWork` in the office) |
 | PUT | `/api/offices/{id}/local-only` | `{ localOnly }`: keep the repository on this machine; push and pull requests are then refused (reserve models still go on) |
-| GET | `/api/offices/{id}/branches` | `{ current, branches }`: branches work can be merged into (task branches hidden) |
+| GET | `/api/offices/{id}/branches` | `{ current, branches, overlaps }`: branches work can be merged into (task branches hidden); `overlaps` lists pairs of unmerged task branches (in review or accepted) that changed the same files since leaving `current`, `[{ taskId, title, otherTaskId, otherTitle, files }]`: merging both will likely conflict |
 | PUT | `/api/offices/{id}/repository` | Set the office's git repository: `{ path, initialize? }`. The folder must exist and be a git repository with a commit; with `initialize: true` Openspace runs `git init` and an empty first commit where needed |
 | GET | `/api/activity?officeId=` | What every desk is doing right now |
-| GET | `/api/needs-you` | What waits for the person, from every office: tasks to approve, to review and failed; routines' pending proposals and routines whose last run failed; by kind, the oldest first |
+| GET | `/api/needs-you` | What waits for the person, from every office: tasks to approve, to review and failed; routines' pending proposals and routines whose last run failed; the brain's decisions accepted by Shiori to review, proposals left for the person (`detail` says why) and decisions due for review (`note` is the note's path); by kind, the oldest first |
 | GET | `/api/context?officeId=` | How full every desk's conversation is: the agents' energy |
 | GET | `/api/interns?officeId=` | The helpers (subagents) working for each desk right now: its interns |
-| GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, account over its limits, graphics card taken, no free seat) |
+| GET | `/api/queue/waits` | Why each queued task has not started yet, as the queue saw it on its last round: `[{ taskId, reason }]` (desk busy, work it builds on not merged, another desk changing the files it names, account over its limits, graphics card taken, no free seat) |
 | GET | `/api/guests?officeId=` | Claude Code sessions started outside Openspace, working in an office's repository now: `{ id, officeId, folder, branch, state, since, lastAt }`; `folder` and `branch` are null in offices with private folders |
 | GET | `/api/feed?officeId=&roomId=&everything=&before=&limit=` | The latest lines of every task's log, newest first, with desk, room, office and task; reads and searches only with `everything=true`; `before` pages back from a line id; at most 200 |
 | POST | `/api/offices/{id}/plan` | `{ request }` (20,000 characters at most): the supervisor plans in the background; `202` with the job `{ id, officeId, kind, what, key, startedAt, state, tasks, epicId, error, endedAt }` at once. `422` with `no-repository`, `no-desks` or `empty-text` before it starts; a plan that fails ends as a `Failed` job with the reason |
@@ -115,7 +116,9 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/brain/summary` | Where the vault is (`folder`, and `configured` for the next start), how many notes of each kind (folder READMEs left out), when one last changed |
 | PUT | `/api/brain/folder` | `{ folder }`: an absolute folder or one starting with `~`, kept in the settings file and opened at the next start; `422` otherwise |
 | GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
+| GET | `/api/brain/now` | Who is changing what right now: `[{ taskId, officeId, office, room, desk, title, paths }]`, one per running task; `paths` (relative to the repository) are the files changed in its working copy, then those its title and description name. See [Brain](#brain) |
 | GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
+| POST | `/api/brain/decisions/{path}/{answer}` | The person's answer on a decision, `answer` one of `fine` (accepted by Shiori: reviewed), `undo` (accepted: rejected), `accept`, `reject` (proposed), `keep` (accepted: review in three months), `supersede`; optional `{ reason }` for undo and reject, written in the proposing desk's journal. Returns the note; `404` for no such note or answer, `422` with code `decision-status` when the answer does not fit its status |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel, openCodeReviewModel }` |
@@ -442,7 +445,16 @@ offer's CV in answer to it.
   Before noon it starts from today, after noon from tomorrow, so a Sunday evening
   recap is about the week to come. The local model opens it with two sentences on
   what the week looks like, or it goes without them. It only reads; without
-  `account` it leaves the agenda out.
+  `account` it leaves the agenda out. What it sends is kept in the brain as
+  `Digests/<year>-W<week>.md` (ISO week of the run, `kind: digest`, by Shiori) and
+  added to the month's `Digests/<year>-<month>.md` under a `## [[<year>-W<week>]]`
+  heading (a week written again replaces its own part), so the month needs no
+  routine of its own; a vault that cannot be written leaves a line in the log.
+- **Decision reviews** (`decision-reviews`): every run (daily unless the schedule
+  says otherwise) lists the accepted decisions of its office, or of every office,
+  whose `review` date has come; once it has looked they wait under **needs you**
+  (Keep moves the date three months on, Supersede retires the decision), and
+  `channel`, when set, gets the list. Nothing due, nothing sent.
 - **Job offers** (`job-offers`): the newest offers of the `boards`, honestly
   identified; boards that turn automatic readers away are left out. `japan-dev` is
   Japan Dev, read through its public list page and each offer's schema.org posting.
@@ -813,6 +825,15 @@ body; then the scope (for each of office, room and path asked, a note that names
 that applies everywhere, which beats one about others; paths are globs such as `src/web/**`);
 then the status (accepted, proposed, the rest); then the text's score; then the newest.
 
+`Now.md` is written by Openspace only. Every `Queue:NowInterval` (5 seconds) `NowService`
+asks git, for each running task, which files its working copy changed since it left the
+repository (committed there or not, new files included; nothing is staged), adds the paths its
+title and description name (`src/web/cart.ts`, a folder as `src/web/` or `src/web/**`, a bare
+`cart.ts`; web and e-mail addresses and paths outside the repository are left out), keeps the
+list in memory for the queue, the briefing and the agents' tools, and rewrites the note,
+office by office, desk by desk, task by task, only when its text changes: no times in it, so
+no commit every few seconds. Edits made by hand are replaced on the next change.
+
 Agents read the brain through the `brain_*` tools above, and their first brief (and `get_task`)
 has a "Before you start" part right after the task: the constitution's numbered rules, one line
 each; the accepted decisions that apply where the task works (not about another office, and
@@ -821,3 +842,13 @@ then room, then office, eight at most with title, first line and path; the work 
 the same office that shares its room or files; and the request to leave a journal line and to
 propose lasting choices. The part is capped at 3,500 characters (decisions go first, then work,
 then the last rules, and it says so); with an empty or unreadable vault the brief is as before.
+
+Until Shiori can talk, a rule accepts proposals for it (`AcceptorService`, on its own file watcher
+and every five minutes): a note with `status: proposed` is accepted, with `accepted_by: Shiori`
+and `reviewed: false` and a commit by "Shiori", when it is about one office or none, is not a
+rule, replaces no decision (`supersedes`) and shares no subject (same title, or same file name
+without its date) with an accepted decision whose offices overlap. The rest stay proposed and
+reach **needs you** with the reason; what Shiori accepted reaches it too, to look at afterwards
+(Fine, Open, Undo). Undoing or rejecting sets `status: rejected` and adds a line under the day's
+heading of `Inhabitants/<desk>/journal.md` for the desk that proposed it (`- 14:05 · Shiori: the
+person undid [[Decisions/…|Title]]. Why: …`).

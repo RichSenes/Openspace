@@ -6,18 +6,22 @@ export interface OfficeForm {
   name: string
   repositoryPath: string
   localOnly: boolean
+  /** A queued task waits while another task of the office changes the files it names. */
+  holdOverlaps: boolean
   /** One absolute path per line, as typed. */
   privatePaths: string
   reserveModels: string[]
 }
 
-export type OfficePart = 'name' | 'repository' | 'localOnly' | 'privatePaths' | 'reserveModels'
+export type OfficePart = 'name' | 'repository' | 'localOnly' | 'holdOverlaps' | 'privatePaths' | 'reserveModels'
 
 export function formOf(office: OfficeView): OfficeForm {
   return {
     name: office.name,
     repositoryPath: office.repositoryPath ?? '',
     localOnly: Boolean(office.localOnly),
+    // On unless the office turned it off: two agents on the same files end in a conflict.
+    holdOverlaps: office.holdOverlappingWork ?? true,
     privatePaths: (office.privatePaths ?? []).join('\n'),
     reserveModels: [...(office.reserveModels ?? [])],
   }
@@ -40,6 +44,7 @@ export function changedParts(office: OfficeView, form: OfficeForm): OfficePart[]
   if (form.repositoryPath.trim() !== saved.repositoryPath) parts.push('repository')
   if (form.name.trim() !== saved.name) parts.push('name')
   if (form.localOnly !== saved.localOnly) parts.push('localOnly')
+  if (form.holdOverlaps !== saved.holdOverlaps) parts.push('holdOverlaps')
   if (!same(pathsOf(form.privatePaths), pathsOf(saved.privatePaths))) parts.push('privatePaths')
   if (!same(form.reserveModels, saved.reserveModels)) parts.push('reserveModels')
   return parts

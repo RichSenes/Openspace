@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
+using Openspace.Application.Brain;
 using Openspace.Application.LocalModels;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
@@ -18,6 +19,7 @@ public sealed class QueueDispatcher(
     EngineLimits limits,
     GpuArbiter gpu,
     QueueWaits waits,
+    IWorkInProgress work,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
     TimeProvider clock)
@@ -48,6 +50,9 @@ public sealed class QueueDispatcher(
         var started = new List<WorkTaskId>();
         var anyPaused = limits.Pauses().Count > 0;
         var officeCache = new Dictionary<OfficeId, Office>();
+        var runningIds = running.Select(t => t.Id.Value).ToHashSet();
+        var inFlight = work.Current().Where(w => runningIds.Contains(w.TaskId)).ToList();
+        var startedTasks = new List<WorkTask>();
 
         foreach (var task in queued)
         {
@@ -75,6 +80,13 @@ public sealed class QueueDispatcher(
                 continue;
             }
 
+            // Two pieces of work on the same files do not run side by side (constitution rule 6).
+            if (await OverlapAsync(task, inFlight, startedTasks, cancellationToken).ConfigureAwait(false) is { } overlap)
+            {
+                reasons[task.Id.Value] = overlap;
+                continue;
+            }
+
             // Desks on an account over its limits keep their tasks queued until it is back,
             // unless the office has a reserve model that can go on with them meanwhile.
             if (anyPaused || task.ReserveModel is not null)
@@ -98,6 +110,7 @@ public sealed class QueueDispatcher(
 
             task.Start(now);
             started.Add(task.Id);
+            startedTasks.Add(task);
         }
 
         if (started.Count > 0)
@@ -107,6 +120,51 @@ public sealed class QueueDispatcher(
 
         await waits.ReplaceAsync(reasons, cancellationToken).ConfigureAwait(false);
         return started;
+    }
+
+    /// <summary>
+    /// Why the task waits for another one changing the files it names, or null when it may start:
+    /// no running work in its office touches them, the office lets overlapping work run, or the
+    /// task names no files at all.
+    /// </summary>
+    /// <param name="startedNow">Tasks started earlier in this round: git has seen nothing of them yet, their words count.</param>
+    private async Task<string?> OverlapAsync(
+        WorkTask task, IReadOnlyList<WorkInFlight> inFlight, IReadOnlyList<WorkTask> startedNow, CancellationToken cancellationToken)
+    {
+        // One office is one repository: work in another office never collides with this one.
+        var office = task.OfficeId.Value;
+        var sameOffice = inFlight.Where(w => w.OfficeId == office).ToList();
+        var startedHere = startedNow.Where(t => t.OfficeId == task.OfficeId).ToList();
+        if (sameOffice.Count == 0 && startedHere.Count == 0)
+        {
+            return null;
+        }
+
+        if (await offices.FindAsync(task.OfficeId, cancellationToken).ConfigureAwait(false) is not { HoldOverlappingWork: true } found)
+        {
+            return null;
+        }
+
+        // A task that names no files never waits on the room alone: holding every task of a busy
+        // room would stall offices whose rooms are their only split, for conflicts that mostly
+        // never come. Merges flag what gets through.
+        var wanted = PathTokens.Extract($"{task.Title}\n{task.Description}", found.RepositoryPath);
+        if (wanted.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (var other in sameOffice.Concat(startedHere.Select(t => NowKeeper.Describe(t, found, []).Work)))
+        {
+            var shared = PathOverlap.Shared(wanted, other.Paths);
+            if (shared.Count > 0)
+            {
+                var more = shared.Count == 1 ? string.Empty : $" and {shared.Count - 1} more {(shared.Count == 2 ? "file" : "files")}";
+                return $"Waits for {other.Desk}, who is changing {shared[0]}{more}.";
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Why a task whose desk is over its limits found no reserve to go on with.</summary>

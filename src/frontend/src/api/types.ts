@@ -175,6 +175,8 @@ export interface OfficeView {
   privatePaths?: string[]
   /** The project stays on this machine: no push, no pull request. */
   localOnly?: boolean
+  /** A queued task waits while another task of the office changes the files it names; on by default. */
+  holdOverlappingWork?: boolean
   /** OpenCode models that go on with tasks while their desk's account is over its limits, in order. */
   reserveModels?: string[]
 }
@@ -315,6 +317,16 @@ export interface BranchList {
   tracking?: BranchTracking[]
   /** Whether accepted work can go up as a pull request instead of a local merge. */
   pullRequests?: boolean
+  /** Pairs of unmerged branches that touched the same files: merging both may conflict. */
+  overlaps?: BranchOverlap[]
+}
+
+export interface BranchOverlap {
+  taskId: string
+  title: string
+  otherTaskId: string
+  otherTitle: string
+  files: string[]
 }
 
 export interface BranchTracking {
@@ -619,7 +631,15 @@ export type ProposalStatus = 'Pending' | 'Approved' | 'Rejected' | 'Done' | 'Fai
 
 /** Something a routine wants to do with the person's things: it waits for a yes. */
 /** What waits for the person, from every office: tasks, routines' proposals, failed routines. */
-export type NeedsYouKind = 'TaskToApprove' | 'TaskToReview' | 'TaskFailed' | 'Proposal' | 'RoutineFailed'
+export type NeedsYouKind =
+  | 'TaskToApprove'
+  | 'TaskToReview'
+  | 'TaskFailed'
+  | 'Proposal'
+  | 'RoutineFailed'
+  | 'DecisionToReview'
+  | 'DecisionToAccept'
+  | 'DecisionDue'
 
 export interface NeedsYouItem {
   kind: NeedsYouKind
@@ -632,6 +652,23 @@ export interface NeedsYouItem {
   detail: string
   /** When it started waiting. */
   since: string
+  /** The note's path in the brain's vault, for decisions. */
+  note?: string | null
+}
+
+/** What the person can say about a decision from the inbox. */
+export type DecisionVerb = 'fine' | 'undo' | 'accept' | 'reject' | 'keep' | 'supersede'
+
+/** One note of the brain's vault, as the API shows it. */
+export interface BrainNoteView {
+  path: string
+  kind: string | null
+  status: string | null
+  title: string
+  offices: string[]
+  author: string | null
+  review: string | null
+  body: string
 }
 
 export interface ProposalView {

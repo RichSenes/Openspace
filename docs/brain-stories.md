@@ -144,11 +144,49 @@ the vault opens in Obsidian with its history.
   place, Shiori's chat and face) for the person to choose.
 - **S2.3 onwards**: the redesign, view by view, one story per view, lanes by folder.
 
-## Phase 3: Shiori on the new interface (outline)
+## Phase 3: Shiori on the new interface
 
-Wiki (browse, search, backlinks, history, "why is this so?"), map with themes, chat with saved
-sessions and three modes, the animated whiteboard turning into a note, "tomorrow morning",
-Shiori as the roaming supervisor across offices, voice (push-to-talk, then the wake word).
+The interface of phase 3 waits for the direction chosen in phase 2. What does not depend on it,
+the engine of the wiki and of the chat, is built first, with its API and tests.
+
+**S3.1 The wiki's engine** · lane V · owns `Application/Brain/Wiki*.cs`, `Api/Endpoints/WikiEndpoints.cs`
+As the person, I want to browse the brain, see what links to a note and how it changed, and edit it,
+so that the wiki page has everything it needs.
+- `GET /api/brain/tree`: folders and notes with kind, status, title, modified.
+- `GET /api/brain/notes/{path}/backlinks`: notes that link to it.
+- `GET /api/brain/notes/{path}/history`: its commits (author, date, summary) from the vault's git;
+  `GET …/history/{commit}`: the note as it was, and the diff with the version before.
+- `PUT /api/brain/notes/{path}`: the person writes a note (author: the person's name); the
+  constitution only through this route.
+- "Why is this so?": `GET /api/brain/why?path=<repository file>` returns the accepted decisions whose
+  scope covers the file, newest first, with the tasks and sessions they came from.
+
+**S3.2 Shiori's sessions** · lane C (new: `Application/Shiori`, `Infrastructure/Shiori`, `Api/Endpoints/ShioriEndpoints.cs`)
+As the person, I want to talk with Shiori in saved sessions, in three modes, so that brainstorming,
+deciding and organising happen in one place.
+- A session is a resumable Claude Code conversation on the model chosen for Shiori (Settings ›
+  Models), with Openspace's and the brain's tools, across every office.
+- Modes: *brainstorm* (reads only), *decide* (may propose and accept decisions), *organise* (may
+  create plans and tasks through the supervisor, as proposals to approve). The mode is part of every
+  message, so a switch takes effect at once and is recorded.
+- Endpoints: create, list, read a session; send a message (the answer streams over the hub as it
+  is written); change mode; end.
+- Every session is saved as a note in `Sessions/` (transcript and whiteboard), updated as it goes.
+- Answers cite notes as `[[path]]`.
+
+**S3.3 The whiteboard's engine** · lane C, depends on S3.2
+As the person, I want the session's ideas, doubts and decisions gathered beside the chat, so that
+nothing said is lost and the end of a session becomes a note.
+- A tool for Shiori, `whiteboard(add|move|done, item)`, with items of kind idea, doubt, decision,
+  task; the board is kept with the session and pushed over the hub at each change.
+- Ending a session writes the board into the session note and proposes its decisions.
+
+**S3.4 Tomorrow morning** · lane R
+- A routine kind that writes the next day's agenda (calendar, tasks waiting, decisions due, what
+  the session asked) into the vault and sends it with the morning message.
+
+**Later in phase 3, on the new interface**: the wiki and map pages, the chat page with the mode
+switch and the animated whiteboard, Shiori as the roaming supervisor in the building, voice.
 
 ## Phase 4: inhabitants (outline)
 

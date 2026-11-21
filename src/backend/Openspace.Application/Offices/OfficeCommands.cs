@@ -143,6 +143,14 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Turns on or off holding queued work whose files another task of the office is changing.</summary>
+    public async Task HoldOverlapsAsync(OfficeId officeId, bool hold, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.HoldOverlaps(hold, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task SetPrivatePathsAsync(OfficeId officeId, IReadOnlyList<string> paths, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);

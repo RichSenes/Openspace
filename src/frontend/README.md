@@ -83,7 +83,8 @@ the server wants it), so a wrong one never reaches the save.
 
 **Office.** The office's own settings in one form with one save: name, repository
 (with "Initialize git here" when the folder is not a repository yet), keeping the
-project on this computer, private folders, and reserve models picked from the
+project on this computer, holding a task while another desk changes the files it
+names (on by default), private folders, and reserve models picked from the
 engines' lists and put in order. A part the server refuses says why under its
 field; the rest is saved.
 
@@ -154,7 +155,10 @@ Across every view:
 - "Needs you" in the top bar counts everything that waits for you, from every office, and
   lists it by kind: agents asking (answered right there), tasks to approve, to review and
   failed (each opens on its office's Board with the task open), routines' proposals (yes
-  and no right there) and routines whose last run failed. It refreshes as tasks and
+  and no right there), routines whose last run failed, and the brain's decisions: those
+  Shiori accepted, to review (Fine, Undo), those left for you with the reason (Accept,
+  Reject) and those due for review (Keep, Supersede). Their "Open" shows the note's text
+  under the card; an answer takes the item away at once. It refreshes as tasks and
   routines change; on a phone the list takes the screen's width.
 - Below 1100 px the layout changes instead of shrinking. The office list folds into one
   line with the current office and a "Switch office" button that opens the list over the

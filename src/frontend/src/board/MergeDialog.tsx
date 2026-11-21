@@ -6,7 +6,7 @@ import { Dialog } from '../ui/Dialog'
 import { emitCue } from '../sounds/rules'
 import { useToast } from '../ui/toastContext'
 import type { DeskWithRoom } from './deskLookup'
-import { defaultMergeSource, defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
+import { defaultMergeSource, defaultMergeTarget, mergeBlocker, overlapNote, remoteStanding } from './mergeTarget'
 import { awaitingMerge, checksDone } from './taskRules'
 import { formatMoment } from '../ui/dates'
 
@@ -205,6 +205,11 @@ export function MergeDialog({ office, tasks, desks, open, onClose }: Props) {
                               {deskOf(t.id)} · accepted {formatMoment(t.statusChangedAt)}
                               {checks.total > checks.done && ` · ${checks.total - checks.done} of ${checks.total} checks not tried by hand`}
                             </span>
+                            {overlapNote(branches.data, t.id) && (
+                              <span className="merge-overlap">
+                                <TriangleAlert size={14} aria-hidden /> {overlapNote(branches.data, t.id)}. Merge one, check, then the other.
+                              </span>
+                            )}
                           </span>
                         </label>
                         {shared && branches.data?.pullRequests && (

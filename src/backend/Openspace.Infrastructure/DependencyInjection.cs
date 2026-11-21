@@ -42,6 +42,10 @@ public static class DependencyInjection
         services.AddSingleton<Application.Brain.IVault, Brain.FileVault>();
         services.AddSingleton<Application.Brain.IBrainIndex>(sp => new Brain.BrainIndex(connectionString, sp.GetRequiredService<Application.Brain.IVault>()));
         services.AddHostedService<BrainService>();
+        services.AddHostedService<AcceptorService>();
+
+        // Who is changing which files, read from the running tasks' copies into Now.md.
+        services.AddHostedService<NowService>();
 
         // Claude Code sessions started outside Openspace come in as guests.
         services.AddSingleton<Application.Guests.IClaudeSessions, Guests.ClaudeSessionLogs>();

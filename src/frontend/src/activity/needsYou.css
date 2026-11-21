@@ -66,6 +66,7 @@
 
 .needs-you-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -133,4 +134,18 @@
     width: auto;
     max-height: calc(100vh - 72px);
   }
+}
+
+/* A decision's text opened in place: readable, scrolled on its own when long. */
+.needs-you-note {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultMergeSource, defaultMergeTarget, mergeBlocker, remoteStanding } from './mergeTarget'
+import { defaultMergeSource, defaultMergeTarget, mergeBlocker, overlapNote, remoteStanding } from './mergeTarget'
 
 describe('defaultMergeTarget', () => {
   it('prefers the branch you have checked out', () => {
@@ -60,5 +60,20 @@ describe('remoteStanding', () => {
 
   it('says nothing for a project with no remote', () => {
     expect(remoteStanding({ current: 'main', branches: ['main'], remotes: [] }, 'main')).toBeNull()
+  })
+})
+
+describe('overlapNote', () => {
+  const list = {
+    current: 'main',
+    branches: ['main'],
+    overlaps: [{ taskId: 'A', title: 'Fix the cart', otherTaskId: 'b', otherTitle: 'Restyle the cart', files: ['src/cart.ts', 'src/cart.css', 'src/total.ts'] }],
+  }
+
+  it('names the other branch and the shared files, from either side, whatever the case of the id', () => {
+    expect(overlapNote(list, 'a')).toBe('Touches the same files as Restyle the cart: src/cart.ts, src/cart.css and 1 more')
+    expect(overlapNote(list, 'B')).toBe('Touches the same files as Fix the cart: src/cart.ts, src/cart.css and 1 more')
+    expect(overlapNote(list, 'c')).toBeNull()
+    expect(overlapNote(undefined, 'a')).toBeNull()
   })
 })

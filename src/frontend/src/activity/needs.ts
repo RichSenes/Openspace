@@ -1,4 +1,4 @@
-import type { NeedsYouItem, NeedsYouKind } from '../api/types'
+import type { DecisionVerb, NeedsYouItem, NeedsYouKind } from '../api/types'
 
 /** Where an item opens: the Board on a task, or the Routines of an office. */
 export interface NeedsYouTarget {
@@ -14,7 +14,41 @@ export const GROUPS: { kind: NeedsYouKind; heading: string; open: string }[] = [
   { kind: 'TaskFailed', heading: 'Failed tasks', open: 'Open on the Board' },
   { kind: 'Proposal', heading: 'Routines ask', open: 'Open in Routines' },
   { kind: 'RoutineFailed', heading: 'Routines that failed', open: 'See the run' },
+  { kind: 'DecisionToReview', heading: 'Shiori accepted, to review', open: 'Open' },
+  { kind: 'DecisionToAccept', heading: 'Decisions to accept', open: 'Open' },
+  { kind: 'DecisionDue', heading: 'Decisions to look at again', open: 'Open' },
 ]
+
+/** A decision's answers, in the order shown; the first is the primary one. "Open" comes after them. */
+const DECISION_ANSWERS: Partial<Record<NeedsYouKind, { verb: DecisionVerb; label: string; done: string }[]>> = {
+  DecisionToReview: [
+    { verb: 'fine', label: 'Fine', done: 'Kept' },
+    { verb: 'undo', label: 'Undo', done: 'Undone' },
+  ],
+  DecisionToAccept: [
+    { verb: 'accept', label: 'Accept', done: 'Accepted' },
+    { verb: 'reject', label: 'Reject', done: 'Rejected' },
+  ],
+  DecisionDue: [
+    { verb: 'keep', label: 'Keep', done: 'Kept for three more months' },
+    { verb: 'supersede', label: 'Supersede', done: 'Superseded' },
+  ],
+}
+
+/** The answers the person can give on a decision right in the list; none for anything else. */
+export function decisionAnswers(kind: NeedsYouKind): { verb: DecisionVerb; label: string; done: string }[] {
+  return DECISION_ANSWERS[kind] ?? []
+}
+
+/** Decisions open in place, under their card, instead of taking the person elsewhere. */
+export function isDecision(kind: NeedsYouKind): boolean {
+  return kind in DECISION_ANSWERS
+}
+
+/** The API address of a note, its path kept as segments so slashes stay slashes. */
+export function notePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/')
+}
 
 /** The items of each kind that has any, in the order of GROUPS. */
 export function grouped(items: NeedsYouItem[]): { kind: NeedsYouKind; heading: string; open: string; items: NeedsYouItem[] }[] {

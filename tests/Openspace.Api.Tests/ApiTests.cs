@@ -927,6 +927,17 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task An_office_can_stop_holding_overlapping_work()
+    {
+        var (officeId, _, _) = await FurnishAsync();
+        Assert.True((await GetAsync<JsonElement>($"/api/offices/{officeId}")).GetProperty("holdOverlappingWork").GetBoolean());
+
+        (await _http.PutAsJsonAsync($"/api/offices/{officeId}/hold-overlaps", new { hold = false })).EnsureSuccessStatusCode();
+
+        Assert.False((await GetAsync<JsonElement>($"/api/offices/{officeId}")).GetProperty("holdOverlappingWork").GetBoolean());
+    }
+
+    [Fact]
     public async Task An_office_kept_local_refuses_to_push()
     {
         var (officeId, _, _) = await FurnishAsync();

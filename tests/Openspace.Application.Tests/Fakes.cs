@@ -254,6 +254,23 @@ internal sealed class FakeWorkspaces : IWorkspaceManager
     public Task<string> DiffAsync(string workspacePath, CancellationToken cancellationToken) =>
         Task.FromResult("+<button>Logout</button>");
 
+    /// <summary>The files each working copy changed, by its path.</summary>
+    public Dictionary<string, IReadOnlyList<string>> Changed { get; } = [];
+
+    public int ChangedReads { get; private set; }
+
+    public Task<IReadOnlyList<string>> ChangedFilesAsync(string repositoryPath, string workspacePath, CancellationToken cancellationToken)
+    {
+        ChangedReads++;
+        return Task.FromResult(Changed.TryGetValue(workspacePath, out var files) ? files : (IReadOnlyList<string>)[]);
+    }
+
+    /// <summary>The files each task branch changed, by its name.</summary>
+    public Dictionary<string, IReadOnlyList<string>> BranchChanges { get; } = [];
+
+    public Task<IReadOnlyList<string>> BranchFilesAsync(string repositoryPath, string branch, string targetBranch, CancellationToken cancellationToken) =>
+        Task.FromResult(BranchChanges.TryGetValue(branch, out var files) ? files : (IReadOnlyList<string>)[]);
+
     public Task CommitAsync(string repositoryPath, string workspacePath, string message, CancellationToken cancellationToken)
     {
         Commits.Add((workspacePath, message));

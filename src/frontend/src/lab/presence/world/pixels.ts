@@ -93,3 +93,27 @@ export const hash1 = (n: number) => {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453
   return s - Math.floor(s)
 }
+
+/**
+ * Layers that cost a pixel loop are drawn once into a canvas and reused: the cache keeps one
+ * canvas per key and redraws it only when the key changes.
+ */
+export class LayerCache {
+  private layers = new Map<string, HTMLCanvasElement>()
+  get(name: string, key: string, w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
+    const id = `${name}|${key}|${w}x${h}`
+    let c = this.layers.get(id)
+    if (!c) {
+      for (const k of [...this.layers.keys()]) if (k.startsWith(`${name}|`)) this.layers.delete(k)
+      c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      draw(c.getContext('2d')!)
+      this.layers.set(id, c)
+    }
+    return c
+  }
+}
+
+/** A whole number of waves across `w`, close to the frequency asked: so a layer tiles seamlessly. */
+export const wavesAcross = (w: number, freq: number) => (2 * Math.PI * Math.max(1, Math.round((freq * w) / (2 * Math.PI)))) / w

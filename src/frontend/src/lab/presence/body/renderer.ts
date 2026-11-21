@@ -36,6 +36,8 @@ export interface FrameUniforms {
   worms?: Float32Array
   /** The portrait's drawing, which its points take their light from. */
   sprite?: HTMLCanvasElement
+  /** False when the drawing has not changed since the last frame, so it is not uploaded again. */
+  spriteFresh?: boolean
   wormLength: number
 }
 
@@ -287,8 +289,10 @@ export class BodyRenderer {
     if (f.sprite) {
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, this.spriteTex)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f.sprite)
-      gl.generateMipmap(gl.TEXTURE_2D)
+      if (f.spriteFresh !== false) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f.sprite)
+        gl.generateMipmap(gl.TEXTURE_2D)
+      }
       gl.uniform1i(P.u.uSprite, 0)
       // One art pixel of the portrait on the target: its height spans PORTRAIT_UNITS of body space.
       // The same size in every drawing mode: only how it is rasterised changes.

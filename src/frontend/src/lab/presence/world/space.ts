@@ -1,5 +1,5 @@
 import { rng } from '../body/shapes'
-import { bayerAt, disc, fbm, hash1, hex, valueNoise } from './pixels'
+import { bayerAt, disc, fbm, hash1, hex, LayerCache, valueNoise } from './pixels'
 import type { Hour, Scene, Weather } from './types'
 
 /**
@@ -201,6 +201,8 @@ function galaxy(g: CanvasRenderingContext2D, s: Space, t: number, dim: boolean) 
   disc(g, x, y, 1)
 }
 
+const galaxies = new LayerCache()
+
 /** One frame of space; `nebulaImage` is drawn once per hour by the scene. */
 export function drawSpace(g: CanvasRenderingContext2D, s: Space, neb: HTMLCanvasElement, time: number, calm: boolean, weather: Weather, cache: { giant?: HTMLCanvasElement; key?: string } = {}) {
   const t = calm ? 0 : time
@@ -223,7 +225,10 @@ export function drawSpace(g: CanvasRenderingContext2D, s: Space, neb: HTMLCanvas
     }
   }
 
-  galaxy(g, s, t, sky === 'Cloudy' || sky === 'Fog')
+  // The galaxy turns very slowly: drawn twice a second into its own layer.
+  const dim = sky === 'Cloudy' || sky === 'Fog'
+  const turn = Math.floor(t * 2) / 2
+  g.drawImage(galaxies.get('galaxy', `${dim}:${turn}`, s.w, s.h, (c) => galaxy(c, s, turn, dim)), 0, 0)
 
   // Galaxies so far away they are smudges.
   for (const m of s.smudges) {
@@ -271,16 +276,20 @@ export function drawSpace(g: CanvasRenderingContext2D, s: Space, neb: HTMLCanvas
     for (let x = -sun.r * 6; x <= sun.r * 6; x++) if (bayerAt(sun.x + x, sun.y) < 1 - Math.abs(x) / (sun.r * 6)) g.fillRect(sun.x + x, sun.y, 1, 1)
   }
 
-  // The giant turns slowly; redrawn each frame so its bands glide instead of jumping.
+  // The giant turns slowly: redrawn twice a second, too little movement between to be seen.
   const storm = sky === 'Storm' ? 1 : 0
-  const gk = `${weather.hour}:${storm}:${t}`
+  const step = Math.floor(t * 2) / 2
+  const gk = `${weather.hour}:${storm}:${step}`
   if (cache.key !== gk || !cache.giant) {
-    const c = cache.giant ?? document.createElement('canvas')
-    c.width = s.w
-    c.height = s.h
+    let c = cache.giant
+    if (!c || c.width !== s.w || c.height !== s.h) {
+      c = document.createElement('canvas')
+      c.width = s.w
+      c.height = s.h
+    }
     const gg = c.getContext('2d')!
     gg.clearRect(0, 0, s.w, s.h)
-    giant(gg, s, sun, t, storm)
+    giant(gg, s, sun, step, storm)
     cache.giant = c
     cache.key = gk
   }

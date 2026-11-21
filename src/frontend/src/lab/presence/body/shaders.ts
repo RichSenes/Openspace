@@ -283,12 +283,14 @@ void main(){
 
   vec2 px = 1.0 / uRes;
   vec3 glow = vec3(0.0);
-  for (int i = 0; i < 12; i++) {
-    float a = float(i) * 0.5236;
+  // Eight directions at two radii, turned a little each pixel row so the ring never shows.
+  float spin = hash(gl_FragCoord.xy) * 0.785;
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.785 + spin;
     vec2 d = vec2(cos(a), sin(a)) * px * uBloomR;
-    glow += scene(uv + d) + scene(uv + d * 2.6) * 0.7 + scene(uv + d * 5.0) * 0.35;
+    glow += scene(uv + d * 1.6) + scene(uv + d * 4.2) * 0.6;
   }
-  col += glow / 12.0 * uBloom;
+  col += glow / 8.0 * uBloom * 0.95;
 
   if (uAscii > 0.001) {
     vec2 cell = floor(gl_FragCoord.xy / uCell);

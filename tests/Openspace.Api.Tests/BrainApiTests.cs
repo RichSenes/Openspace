@@ -123,4 +123,72 @@ public sealed class BrainApiTests : IDisposable
             await Task.Delay(50);
         }
     }
+
+    private sealed record Need(string Kind, string Title, string Detail, string? Note);
+
+    private async Task<List<Need>> NeedsAsync() => (await _http.GetFromJsonAsync<List<Need>>("/api/needs-you", Json))!;
+
+    [Fact]
+    public async Task A_proposal_saved_in_the_vault_is_accepted_by_Shiori_and_undoing_it_tells_its_desk()
+    {
+        await SearchAsync("q=merge");
+        await File.WriteAllTextAsync(Path.Combine(_app.BrainFolder, "Decisions", "2026-11-21-queue-order.md"), """
+            ---
+            kind: decision
+            status: proposed
+            offices: [E Corp]
+            author: Screens
+            ---
+            # Queue order
+
+            The oldest task first.
+            """);
+
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (!(await NeedsAsync()).Any(n => n.Kind == "DecisionToReview"))
+        {
+            Assert.True(DateTime.UtcNow < until, "Shiori did not accept the proposal in time.");
+            await Task.Delay(50);
+        }
+
+        var item = (await NeedsAsync()).Single(n => n.Kind == "DecisionToReview");
+        Assert.Equal(("Queue order", "Decisions/2026-11-21-queue-order.md"), (item.Title, item.Note));
+        Assert.Contains("accepted_by: Shiori", await File.ReadAllTextAsync(Path.Combine(_app.BrainFolder, item.Note!)), StringComparison.Ordinal);
+
+        using var undo = await _http.PostAsJsonAsync("/api/brain/decisions/Decisions/2026-11-21-queue-order.md/undo", new { reason = "Size first." });
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        Assert.Equal("rejected", (await undo.Content.ReadFromJsonAsync<NoteView>(Json))!.Status);
+        var journal = await File.ReadAllTextAsync(Path.Combine(_app.BrainFolder, "Inhabitants", "Screens", "journal.md"));
+        Assert.Contains("· Shiori: the person undid [[Decisions/2026-11-21-queue-order|Queue order]]. Why: Size first.", journal, StringComparison.Ordinal);
+        Assert.DoesNotContain(await NeedsAsync(), n => n.Note == item.Note);
+
+        // Undone once is undone: the same answer again does not fit, and unknown answers are nowhere.
+        using var again = await _http.PostAsync("/api/brain/decisions/Decisions/2026-11-21-queue-order.md/undo", null);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, again.StatusCode);
+        using var unknown = await _http.PostAsync("/api/brain/decisions/Decisions/2026-11-21-queue-order.md/shred", null);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        using var missing = await _http.PostAsync("/api/brain/decisions/Decisions/nothing.md/fine", null);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_proposal_about_two_offices_waits_for_the_person_who_accepts_it()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_app.BrainFolder, "Decisions", "2026-11-21-tabs.md"), """
+            ---
+            kind: decision
+            status: proposed
+            offices: [E Corp, Allsafe]
+            ---
+            # Tabs everywhere
+            """);
+
+        var waiting = (await NeedsAsync()).Single(n => n.Kind == "DecisionToAccept");
+        Assert.StartsWith("It is about 2 offices", waiting.Detail, StringComparison.Ordinal);
+
+        using var accept = await _http.PostAsync("/api/brain/decisions/Decisions/2026-11-21-tabs/accept", null);
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+        Assert.Equal("accepted", (await accept.Content.ReadFromJsonAsync<NoteView>(Json))!.Status);
+        Assert.DoesNotContain(await NeedsAsync(), n => n.Kind.StartsWith("Decision", StringComparison.Ordinal));
+    }
 }

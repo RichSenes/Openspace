@@ -207,7 +207,10 @@ More of what it does, in short:
   offices kept on this computer only.
 - The shared brain, Shiori, starts as a vault of Markdown notes with its own git
   (`~/.local/share/openspace/brain`, opens in Obsidian): the constitution, decisions,
-  plans and studies, searchable by words and by office, room and file.
+  plans and studies, searchable by words and by office, room and file. Shiori accepts
+  agents' proposals that stay in one office and contradict nothing; you review them
+  afterwards under **needs you** and can undo them. Decisions come back when their review
+  date comes, and the weekly recap is kept there as weekly and monthly digests.
 
 ## Repository layout
 

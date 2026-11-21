@@ -271,16 +271,16 @@ export function drawSpace(g: CanvasRenderingContext2D, s: Space, neb: HTMLCanvas
     for (let x = -sun.r * 6; x <= sun.r * 6; x++) if (bayerAt(sun.x + x, sun.y) < 1 - Math.abs(x) / (sun.r * 6)) g.fillRect(sun.x + x, sun.y, 1, 1)
   }
 
-  // The giant turns slowly: redrawn every two seconds, not every frame.
+  // The giant turns slowly; redrawn each frame so its bands glide instead of jumping.
   const storm = sky === 'Storm' ? 1 : 0
-  const gk = `${weather.hour}:${storm}:${Math.floor(t / 2)}`
+  const gk = `${weather.hour}:${storm}:${t}`
   if (cache.key !== gk || !cache.giant) {
     const c = cache.giant ?? document.createElement('canvas')
     c.width = s.w
     c.height = s.h
     const gg = c.getContext('2d')!
     gg.clearRect(0, 0, s.w, s.h)
-    giant(gg, s, sun, Math.floor(t / 2) * 2, storm)
+    giant(gg, s, sun, t, storm)
     cache.giant = c
     cache.key = gk
   }

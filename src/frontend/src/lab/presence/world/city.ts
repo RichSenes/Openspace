@@ -129,16 +129,18 @@ export function makeCity(w: number, h: number, seed = 7, kind: CityKind = 'burni
   const mid = row(r, w, horizon, 10, 26, 0.12, tokyo ? 0.5 : 0.42, tokyo ? 0.24 : 0.16)
   const near = row(r, w, roof - horizon + Math.round(h * 0.12), 14, 34, 0.55, 1, 0.1)
   const tw = Math.max(8, Math.round(w * 0.05))
+  // Tokyo's tower stands far away, behind the distant blocks: a detail of the skyline.
   const tower = tokyo
-    ? { x: Math.round(w * 0.24), w: Math.max(12, Math.round(horizon * 0.72 * 0.26)), h: Math.round(horizon * 0.72) }
+    ? { x: Math.round(w * 0.27), w: Math.max(6, Math.round(horizon * 0.56 * 0.17)), h: Math.round(horizon * 0.56) }
     : { x: Math.round(w * 0.16), w: tw, h: Math.round(horizon * 0.78) }
-  // In Tokyo, the blocks around the tower stay low so it stands clear down to its arch.
-  if (tokyo) {
-    const from = tower.x - tower.w - 6
-    const to = tower.x + tower.w + 6
-    for (const b of mid) if (b.x + b.w > from && b.x < to) b.h = Math.min(b.h, Math.round(horizon * 0.06))
-  }
-  const clearOfTower = (b: Building) => !tokyo || b.x + b.w + 12 < tower.x - tower.w || b.x - 12 > tower.x + tower.w
+  const clearOfTower = (b: Building) => !tokyo || b.x + b.w + 4 < tower.x - tower.w || b.x - 4 > tower.x + tower.w
+  // Around it the far and middle blocks stay low, so its legs show above the skyline.
+  if (tokyo)
+    for (const [row, k] of [
+      [far, 0.1],
+      [mid, 0.08],
+    ] as const)
+      for (const b of row) if (b.x + b.w > tower.x - tower.w - 3 && b.x < tower.x + tower.w + 3) b.h = Math.min(b.h, Math.round(horizon * k))
   const plumes = tokyo ? [] : [0.07, 0.33, 0.62, 0.9].map((k) => ({ x: Math.round(w * k + (r() - 0.5) * w * 0.05), seed: r() }))
   // Signs hang on the side of tall blocks: one in the burning city, many in Tokyo.
   const tall = mid.filter((b) => b.x > 6 && b.x + b.w < w - 12 && b.h > horizon * 0.18 && clearOfTower(b))
@@ -297,9 +299,8 @@ function sign(g: CanvasRenderingContext2D, s: Sign, t: number, calm: boolean, ho
 }
 
 /**
- * Tokyo's tower: four legs that splay out from an arch, a slim lattice body, the main deck, the
- * top deck and the antenna. By day it is orange and white; by night a dark frame lit warm along
- * its edges, as its floodlights do.
+ * Tokyo's tower, far away: a small red lattice silhouette with its two decks and a blinking
+ * light, behind the distant blocks. Seen through the haze, so its colours are muted.
  */
 function tokyoTower(g: CanvasRenderingContext2D, city: City, hour: Hour, t: number) {
   const base = city.horizon + 1
@@ -307,57 +308,30 @@ function tokyoTower(g: CanvasRenderingContext2D, city: City, hour: Hour, t: numb
   const cx = city.tower.x
   const foot = city.tower.w
   const night = hour === 'night' || hour === 'dusk'
-  const body = night ? '#1a0e14' : '#c8442c'
-  const white = night ? '#2a1a1e' : '#e8e2dc'
-  const edge = night ? '#ff9a3a' : '#a83420'
-  const glow = '#ffd08a'
-  const mainDeck = 0.36
-  const topDeck = 0.68
-  const halfAt = (k: number) => {
-    // Legs splay fast near the ground, then the body tapers slowly; above the top deck, a mast.
-    if (k > topDeck) return Math.max(0, 1.5 * (1 - (k - topDeck) / (1 - topDeck)))
-    return 1.5 + (foot - 1.5) * (1 - k / topDeck) ** 3.2
-  }
+  const red = night ? '#8a2a2a' : '#a83a30'
+  const pale = night ? '#5a2026' : '#b8a8a0'
   for (let y = 0; y < height; y++) {
     const k = y / height
-    const hw = halfAt(k)
-    const left = Math.round(cx - hw)
-    const right = Math.round(cx + hw)
-    const striped = !night && (Math.floor(k * 14) % 2 === 1) && k < topDeck
-    // The arch: below a fifth of the height the legs stand apart.
-    const arch = k < 0.16 ? Math.round(hw * (1 - k / 0.16) ** 0.6 * 0.8) : 0
-    g.fillStyle = striped ? white : body
-    if (arch > 0) {
-      g.fillRect(left, base - y, Math.max(1, Math.round(hw - arch)), 1)
-      g.fillRect(cx + arch, base - y, Math.max(1, right - cx - arch + 1), 1)
-    } else g.fillRect(left, base - y, right - left + 1, 1)
-    // The lattice shows as a darker cross pattern inside the body.
-    if (hw > 3 && !arch) {
-      g.fillStyle = night ? '#0a0508' : '#8a2a1a'
-      for (let x = left + 1; x < right; x++) if ((x - cx + y) % 6 === 0 || (x - cx - y) % 6 === 0) g.fillRect(x, base - y, 1, 1)
-    }
-    g.fillStyle = edge
-    g.fillRect(left, base - y, 1, 1)
-    g.fillRect(right, base - y, 1, 1)
-    if (night && k < topDeck && y % 2 === 0) {
-      g.fillStyle = glow
-      g.fillRect(left + 1, base - y, 1, 1)
-      g.fillRect(right - 1, base - y, 1, 1)
+    const hw = k > 0.72 ? 0 : Math.round(0.5 + (foot - 0.5) * (1 - k / 0.72) ** 2)
+    const band = !night && k < 0.72 && Math.floor(k * 10) % 2 === 1
+    g.fillStyle = band ? pale : red
+    if (hw === 0) g.fillRect(cx, base - y, 1, 1)
+    else {
+      g.fillRect(cx - hw, base - y, 1, 1)
+      g.fillRect(cx + hw, base - y, 1, 1)
+      if (y % 3 === 0 || hw < 2) g.fillRect(cx - hw, base - y, hw * 2 + 1, 1)
     }
   }
-  for (const [k, extra, rows] of [
-    [mainDeck, 3, 4],
-    [topDeck, 2, 2],
-  ] as const) {
+  g.fillStyle = night ? '#d86a3a' : red
+  for (const k of [0.34, 0.6]) {
     const y = base - Math.round(height * k)
-    const hw = Math.round(halfAt(k)) + extra
-    g.fillStyle = night ? '#2a1a1e' : '#e8e2dc'
-    g.fillRect(cx - hw, y - rows, hw * 2 + 1, rows)
-    g.fillStyle = night ? glow : '#6a7a8a'
-    for (let x = cx - hw + 1; x < cx + hw; x += 2) g.fillRect(x, y - rows + 1, 1, rows - 2 || 1)
+    const hw = Math.round(0.5 + (foot - 0.5) * (1 - k / 0.72) ** 2) + 1
+    g.fillRect(cx - hw, y, hw * 2 + 1, 1)
   }
-  g.fillStyle = night && Math.sin(t * 3) > 0 ? '#ff2a3a' : '#7a2a2a'
-  g.fillRect(cx, base - height - 1, 1, 2)
+  if (night && Math.sin(t * 2.5) > 0.3) {
+    g.fillStyle = '#ff3a3a'
+    g.fillRect(cx, base - height, 1, 1)
+  }
 }
 
 /** The sky tree: very tall, very thin, two pods, lit blue or purple at night. */
@@ -519,7 +493,10 @@ export function drawCity(g: CanvasRenderingContext2D, city: City, sky: HTMLCanva
   const out = weather.sky === 'Storm' && !calm ? blackout(t, w) : null
   const dark = (x: number) => !!out && x >= out[0] && x < out[1]
 
-  if (city.kind === 'tokyo') skyTree(g, city, weather.hour, light)
+  if (city.kind === 'tokyo') {
+    skyTree(g, city, weather.hour, light)
+    tokyoTower(g, city, weather.hour, t)
+  }
   for (const b of city.far) building(g, b, horizon, light.far, t, 3, light.lit, dark)
   if (snowy) caps(g, city.far, horizon, light.snow)
 
@@ -536,7 +513,7 @@ export function drawCity(g: CanvasRenderingContext2D, city: City, sky: HTMLCanva
       g.fillRect(tw.x + Math.floor(tw.w / 2) - 1, horizon - tw.h - 9, 2, 2)
     }
     if (snowy) caps(g, [{ x: tw.x, w: tw.w, h: tw.h, windows: [], antenna: 0 }], horizon, light.snow)
-  } else tokyoTower(g, city, weather.hour, t)
+  }
 
   if (weather.sky === 'Fog') fog(g, city, light.fog, t, horizon * 0.45, 0.5)
 

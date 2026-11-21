@@ -558,6 +558,16 @@ After the first prototype the person chose (2026-11-21):
 | Worlds | Four, each with Openspace's four hours and seven skies **in its own words**, and its own 8-colour palette that Shiori snaps to in pixel mode. **Burning city**: fires on the horizon, smoke, embers, a beacon. **Tokyo**: its tower (legs splaying from an arch, two decks, orange and white by day, a dark frame lit warm by night, with the blocks around it kept low), the sky tree, a train crossing on a viaduct, a billboard, neon signs on many blocks, petals on clear days. **Space**, from a station, everything far away: dense faint stars, far galaxies as smudges, seven small planets of five kinds kept clear of Shiori, a nebula, a spiral galaxy, a smaller banded ringed giant with lit cities on its night side, a moon, a star that rises over the giant's limb and sets; skies become nebula, dust, meteors, a meteor shower, ice and a solar storm with auroras. **Inside the machine**: a dense circuit board (two layers of traces, hundreds of small parts, chips) with signals running along it, a quiet dark zone behind Shiori so she always reads first, the socket Shiori stands on and a data bus; hours become booting, busy, winding down, asleep, and skies calm, heat, static, trickle, code rain, drifting bits, overload. Drawn on a canvas at the art's own size at 12 frames a second |
 | Weather in the details | The cities show the weather in what is there, not only in what falls: clouds that drift, the moon or the sun when the sky lets them through, snow on every ledge, puddles that hold the neon on a wet roof, drops from the railing, smoke bent by a storm's wind, lightning on the roof edges and districts losing power |
 
+**The scanline bust is being replaced** (2026-11-21): built from formulas, a head cannot carry a
+face or real hair, and emotions shown by the body moving read as jerks. Shiori becomes a **layered
+portrait** in dense pixel art, as visual novels and VTubers do: back hair, body, clothes, face,
+eyes, brows, nose, mouth, front hair and a hairpin with a bookmark ribbon, each a layer, so that
+feelings are told by the face (lids, brows, mouth, gaze, a tilt) and the turn of the head is
+faked with parallax. Each layer is painted with vector shapes and snapped to a 3–5 tone ramp with
+a narrow ordered dither, then outlined. `?lab=portrait` shows the still portrait first, in colour
+and as a hologram; expressions and animation come after the person approves it. Tokyo's tower is
+now small, far and red, behind the skyline; space's giant glides instead of stepping.
+
 Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader
 is Ashima Arts' (MIT).
 

@@ -565,8 +565,11 @@ eyes, brows, nose, mouth, front hair and a hairpin with a bookmark ribbon, each 
 feelings are told by the face (lids, brows, mouth, gaze, a tilt) and the turn of the head is
 faked with parallax. Each layer is painted with vector shapes and snapped to a 3–5 tone ramp with
 a narrow ordered dither, then outlined. `?lab=portrait` shows the still portrait first, in colour
-and as a hologram; expressions and animation come after the person approves it. Tokyo's tower is
-now small, far and red, behind the skyline; space's giant glides instead of stepping.
+and as a hologram; expressions and animation come after the person approves it. Second draft: hair
+gathered in a bun at the centre with two locks in front, a small nose, lips with a cupid's bow
+and a fuller lower lip, a hint of a woman's figure under an elegant dark kimono with a white
+under-collar, small flowers and a red obi. Tokyo's tower is now a small dark-red silhouette far
+behind the skyline, which stays as it was; space's giant glides instead of stepping.
 
 Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader
 is Ashima Arts' (MIT).

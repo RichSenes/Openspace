@@ -117,7 +117,7 @@ export function swarm(n = 2600, eyes = 320): PointSet {
  * Medusa: a bell (a dome of points, its `u` from the top to the rim) and tentacles hanging from
  * the rim (their `s` from the rim to the tip). The shader pulses the bell and sways the strands.
  */
-export function medusa(bell = 1500, tentacles = 30, perTentacle = 80, eyes = 260): PointSet {
+export function medusa(bell = 1500, tentacles = 30, perTentacle = 80, eyes = 110): PointSet {
   const b = new Builder()
   const r = rng(21)
   for (let i = 0; i < bell; i++) {
@@ -155,57 +155,80 @@ export function medusa(bell = 1500, tentacles = 30, perTentacle = 80, eyes = 260
   return b.build()
 }
 
-/** Radius of the bust (a smooth, faceless head, neck and shoulders) at height y, front and side. */
-export function bustRadius(y: number): { rx: number; rz: number } | null {
+const bump = (y: number, c: number, w: number) => Math.exp(-(((y - c) / w) ** 2))
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * The bust at height y, as a cross-section: half width, and depth toward the front and the
+ * back. A faceless head (skull, brow, nose, lips, chin, jaw), a neck, and shoulders that slope
+ * down from it. Null above the head.
+ */
+export function bustSection(y: number): { rx: number; front: number; back: number } | null {
+  if (y > 0.86) return null
   let rx = 0
-  let rz = 0
-  // Head: an egg, narrower at the chin.
-  const hy = (y - 0.36) / 0.47
-  if (Math.abs(hy) < 1) {
-    const k = Math.sqrt(1 - hy * hy)
-    const chin = y < 0.3 ? 1 - 0.3 * Math.min(1, (0.3 - y) / 0.35) : 1
-    rx = Math.max(rx, 0.35 * k * chin)
-    rz = Math.max(rz, 0.41 * k * chin)
+  let front = 0
+  let back = 0
+  // Head: skull above, jaw narrowing to the chin below.
+  if (y >= 0.04) {
+    const skull = Math.sqrt(Math.max(0, 1 - ((y - 0.47) / 0.39) ** 2))
+    rx = y >= 0.42 ? 0.31 * skull : 0.12 + 0.18 * smooth(0.04, 0.42, y) ** 0.7
+    back = y >= 0.3 ? Math.max(0.15, 0.39 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.4) ** 2))) : 0.15
+    const forehead = 0.36 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.37) ** 2))
+    front = y > 0.56 ? forehead : 0.33
+    front += 0.025 * bump(y, 0.53, 0.025) - 0.03 * bump(y, 0.46, 0.035)
+    front += 0.02 * bump(y, 0.215, 0.015) - 0.015 * bump(y, 0.195, 0.006) + 0.018 * bump(y, 0.175, 0.014)
+    front += 0.02 * bump(y, 0.09, 0.03)
+    front = front * smooth(0.0, 0.1, y) + 0.13 * (1 - smooth(0.0, 0.1, y))
   }
-  // Neck.
-  if (y < 0.0 && y > -0.42) {
-    rx = Math.max(rx, 0.15)
-    rz = Math.max(rz, 0.16)
+  // Neck, then the trapezius sloping to the shoulders, then the chest and arms.
+  if (y < 0.14) {
+    const t = Math.min(1, Math.max(0, (-0.1 - y) / 0.38))
+    const slope = 1 - (1 - t) ** 2.2
+    const nrx = y > -0.1 ? 0.14 : 0.14 + 0.66 * slope - (y < -0.48 ? 0.04 * ((-0.48 - y) / 0.5) : 0)
+    const nfront = 0.13 + 0.11 * slope
+    const nback = 0.15 + 0.07 * slope
+    rx = Math.max(rx, nrx)
+    front = Math.max(front, nfront)
+    back = Math.max(back, nback)
   }
-  // Shoulders: a wide flattened dome.
-  const sy = (y + 0.68) / 0.36
-  if (sy > -0.55 && sy < 1) {
-    const k = Math.sqrt(Math.max(0, 1 - sy * sy))
-    rx = Math.max(rx, 0.88 * k)
-    rz = Math.max(rz, 0.36 * k)
-  }
-  return rx > 0 ? { rx, rz } : null
+  return { rx, front, back }
+}
+
+/** How far the nose stands out at height y (its tip at 0.3). */
+export function noseAt(y: number): number {
+  if (y > 0.45 || y < 0.27) return 0
+  return y >= 0.3 ? 0.085 * ((0.45 - y) / 0.15) : 0.085 * ((y - 0.27) / 0.03)
 }
 
 /**
  * Scanline: the bust drawn as horizontal dashes, line by line, like a scan. `data.z` is the
  * line's index (0..1, bottom to top), `data.w` the angle around the body.
  */
-export function scanline(lines = 54, spacing = 0.04, eyes = 240): PointSet {
+export function scanline(lines = 78, spacing = 0.032, eyes = 90): PointSet {
   const b = new Builder()
   const r = rng(31)
-  const top = 0.84
+  const top = 0.86
   const bottom = -0.98
   for (let l = 0; l < lines; l++) {
     const y = bottom + ((top - bottom) * l) / (lines - 1)
-    const rad = bustRadius(y)
-    if (!rad) continue
-    const around = 2 * Math.PI * Math.sqrt((rad.rx * rad.rx + rad.rz * rad.rz) / 2)
-    const n = Math.max(6, Math.round(around / spacing))
+    const sec = bustSection(y)
+    if (!sec) continue
+    const around = 2 * Math.PI * Math.sqrt((sec.rx * sec.rx + ((sec.front + sec.back) / 2) ** 2) / 2)
+    const n = Math.max(8, Math.round(around / spacing))
     for (let i = 0; i < n; i++) {
       const phi = (i / n) * Math.PI * 2
-      // A soft nose and brow at the front of the head, so turning reads as turning.
-      const front = Math.max(0, Math.sin(phi))
-      const nose = y > 0.2 && y < 0.45 ? 0.05 * Math.exp(-(((y - 0.3) / 0.06) ** 2)) * front ** 8 : 0
-      b.add([Math.cos(phi) * rad.rx, y, Math.sin(phi) * (rad.rz + nose)], [KIND.body, r(), l / (lines - 1), phi])
+      const c = Math.cos(phi)
+      const sn = Math.sin(phi)
+      const ear = y > 0.28 && y < 0.48 && sn < 0.25 ? 0.045 * bump(y, 0.37, 0.05) * Math.abs(c) ** 10 : 0
+      const nose = noseAt(y) * Math.max(0, sn) ** 40
+      const depth = sn >= 0 ? sec.front + nose : sec.back
+      b.add([c * (sec.rx + ear), y, sn * depth], [KIND.body, r(), l / (lines - 1), phi])
     }
   }
-  addEyes(b, eyes, (rr) => [rr() * 0.6 - 0.3, 0.1 + rr() * 0.6, 0.2], 32)
+  addEyes(b, eyes, (rr) => [rr() * 0.5 - 0.25, 0.2 + rr() * 0.5, 0.2], 32)
   return b.build()
 }
 

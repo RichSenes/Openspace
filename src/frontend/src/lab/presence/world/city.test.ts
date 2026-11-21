@@ -27,3 +27,43 @@ describe('the city', () => {
       }
   })
 })
+
+import { hourOf, LIGHTS, HOURS, rainAmount, SKIES, stormFlash } from './city'
+
+describe('hours and weather', () => {
+  it('reads the hour of the world from the clock', () => {
+    const at = (h: number, m = 0) => new Date(2026, 10, 21, h, m)
+    expect(hourOf(at(6))).toBe('dawn')
+    expect(hourOf(at(12))).toBe('day')
+    expect(hourOf(at(18))).toBe('dusk')
+    expect(hourOf(at(23))).toBe('night')
+    expect(hourOf(at(3))).toBe('night')
+  })
+
+  it('lights more windows by night than by day', () => {
+    expect(LIGHTS.night.lit).toBeGreaterThan(LIGHTS.dusk.lit)
+    expect(LIGHTS.dusk.lit).toBeGreaterThan(LIGHTS.day.lit)
+    for (const h of HOURS) expect(LIGHTS[h].sky.length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('rains harder in a storm and not at all when clear or snowing', () => {
+    expect(rainAmount('Storm')).toBeGreaterThan(rainAmount('Rain'))
+    expect(rainAmount('Rain')).toBeGreaterThan(rainAmount('Drizzle'))
+    expect(rainAmount('Clear')).toBe(0)
+    expect(rainAmount('Snow')).toBe(0)
+    expect(SKIES).toHaveLength(7)
+  })
+
+  it('flashes twice in quick succession, then waits', () => {
+    expect(stormFlash(7.02)).toBe(1)
+    expect(stormFlash(7.22)).toBeGreaterThan(0)
+    expect(stormFlash(10)).toBe(0)
+  })
+
+  it('hangs the sign on a block inside the city', () => {
+    const c = makeCity(400, 300)
+    expect(c.sign.x).toBeGreaterThan(400 * 0.7)
+    expect(c.sign.x + 10).toBeLessThanOrEqual(400)
+    expect(c.sign.y).toBeLessThan(c.horizon)
+  })
+})

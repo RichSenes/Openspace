@@ -9,12 +9,21 @@ namespace Openspace.Application.Characters;
 /// The character monitor: who each inhabitant is and how they are doing, for the person only.
 /// Agents never see these numbers: no tool and no briefing reads them.
 /// </summary>
-public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskRepository tasks)
+public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskRepository tasks, IAuditLog audit, TimeProvider clock)
 {
+    /// <summary>Lines of the log read per page.</summary>
+    private const int Page = 1000;
+
+    /// <summary>The kinds of log line office life is read from.</summary>
+    private static readonly AuditKind[] LifeKinds = [AuditKind.Lifecycle, AuditKind.Change];
+
     public async Task<CharacterBoardView> GetAsync(OfficeId officeId, CancellationToken cancellationToken)
     {
         var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
         var all = await tasks.ListAsync(officeId, null, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        var log = await LogSinceAsync(audit, all, now - Mood.Window, cancellationToken).ConfigureAwait(false);
+        var events = LifeEvents.From(all, log);
         var seniority = Seniority.Of(office, all);
 
         var characters = office.Rooms.SelectMany(room => room.Desks.Select(desk => new CharacterView(
@@ -26,7 +35,8 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
             BirthdayView.From(desk),
             desk.Shift,
             desk.Trust.Levels,
-            [.. seniority.Where(s => s.Desk == desk.Id).Select(s => new SeniorityView(s.Room.Value, room.Name, s.Done, s.Merged, s.Expert))])))
+            [.. seniority.Where(s => s.Desk == desk.Id).Select(s => new SeniorityView(s.Room.Value, room.Name, s.Done, s.Merged, s.Expert))],
+            Mood.Of(desk.Traits, events.Where(e => e.Desk == desk.Id), now, clock.LocalTimeZone))))
             .ToList();
 
         var experts = seniority.Where(s => s.Expert)
@@ -34,10 +44,40 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
             .ToList();
         return new CharacterBoardView(office.Id.Value, office.Name, characters, experts);
     }
+
+    /// <summary>The lifecycle and change lines of these tasks from <paramref name="since"/> on, oldest first.</summary>
+    public static async Task<IReadOnlyList<AuditEntry>> LogSinceAsync(
+        IAuditLog audit, IReadOnlyCollection<WorkTask> of, DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+        ArgumentNullException.ThrowIfNull(of);
+        var ids = of.Select(t => t.Id).ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var lines = new List<AuditEntry>();
+        long? before = null;
+        while (true)
+        {
+            var page = await audit.LatestAsync(ids, LifeKinds, before, Page, cancellationToken).ConfigureAwait(false);
+            lines.AddRange(page.Where(e => e.At >= since));
+            if (page.Count < Page || page[^1].At < since || page[^1].Id <= 0)
+            {
+                break;
+            }
+
+            before = page[^1].Id;
+        }
+
+        return [.. lines.OrderBy(e => e.At)];
+    }
 }
 
 public sealed record CharacterBoardView(Guid OfficeId, string OfficeName, IReadOnlyList<CharacterView> Characters, IReadOnlyList<RoomExpertView> Experts);
 
+/// <param name="Mood">From 0 to 100, with every change of the last week and its reason.</param>
 public sealed record CharacterView(
     Guid DeskId,
     string Name,
@@ -47,7 +87,8 @@ public sealed record CharacterView(
     BirthdayView Birthday,
     Shift Shift,
     IReadOnlyDictionary<TrustedAction, TrustLevel> Trust,
-    IReadOnlyList<SeniorityView> Seniority);
+    IReadOnlyList<SeniorityView> Seniority,
+    MoodLine Mood);
 
 /// <param name="Done">Tasks of the room it finished.</param>
 /// <param name="Expert">It is the room's expert.</param>

@@ -567,8 +567,9 @@ faked with parallax. Each layer is painted with vector shapes and snapped to a 3
 a narrow ordered dither, then outlined. `?lab=portrait` shows the still portrait first, in colour
 and as a hologram; expressions and animation come after the person approves it. Second draft: hair
 gathered in a bun at the centre with two locks in front, a small nose, lips with a cupid's bow
-and a fuller lower lip, a hint of a woman's figure under an elegant dark kimono with a white
-under-collar, small flowers and a red obi. Tokyo's tower is now a small dark-red silhouette far
+and a fuller lower lip, a woman's figure under a modern wrap dress (straight V neckline, a branch
+of plum blossom embroidered on one shoulder, a slim sash knotted at the side), two gold pins
+crossed through the bun, jade earrings and a pendant, and the jaw's shadow on the neck. Tokyo's tower is now a small dark-red silhouette far
 behind the skyline, which stays as it was; space's giant glides instead of stepping.
 
 Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader

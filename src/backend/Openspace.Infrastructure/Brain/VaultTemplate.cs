@@ -113,6 +113,13 @@ internal static class VaultTemplate
             `2026-W47.md`, `2026-11.md`.
 
             """),
+        ("Agenda/README.md", """
+            # Agenda
+
+            The next day's agenda, one note per day, written by the "Tomorrow morning" routine:
+            `2026-11-22.md`.
+
+            """),
         ("Offices/README.md", """
             # Offices
 

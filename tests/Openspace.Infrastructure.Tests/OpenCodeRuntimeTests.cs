@@ -203,6 +203,23 @@ public class OpenCodeRuntimeTests
     }
 
     [Fact]
+    public async Task A_draft_can_name_its_model()
+    {
+        var (runtime, server) = Create(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/session" => (HttpStatusCode.OK, """{"id":"ses_draft"}"""),
+            "/session/ses_draft/message" => (HttpStatusCode.OK, """{"info":{"role":"assistant"},"parts":[{"type":"text","text":"A calm day."}]}"""),
+            _ => (HttpStatusCode.OK, "true"),
+        });
+
+        var draft = await runtime.DraftAsync("You write agendas.", "Dentist at 9:30", "anthropic/claude-sonnet", default);
+
+        Assert.Equal("A calm day.", draft);
+        using var body = JsonDocument.Parse(server.Requests[1].Body!);
+        Assert.Equal(("anthropic", "claude-sonnet"), (body.RootElement.GetProperty("model").GetProperty("providerID").GetString(), body.RootElement.GetProperty("model").GetProperty("modelID").GetString()));
+    }
+
+    [Fact]
     public async Task Pending_permissions_are_read_from_the_workspace()
     {
         var (runtime, server) = Create(_ => (HttpStatusCode.OK, """

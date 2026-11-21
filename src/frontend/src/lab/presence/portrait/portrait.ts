@@ -3,8 +3,9 @@ import { curve, layer, outline, px, type Ramp } from './paint'
 
 /**
  * Shiori's portrait: a young woman with East Asian features, dark hair gathered in a bun at the
- * centre of her head and held by a pin with a bookmark ribbon (栞), two locks falling in front;
- * an elegant dark kimono with a white under-collar, small flowers, and the top of the obi.
+ * centre of her head held by two crossed pins, two locks falling in front; jade earrings and a
+ * pendant; a modern wrap dress with a straight V neckline, a branch of plum blossom embroidered
+ * on one shoulder and a slim sash knotted at the side.
  * Drawn in layers at the art's own size, back to front; the face's parts read an Expression.
  */
 export const PORTRAIT_W = 128
@@ -14,7 +15,7 @@ export const RAMPS: Record<string, Ramp> = {
   skin: ['#6a3e36', '#a86e5c', '#d49c80', '#ecc0a2', '#f8dcc6'],
   hair: ['#0c0c16', '#161828', '#22263c', '#343a58', '#525a80'],
   cloth: ['#0a0810', '#141020', '#201a32', '#30284a', '#44396a'],
-  obi: ['#4a0e1a', '#7a1a2a', '#b02a3a', '#d84a50'],
+  sash: ['#4a0e1a', '#7a1a2a', '#b02a3a', '#d84a50'],
   gold: ['#6a4a1a', '#a8782a', '#e0b050', '#f8e0a0'],
   ribbon: ['#5a1424', '#8a2234', '#c23a4a'],
 }
@@ -94,124 +95,146 @@ function hairSheen(g: CanvasRenderingContext2D, e: Expression) {
 }
 
 function body(g: CanvasRenderingContext2D) {
-  // Neck, collarbones and shoulders, under the kimono.
+  // Neck, collarbones and shoulders, under the dress.
   const skin = g.createLinearGradient(56, 96, 74, 96)
   skin.addColorStop(0, '#dca88c')
   skin.addColorStop(0.6, '#d49c80')
   skin.addColorStop(1, '#b07a64')
   g.fillStyle = skin
   g.beginPath()
-  g.moveTo(57, 88)
-  g.lineTo(57, 106)
-  g.bezierCurveTo(48, 112, 30, 116, 18, 126)
+  g.moveTo(57, 86)
+  g.lineTo(57, 105)
+  g.bezierCurveTo(48, 111, 30, 115, 18, 126)
   g.lineTo(12, 176)
   g.lineTo(116, 176)
   g.lineTo(110, 126)
-  g.bezierCurveTo(98, 116, 80, 112, 71, 106)
-  g.lineTo(71, 88)
+  g.bezierCurveTo(98, 115, 80, 111, 71, 105)
+  g.lineTo(71, 86)
   g.closePath()
   g.fill()
+  // The shadow the jaw casts on the neck: what separates the face from it.
+  g.save()
+  g.globalCompositeOperation = 'source-atop'
+  const shade = g.createRadialGradient(64, 88, 2, 64, 90, 12)
+  shade.addColorStop(0, 'rgba(120,70,56,1)')
+  shade.addColorStop(0.7, 'rgba(140,86,70,0.8)')
+  shade.addColorStop(1, 'rgba(140,86,70,0)')
+  g.fillStyle = shade
+  g.fillRect(50, 84, 28, 16)
+  g.restore()
 }
 
-/** The kimono: crossed collar, a soft fullness at the chest, sleeves falling from the shoulders. */
+/** A modern wrap dress: a straight V neckline, fitted at the chest, set-in sleeves. */
 function clothes(g: CanvasRenderingContext2D) {
-  const grad = g.createLinearGradient(20, 112, 100, 176)
+  const grad = g.createLinearGradient(20, 110, 100, 176)
   grad.addColorStop(0, '#30284a')
   grad.addColorStop(0.5, '#1c1630')
   grad.addColorStop(1, '#0e0b18')
   g.fillStyle = grad
   g.beginPath()
   g.moveTo(10, 176)
-  g.lineTo(17, 127)
-  g.bezierCurveTo(28, 118, 42, 114, 51, 112)
-  // The left panel over the right, closing just under the bust.
-  g.bezierCurveTo(56, 124, 62, 138, 68, 152)
-  g.bezierCurveTo(71, 140, 74, 124, 78, 112)
-  g.bezierCurveTo(88, 114, 101, 118, 111, 127)
+  g.lineTo(16, 128)
+  g.bezierCurveTo(26, 117, 40, 113, 51, 110)
+  g.lineTo(64, 141)
+  g.lineTo(77, 110)
+  g.bezierCurveTo(88, 113, 102, 117, 112, 128)
   g.lineTo(118, 176)
   g.closePath()
   g.fill()
-  g.save()
-  g.globalCompositeOperation = 'source-atop'
-  // The sleeves part from the body at the shoulder seam.
-  g.fillStyle = 'rgba(6,4,10,0.7)'
-  g.fillRect(24, 132, 2, 44)
-  g.fillRect(103, 132, 2, 44)
-  g.restore()
 }
 
-/** The chest drawn as folds of cloth: a soft light along the top, a shadow line beneath. */
+/**
+ * The figure under the dress: the light along the top of the chest and the shadow beneath it,
+ * the arms parting from the body, the wrap's fold. Drawn as pixel lines, so it reads clearly
+ * without being heavy.
+ */
 function chest(g: CanvasRenderingContext2D) {
   for (const [cx, side] of [
     [46, -1],
-    [83, 1],
+    [82, 1],
   ] as const) {
-    const under = curve((x) => 150 - Math.sqrt(Math.max(0, 1 - ((x - cx) / 13) ** 2)) * 4, cx - 12, cx + 12)
-    px(g, '#07050c', under)
-    px(g, '#0e0b18', under.map(([x, y]) => [x, y + 1] as P))
-    const light = curve((x) => 137 - Math.sqrt(Math.max(0, 1 - ((x - cx) / 10) ** 2)) * 3, cx - 8 + side * 2, cx + 6 + side * 2)
-    px(g, '#30284a', light.filter((_, i) => i % 3 !== 0))
+    const r = 13
+    const top = (x: number) => 141 - Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 7
+    const under = (x: number) => 148 + Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 4
+    // Light on the curve, strongest toward the outside where it meets the light.
+    const lit = curve(top, cx - r + 3, cx + r - 3)
+    px(g, '#30284a', lit)
+    px(g, '#44396a', lit.filter(([x]) => (x - cx) * side < 4 && (x - cx) * side > -7))
+    px(g, '#30284a', lit.map(([x, y]) => [x, y + 1] as P).filter(([x]) => Math.abs(x - cx) < 6))
+    // The shadow beneath, two pixels deep at the middle.
+    const dark = curve(under, cx - r + 1, cx + r - 1)
+    px(g, '#07050c', dark)
+    px(g, '#0e0b18', dark.map(([x, y]) => [x, y - 1] as P).filter(([x]) => Math.abs(x - cx) < 8))
   }
+  // Arms parting from the body, curving round the figure.
+  px(g, '#07050c', [
+    ...Array.from({ length: 46 }, (_, k) => [27 - Math.sin((k / 46) * Math.PI) * 2, 130 + k] as P),
+    ...Array.from({ length: 46 }, (_, k) => [101 + Math.sin((k / 46) * Math.PI) * 2, 130 + k] as P),
+  ])
+  // The wrap: the left panel crosses over the right from the bottom of the V.
+  px(g, '#07050c', curve((x) => 141 + (x - 64) * 1.1, 64, 80))
+  px(g, '#30284a', curve((x) => 140 + (x - 64) * 1.1, 65, 79))
 }
 
-/** The obi, high under the bust, with its cord. */
-function obi(g: CanvasRenderingContext2D) {
-  const grad = g.createLinearGradient(0, 160, 0, 176)
-  grad.addColorStop(0, '#b02a3a')
-  grad.addColorStop(1, '#4a0e1a')
+/** A slim sash at the waist, knotted at the side with two tails. */
+function sash(g: CanvasRenderingContext2D) {
+  const grad = g.createLinearGradient(0, 160, 0, 168)
+  grad.addColorStop(0, '#d84a50')
+  grad.addColorStop(1, '#5a1020')
   g.fillStyle = grad
   g.beginPath()
-  g.moveTo(22, 164)
-  g.bezierCurveTo(48, 160, 80, 160, 106, 164)
-  g.lineTo(108, 176)
-  g.lineTo(20, 176)
+  g.moveTo(28, 162)
+  g.bezierCurveTo(50, 159, 78, 159, 100, 162)
+  g.lineTo(100, 166)
+  g.bezierCurveTo(78, 163, 50, 163, 28, 166)
+  g.closePath()
+  g.fill()
+  // The knot and its tails, on her left.
+  g.beginPath()
+  g.ellipse(86, 164, 4, 4, 0, 0, Math.PI * 2)
+  g.fill()
+  g.beginPath()
+  g.moveTo(84, 166)
+  g.lineTo(80, 176)
+  g.lineTo(84, 176)
+  g.lineTo(87, 167)
+  g.closePath()
+  g.moveTo(88, 166)
+  g.lineTo(92, 176)
+  g.lineTo(95, 175)
+  g.lineTo(89, 166)
   g.closePath()
   g.fill()
 }
 
 function collarTrim(g: CanvasRenderingContext2D) {
-  // The white under-collar showing inside the kimono's, then the kimono's own edge.
-  const left = (x: number) => 112 + (x - 51) * (40 / 17) * (0.85 + 0.15 * ((x - 51) / 17))
-  const right = (x: number) => 112 + (78 - x) * (40 / 10)
-  const inner: P[] = []
-  const edge: P[] = []
-  for (const [x, y] of curve(left, 51, 67)) {
-    inner.push([x + 1, y], [x + 2, y])
-    edge.push([x - 1, y])
-  }
-  for (const [x, y] of curve(right, 69, 78)) {
-    if (y > 150) continue
-    inner.push([x - 1, y], [x - 2, y])
-    edge.push([x + 1, y])
-  }
-  px(g, '#ece6e0', inner)
-  px(g, '#b8b0b0', inner.filter((_, i) => i % 2 === 1))
-  px(g, '#c8a04a', edge)
-  // The neck's shadow under the jaw.
-  px(g, SHADOW, curve((x) => 93 + Math.abs(x - 64) * 0.15, 57, 71))
+  // The neckline's edge: a thin band of contrast cloth, the same on both sides.
+  const left = curve((x) => 110 + (x - 51) * (31 / 13), 51, 64)
+  const right = left.map(([x, y]) => [128 - x, y] as P)
+  px(g, '#c8a04a', [...left.map(([x, y]) => [x - 1, y] as P), ...right.map(([x, y]) => [x + 1, y] as P)])
+  px(g, '#6a5a8a', [...left.map(([x, y]) => [x - 2, y] as P), ...right.map(([x, y]) => [x + 2, y] as P)])
   // Collarbones, faintly.
-  px(g, SHADOW, [
-    ...curve((x) => 110 - (x - 40) * 0.12, 42, 54),
-    ...curve((x) => 110 - (88 - x) * 0.12, 74, 86),
-  ])
+  px(g, SHADOW, [...curve((x) => 109 - (x - 40) * 0.12, 42, 54), ...curve((x) => 109 - (88 - x) * 0.12, 74, 86)])
 }
 
-/** Small flowers on the kimono, and a cord across the obi. */
-function pattern(g: CanvasRenderingContext2D) {
-  const flowers: [number, number, number][] = [
-    [30, 140, 0],
-    [20, 160, 1],
-    [38, 168, 0],
-    [96, 136, 1],
-    [108, 152, 0],
-    [92, 170, 1],
-    [14, 140, 1],
-    [114, 140, 0],
+/** A branch of plum blossom embroidered from the left shoulder down. */
+function embroidery(g: CanvasRenderingContext2D) {
+  const stem: P[] = []
+  for (let k = 0; k <= 40; k++) {
+    const u = k / 40
+    stem.push([20 + u * 16 + Math.sin(u * 5) * 2, 124 + u * 34])
+  }
+  stem.push(...Array.from({ length: 10 }, (_, k) => [28 + k, 134 - k * 0.6] as P))
+  px(g, '#8a6a3a', stem)
+  const flowers: [number, number, boolean][] = [
+    [22, 127, true],
+    [37, 128, false],
+    [27, 140, true],
+    [33, 152, false],
+    [36, 160, true],
   ]
-  for (const [x, y, k] of flowers) {
-    if (y > 160 && x > 20 && x < 106) continue
-    const petal = k ? '#c84a5a' : '#e0a0b0'
-    px(g, petal, [
+  for (const [x, y, open] of flowers) {
+    px(g, open ? '#e8a0b4' : '#c85a72', [
       [x, y - 1],
       [x - 1, y],
       [x + 1, y],
@@ -220,18 +243,43 @@ function pattern(g: CanvasRenderingContext2D) {
     ])
     px(g, '#e0b050', [[x, y]])
   }
-  // The cord, with its knot a little off centre.
-  px(g, '#e0b050', curve((x) => 170 - Math.sin((x - 22) / 86 * Math.PI) * 2, 22, 106))
-  px(g, '#a8782a', curve((x) => 171 - Math.sin((x - 22) / 86 * Math.PI) * 2, 22, 106))
-  px(g, '#f8e0a0', [
-    [72, 167],
-    [73, 167],
-    [71, 168],
-    [74, 168],
-    [72, 169],
-    [73, 169],
+}
+
+/** Jade drops at the ears and a pendant on a fine chain. */
+function jewellery(g: CanvasRenderingContext2D, e: Expression, t: number) {
+  const turn = e.turn * 3
+  const swing = Math.round(Math.sin(t * 1.6) * 0.6)
+  for (const x of [43 + turn, 85 + turn]) {
+    const xs = Math.round(x)
+    px(g, '#e0b050', [
+      [xs, 77],
+      [xs, 78],
+    ])
+    px(g, '#a8782a', [[xs + swing, 79]])
+    px(g, '#5ab890', [
+      [xs + swing, 80],
+      [xs - 1 + swing, 81],
+      [xs + swing, 81],
+      [xs + 1 + swing, 81],
+      [xs + swing, 82],
+    ])
+    px(g, '#c8f0d8', [[xs - 1 + swing, 81]])
+  }
+  // The chain sits at the base of the neck and dips to the pendant.
+  const chain = curve((x) => 104 + 8 * (1 - ((x - 64) / 8) ** 2), 56, 72)
+  px(g, '#e0b050', chain.filter((_, i) => i % 2 === 0))
+  px(g, '#a8782a', chain.filter((_, i) => i % 2 === 1))
+  px(g, '#e0b050', [[64, 113]])
+  px(g, '#3a8a6a', [
+    [63, 114],
+    [64, 114],
+    [65, 114],
+    [63, 115],
+    [64, 115],
+    [65, 115],
+    [64, 116],
   ])
-  px(g, '#1a0a14', curve((x) => 163 - Math.sin((x - 22) / 86 * Math.PI) * 3.5, 22, 106))
+  px(g, '#c8f0d8', [[63, 114]])
 }
 
 function face(g: CanvasRenderingContext2D, e: Expression) {
@@ -497,52 +545,41 @@ function strands(g: CanvasRenderingContext2D, e: Expression, t: number) {
   px(g, '#343a58', pts)
 }
 
-function pin(g: CanvasRenderingContext2D, e: Expression, t: number) {
-  // A hairpin through the bun, and a bookmark ribbon hanging from its end with a tassel.
+/** Two hairpins crossed through the bun, drawn before it so the bun hides their middle. */
+function pins(g: CanvasRenderingContext2D, e: Expression) {
   const turn = e.turn * 1.5
-  const swing = Math.sin(t * 1.3) * 1.2
-  px(g, '#e0b050', curve((x) => 6 + (x - 46) * 0.36, 46 + turn, 88 + turn))
-  px(g, '#a8782a', curve((x) => 7 + (x - 46) * 0.36, 48 + turn, 87 + turn))
-  px(g, '#f8e0a0', [
-    [45 + turn, 6],
-    [46 + turn, 5],
-    [44 + turn, 7],
-  ])
-  const top: P = [88 + turn, 22]
-  const ribbon: P[] = []
-  const dark: P[] = []
-  for (let y = 0; y < 16; y++) {
-    const x = top[0] + Math.round((y / 16) * swing * 1.5)
-    ribbon.push([x, top[1] + y], [x + 1, top[1] + y])
-    dark.push([x + 2, top[1] + y])
+  for (const [x0, y0, x1, y1] of [
+    [42, 4, 76, 22],
+    [86, 4, 52, 22],
+  ]) {
+    const slope = (y1 - y0) / (x1 - x0)
+    const line = curve((x) => y0 + (x - x0) * slope, Math.min(x0, x1) + turn, Math.max(x0, x1) + turn)
+    px(g, '#e0b050', line)
+    px(g, '#a8782a', line.map(([x, y]) => [x, y + 1] as P).filter(([x]) => Math.abs(x - 64 - turn) < 18))
+    // A small gold bloom at the top end of each pin.
+    const tx = Math.round(x0 + turn)
+    px(g, '#f8e0a0', [
+      [tx, y0 - 1],
+      [tx - 1, y0],
+      [tx + 1, y0],
+      [tx, y0 + 1],
+    ])
+    px(g, '#e8a0b4', [[tx, y0]])
   }
-  px(g, '#c23a4a', ribbon)
-  px(g, '#8a2234', dark)
-  const end = top[0] + Math.round(swing * 1.5)
-  px(g, '#e0b050', [
-    [end, top[1] + 16],
-    [end + 1, top[1] + 16],
-    [end + 2, top[1] + 16],
-  ])
-  px(g, '#a8782a', [
-    [end, top[1] + 17],
-    [end + 1, top[1] + 18],
-    [end + 2, top[1] + 17],
-    [end + 1, top[1] + 19],
-  ])
 }
 
 /** Draws the whole portrait into a PORTRAIT_W × PORTRAIT_H canvas. */
 export function drawPortrait(g: CanvasRenderingContext2D, e: Expression, t = 0) {
   g.clearRect(0, 0, PORTRAIT_W, PORTRAIT_H)
   g.imageSmoothingEnabled = false
+  pins(g, e)
   layer(g, RAMPS.hair, (c) => backHair(c, e))
   hairSheen(g, e)
   layer(g, RAMPS.skin, body)
   layer(g, RAMPS.cloth, clothes)
   chest(g)
-  layer(g, RAMPS.obi, obi)
-  pattern(g)
+  layer(g, RAMPS.sash, sash)
+  embroidery(g)
   collarTrim(g)
   layer(g, RAMPS.skin, (c) => face(c, e))
   blush(g, e)
@@ -553,6 +590,6 @@ export function drawPortrait(g: CanvasRenderingContext2D, e: Expression, t = 0) 
   mouth(g, e)
   layer(g, RAMPS.hair, (c) => frontHair(c, e, t))
   strands(g, e, t)
-  pin(g, e, t)
+  jewellery(g, e, t)
   outline(g, INK)
 }

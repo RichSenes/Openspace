@@ -3,7 +3,7 @@ import type { FaceState } from '../../shiori/faceMachine'
 import type { Mode } from '../../shiori/modes'
 import { approach, blinkOpen, LOOKS, makeLife, POSES, stepLife, voiceLevel, type Pose } from './character'
 import { BodyRenderer } from './renderer'
-import { bodyRotation, DYSTOPIA_PALETTE, mix3, MODE_HEAT, project, RIGS } from './rig'
+import { bodyRotation, mix3, MODE_HEAT, project, RIGS } from './rig'
 import { rng, type SkinId } from './shapes'
 import { changeAt, type Change } from './transition'
 import { makeWorms, stepWorms, wormPositions } from './worms'
@@ -14,6 +14,8 @@ export interface BodyProps {
   mode: Mode
   /** 0 smooth; otherwise screen pixels per art pixel. */
   pixel: number
+  /** The world's palette, which Shiori snaps to in pixel mode. */
+  palette: [number, number, number][]
   calm: boolean
   /** Where Shiori stands in the stage: centre (0..1 of width and height) and radius in CSS px. */
   focus: { x: number; y: number; size: number }
@@ -135,7 +137,7 @@ export function ShioriBody(props: BodyProps) {
           worms: wormBuf,
           wormLength: WORM_LENGTH,
         },
-        { pixel: p.pixel, palette: p.pixel ? DYSTOPIA_PALETTE : [] },
+        { pixel: p.pixel, palette: p.pixel ? p.palette : [] },
         WORMS,
       )
 

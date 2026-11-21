@@ -110,9 +110,13 @@ vec3 strandAt(vec3 root, float s, float seed, float inner, out float sig){
   return q;
 }
 
-vec3 bustAt(vec3 p, float line, float seed, out float alpha, out float scan){
+vec3 bustAt(vec3 p, float line, float seed, float hair, out float alpha, out float scan){
   vec3 q = p;
   q.x += snoise(vec3(line * 40.0, uTime * 9.0, 0.0)) * 0.035 * uVoice;
+  // Hair sways, more toward its tips.
+  float loose = hair * clamp(0.6 - p.y, 0.0, 1.4);
+  q.x += loose * (sin(uTime * 0.9 + p.y * 4.0) * 0.018 + snoise(vec3(p.y * 3.0, uTime * 0.4, seed)) * 0.01);
+  q.z += loose * cos(uTime * 0.7 + p.y * 3.0) * 0.012;
   alpha = 1.0;
   if (p.y < -0.5) {
     float drop = snoise(vec3(seed * 50.0, line * 20.0, uPhase * 0.6));
@@ -150,7 +154,7 @@ void main(){
     }
   } else {
     float scan;
-    body = bustAt(aPos, aData.z, seed, alpha, scan);
+    body = bustAt(aPos, aData.z, seed, eye ? 0.0 : aExtra.x, alpha, scan);
     glow = scan * 2.0;
     vDash = 1.0;
   }
@@ -162,7 +166,9 @@ void main(){
   vec3 nrm = uRot * normalize(vec3(aPos.x, uSkin > 1.5 ? 0.0 : aPos.y, aPos.z) + 1e-4);
   float facing = nrm.z;
   // Seen edge-on, dashes pile up at the outline: let them fade there.
-  if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing) * mix(0.3, 1.0, clamp(facing, 0.0, 1.0));
+  bool isHair = uSkin > 1.5 && !eye && aExtra.x > 0.5;
+  if (isHair) alpha *= smoothstep(-0.45, 0.05, facing);
+  else if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing) * mix(0.3, 1.0, clamp(facing, 0.0, 1.0));
 
   float m = 0.0;
   if (eye) {
@@ -201,6 +207,13 @@ void main(){
     size *= 1.0 + 0.9 * (1.0 - aData.z);
   }
   float rim = eye ? smoothstep(0.55, 0.95, length(aData.zw)) : 0.0;
+  // Hair: the body's colours, warmer and dimmer, so it reads apart from the face.
+  if (isHair) {
+    // Strands: each thin column of hair has its own brightness.
+    float strand = fract(sin(floor(aData.w * 38.0) * 12.9898) * 43758.5453);
+    col = mix(col, uHot, 0.45);
+    bright *= 0.45 + 0.7 * strand;
+  }
   col = mix(col, uEye, m);
   bright = mix(bright, 0.42 + 0.5 * rim, m);
   size = mix(size, uPoint * 0.95, m);

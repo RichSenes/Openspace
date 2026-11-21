@@ -10,8 +10,9 @@ import type { SkinId } from './body/shapes'
 import { ShioriBody } from './body/ShioriBody'
 import { focusFor, subtitles } from './subtitles'
 import type { Sky } from '../../api/types'
-import { HOURS, hourOf, SKIES, type Hour } from './world/city'
-import { CityBackdrop } from './world/CityBackdrop'
+import { HOURS, hourOf, SKIES, type Hour, type WorldId } from './world/types'
+import { WorldBackdrop } from './world/WorldBackdrop'
+import { WORLD_ORDER, WORLDS } from './world/worlds'
 import './presence.css'
 
 const SKINS: SkinId[] = ['swarm', 'medusa', 'scanline']
@@ -23,12 +24,10 @@ interface Prefs {
   pixel: number
   hour: Hour | 'auto'
   sky: Sky
+  world: WorldId
 }
 
-const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'Rain' }
-
-const HOUR_LABELS: Record<Hour | 'auto', string> = { auto: 'Now', dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' }
-const SKY_LABELS: Record<Sky, string> = { Clear: 'Clear', Cloudy: 'Cloudy', Fog: 'Fog', Drizzle: 'Drizzle', Rain: 'Rain', Snow: 'Snow', Storm: 'Storm' }
+const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'Rain', world: 'city' }
 
 function loadPrefs(): Prefs {
   try {
@@ -38,6 +37,7 @@ function loadPrefs(): Prefs {
       pixel: [0, 2, 3, 4].includes(v.pixel ?? -1) ? v.pixel! : DEFAULTS.pixel,
       hour: v.hour === 'auto' || HOURS.includes(v.hour as Hour) ? (v.hour as Hour | 'auto') : DEFAULTS.hour,
       sky: SKIES.includes(v.sky as Sky) ? (v.sky as Sky) : DEFAULTS.sky,
+      world: WORLD_ORDER.includes(v.world as WorldId) ? (v.world as WorldId) : DEFAULTS.world,
     }
   } catch {
     return DEFAULTS
@@ -142,6 +142,7 @@ export function Presence() {
       pixel: (p: number) => pick({ pixel: p }),
       hour: (h: Hour | 'auto') => pick({ hour: h }),
       sky: (k: Sky) => pick({ sky: k }),
+      world: (w: WorldId) => pick({ world: w }),
       state: (s: FaceState | null) => setForced(s),
       seek: (step: number | 'end', at: 'start' | 'mid' | 'end' = 'mid') => {
         setPlaying(false)
@@ -162,12 +163,13 @@ export function Presence() {
   const sections = boardSections(snap.board)
   const progress = Math.round((t / timeline.duration) * 100)
   const weather = { hour: prefs.hour === 'auto' ? clockHour : prefs.hour, sky: prefs.sky }
+  const world = WORLDS[prefs.world]
 
   return (
     <div ref={root} className={`pr${subs.long ? ' is-long' : ''}${calm ? ' is-calm' : ''}`} data-mode={snap.mode} style={{ '--mode': info.hex } as React.CSSProperties}>
-      <CityBackdrop pixel={prefs.pixel} calm={calm} weather={weather} />
+      <WorldBackdrop world={prefs.world} pixel={prefs.pixel} calm={calm} weather={weather} />
       <div className="pr-shade" aria-hidden="true" />
-      <ShioriBody state={face} skin={prefs.skin} mode={snap.mode} pixel={prefs.pixel} calm={calm} focus={focus} notes={subs.notes} />
+      <ShioriBody state={face} skin={prefs.skin} mode={snap.mode} pixel={prefs.pixel} palette={world.palette} calm={calm} focus={focus} notes={subs.notes} />
 
       <header className="pr-top">
         <div className="pr-brand">
@@ -341,14 +343,25 @@ export function Presence() {
                 </button>
               ))}
             </div>
-            <p className="pr-muted">Pixel: Shiori on the city's own grid and palette.</p>
+            <p className="pr-muted">Pixel: Shiori on the world's own grid and palette.</p>
+          </fieldset>
+          <fieldset>
+            <legend>World</legend>
+            <div className="pr-chips">
+              {WORLD_ORDER.map((id) => (
+                <button key={id} type="button" className={`pr-chip${prefs.world === id ? ' is-on' : ''}`} aria-pressed={prefs.world === id} onClick={() => pick({ world: id })}>
+                  {WORLDS[id].label}
+                </button>
+              ))}
+            </div>
+            <p className="pr-muted">{world.line}</p>
           </fieldset>
           <fieldset>
             <legend>Hour</legend>
             <div className="pr-chips">
               {(['auto', ...HOURS] as const).map((h) => (
                 <button key={h} type="button" className={`pr-chip${prefs.hour === h ? ' is-on' : ''}`} aria-pressed={prefs.hour === h} onClick={() => pick({ hour: h })}>
-                  {HOUR_LABELS[h]}
+                  {h === 'auto' ? `Now · ${world.hours[clockHour]}` : world.hours[h]}
                 </button>
               ))}
             </div>
@@ -358,11 +371,11 @@ export function Presence() {
             <div className="pr-chips">
               {SKIES.map((k) => (
                 <button key={k} type="button" className={`pr-chip${prefs.sky === k ? ' is-on' : ''}`} aria-pressed={prefs.sky === k} onClick={() => pick({ sky: k })}>
-                  {SKY_LABELS[k]}
+                  {world.skies[k]}
                 </button>
               ))}
             </div>
-            <p className="pr-muted">The same skies as Openspace's weather, so the city can follow the real one.</p>
+            <p className="pr-muted">Openspace's seven skies, in this world's words, so it can follow the real weather.</p>
           </fieldset>
           <fieldset>
             <legend>State</legend>

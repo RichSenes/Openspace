@@ -28,7 +28,7 @@ describe('the city', () => {
   })
 })
 
-import { hourOf, LIGHTS, HOURS, rainAmount, SKIES, stormFlash } from './city'
+import { blackout, hourOf, LIGHTS, HOURS, rainAmount, SKIES, stormFlash } from './city'
 
 describe('hours and weather', () => {
   it('reads the hour of the world from the clock', () => {
@@ -60,10 +60,38 @@ describe('hours and weather', () => {
     expect(stormFlash(10)).toBe(0)
   })
 
-  it('hangs the sign on a block inside the city', () => {
-    const c = makeCity(400, 300)
-    expect(c.sign.x).toBeGreaterThan(400 * 0.7)
-    expect(c.sign.x + 10).toBeLessThanOrEqual(400)
-    expect(c.sign.y).toBeLessThan(c.horizon)
+  it('hangs one sign in the burning city and many in Tokyo, all inside the frame', () => {
+    const burning = makeCity(400, 300)
+    expect(burning.signs).toHaveLength(1)
+    expect(burning.signs[0].x).toBeGreaterThan(400 * 0.7)
+    const tokyo = makeCity(400, 300, 23, 'tokyo')
+    expect(tokyo.signs.length).toBeGreaterThan(2)
+    for (const s of [...burning.signs, ...tokyo.signs]) {
+      expect(s.x).toBeGreaterThanOrEqual(0)
+      expect(s.x + 10).toBeLessThanOrEqual(400)
+      expect(s.y).toBeLessThan(burning.horizon)
+    }
+  })
+
+  it('gives Tokyo its viaduct and billboard, and the burning city its smoke', () => {
+    const tokyo = makeCity(400, 300, 23, 'tokyo')
+    expect(tokyo.rail!.y).toBeGreaterThan(tokyo.horizon)
+    expect(tokyo.rail!.y).toBeLessThan(tokyo.roof)
+    expect(tokyo.billboard).toBeDefined()
+    expect(tokyo.plumes).toHaveLength(0)
+    expect(makeCity(400, 300).plumes.length).toBeGreaterThan(0)
+  })
+
+  it('cuts the power to a district now and then in a storm', () => {
+    let outs = 0
+    for (let t = 0; t < 200; t += 5) {
+      const b = blackout(t, 400)
+      if (!b) continue
+      outs++
+      expect(b[0]).toBeGreaterThanOrEqual(0)
+      expect(b[1]).toBeGreaterThan(b[0])
+    }
+    expect(outs).toBeGreaterThan(5)
+    expect(outs).toBeLessThan(40)
   })
 })

@@ -38,6 +38,12 @@ public static class DecisionRules
             return "A rule of the constitution: only you change those.";
         }
 
+        // An agent proposing for every office speaks for offices it never worked in.
+        if (proposal.Offices.Count == 0 && FromAgent(proposal))
+        {
+            return "It is about every office: Shiori accepts only what stays in one.";
+        }
+
         if (proposal.Offices.Count > 1)
         {
             return $"It is about {proposal.Offices.Count} offices: Shiori accepts only what stays in one.";
@@ -51,6 +57,10 @@ public static class DecisionRules
         var clash = accepted.FirstOrDefault(d => d.Path != proposal.Path && Overlap(proposal, d) && SameSubject(proposal, d));
         return clash is null ? null : $"[[{Link(clash.Path)}]] is accepted on the same subject and may say otherwise.";
     }
+
+    /// <summary>Written by a desk while it worked on a task: brain_propose signs its notes "from: task …".</summary>
+    public static bool FromAgent(Note note) =>
+        note?.From?.Trim().StartsWith("task ", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>Whether the note is an accepted decision, the kind proposals are weighed against.</summary>
     public static bool IsAcceptedDecision(Note note) =>

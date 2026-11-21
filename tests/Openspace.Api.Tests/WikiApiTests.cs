@@ -55,7 +55,7 @@ public sealed class WikiApiTests : IDisposable
 
     private sealed record Backlink(string Path, string Title, string? Kind, string? Status);
 
-    private sealed record Reason(string Path, string Title, DateOnly Decided, List<string> Covering, string? From);
+    private sealed record Reason(string Path, string Title, DateOnly Decided, List<string> Covering, string? From, bool General);
 
     private sealed record NoteView(string Path, string? Kind, string Title, string? Author, string Body);
 
@@ -189,6 +189,11 @@ public sealed class WikiApiTests : IDisposable
         Assert.Equal(["src/web/**"], only.Covering);
         Assert.Empty((await _http.GetFromJsonAsync<List<Reason>>("/api/brain/why?path=src/api/Program.cs", Json))!);
         Assert.Empty((await _http.GetFromJsonAsync<List<Reason>>("/api/brain/why?path=src/web/cart.ts&office=E%20Corp", Json))!);
+        File.WriteAllText(Path.Combine(_app.BrainFolder, "Decisions", "2026-11-21-reviews.md"), "---\nkind: decision\nstatus: accepted\nrooms: [Web]\n---\n# Reviews\n\nTwo reviewers.\n");
+        var general = (await _http.GetFromJsonAsync<List<Reason>>("/api/brain/why?path=src/web/cart.ts&office=Allsafe&room=Web", Json))!;
+        Assert.Equal([("Decisions/2026-11-20-cart-totals.md", false), ("Decisions/2026-11-21-reviews.md", true)], general.Select(r => (r.Path, r.General)));
+        Assert.Empty(general[1].Covering);
+        Assert.Single((await _http.GetFromJsonAsync<List<Reason>>("/api/brain/why?path=src/web/cart.ts&office=Allsafe&room=Api", Json))!);
         using var none = await _http.GetAsync("/api/brain/why");
         Assert.Equal(HttpStatusCode.BadRequest, none.StatusCode);
     }

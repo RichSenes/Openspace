@@ -203,7 +203,7 @@ public sealed partial class TomorrowMorning(
     private async Task<string?> ComposeAsync(RoutineContext context, TomorrowSettings settings, DayPlan plan, CancellationToken cancellationToken)
     {
         var function = models.CurrentValue.Digests;
-        if (!PersonalDataReaders.MayRead(function))
+        if (!PersonalDataReaders.MayRead(function, models.CurrentValue.FreeModels))
         {
             context.Write($"The digests model ({(string.IsNullOrWhiteSpace(function.Model) ? "OpenCode's default" : function.Model.Trim())}) may be a free online model, "
                 + "and the calendar is personal: the agenda is written from the plain template, without a model.");

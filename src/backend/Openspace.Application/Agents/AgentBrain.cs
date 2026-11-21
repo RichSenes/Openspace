@@ -27,8 +27,14 @@ public sealed partial class AgentBrain(
     /// <summary>At most this many decisions go in a briefing; the rest are a search away.</summary>
     public const int BriefingDecisions = 8;
 
+    /// <summary>At most this many of the room's expert notes go in a briefing; the rest are a search away.</summary>
+    public const int BriefingNotes = 5;
+
     /// <summary>At most this many tasks in flight go in a briefing; the rest are in brain_now.</summary>
     public const int BriefingWork = 5;
+
+    /// <summary>What an agent writes in a proposal's offices to mean every office.</summary>
+    public const string EveryOffice = "*";
 
     private const int SearchHits = 10;
 
@@ -88,7 +94,7 @@ public sealed partial class AgentBrain(
     }
 
     /// <summary>Creates a new note with <c>status: proposed</c>; it never changes an existing one.</summary>
-    /// <param name="offices">The offices it is about; the caller's own when none is given.</param>
+    /// <param name="offices">The offices it is about; the caller's own when none is given, every office with <see cref="EveryOffice"/>.</param>
     /// <returns>The new note's path.</returns>
     public async Task<string> ProposeAsync(
         WorkTaskId taskId,
@@ -123,10 +129,13 @@ public sealed partial class AgentBrain(
             path = $"{stem}-{n}.md";
         }
 
+        // "*" means every office, which the front matter says by naming none; the person then
+        // decides, since an agent's word for every office is not Shiori's to accept.
         var scope = List(offices);
+        IReadOnlyList<string> about = scope.Contains(EveryOffice) ? [] : scope.Count > 0 ? scope : [caller.Office.Name];
         var note = new Note(
             path, what, NoteStatus.Proposed, name,
-            scope.Count > 0 ? scope : [caller.Office.Name], List(rooms), List(paths), null, null,
+            about, List(rooms), List(paths), null, null,
             $"task {caller.Task.Id.Value}", caller.Desk.Name,
             $"# {name}\n\n{text}\n\n## Reasons\n\n{why}\n", []);
         await vault.WriteAsync(note, caller.Desk.Name, cancellationToken, $"proposed {path}").ConfigureAwait(false);
@@ -170,6 +179,7 @@ public sealed partial class AgentBrain(
 
             var rules = Rules((await vault.ReadAsync("Constitution.md", cancellationToken).ConfigureAwait(false))?.Body);
             var (decisions, more) = await DecisionsAsync(office, room, taskPaths, cancellationToken).ConfigureAwait(false);
+            var (notes, moreNotes) = await ExpertNotesAsync(office, room, cancellationToken).ConfigureAwait(false);
             var nearby = inFlight
                 .Where(w => w.OfficeId == office.Id.Value && w.TaskId != task.Id.Value)
                 .Select(w => (Work: w, Shared: Shared(w.Paths, taskPaths)))
@@ -177,9 +187,9 @@ public sealed partial class AgentBrain(
                 .OrderByDescending(x => x.Shared.Count)
                 .ToList();
 
-            return rules.Count == 0 && decisions.Count == 0 && nearby.Count == 0
+            return rules.Count == 0 && decisions.Count == 0 && notes.Count == 0 && nearby.Count == 0
                 ? null
-                : new BrainBrief(rules, decisions, more, [.. nearby.Select(x => new NearbyWork(Doing(x.Work, 4), x.Shared))]);
+                : new BrainBrief(rules, decisions, more, [.. nearby.Select(x => new NearbyWork(Doing(x.Work, 4), x.Shared))], notes, moreNotes);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -227,6 +237,50 @@ public sealed partial class AgentBrain(
         }
 
         return (shown, applying.Count - shown.Count);
+    }
+
+    /// <summary>
+    /// The accepted notes of the office (<c>Offices/&lt;office&gt;/</c>) about this room or about
+    /// every room. Notes written by the room's seniors come first, the most senior first: someone
+    /// who finished many of the room's tasks knows its corners. Then the newest.
+    /// </summary>
+    private async Task<(IReadOnlyList<BriefNote> Shown, int More)> ExpertNotesAsync(Office office, Room room, CancellationToken cancellationToken)
+    {
+        var folder = $"{Folders["note"]}/{Journals.FolderName(office.Name)}/";
+        var found = (await index.FindAsync([], "note", cancellationToken).ConfigureAwait(false))
+            .Where(n => string.Equals(n.Status, NoteStatus.Accepted, StringComparison.OrdinalIgnoreCase))
+            .Where(n => n.Path.StartsWith(folder, StringComparison.Ordinal) && !n.Path.EndsWith("/README.md", StringComparison.OrdinalIgnoreCase))
+            .Where(n => n.Rooms.Count == 0 || n.Rooms.Any(r => string.Equals(r.Trim(), room.Name, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (found.Count == 0)
+        {
+            return ([], 0);
+        }
+
+        // Seniority is only counted when there are notes to weigh: one query for the office's
+        // finished tasks, counted by the room's desks, instead of a lookup per note.
+        var deskNames = room.Desks.ToDictionary(d => d.Id, d => d.Name);
+        var done = (await tasks.ListAsync(office.Id, WorkTaskStatus.Done, cancellationToken).ConfigureAwait(false))
+            .Where(t => t.DeskId is { } id && deskNames.ContainsKey(id))
+            .GroupBy(t => deskNames[t.DeskId!.Value], StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var weighed = new List<(BriefNote Note, DateTimeOffset Modified)>();
+        foreach (var n in found)
+        {
+            var note = await vault.ReadAsync(n.Path, cancellationToken).ConfigureAwait(false);
+            var author = Blank(note?.Author);
+            var seniority = author is not null && done.TryGetValue(author, out var count) ? count : 0;
+            weighed.Add((new BriefNote(n.Path, n.Title, Gist(note?.Body ?? n.Excerpt, n.Title), author, seniority), n.Modified));
+        }
+
+        var ordered = weighed
+            .OrderByDescending(x => x.Note.Seniority)
+            .ThenByDescending(x => x.Modified)
+            .ThenBy(x => x.Note.Path, StringComparer.Ordinal)
+            .Select(x => x.Note)
+            .ToList();
+        return ([.. ordered.Take(BriefingNotes)], Math.Max(0, ordered.Count - BriefingNotes));
     }
 
     /// <summary>The numbered rules of the constitution, one line each.</summary>
@@ -374,10 +428,19 @@ public sealed partial class AgentBrain(
 /// <param name="Decisions">The accepted decisions that apply, most relevant first.</param>
 /// <param name="MoreDecisions">Decisions that apply too, left out to keep the briefing short.</param>
 /// <param name="Nearby">Work in flight in the same room or on the same files.</param>
-public sealed record BrainBrief(IReadOnlyList<string> Rules, IReadOnlyList<BriefDecision> Decisions, int MoreDecisions, IReadOnlyList<NearbyWork> Nearby);
+/// <param name="Notes">The room's expert notes, the seniors' first.</param>
+/// <param name="MoreNotes">Expert notes left out to keep the briefing short.</param>
+public sealed record BrainBrief(
+    IReadOnlyList<string> Rules, IReadOnlyList<BriefDecision> Decisions, int MoreDecisions, IReadOnlyList<NearbyWork> Nearby,
+    IReadOnlyList<BriefNote> Notes, int MoreNotes);
 
 /// <param name="Gist">The decision's first line, so the agent knows whether to read it.</param>
 public sealed record BriefDecision(string Path, string Title, string Gist);
+
+/// <summary>A note of the office about the room, as the briefing names it.</summary>
+/// <param name="Author">The inhabitant who wrote it, when the note says so.</param>
+/// <param name="Seniority">How many of the room's tasks its author finished; 0 for anyone else.</param>
+public sealed record BriefNote(string Path, string Title, string Gist, string? Author, int Seniority);
 
 /// <param name="Doing">Which task, at which desk, changing which files.</param>
 /// <param name="Shared">The files it shares with the task being briefed.</param>

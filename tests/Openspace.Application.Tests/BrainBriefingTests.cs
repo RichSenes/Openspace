@@ -1,5 +1,6 @@
 using Openspace.Application.Agents;
 using Openspace.Application.Brain;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
 namespace Openspace.Application.Tests;
@@ -149,6 +150,86 @@ public class BrainBriefingTests
         Assert.Contains("more: read them with brain_read Constitution.md", part, StringComparison.Ordinal);
         Assert.Contains("8 more decisions apply", part, StringComparison.Ordinal);
         Assert.Contains("brain_journal", part, StringComparison.Ordinal);
+    }
+
+    private static string OfficeNote(string title, string gist, string author, string scope = "", string status = "accepted") => $"""
+        ---
+        kind: note
+        status: {status}
+        {scope}
+        author: {author}
+        ---
+        # {title}
+
+        {gist}
+        """;
+
+    /// <summary>A task the desk finished in the room: what seniority counts.</summary>
+    private void Finished(Desk desk)
+    {
+        var task = WorkTask.Assign(_h.Office, desk.Id, "Old work", null, "elliot", _h.Clock.GetUtcNow());
+        task.Start(_h.Clock.GetUtcNow());
+        task.SubmitForReview(_h.Clock.GetUtcNow());
+        task.Accept(_h.Clock.GetUtcNow());
+        _h.Tasks.Add(task);
+    }
+
+    [Fact]
+    public async Task The_rooms_expert_notes_come_after_the_decisions_the_seniors_first()
+    {
+        var senior = _h.Office.AddDesk(_h.Room.Id, "Screens", AgentProfile.Create("frontend-dev"), Harness.Start);
+        Finished(senior);
+        Finished(senior);
+        Finished(_h.Desk);
+        _h.Vault.Put("Decisions/2026-11-01-web-buttons.md", Decision("Buttons use the shared component", "Never style a button by hand.", "rooms: [Web]"));
+        _h.Vault.Put("Offices/E Corp/newest.md", OfficeNote("Newest tip", "Clear the cache first.", "elliot"));
+        _h.Vault.Put("Offices/E Corp/forms.md", OfficeNote("Forms", "Validate on blur.", "Screens", "rooms: [Web]"));
+        _h.Vault.Put("Offices/E Corp/icons.md", OfficeNote("Icons", "Use the sprite.", "Frontend"));
+        _h.Vault.Put("Offices/E Corp/api.md", OfficeNote("Api routes", "Version them.", "Screens", "rooms: [Api]"));
+        _h.Vault.Put("Offices/E Corp/draft.md", OfficeNote("Draft tip", "Not yet.", "Screens", status: "proposed"));
+        _h.Vault.Put("Offices/Allsafe/deploys.md", OfficeNote("Allsafe deploys", "Mondays.", "Screens"));
+
+        var text = await BriefAsync(Task());
+
+        Assert.Contains("Notes of this room", text, StringComparison.Ordinal);
+        Assert.Contains("- Forms: Validate on blur. (Offices/E Corp/forms.md, by Screens, 2 tasks done in this room)", text, StringComparison.Ordinal);
+        Assert.Contains("- Icons: Use the sprite. (Offices/E Corp/icons.md, by Frontend, 1 task done in this room)", text, StringComparison.Ordinal);
+        string[] order = ["Buttons use the shared component", "Notes of this room", "- Forms", "- Icons", "- Newest tip"];
+        var at = order.Select(t => text.IndexOf(t, StringComparison.Ordinal)).ToList();
+        Assert.All(at, i => Assert.True(i > 0));
+        Assert.Equal(at.Order(), at);
+        Assert.DoesNotContain("Api routes", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Draft tip", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Allsafe deploys", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Expert_notes_are_cut_after_the_decisions_when_the_brief_runs_long()
+    {
+        _h.Vault.Put("Constitution.md", "# Constitution\n\n" + string.Join('\n', Enumerable.Range(1, 11).Select(i => $"{i}. Rule {i}: " + new string('x', 150))) + "\n");
+        for (var i = 1; i <= 8; i++)
+        {
+            _h.Vault.Put($"Decisions/2026-11-{i:00}-d{i}.md", Decision($"Decision {i}", new string('y', 300), "rooms: [Web]"));
+        }
+
+        for (var i = 1; i <= 5; i++)
+        {
+            _h.Vault.Put($"Offices/E Corp/n{i}.md", OfficeNote($"Note {i}", new string('z', 150), "elliot"));
+        }
+
+        var part = Briefing.BeforeYouStart((await _h.BrainTools().BriefAsync(_h.Office, _h.Room, Task(), default))!);
+
+        Assert.True(part.Length <= Briefing.BeforeYouStartLimit, $"{part.Length} characters");
+        Assert.Contains("more decisions apply", part, StringComparison.Ordinal);
+        Assert.All(Enumerable.Range(1, 5), i => Assert.Contains($"- Note {i}", part, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Only_expert_notes_are_enough_for_a_before_you_start_part()
+    {
+        _h.Vault.Put("Offices/E Corp/icons.md", OfficeNote("Icons", "Use the sprite.", "elliot"));
+
+        Assert.Contains("- Icons: Use the sprite. (Offices/E Corp/icons.md, by elliot)", await BriefAsync(Task()), StringComparison.Ordinal);
     }
 
     [Fact]

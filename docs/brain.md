@@ -181,12 +181,12 @@ New MCP tools on the existing server:
 | `brain_search(query, scope?)` | Notes that match, with their status and a short excerpt |
 | `brain_read(note)` | One note |
 | `brain_journal(text)` | Appends to the agent's journal |
-| `brain_propose(kind, title, body, scope)` | A decision or note proposal for the person or Shiori |
+| `brain_propose(kind, title, body, scope)` | A decision or note proposal for the person or Shiori; the scope defaults to the agent's office, `*` means every office (then the person decides) |
 | `brain_now()` | Who is working on what, now |
 
 The briefing grows a "Before you start" part: the constitution's rules, the accepted decisions
-whose scope matches the task's office, room or paths, overlaps from *Now*, and the room's expert
-notes. At the end of a task the agent is asked to write its journal entry and, when it made a
+whose scope matches the task's office, room or paths, the room's expert notes (those written by
+the room's seniors, the desks that finished most of its tasks, first), and overlaps from *Now*. At the end of a task the agent is asked to write its journal entry and, when it made a
 choice others should follow, to propose a decision.
 
 ### Decisions over time
@@ -208,8 +208,9 @@ it like this?" always has an answer.
 - **The whiteboard** beside the chat fills in as the session goes: ideas, doubts, decisions taken.
   At the end it becomes a note, animated in the interface.
 - **Answers cite** the notes they come from.
-- **"Tomorrow morning"**: on a schedule, or at the end of a session, an agenda for the next day
-  written into the vault and sent with the morning message.
+- **"Tomorrow morning"**: on a schedule, an agenda for the next day written into the vault and
+  sent with the morning message; a session that ends leaves its open tasks under "Next" in its
+  note, and the agenda starts from them.
 - **Shiori as supervisor** replaces today's one-shot planner: it plans with the whole brain in
   view, assigns desks in every office and checks on work while it goes. In the building it is a
   character with its own look that walks between places, talks with inhabitants and visits the
@@ -230,7 +231,8 @@ Settings › Models lists every function with its engine and model:
 ### The wiki and the map
 
 - **Wiki**: browse by folder and kind, full-text search, backlinks, history with diffs from the
-  vault's git, decision status and review date, "why is this so?" from a file or a decision.
+  vault's git, decision status and review date, "why is this so?" from a file or a decision
+  (the decisions about its paths, then the general ones of its office and room).
 - **Map**: the graph of notes and links, filterable by office, kind and author, with visual
   themes (a galaxy, a city…) chosen like the building's.
 
@@ -333,7 +335,8 @@ them, in this generic form, as the template of a new vault:
   rather than restart, and work that does not need Opus goes elsewhere.
 - **Privacy**: once mail, health and food enter the vault, rule 9 applies: a per-folder
   "personal" flag tells Openspace which models may read those notes (local ones and Claude on the
-  person's account, never free online ones).
+  person's account, never free online ones). Free models are those named `-free`/`:free` and
+  those the person lists in Settings › Models.
 - **Vault rot**: proposals, scopes and review dates keep it clean; a monthly tidy-up job may help.
 - **Edits from both sides**: Obsidian and Openspace writing the same note at once; the vault's
   git and short writes keep it safe, conflicts become proposals.

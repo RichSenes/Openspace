@@ -59,6 +59,17 @@ public class AgentBrainTests
     }
 
     [Fact]
+    public async Task A_star_proposes_for_every_office_with_no_offices_in_the_front_matter()
+    {
+        var task = await RunningTaskAsync();
+
+        var path = await _h.BrainTools().ProposeAsync(task.Id, "decision", "Tabs everywhere", "Tabs.", [AgentBrain.EveryOffice, "Allsafe"], null, null, "One style.", default);
+
+        Assert.Empty(_h.Vault.Notes[path].Offices);
+        Assert.DoesNotContain("offices:", VaultFormat.Write(_h.Vault.Notes[path]), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task An_office_note_goes_in_the_office_folder()
     {
         var task = await RunningTaskAsync();

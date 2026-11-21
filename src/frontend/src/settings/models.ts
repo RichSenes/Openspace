@@ -16,7 +16,26 @@ export const DEFAULT_MODEL: Record<ModelEngine, string> = {
 
 /** What is sent: the view without what is only shown. */
 export function settingsOf(view: ModelsView): ModelsSettings {
-  return { shiori: view.shiori, reviewer: view.reviewer, digests: view.digests, journals: view.journals }
+  return { shiori: view.shiori, reviewer: view.reviewer, digests: view.digests, journals: view.journals, freeModels: view.freeModels }
+}
+
+/** The free models as the field shows them: one per line. */
+export function freeModelsText(models: string[]): string {
+  return models.join('\n')
+}
+
+/** The field's lines as ids: trimmed, blank lines dropped, each once whatever its case. */
+export function parseFreeModels(text: string): string[] {
+  const seen = new Set<string>()
+  const models: string[] = []
+  for (const line of text.split('\n')) {
+    const id = line.trim()
+    if (id && !seen.has(id.toLowerCase())) {
+      seen.add(id.toLowerCase())
+      models.push(id)
+    }
+  }
+  return models
 }
 
 export function changed(saved: ModelsView, draft: ModelsSettings): boolean {
@@ -43,6 +62,9 @@ export function withEngine(choice: FunctionChoice, engine: ModelEngine): Functio
 /** Why the form cannot be saved as it is, or null; the server checks the same. */
 export function problemOf(draft: ModelsSettings): string | null {
   if (draft.reviewer.engine === 'OpenCode' && !draft.reviewer.openCodeModel) return 'The reviewer on OpenCode needs a model: choose one, or No review.'
+  // OpenCode names models provider/model, and so does the server when it checks the list.
+  const wrong = draft.freeModels.find((m) => !/^[^\s/]\S*\/\S*[^\s/]$/.test(m))
+  if (wrong !== undefined) return `Free models are named provider/model, as OpenCode lists them: “${wrong}” is not.`
   return null
 }
 

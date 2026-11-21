@@ -210,9 +210,11 @@ public sealed class TomorrowMorningTests
     [Theory]
     [InlineData("opencode/deepseek-v4.1-flash-free")]
     [InlineData("openrouter/some-model:free")]
+    [InlineData("openrouter/marked-by-the-person")]
     [InlineData(null)]
     public async Task On_a_free_online_model_the_personal_agenda_is_written_from_the_template_and_the_log_says_why(string? model)
     {
+        _models.FreeModels = ["OpenRouter/Marked-By-The-Person"];
         _models.Digests = new FunctionModel { Engine = ModelEngine.OpenCode, Model = model };
         var routine = Create();
         Evening();
@@ -392,6 +394,13 @@ public sealed class TomorrowMorningTests
     [InlineData(ModelEngine.OpenCode, "  ", false)]
     public void Only_models_that_are_not_free_online_ones_may_read_personal_data(ModelEngine engine, string? model, bool may) =>
         Assert.Equal(may, PersonalDataReaders.MayRead(new FunctionModel { Engine = engine, Model = model }));
+
+    [Theory]
+    [InlineData("zen/grok-code", false)]
+    [InlineData(" ZEN/GROK-CODE ", false)]
+    [InlineData("anthropic/claude-sonnet", true)]
+    public void Models_the_person_marked_as_free_may_not_read_personal_data_either(string model, bool may) =>
+        Assert.Equal(may, PersonalDataReaders.MayRead(new FunctionModel { Engine = ModelEngine.OpenCode, Model = model }, ["zen/grok-code", " "]));
 
     private sealed class FakeAgenda : IAgenda
     {

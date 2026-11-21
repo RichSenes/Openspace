@@ -18,10 +18,12 @@ public interface IEngineText
 public static class PersonalDataReaders
 {
     /// <summary>
-    /// False for OpenCode's free online models, named <c>…-free</c> or <c>…:free</c>, and for
-    /// OpenCode's default model, which cannot be told apart from one.
+    /// False for OpenCode's free online models: those named <c>…-free</c> or <c>…:free</c>, those
+    /// the person listed in Settings › Models, and OpenCode's default model, which cannot be told
+    /// apart from one.
     /// </summary>
-    public static bool MayRead(FunctionModel function)
+    /// <param name="freeModels">The models the person marked as free (<c>Models:FreeModels</c>).</param>
+    public static bool MayRead(FunctionModel function, IEnumerable<string>? freeModels = null)
     {
         ArgumentNullException.ThrowIfNull(function);
         if (function.Engine != ModelEngine.OpenCode)
@@ -32,6 +34,7 @@ public static class PersonalDataReaders
         var model = function.Model?.Trim();
         return !string.IsNullOrEmpty(model)
             && !model.EndsWith("-free", StringComparison.OrdinalIgnoreCase)
-            && !model.EndsWith(":free", StringComparison.OrdinalIgnoreCase);
+            && !model.EndsWith(":free", StringComparison.OrdinalIgnoreCase)
+            && !(freeModels ?? []).Any(f => string.Equals(f?.Trim(), model, StringComparison.OrdinalIgnoreCase));
     }
 }

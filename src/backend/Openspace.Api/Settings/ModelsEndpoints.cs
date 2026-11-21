@@ -24,17 +24,21 @@ public sealed record LocalModelChoice(string Id, string Name);
 /// <param name="Configured">Whether a command starts the decider; otherwise routines have none.</param>
 public sealed record DeciderSummary(bool Configured, string Command, string Url);
 
-public sealed record ModelsRequest(EngineChoiceView Shiori, EngineChoiceView Reviewer, FunctionChoiceView Digests, FunctionChoiceView Journals);
+/// <param name="FreeModels">OpenCode models the person marks as free; left as they are when not sent.</param>
+public sealed record ModelsRequest(
+    EngineChoiceView Shiori, EngineChoiceView Reviewer, FunctionChoiceView Digests, FunctionChoiceView Journals, IReadOnlyList<string>? FreeModels = null);
 
 /// <param name="LocalModels">The models of Settings › Local AI, as functions name them.</param>
 /// <param name="Decider">Shown only: it is set in Settings › Local AI.</param>
+/// <param name="FreeModels">OpenCode models marked as free: personal data never goes to them.</param>
 public sealed record ModelsView(
     EngineChoiceView Shiori,
     EngineChoiceView Reviewer,
     FunctionChoiceView Digests,
     FunctionChoiceView Journals,
     IReadOnlyList<LocalModelChoice> LocalModels,
-    DeciderSummary Decider);
+    DeciderSummary Decider,
+    IReadOnlyList<string> FreeModels);
 
 /// <summary>
 /// Settings › Models: the engine and model of each function, written to the settings file and
@@ -73,7 +77,8 @@ internal static class ModelsEndpoints
                 .Where(m => !string.IsNullOrWhiteSpace(m.Id))
                 .Select(m => new LocalModelChoice($"{l.Provider}/{m.Id}", string.IsNullOrWhiteSpace(m.Name) ? m.Id : m.Name))
                 .ToList(),
-            new DeciderSummary(!string.IsNullOrWhiteSpace(l.Decider.Command), l.Decider.Command, l.Decider.Url.ToString()));
+            new DeciderSummary(!string.IsNullOrWhiteSpace(l.Decider.Command), l.Decider.Command, l.Decider.Url.ToString()),
+            [.. f.FreeModels.Where(m => !string.IsNullOrWhiteSpace(m)).Select(m => m.Trim())]);
     }
 
     private static string? Blank(string? model) => string.IsNullOrWhiteSpace(model) ? null : model.Trim();
@@ -95,6 +100,10 @@ internal static class ModelsEndpoints
         var functions = section(FunctionModelOptions.SectionName);
         functions["Digests"] = new System.Text.Json.Nodes.JsonObject { ["Engine"] = models.Digests.Engine.ToString(), ["Model"] = models.Digests.Model ?? string.Empty };
         functions["Journals"] = new System.Text.Json.Nodes.JsonObject { ["Engine"] = models.Journals.Engine.ToString(), ["Model"] = models.Journals.Model ?? string.Empty };
+        if (models.FreeModels is not null)
+        {
+            functions["FreeModels"] = new System.Text.Json.Nodes.JsonArray([.. models.FreeModels.Select(m => (System.Text.Json.Nodes.JsonNode?)m)]);
+        }
     });
 }
 
@@ -144,7 +153,20 @@ internal static class ModelChoices
             TwoEngines(request.Shiori, "Shiori", noneAllowed: false),
             TwoEngines(request.Reviewer, "The reviewer", noneAllowed: true),
             Function(request.Digests, "Digests", localProvider),
-            Function(request.Journals, "Journals", localProvider));
+            Function(request.Journals, "Journals", localProvider),
+            request.FreeModels is null ? null : FreeModels(request.FreeModels));
+    }
+
+    /// <summary>Trimmed, blank lines dropped, each once; an id is <c>provider/model</c>, as OpenCode names them.</summary>
+    private static List<string> FreeModels(IReadOnlyList<string> models)
+    {
+        var valid = models.Select(m => m?.Trim() ?? string.Empty).Where(m => m.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (valid.FirstOrDefault(m => m.Contains(' ', StringComparison.Ordinal) || m.IndexOf('/', StringComparison.Ordinal) is <= 0 || m.EndsWith('/')) is { } wrong)
+        {
+            throw new DomainException($"Free models are named provider/model, as OpenCode lists them: \"{wrong}\" is not.");
+        }
+
+        return valid;
     }
 
     private static EngineChoiceView TwoEngines(EngineChoiceView choice, string name, bool noneAllowed)

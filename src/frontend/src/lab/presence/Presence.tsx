@@ -9,6 +9,7 @@ import { RIGS } from './body/rig'
 import type { SkinId } from './body/shapes'
 import { ShioriBody } from './body/ShioriBody'
 import { focusFor, subtitles } from './subtitles'
+import { useWeather } from '../../api/hooks'
 import type { Sky } from '../../api/types'
 import { HOURS, hourOf, SKIES, type Hour, type WorldId } from './world/types'
 import { WorldBackdrop } from './world/WorldBackdrop'
@@ -23,11 +24,12 @@ interface Prefs {
   skin: SkinId
   pixel: number
   hour: Hour | 'auto'
-  sky: Sky
+  /** 'auto' follows the real weather of the person's town. */
+  sky: Sky | 'auto'
   world: WorldId
 }
 
-const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'Rain', world: 'city' }
+const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'auto', world: 'city' }
 
 function loadPrefs(): Prefs {
   try {
@@ -36,7 +38,7 @@ function loadPrefs(): Prefs {
       skin: SKINS.includes(v.skin as SkinId) ? (v.skin as SkinId) : DEFAULTS.skin,
       pixel: [0, 2, 3, 4].includes(v.pixel ?? -1) ? v.pixel! : DEFAULTS.pixel,
       hour: v.hour === 'auto' || HOURS.includes(v.hour as Hour) ? (v.hour as Hour | 'auto') : DEFAULTS.hour,
-      sky: SKIES.includes(v.sky as Sky) ? (v.sky as Sky) : DEFAULTS.sky,
+      sky: v.sky === 'auto' || SKIES.includes(v.sky as Sky) ? (v.sky as Sky | 'auto') : DEFAULTS.sky,
       world: WORLD_ORDER.includes(v.world as WorldId) ? (v.world as WorldId) : DEFAULTS.world,
     }
   } catch {
@@ -141,7 +143,7 @@ export function Presence() {
       skin: (s: SkinId) => pick({ skin: s }),
       pixel: (p: number) => pick({ pixel: p }),
       hour: (h: Hour | 'auto') => pick({ hour: h }),
-      sky: (k: Sky) => pick({ sky: k }),
+      sky: (k: Sky | 'auto') => pick({ sky: k }),
       world: (w: WorldId) => pick({ world: w }),
       state: (s: FaceState | null) => setForced(s),
       seek: (step: number | 'end', at: 'start' | 'mid' | 'end' = 'mid') => {
@@ -162,7 +164,8 @@ export function Presence() {
   const look = FACE_LOOKS[face]
   const sections = boardSections(snap.board)
   const progress = Math.round((t / timeline.duration) * 100)
-  const weather = { hour: prefs.hour === 'auto' ? clockHour : prefs.hour, sky: prefs.sky }
+  const realSky = useWeather().data?.now?.sky
+  const weather = { hour: prefs.hour === 'auto' ? clockHour : prefs.hour, sky: prefs.sky === 'auto' ? (realSky ?? 'Clear') : prefs.sky }
   const world = WORLDS[prefs.world]
 
   return (
@@ -369,13 +372,16 @@ export function Presence() {
           <fieldset>
             <legend>Weather</legend>
             <div className="pr-chips">
+              <button type="button" className={`pr-chip${prefs.sky === 'auto' ? ' is-on' : ''}`} aria-pressed={prefs.sky === 'auto'} onClick={() => pick({ sky: 'auto' })}>
+                {realSky ? `Now · ${world.skies[realSky]}` : 'Now'}
+              </button>
               {SKIES.map((k) => (
                 <button key={k} type="button" className={`pr-chip${prefs.sky === k ? ' is-on' : ''}`} aria-pressed={prefs.sky === k} onClick={() => pick({ sky: k })}>
                   {world.skies[k]}
                 </button>
               ))}
             </div>
-            <p className="pr-muted">Openspace's seven skies, in this world's words, so it can follow the real weather.</p>
+            <p className="pr-muted">{realSky ? 'Now follows the weather of your town, from Settings.' : 'Now needs a town in Settings › Look and sound; until then it stays clear.'}</p>
           </fieldset>
           <fieldset>
             <legend>State</legend>

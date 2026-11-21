@@ -149,22 +149,14 @@ function clothes(g: CanvasRenderingContext2D) {
  * without being heavy.
  */
 function chest(g: CanvasRenderingContext2D) {
-  for (const [cx, side] of [
-    [46, -1],
-    [82, 1],
-  ] as const) {
-    const r = 13
-    const top = (x: number) => 141 - Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 7
-    const under = (x: number) => 148 + Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 4
-    // Light on the curve, strongest toward the outside where it meets the light.
-    const lit = curve(top, cx - r + 3, cx + r - 3)
-    px(g, '#30284a', lit)
-    px(g, '#44396a', lit.filter(([x]) => (x - cx) * side < 4 && (x - cx) * side > -7))
-    px(g, '#30284a', lit.map(([x, y]) => [x, y + 1] as P).filter(([x]) => Math.abs(x - cx) < 6))
-    // The shadow beneath, two pixels deep at the middle.
-    const dark = curve(under, cx - r + 1, cx + r - 1)
-    px(g, '#07050c', dark)
-    px(g, '#0e0b18', dark.map(([x, y]) => [x, y - 1] as P).filter(([x]) => Math.abs(x - cx) < 8))
+  // Only the shadow beneath each curve: wide, soft at the ends, two pixels deep in the middle.
+  for (const cx of [45, 83]) {
+    const r = 17
+    const under = (x: number) => 150 + Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 5
+    const dark = curve(under, cx - r + 2, cx + r - 2)
+    px(g, '#0e0b18', dark.filter(([x]) => Math.abs(x - cx) > r - 6))
+    px(g, '#07050c', dark.filter(([x]) => Math.abs(x - cx) <= r - 6))
+    px(g, '#0e0b18', dark.map(([x, y]) => [x, y + 1] as P).filter(([x]) => Math.abs(x - cx) < r - 8))
   }
   // Arms parting from the body, curving round the figure.
   px(g, '#07050c', [
@@ -172,37 +164,37 @@ function chest(g: CanvasRenderingContext2D) {
     ...Array.from({ length: 46 }, (_, k) => [101 + Math.sin((k / 46) * Math.PI) * 2, 130 + k] as P),
   ])
   // The wrap: the left panel crosses over the right from the bottom of the V.
-  px(g, '#07050c', curve((x) => 141 + (x - 64) * 1.1, 64, 80))
-  px(g, '#30284a', curve((x) => 140 + (x - 64) * 1.1, 65, 79))
+  px(g, '#07050c', curve((x) => 141 + (x - 64) * 1.1, 64, 85))
+  px(g, '#30284a', curve((x) => 140 + (x - 64) * 1.1, 65, 84))
 }
 
 /** A slim sash at the waist, knotted at the side with two tails. */
 function sash(g: CanvasRenderingContext2D) {
-  const grad = g.createLinearGradient(0, 160, 0, 168)
+  const grad = g.createLinearGradient(0, 164, 0, 172)
   grad.addColorStop(0, '#d84a50')
   grad.addColorStop(1, '#5a1020')
   g.fillStyle = grad
   g.beginPath()
-  g.moveTo(28, 162)
-  g.bezierCurveTo(50, 159, 78, 159, 100, 162)
-  g.lineTo(100, 166)
-  g.bezierCurveTo(78, 163, 50, 163, 28, 166)
+  g.moveTo(28, 166)
+  g.bezierCurveTo(50, 163, 78, 163, 100, 166)
+  g.lineTo(100, 170)
+  g.bezierCurveTo(78, 167, 50, 167, 28, 170)
   g.closePath()
   g.fill()
   // The knot and its tails, on her left.
   g.beginPath()
-  g.ellipse(86, 164, 4, 4, 0, 0, Math.PI * 2)
+  g.ellipse(86, 168, 3.5, 3.5, 0, 0, Math.PI * 2)
   g.fill()
   g.beginPath()
-  g.moveTo(84, 166)
-  g.lineTo(80, 176)
+  g.moveTo(84, 170)
+  g.lineTo(81, 176)
   g.lineTo(84, 176)
-  g.lineTo(87, 167)
+  g.lineTo(87, 171)
   g.closePath()
-  g.moveTo(88, 166)
-  g.lineTo(92, 176)
-  g.lineTo(95, 175)
-  g.lineTo(89, 166)
+  g.moveTo(88, 170)
+  g.lineTo(91, 176)
+  g.lineTo(94, 176)
+  g.lineTo(89, 170)
   g.closePath()
   g.fill()
 }
@@ -251,19 +243,28 @@ function jewellery(g: CanvasRenderingContext2D, e: Expression, t: number) {
   const swing = Math.round(Math.sin(t * 1.6) * 0.6)
   for (const x of [43 + turn, 85 + turn]) {
     const xs = Math.round(x)
+    const d = xs + swing
     px(g, '#e0b050', [
       [xs, 77],
       [xs, 78],
+      [d, 79],
     ])
-    px(g, '#a8782a', [[xs + swing, 79]])
-    px(g, '#5ab890', [
-      [xs + swing, 80],
-      [xs - 1 + swing, 81],
-      [xs + swing, 81],
-      [xs + 1 + swing, 81],
-      [xs + swing, 82],
+    px(g, '#a8782a', [[d, 80]])
+    px(g, '#3a8a6a', [
+      [d, 81],
+      [d - 1, 82],
+      [d, 82],
+      [d + 1, 82],
+      [d - 1, 83],
+      [d, 83],
+      [d + 1, 83],
+      [d, 84],
     ])
-    px(g, '#c8f0d8', [[xs - 1 + swing, 81]])
+    px(g, '#7ad0a8', [
+      [d - 1, 82],
+      [d, 81],
+    ])
+    px(g, '#d8f8e8', [[d - 1, 83]])
   }
   // The chain sits at the base of the neck and dips to the pendant.
   const chain = curve((x) => 104 + 8 * (1 - ((x - 64) / 8) ** 2), 56, 72)
@@ -390,15 +391,15 @@ function brows(g: CanvasRenderingContext2D, e: Expression) {
     const lift = -e.brow * 2 + outer * e.browTilt * 1.5
     // Inner ends rise when worried, drop when frowning.
     const innerLift = e.brow < 0 ? -e.brow * 1.5 : -e.brow * 0.5
-    const pts: P[] = []
-    for (let k = 0; k <= 12; k++) {
-      const u = k / 12
-      const x = eye.x - outer * 6 + outer * 13 * u
-      const y = eye.y - 9.5 + lift + innerLift * (1 - u) - Math.sin(Math.PI * u * 0.9) * 1.6 + u * 0.8
-      pts.push([x, y])
-      if (u < 0.55) pts.push([x, y + 1])
+    const inner = eye.x - outer * 6
+    const y = (x: number) => {
+      const u = ((x - inner) * outer) / 13
+      return eye.y - 9.5 + lift + innerLift * (1 - u) - Math.sin(Math.PI * u * 0.9) * 1.6 + u * 0.8
     }
-    px(g, BROW, pts)
+    // One continuous line, pixel by pixel, two pixels thick on its inner half.
+    const line = curve(y, Math.min(inner, inner + outer * 13), Math.max(inner, inner + outer * 13))
+    const thick = line.filter(([x]) => ((x - inner) * outer) / 13 < 0.55).map(([x, yy]) => [x, yy + 1] as P)
+    px(g, BROW, [...line, ...thick])
   }
 }
 

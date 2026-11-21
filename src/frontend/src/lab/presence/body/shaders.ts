@@ -65,8 +65,6 @@ uniform vec3 uEyeSize; // x: half width, y: half height, z: half distance betwee
 uniform sampler2D uSprite; // the portrait, drawn at its art size: its points take their light from it
 uniform float uArtPx;      // one art pixel of the portrait, in target pixels
 uniform vec2 uRes;         // the target's size in pixels, to snap points to it in pixel mode
-uniform float uStride;     // pixel mode, small: one point per stride×stride art pixels
-uniform vec2 uArt;         // the drawing's size in art pixels
 out vec3 vColor;
 out float vDash;
 ${NOISE}
@@ -144,11 +142,9 @@ void main(){
   } else {
     // The portrait as a cloud of points: one per art pixel, lit by the drawing underneath, on a
     // gently curved surface so turning gives depth. The membrane breathes like the others.
-    vec2 cell = floor(aData.zw * uArt);
-    bool kept = uStride < 1.5 || (mod(cell.x, uStride) < 0.5 && mod(cell.y, uStride) < 0.5);
-    vec2 uv = uStride < 1.5 ? aData.zw : (cell + uStride * 0.5) / uArt;
-    vec4 c = textureLod(uSprite, uv, uStride < 1.5 ? 0.0 : log2(uStride));
-    if (!kept) c = vec4(0.0);
+    // When an art pixel is smaller than a screen pixel, read the drawing averaged to that size,
+    // so the points that land on the same pixel agree instead of flickering.
+    vec4 c = textureLod(uSprite, aData.zw, max(0.0, -log2(max(uArtPx, 0.01))));
     pLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
     n = snoise(aPos * 5.0 + vec3(0.0, 0.0, uPhase * 0.5));
     body = aPos + vec3(0.0, 0.0, 0.012 * n * (0.5 + uEnergy));
@@ -159,8 +155,6 @@ void main(){
     body.y += fade * drift * 0.45;
     body.x += fade * (seed - 0.5) * 0.5 * drift;
     alpha = step(0.5, c.a) * (1.0 - fade * drift);
-    // On the pixel grid she is a flat projection: depth would pull points apart into gaps.
-    if (uPixel > 0.5) body.z = 0.0;
   }
 
   vec3 v = uRot * (body * uBodyScale);
@@ -184,7 +178,7 @@ void main(){
     vDash = mix(vDash, 0.0, m);
   }
 
-  float persp = (uPixel > 0.5 && uSkin > 1.5) ? 1.0 : 3.0 / (3.0 - v.z);
+  float persp = 3.0 / (3.0 - v.z);
   vec2 clip = vec2(v.x * persp * uScale / uAspect, v.y * persp * uScale) + uOffset;
   // In pixel mode every point sits on a whole pixel, so nothing shimmers as she moves or resizes.
   if (uPixel > 0.5) clip = (floor((clip * 0.5 + 0.5) * uRes) + 0.5) / uRes * 2.0 - 1.0;
@@ -207,9 +201,9 @@ void main(){
     // Contrast, so features stay dark against the skin; the glow adds the rest.
     float k = smoothstep(0.06, 0.98, pLum);
     bright = (0.1 + 0.95 * k) * (0.7 + 0.35 * depth) * (0.6 + 0.5 * uEnergy);
-    // Smooth: soft dots a little larger where she is lit. Pixel: whole pixels with no gaps; they
-    // overlap, so the renderer keeps the brightest instead of adding them up.
-    size = uPixel > 0.5 ? floor(uArtPx + 0.5) : uArtPx * (0.9 + 0.5 * k);
+    // Smooth: soft dots a little larger where she is lit. Pixel: whole pixels a little larger than
+    // their spacing, so no row or column is ever left empty; overlaps keep the brightest.
+    size = uPixel > 0.5 ? max(1.0, ceil(uArtPx * 1.2)) : max(1.0, uArtPx) * (0.9 + 0.5 * k);
     // Pixel mode snaps to the world's few colours: keep her below white, whatever the mode's heat.
     if (uPixel > 0.5) {
       bright = min(bright * 0.42, 0.5);

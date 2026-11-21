@@ -3,7 +3,7 @@ import { along, makeMachine, PACE } from './machine'
 import { bayerAt, fbm, valueNoise } from './pixels'
 import { makeSpace, sunAt } from './space'
 import { KYOTO_LIGHTS, makeKyoto, skyLanternAt } from './kyoto'
-import { depthAt, makeLibrary } from './library'
+import { makeLibrary, towerShift } from './library'
 import { HOURS, SKIES } from './types'
 import { WORLD_ORDER, WORLDS } from './worlds'
 
@@ -109,30 +109,26 @@ describe('pixel tools', () => {
 })
 
 describe('Kyoto', () => {
-  it('has a bamboo grove on one side, cherry trees on the other, and the middle clear', () => {
+  it('is seen from far: a town of many small houses below the ridges', () => {
     const k = makeKyoto(400, 300)
-    expect(k.bamboo.length).toBeGreaterThan(5)
-    for (const s of k.bamboo) expect(s.x).toBeLessThan(400 * 0.12)
-    expect(k.blossoms.length).toBeGreaterThan(15)
-    for (const b of k.blossoms) expect(b.x).toBeGreaterThan(400 * 0.5)
+    const all = k.terraces.flatMap((t) => t.houses)
+    expect(all.length).toBeGreaterThan(80)
+    for (const hs of all) expect(hs.h).toBeLessThanOrEqual(16)
+    for (let i = 1; i < k.terraces.length; i++) expect(k.terraces[i].base).toBeGreaterThan(k.terraces[i - 1].base)
   })
 
-  it('lays a path of gates that recede: each smaller and higher than the one before', () => {
+  it('has pagodas, a path of gates and a bamboo grove, all small', () => {
     const k = makeKyoto(400, 300)
-    for (let i = 1; i < k.gates.length; i++) {
-      expect(k.gates[i].h).toBeLessThan(k.gates[i - 1].h)
-      expect(k.gates[i].base).toBeLessThan(k.gates[i - 1].base)
-    }
     expect(k.pagodas.length).toBeGreaterThanOrEqual(3)
+    expect(k.gates.length).toBeGreaterThan(8)
+    expect(k.grove.x1 - k.grove.x0).toBeLessThan(400 * 0.15)
   })
 
-  it('lets sky lanterns rise and start again from below', () => {
+  it('lets sky lanterns rise from the town and start again', () => {
     const k = makeKyoto(400, 300)
     const l = k.skyLanterns[0]
-    const a = skyLanternAt(l, k, 1)
-    const b = skyLanternAt(l, k, 2)
-    expect(b.y).toBeLessThan(a.y)
-    for (let t = 0; t < 200; t += 3) expect(skyLanternAt(l, k, t).y).toBeLessThanOrEqual(k.floor)
+    expect(skyLanternAt(l, k, 2).y).toBeLessThan(skyLanternAt(l, k, 1).y)
+    for (let t = 0; t < 200; t += 3) expect(skyLanternAt(l, k, t).y).toBeLessThanOrEqual(k.horizon + 30)
   })
 
   it('lights its lanterns after dark only', () => {
@@ -142,15 +138,25 @@ describe('Kyoto', () => {
 })
 
 describe('the endless library', () => {
-  it('runs its walls away toward the middle: near columns wider than far ones', () => {
-    expect(depthAt(0)).toBe(0)
-    expect(depthAt(0.1) - depthAt(0)).toBeGreaterThan(depthAt(1) - depthAt(0.9))
-    expect(depthAt(1)).toBeLessThan(1)
+  it('builds towers in three depths, some hanging from above, none of the near ones behind Shiori', () => {
+    const lib = makeLibrary(400, 300)
+    for (const layer of [0, 1, 2]) expect(lib.towers.some((t) => t.layer === layer)).toBe(true)
+    expect(lib.towers.some((t) => t.hanging)).toBe(true)
+    expect(lib.towers.some((t) => !t.hanging)).toBe(true)
+    for (const t of lib.towers.filter((x) => x.layer > 0)) expect(t.x + t.w < 400 * 0.32 || t.x > 400 * 0.68).toBe(true)
   })
 
-  it('hangs a few large lanterns, none in front of Shiori', () => {
+  it('lets a tower glide to a new height now and then, and rest in between', () => {
     const lib = makeLibrary(400, 300)
-    expect(lib.lanterns.length).toBeLessThanOrEqual(6)
-    for (const l of lib.lanterns) expect(Math.abs(l.x - 200)).toBeGreaterThan(400 * 0.15)
+    const tw = lib.towers[0]
+    const seen = new Set<number>()
+    let still = 0
+    for (let t = 0; t < 120; t += 0.5) {
+      const a = towerShift(tw, t, false)
+      seen.add(a)
+      if (a === towerShift(tw, t + 0.5, false)) still++
+    }
+    expect(seen.size).toBeGreaterThan(2)
+    expect(still).toBeGreaterThan(150)
   })
 })

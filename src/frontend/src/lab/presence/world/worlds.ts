@@ -64,7 +64,7 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   library: {
     id: 'library',
     label: 'Endless library',
-    line: 'Walls of shelves running into the dark, a room hanging upside down, great lanterns',
+    line: 'Towers of shelves rising and hanging in the dark, lanterns, paper cranes; it rearranges itself',
     // Cool colours for Shiori, so she stands apart from the warm wood.
     palette: [
       [0, 0, 0],

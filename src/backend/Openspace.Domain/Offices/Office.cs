@@ -404,6 +404,13 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new DeskBirthdaySet(Id, deskId, now));
     }
 
+    /// <summary>Puts a desk on the day shift, the night shift, or around the clock.</summary>
+    public void SetDeskShift(DeskId deskId, Shift shift, DateTimeOffset now)
+    {
+        FindDesk(deskId).WorkOn(shift);
+        Raise(new DeskShiftSet(Id, deskId, shift, now));
+    }
+
     /// <summary>Sets how far a desk is trusted with one kind of action.</summary>
     public void SetDeskTrust(DeskId deskId, TrustedAction action, TrustLevel level, DateTimeOffset now)
     {

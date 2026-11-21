@@ -91,11 +91,11 @@ public sealed record RoomView(
 /// <param name="Trust">How much it does on its own, for every kind of action.</param>
 public sealed record DeskView(
     Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot, DeskLook? Look, AgentEngine Engine,
-    IReadOnlyList<Trait> Traits, BirthdayView Birthday, IReadOnlyDictionary<TrustedAction, TrustLevel> Trust)
+    IReadOnlyList<Trait> Traits, BirthdayView Birthday, IReadOnlyDictionary<TrustedAction, TrustLevel> Trust, Shift Shift)
 {
     public static DeskView From(Desk desk) =>
         new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot, desk.Look, desk.Agent.Engine,
-            [.. desk.Traits], BirthdayView.From(desk), desk.Trust.Levels);
+            [.. desk.Traits], BirthdayView.From(desk), desk.Trust.Levels, desk.Shift);
 }
 
 /// <param name="Chosen">The person chose it; otherwise it was picked from the desk's id.</param>

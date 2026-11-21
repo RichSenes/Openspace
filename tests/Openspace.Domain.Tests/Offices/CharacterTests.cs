@@ -103,6 +103,31 @@ public class CharacterTests
     }
 
     [Fact]
+    public void A_desk_works_around_the_clock_until_given_a_shift()
+    {
+        var (office, desk) = ECorpWithDesk();
+        Assert.Equal(Shift.Always, desk.Shift);
+
+        office.SetDeskShift(desk.Id, Shift.Night, Now);
+
+        Assert.Equal(Shift.Night, desk.Shift);
+        Assert.Throws<DomainException>(() => office.SetDeskShift(desk.Id, (Shift)7, Now));
+    }
+
+    [Theory]
+    [InlineData(Shift.Day, 7, false)]
+    [InlineData(Shift.Day, 8, true)]
+    [InlineData(Shift.Day, 20, false)]
+    [InlineData(Shift.Night, 23, true)]
+    [InlineData(Shift.Night, 3, true)]
+    [InlineData(Shift.Night, 12, false)]
+    [InlineData(Shift.Always, 3, true)]
+    public void A_shift_says_who_is_in(Shift shift, int hour, bool isIn)
+    {
+        Assert.Equal(isIn, shift.IsIn(new TimeOnly(hour, 0)));
+    }
+
+    [Fact]
     public void The_person_can_choose_a_birthday_and_give_it_back()
     {
         var (office, desk) = ECorpWithDesk();

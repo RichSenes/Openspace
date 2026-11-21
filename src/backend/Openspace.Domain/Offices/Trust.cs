@@ -109,7 +109,23 @@ public enum Shift
     /// <summary>Around the clock: today's behaviour.</summary>
     Always,
 
+    /// <summary>From 08:00 to 20:00.</summary>
     Day,
 
+    /// <summary>From 20:00 to 08:00.</summary>
     Night,
+}
+
+public static class Shifts
+{
+    public static readonly TimeOnly DayStarts = new(8, 0);
+    public static readonly TimeOnly NightStarts = new(20, 0);
+
+    /// <summary>Whether someone on <paramref name="shift"/> is in at <paramref name="time"/>, the local time of the office.</summary>
+    public static bool IsIn(this Shift shift, TimeOnly time) => shift switch
+    {
+        Shift.Day => time >= DayStarts && time < NightStarts,
+        Shift.Night => time >= NightStarts || time < DayStarts,
+        _ => true,
+    };
 }

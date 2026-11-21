@@ -46,4 +46,34 @@ public sealed class CharacterPersistenceTests : IAsyncLifetime
             Assert.False(desks[old.Value].Birthday.Chosen);
         }
     }
+
+    [Fact]
+    public async Task Trust_and_shift_survive_a_round_trip_and_start_as_today()
+    {
+        OfficeId office;
+        DeskId set, plain;
+        await using (var scope = _db.Scope())
+        {
+            var commands = scope.ServiceProvider.GetRequiredService<OfficeCommands>();
+            office = await commands.OpenOfficeAsync("E Corp", default);
+            var room = await commands.OpenRoomAsync(office, "Web", default);
+            set = await commands.AddDeskAsync(office, room, "Frontend", "frontend-dev", null, null, default);
+            plain = await commands.AddDeskAsync(office, room, "Backend", "backend-dev", null, null, default);
+        }
+
+        await using (var scope = _db.Scope())
+        {
+            var commands = scope.ServiceProvider.GetRequiredService<OfficeCommands>();
+            await commands.SetDeskTrustAsync(office, set, TrustedAction.SafeRequests, TrustLevel.AsksFirst, default);
+            await commands.SetDeskShiftAsync(office, set, Shift.Night, default);
+        }
+
+        await using (var scope = _db.Scope())
+        {
+            var view = await scope.ServiceProvider.GetRequiredService<OfficeQueries>().GetAsync(office, default);
+            var desks = view.Rooms.SelectMany(r => r.Desks).ToDictionary(d => d.Id);
+            Assert.Equal((TrustLevel.AsksFirst, Shift.Night), (desks[set.Value].Trust[TrustedAction.SafeRequests], desks[set.Value].Shift));
+            Assert.Equal((TrustLevel.Alone, Shift.Always), (desks[plain.Value].Trust[TrustedAction.SafeRequests], desks[plain.Value].Shift));
+        }
+    }
 }

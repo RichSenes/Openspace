@@ -45,4 +45,6 @@ public sealed record FloorPlanned(OfficeId OfficeId, DateTimeOffset OccurredAt) 
 
 public sealed record DeskTrustSet(OfficeId OfficeId, DeskId DeskId, TrustedAction Action, TrustLevel Level, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record DeskShiftSet(OfficeId OfficeId, DeskId DeskId, Shift Shift, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record DeskBirthdaySet(OfficeId OfficeId, DeskId DeskId, DateTimeOffset OccurredAt) : IDomainEvent;

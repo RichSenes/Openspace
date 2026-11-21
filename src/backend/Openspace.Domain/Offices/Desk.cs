@@ -52,6 +52,11 @@ public sealed class Desk
     /// <summary>How much it does on its own, per kind of action; what is not set is today's behaviour.</summary>
     public TrustSettings Trust { get; private set; } = TrustSettings.Default;
 
+    /// <summary>When it works: by day, by night, or around the clock as today.</summary>
+    public Shift Shift { get; private set; } = Shift.Always;
+
+    internal void WorkOn(Shift shift) => Shift = Enum.IsDefined(shift) ? shift : throw new Common.DomainException("Unknown shift.");
+
     internal void Entrust(TrustedAction action, TrustLevel level) => Trust = Trust.With(action, level);
 
     internal void BeBorn(Personality personality) => Personality = personality;

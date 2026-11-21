@@ -686,6 +686,13 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                     b2.Property<Guid>("RoomId")
                                         .HasColumnType("TEXT");
 
+                                    b2.Property<string>("Shift")
+                                        .IsRequired()
+                                        .ValueGeneratedOnAdd()
+                                        .HasMaxLength(10)
+                                        .HasColumnType("TEXT")
+                                        .HasDefaultValue("Always");
+
                                     b2.Property<string>("Trust")
                                         .IsRequired()
                                         .ValueGeneratedOnAdd()

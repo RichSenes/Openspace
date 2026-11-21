@@ -115,6 +115,13 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task SetDeskShiftAsync(OfficeId officeId, DeskId deskId, Shift shift, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetDeskShift(deskId, shift, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Sets how far a desk is trusted with one kind of action. Applies from its next request.</summary>
     public async Task SetDeskTrustAsync(OfficeId officeId, DeskId deskId, TrustedAction action, TrustLevel level, CancellationToken cancellationToken)
     {

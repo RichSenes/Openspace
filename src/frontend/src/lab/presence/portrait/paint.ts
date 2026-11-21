@@ -43,12 +43,22 @@ export function quantize(img: ImageData, ramp: Ramp, offset: [number, number] = 
 }
 
 /** A layer: drawn with full-colour vector shapes, then snapped to its ramp. */
+let scratch: CanvasRenderingContext2D | null = null
+
 export function layer(target: CanvasRenderingContext2D, ramp: Ramp, draw: (g: CanvasRenderingContext2D) => void) {
   const { width, height } = target.canvas
-  const c = document.createElement('canvas')
-  c.width = width
-  c.height = height
-  const g = c.getContext('2d')!
+  // One scratch canvas, reused: the portrait is redrawn many times a second.
+  if (!scratch || scratch.canvas.width !== width || scratch.canvas.height !== height) {
+    const c = document.createElement('canvas')
+    c.width = width
+    c.height = height
+    scratch = c.getContext('2d', { willReadFrequently: true })!
+  }
+  const g = scratch
+  const c = g.canvas
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.globalCompositeOperation = 'source-over'
+  g.clearRect(0, 0, width, height)
   draw(g)
   const img = g.getImageData(0, 0, width, height)
   quantize(img, ramp)

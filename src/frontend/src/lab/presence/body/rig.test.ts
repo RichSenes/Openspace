@@ -10,9 +10,7 @@ describe('rotation', () => {
     expect(Math.hypot(...apply(r, [0.3, -0.5, 0.8]))).toBeCloseTo(Math.hypot(0.3, -0.5, 0.8), 6)
   })
 
-  it('lets a head turn its eyes with it, and a creature keep them on you', () => {
-    const head = bodyRotation('scanline', 1, 1, [0.5, 0], 0)
-    expect(head.eyeRot).toEqual(head.rot)
+  it('lets a creature keep its eyes on you while its body turns', () => {
     const swarm = bodyRotation('swarm', 1, 1, [0.5, 0], 0)
     expect(swarm.eyeRot).not.toEqual(swarm.rot)
   })

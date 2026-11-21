@@ -1,0 +1,177 @@
+/* The character monitor: one card per inhabitant, wrapping to one column on narrow windows. */
+.characters {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px 20px 32px;
+}
+
+.characters-head {
+  display: grid;
+  gap: 4px;
+}
+
+.characters-head h1 {
+  font-size: 20px;
+}
+
+.characters-head p,
+.characters-experts {
+  margin: 0;
+  max-width: 70ch;
+}
+
+.characters-empty {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.characters-error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.character {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.character-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.character-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.character h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.character-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.character-traits li {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.character-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+  align-items: baseline;
+}
+
+.character-facts dt {
+  font-weight: 600;
+}
+
+.character-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.character-birthday {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.character-expert {
+  font-weight: 600;
+}
+
+.character-trust {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.character-trust legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.character-trust .field {
+  display: grid;
+  gap: 4px;
+}
+
+.mood-week {
+  display: block;
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.mood-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.mood-baseline {
+  stroke: var(--line);
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.character-history {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.character-history .up,
+.character-history .down {
+  display: inline-block;
+  min-width: 3ch;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.character-ties details summary {
+  cursor: pointer;
+}
+
+.character-ties p {
+  margin: 0;
+}

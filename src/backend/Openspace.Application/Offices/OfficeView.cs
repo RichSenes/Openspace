@@ -86,8 +86,23 @@ public sealed record RoomView(
 /// <param name="Spot">Where the desk stands in its room; null when it is placed automatically.</param>
 /// <param name="Look">How its agent looks, chosen by hand; null when picked from the desk's id.</param>
 /// <param name="Engine">What runs its agent: OpenCode or Claude Code.</param>
-public sealed record DeskView(Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot, DeskLook? Look, AgentEngine Engine)
+/// <param name="Traits">Two or three, fixed at creation.</param>
+/// <param name="Birthday">A day and a month, never a year.</param>
+public sealed record DeskView(
+    Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot, DeskLook? Look, AgentEngine Engine,
+    IReadOnlyList<Trait> Traits, BirthdayView Birthday)
 {
     public static DeskView From(Desk desk) =>
-        new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot, desk.Look, desk.Agent.Engine);
+        new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot, desk.Look, desk.Agent.Engine,
+            [.. desk.Traits], BirthdayView.From(desk));
+}
+
+/// <param name="Chosen">The person chose it; otherwise it was picked from the desk's id.</param>
+public sealed record BirthdayView(int Month, int Day, bool Chosen)
+{
+    public static BirthdayView From(Desk desk)
+    {
+        ArgumentNullException.ThrowIfNull(desk);
+        return new(desk.Birthday.Month, desk.Birthday.Day, desk.ChosenBirthday is not null);
+    }
 }

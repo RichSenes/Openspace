@@ -42,3 +42,5 @@ public sealed record RoomProcedureSet(OfficeId OfficeId, RoomId RoomId, DateTime
 public sealed record RoomArranged(OfficeId OfficeId, RoomId RoomId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record FloorPlanned(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
+
+public sealed record DeskBirthdaySet(OfficeId OfficeId, DeskId DeskId, DateTimeOffset OccurredAt) : IDomainEvent;

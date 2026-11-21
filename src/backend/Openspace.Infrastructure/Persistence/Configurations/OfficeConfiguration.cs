@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Openspace.Domain.Offices;
 
@@ -76,6 +77,15 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                 desk.Property(d => d.Id).ValueGeneratedNever();
                 desk.Property(d => d.Name).IsRequired();
                 desk.Property(d => d.RoleId);
+
+                // Desks from before traits keep an empty text: their traits come from their id.
+                desk.Property(d => d.Personality).HasColumnName("Traits").HasMaxLength(100).IsRequired()
+                    .HasConversion(p => p.ToString(), s => Personality.Parse(s), new ValueComparer<Personality>((a, b) => Equals(a, b), p => p.GetHashCode(), p => p))
+                    .HasDefaultValueSql("''");
+                desk.Property(d => d.ChosenBirthday).HasColumnName("Birthday").HasMaxLength(5)
+                    .HasConversion(b => b!.ToString(), s => Birthday.Parse(s));
+                desk.Ignore(d => d.Traits);
+                desk.Ignore(d => d.Birthday);
                 desk.OwnsOne(d => d.Agent, agent =>
                 {
                     agent.Property(a => a.AgentName).HasColumnName("AgentName").IsRequired();

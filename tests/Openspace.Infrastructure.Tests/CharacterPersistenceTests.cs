@@ -1,0 +1,49 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Openspace.Application.Offices;
+using Openspace.Domain.Offices;
+
+namespace Openspace.Infrastructure.Tests;
+
+/// <summary>What makes a desk an inhabitant, kept in SQLite.</summary>
+public sealed class CharacterPersistenceTests : IAsyncLifetime
+{
+    private readonly SqliteFixture _db = new();
+
+    public Task InitializeAsync() => _db.InitializeAsync();
+
+    public Task DisposeAsync() => _db.DisposeAsync();
+
+    [Fact]
+    public async Task Traits_and_a_chosen_birthday_survive_a_round_trip_and_old_desks_get_the_traits_of_their_id()
+    {
+        OfficeId office;
+        DeskId chosen, old;
+        await using (var scope = _db.Scope())
+        {
+            var commands = scope.ServiceProvider.GetRequiredService<OfficeCommands>();
+            office = await commands.OpenOfficeAsync("E Corp", default);
+            var room = await commands.OpenRoomAsync(office, "Web", default);
+            chosen = await commands.AddDeskAsync(office, room, "Frontend", "frontend-dev", null, null, default,
+                personality: Personality.Of([Trait.Shy, Trait.DryHumoured]), birthday: Birthday.On(2, 29));
+            old = await commands.AddDeskAsync(office, room, "Backend", "backend-dev", null, null, default);
+        }
+
+        await using (var scope = _db.Scope())
+        {
+            // A desk from before traits: stored with none.
+            var db = scope.ServiceProvider.GetRequiredService<Persistence.OpenspaceDbContext>();
+            Assert.Equal(1, await db.Database.ExecuteSqlRawAsync("UPDATE Desks SET Traits = '' WHERE Name = 'Backend'"));
+        }
+
+        await using (var scope = _db.Scope())
+        {
+            var view = await scope.ServiceProvider.GetRequiredService<OfficeQueries>().GetAsync(office, default);
+            var desks = view.Rooms.SelectMany(r => r.Desks).ToDictionary(d => d.Id);
+            Assert.Equal([Trait.Shy, Trait.DryHumoured], desks[chosen.Value].Traits);
+            Assert.Equal(new BirthdayView(2, 29, true), desks[chosen.Value].Birthday);
+            Assert.Equal(Personality.FromSeed(old.Value).Traits, desks[old.Value].Traits);
+            Assert.False(desks[old.Value].Birthday.Chosen);
+        }
+    }
+}

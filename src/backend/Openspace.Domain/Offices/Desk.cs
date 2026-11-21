@@ -10,6 +10,7 @@ public sealed class Desk
         Id = id;
         Name = name;
         Agent = agent;
+        Personality = Personality.FromSeed(id.Value);
     }
 
     // Used by persistence, which sets Agent right after construction.
@@ -32,6 +33,25 @@ public sealed class Desk
 
     /// <summary>How its agent looks, chosen by hand; null to let Openspace pick from the desk's id.</summary>
     public DeskLook? Look { get; private set; }
+
+    /// <summary>
+    /// The traits as stored: fixed when the desk is created. Desks from before traits were
+    /// stored without, and <see cref="Traits"/> gives them the ones of their id.
+    /// </summary>
+    public Personality Personality { get; private set; } = Personality.None;
+
+    /// <summary>Two or three traits, fixed at creation; the same for the desk's whole life.</summary>
+    public IReadOnlyList<Trait> Traits => Personality.IsEmpty ? Personality.FromSeed(Id.Value).Traits : Personality.Traits;
+
+    /// <summary>The birthday the person chose; null when it is the one picked from the desk's id.</summary>
+    public Birthday? ChosenBirthday { get; private set; }
+
+    /// <summary>A day and a month: chosen by the person, or picked from the desk's id.</summary>
+    public Birthday Birthday => ChosenBirthday ?? Birthday.FromSeed(Id.Value);
+
+    internal void BeBorn(Personality personality) => Personality = personality;
+
+    internal void CelebrateOn(Birthday? birthday) => ChosenBirthday = birthday;
 
     internal void MoveTo(Spot? spot) => Spot = spot;
 

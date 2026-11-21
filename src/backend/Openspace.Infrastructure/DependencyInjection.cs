@@ -40,6 +40,7 @@ public static class DependencyInjection
 
         // Shiori's vault: Markdown files with their own git, mirrored in the database for search.
         services.AddSingleton<Application.Brain.IVault, Brain.FileVault>();
+        services.AddSingleton<Application.Brain.IVaultHistory, Brain.GitVaultHistory>();
         services.AddSingleton<Application.Brain.IBrainIndex>(sp => new Brain.BrainIndex(connectionString, sp.GetRequiredService<Application.Brain.IVault>()));
         services.AddHostedService<BrainService>();
         services.AddHostedService<AcceptorService>();

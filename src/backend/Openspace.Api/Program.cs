@@ -103,6 +103,7 @@ app.MapModelsEndpoints();
 app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();
 app.MapBrainEndpoints();
+app.MapWikiEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");

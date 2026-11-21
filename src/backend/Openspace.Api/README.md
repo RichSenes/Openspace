@@ -118,6 +118,12 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/brain/search?q=&office=&room=&path=&kind=&limit=` | Notes of the brain's vault that hold every word of `q` (each also as the start of a longer word; every note when blank): `[{ path, title, kind, status, offices, rooms, paths, review, modified, excerpt }]`, at most `limit` (20 by default, 100 at most). Notes about the office, room and file asked come first, superseded ones last. See [Brain](#brain) |
 | GET | `/api/brain/now` | Who is changing what right now: `[{ taskId, officeId, office, room, desk, title, paths }]`, one per running task; `paths` (relative to the repository) are the files changed in its working copy, then those its title and description name. See [Brain](#brain) |
 | GET | `/api/brain/notes/{path}` | One note, `.md` optional: `{ path, kind, status, title, offices, rooms, paths, review, supersedes, from, author, links, modified, body }`; `404` when there is none, `422` with code `brain-path` for a path outside the vault or in its hidden folders |
+| GET | `/api/brain/tree` | The vault as a tree: `{ name, path, folders: [...], notes: [{ path, name, title, kind, status, modified }] }`, the root with an empty name and path; folders first, then notes, each by name. See [Brain](#brain) |
+| GET | `/api/brain/notes/{path}/backlinks` | The notes that link to it with a `[[wikilink]]` (by path, end of path or file name, as Obsidian resolves them; the note itself left out): `[{ path, title, kind, status, modified }]`; `404` when there is no such note |
+| GET | `/api/brain/notes/{path}/history?limit=` | The commits of the vault's git that changed the note, newest first: `[{ commit, author, date, summary }]` (50 by default, 500 at most; the author's name Openspace puts before the summary is left out); empty when there is no history yet |
+| GET | `/api/brain/notes/{path}/history/{commit}` | The note at that commit (a full or short hash): `{ commit: { commit, author, date, summary }, path, text, diff, previous, truncated }`; `text` is the whole file then (null when that commit deleted it), `diff` the unified diff from the version before (from nothing for the first), `previous` the commit of that version; text over 512 KB and diffs over 256 KB are cut and `truncated` says so; `404` for anything that is not a commit of the vault |
+| PUT | `/api/brain/notes/{path}` | `{ text, summary? }`: the person writes the whole file (front matter and Markdown), committed with `Operator:Name` as author and `summary` (else "wrote" or "edited" the note) as message; `201` for a new note, `200` otherwise, with the note as `GET` gives it. The only route that changes `Constitution.md`; `422` with code `brain-now` for `Now.md`, `brain-path` for a path outside the vault, `brain-too-long` over 1 MB; `400` without `text` |
+| GET | `/api/brain/why?path=&office=` | "Why is this so?": the accepted decisions whose `paths` cover a file of a repository (relative to its root), only those about `office` or every office when it is given: `[{ path, title, decided, offices, rooms, covering, from, review, modified }]`, newest first by the date their file name starts with; `covering` are the globs that matched, `from` the task, routine or session it came from; `400` without `path` |
 | POST | `/api/brain/decisions/{path}/{answer}` | The person's answer on a decision, `answer` one of `fine` (accepted by Shiori: reviewed), `undo` (accepted: rejected), `accept`, `reject` (proposed), `keep` (accepted: review in three months), `supersede`; optional `{ reason }` for undo and reject, written in the proposing desk's journal. Returns the note; `404` for no such note or answer, `422` with code `decision-status` when the answer does not fit its status |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
@@ -852,3 +858,14 @@ reach **needs you** with the reason; what Shiori accepted reaches it too, to loo
 (Fine, Open, Undo). Undoing or rejecting sets `status: rejected` and adds a line under the day's
 heading of `Inhabitants/<desk>/journal.md` for the desk that proposed it (`- 14:05 · Shiori: the
 person undid [[Decisions/…|Title]]. Why: …`).
+
+The wiki reads the vault each time it is asked (`Wiki`): the tree from the files, backlinks from
+every note's `[[wikilinks]]`, labels (`|`) and headings (`#`) left out. A link resolves to the note
+with that path, `.md` optional, else to a note whose path ends with it, in any case; when two notes
+share a name the one in the linking note's folder wins, then the shortest path. History and
+versions come from the vault's git (`GitVaultHistory`, `IVaultHistory`): fields read with control
+characters as separators, paths taken literally (`--literal-pathspecs`), only hashes accepted as
+commits, merges diffed against their first parent. The person edits through `PUT
+/api/brain/notes/{path}`, the one way the constitution changes (agents only propose, and rules
+are refused to them); `Now.md` is refused there because Openspace rewrites it. "Why" weighs only
+accepted decisions that name paths, with the same globs as search.

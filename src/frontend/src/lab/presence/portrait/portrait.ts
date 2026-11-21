@@ -152,7 +152,7 @@ function chest(g: CanvasRenderingContext2D) {
   // Only the shadow beneath each curve: wide, soft at the ends, two pixels deep in the middle.
   for (const cx of [45, 83]) {
     const r = 17
-    const under = (x: number) => 150 + Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 5
+    const under = (x: number) => 153 + Math.sqrt(Math.max(0, 1 - ((x - cx) / r) ** 2)) * 5
     const dark = curve(under, cx - r + 2, cx + r - 2)
     px(g, '#0e0b18', dark.filter(([x]) => Math.abs(x - cx) > r - 6))
     px(g, '#07050c', dark.filter(([x]) => Math.abs(x - cx) <= r - 6))

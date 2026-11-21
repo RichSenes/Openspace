@@ -213,6 +213,43 @@ public class AgentSignalsTests
     }
 
     [Fact]
+    public async Task A_desk_that_asks_first_waits_for_you_even_on_a_safe_request()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+        _h.Office.SetDeskTrust(_h.Desk.Id, TrustedAction.SafeRequests, TrustLevel.AsksFirst, _h.Clock.GetUtcNow());
+
+        await _h.Signals().PermissionAskedAsync("ses_1", "per_1", new AgentAction(ActionKind.Edit, $"{task.Run!.WorkspacePath}/header.php"), default);
+
+        Assert.Equal(ActivityKind.Waiting, _h.Activity.ForTask(task.Id.Value)?.Kind);
+    }
+
+    [Fact]
+    public async Task A_desk_that_does_it_and_tells_leaves_a_line_for_each_request_it_allowed_itself()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+        _h.Office.SetDeskTrust(_h.Desk.Id, TrustedAction.SafeRequests, TrustLevel.Tells, _h.Clock.GetUtcNow());
+
+        Assert.True(await _h.Signals().RequestPermissionAsync(task.Id, new AgentAction(ActionKind.Edit, $"{task.Run!.WorkspacePath}/header.php"), default));
+
+        Assert.Contains("as its trust says", task.Notes[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_desk_trusted_alone_allows_safe_requests_without_a_line_as_today()
+    {
+        _h.Autonomy = Autonomy.Auto;
+        var task = await RunningTaskAsync();
+        var notes = task.Notes.Count;
+
+        Assert.True(await _h.Signals().RequestPermissionAsync(task.Id, new AgentAction(ActionKind.Edit, $"{task.Run!.WorkspacePath}/header.php"), default));
+
+        Assert.Equal(notes, task.Notes.Count);
+        Assert.Equal(TrustLevel.Alone, _h.Desk.Trust.LevelOf(TrustedAction.SafeRequests));
+    }
+
+    [Fact]
     public async Task An_answer_sets_the_energy_of_the_desk_and_still_counts_once_the_work_is_in_review()
     {
         var task = await RunningTaskAsync();

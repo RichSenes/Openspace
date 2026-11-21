@@ -84,6 +84,9 @@ internal sealed class OfficeConfiguration : IEntityTypeConfiguration<Office>
                     .HasDefaultValueSql("''");
                 desk.Property(d => d.ChosenBirthday).HasColumnName("Birthday").HasMaxLength(5)
                     .HasConversion(b => b!.ToString(), s => Birthday.Parse(s));
+                desk.Property(d => d.Trust).HasColumnName("Trust").HasMaxLength(200).IsRequired()
+                    .HasConversion(t => t.ToString(), s => TrustSettings.Parse(s), new ValueComparer<TrustSettings>((a, b) => Equals(a, b), t => t.GetHashCode(), t => t))
+                    .HasDefaultValueSql("''");
                 desk.Ignore(d => d.Traits);
                 desk.Ignore(d => d.Birthday);
                 desk.OwnsOne(d => d.Agent, agent =>

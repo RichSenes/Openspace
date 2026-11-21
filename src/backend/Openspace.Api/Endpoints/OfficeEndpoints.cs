@@ -82,6 +82,8 @@ internal static class OfficeEndpoints
 
     public sealed record BirthdayRequest(int Month, int Day);
 
+    public sealed record TrustRequest(TrustedAction Action, TrustLevel Level);
+
     public sealed record DeskAgentRequest(AgentEngine Engine, string AgentName, string? Model);
 
     public sealed record DeskRoleRequest(Guid? RoleId);
@@ -240,6 +242,13 @@ internal static class OfficeEndpoints
             Guid officeId, Guid deskId, BirthdayRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.SetDeskBirthdayAsync(new OfficeId(officeId), new DeskId(deskId), Birthday.On(request.Month, request.Day), ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/desks/{deskId:guid}/trust", async (
+            Guid officeId, Guid deskId, TrustRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.SetDeskTrustAsync(new OfficeId(officeId), new DeskId(deskId), request.Action, request.Level, ct);
             return Results.NoContent();
         });
 

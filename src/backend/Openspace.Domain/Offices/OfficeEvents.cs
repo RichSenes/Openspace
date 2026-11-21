@@ -43,4 +43,6 @@ public sealed record RoomArranged(OfficeId OfficeId, RoomId RoomId, DateTimeOffs
 
 public sealed record FloorPlanned(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record DeskTrustSet(OfficeId OfficeId, DeskId DeskId, TrustedAction Action, TrustLevel Level, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record DeskBirthdaySet(OfficeId OfficeId, DeskId DeskId, DateTimeOffset OccurredAt) : IDomainEvent;

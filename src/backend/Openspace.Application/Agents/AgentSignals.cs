@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Openspace.Application.Abstractions;
+using Openspace.Domain.Offices;
 using Openspace.Domain.Work;
 
 namespace Openspace.Application.Agents;
@@ -248,7 +249,7 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        var privatePaths = await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false);
+        var (privatePaths, trust) = await GuardsAsync(task, cancellationToken).ConfigureAwait(false);
         if (PermissionPolicy.PrivateFolder(action, privatePaths) is { } folder)
         {
             await runtime.ReplyToPermissionAsync(permissionId, task.Run!.WorkspacePath, false, cancellationToken).ConfigureAwait(false);
@@ -256,10 +257,11 @@ public sealed partial class AgentSignals(
             return;
         }
 
-        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0))
+        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0, trust))
         {
             await runtime.ReplyToPermissionAsync(permissionId, task.Run!.WorkspacePath, true, cancellationToken).ConfigureAwait(false);
             await LogAsync(AllowedOnItsOwn(task, action, permissionId), cancellationToken).ConfigureAwait(false);
+            await TellIfTrustedAsync(task, action, trust, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -276,16 +278,17 @@ public sealed partial class AgentSignals(
     {
         ArgumentNullException.ThrowIfNull(action);
         var task = await WorkingTaskAsync(taskId, cancellationToken).ConfigureAwait(false);
-        var privatePaths = await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false);
+        var (privatePaths, trust) = await GuardsAsync(task, cancellationToken).ConfigureAwait(false);
         if (PermissionPolicy.PrivateFolder(action, privatePaths) is { } folder)
         {
             await RefusePrivateAsync(task, action, folder, null, cancellationToken).ConfigureAwait(false);
             return false;
         }
 
-        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0))
+        if (MayAllowOnItsOwn(task, action, privatePaths.Count > 0, trust))
         {
             await LogAsync(AllowedOnItsOwn(task, action, null), cancellationToken).ConfigureAwait(false);
+            await TellIfTrustedAsync(task, action, trust, cancellationToken).ConfigureAwait(false);
             return true;
         }
 
@@ -301,8 +304,27 @@ public sealed partial class AgentSignals(
         return await permissions.WaitAsync(id, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<string>> PrivatePathsAsync(WorkTask task, CancellationToken cancellationToken) =>
-        (await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false)).PrivatePaths;
+    /// <summary>The office's private folders, and how far the task's desk is trusted with safe requests.</summary>
+    private async Task<(IReadOnlyList<string> PrivatePaths, TrustLevel Trust)> GuardsAsync(WorkTask task, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(task.OfficeId, cancellationToken).ConfigureAwait(false);
+        var trust = task.DeskId is { } deskId && office.HasDesk(deskId)
+            ? office.Locate(deskId).Desk.Trust.LevelOf(TrustedAction.SafeRequests)
+            : TrustSettings.DefaultOf(TrustedAction.SafeRequests);
+        return (office.PrivatePaths, trust);
+    }
+
+    /// <summary>A desk trusted to "do it and tell" leaves a line on the task for each request it allowed itself.</summary>
+    private async Task TellIfTrustedAsync(WorkTask task, AgentAction action, TrustLevel trust, CancellationToken cancellationToken)
+    {
+        if (trust != TrustLevel.Tells)
+        {
+            return;
+        }
+
+        task.AddNote(NoteAuthor.System, $"Done on its own, as its trust says, and told: {ActionPhrases.Request(action)}.", clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>A request naming a private folder: refused at once, and said so on the task.</summary>
     private async Task RefusePrivateAsync(WorkTask task, AgentAction action, string folder, string? permissionId, CancellationToken cancellationToken)
@@ -317,10 +339,12 @@ public sealed partial class AgentSignals(
 
     /// <summary>Whether Openspace answers this request without a person: in auto mode, unless it is risky.</summary>
     /// <param name="guarded">The office has private folders: commands climbing above the copy need a person too.</param>
-    public bool MayAllowOnItsOwn(WorkTask task, AgentAction action, bool guarded = false)
+    /// <param name="trust">The desk's trust with safe requests: one that asks first never answers itself.</param>
+    public bool MayAllowOnItsOwn(WorkTask task, AgentAction action, bool guarded = false, TrustLevel trust = TrustLevel.Alone)
     {
         ArgumentNullException.ThrowIfNull(task);
         return agentOptions.CurrentValue.Autonomy == Autonomy.Auto
+            && trust != TrustLevel.AsksFirst
             && PermissionPolicy.NeedsPerson(action, task.Run!.WorkspacePath, guarded) is null;
     }
 
@@ -347,9 +371,10 @@ public sealed partial class AgentSignals(
             .ConfigureAwait(false);
 
         var pending = await runtime.PendingPermissionsAsync(task.Run!.WorkspacePath, cancellationToken).ConfigureAwait(false);
-        var guarded = (await PrivatePathsAsync(task, cancellationToken).ConfigureAwait(false)).Count > 0;
+        var (privatePaths, trust) = await GuardsAsync(task, cancellationToken).ConfigureAwait(false);
+        var guarded = privatePaths.Count > 0;
         // Every session in the task's copy is its agent's or one of its helpers'.
-        if (pending.FirstOrDefault(p => p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action, guarded)) is { } next)
+        if (pending.FirstOrDefault(p => p.Id != permissionId && !MayAllowOnItsOwn(task, p.Action, guarded, trust)) is { } next)
         {
             await ShowWaitingAsync(task, next.Id, next.Action, cancellationToken).ConfigureAwait(false);
         }

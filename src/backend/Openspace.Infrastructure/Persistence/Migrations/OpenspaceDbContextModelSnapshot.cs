@@ -686,6 +686,14 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                                     b2.Property<Guid>("RoomId")
                                         .HasColumnType("TEXT");
 
+                                    b2.Property<string>("Trust")
+                                        .IsRequired()
+                                        .ValueGeneratedOnAdd()
+                                        .HasMaxLength(200)
+                                        .HasColumnType("TEXT")
+                                        .HasColumnName("Trust")
+                                        .HasDefaultValueSql("''");
+
                                     b2.HasKey("Id");
 
                                     b2.HasIndex("RoomId");

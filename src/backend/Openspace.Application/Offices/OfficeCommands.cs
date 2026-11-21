@@ -115,6 +115,14 @@ public sealed class OfficeCommands(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Sets how far a desk is trusted with one kind of action. Applies from its next request.</summary>
+    public async Task SetDeskTrustAsync(OfficeId officeId, DeskId deskId, TrustedAction action, TrustLevel level, CancellationToken cancellationToken)
+    {
+        var office = await offices.GetAsync(officeId, cancellationToken).ConfigureAwait(false);
+        office.SetDeskTrust(deskId, action, level, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Sets the day a desk celebrates; null gives it back the one picked from its id.</summary>
     public async Task SetDeskBirthdayAsync(OfficeId officeId, DeskId deskId, Birthday? birthday, CancellationToken cancellationToken)
     {

@@ -404,6 +404,13 @@ public sealed class Office : AggregateRoot<OfficeId>
         Raise(new DeskBirthdaySet(Id, deskId, now));
     }
 
+    /// <summary>Sets how far a desk is trusted with one kind of action.</summary>
+    public void SetDeskTrust(DeskId deskId, TrustedAction action, TrustLevel level, DateTimeOffset now)
+    {
+        FindDesk(deskId).Entrust(action, level);
+        Raise(new DeskTrustSet(Id, deskId, action, level, now));
+    }
+
     public bool UsesRole(RoleId roleId) => _rooms.Exists(r => r.Desks.Any(d => d.RoleId == roleId));
 
     public bool HasDesk(DeskId deskId) => _rooms.Exists(r => r.Desks.Any(d => d.Id == deskId));

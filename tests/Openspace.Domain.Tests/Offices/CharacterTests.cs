@@ -79,6 +79,30 @@ public class CharacterTests
     }
 
     [Fact]
+    public void Trust_starts_as_today_with_everything_done_alone()
+    {
+        var (_, desk) = ECorpWithDesk();
+        Assert.All(Enum.GetValues<TrustedAction>(), a => Assert.Equal(TrustLevel.Alone, desk.Trust.LevelOf(a)));
+        Assert.Equal(string.Empty, desk.Trust.ToString());
+    }
+
+    [Fact]
+    public void Trust_is_set_per_action_and_survives_its_stored_text()
+    {
+        var (office, desk) = ECorpWithDesk();
+        office.SetDeskTrust(desk.Id, TrustedAction.SafeRequests, TrustLevel.AsksFirst, Now);
+        office.SetDeskTrust(desk.Id, TrustedAction.Journal, TrustLevel.Tells, Now);
+
+        Assert.Equal(TrustLevel.AsksFirst, desk.Trust.LevelOf(TrustedAction.SafeRequests));
+        Assert.Equal(TrustLevel.Alone, desk.Trust.LevelOf(TrustedAction.Proposals));
+        Assert.Equal(desk.Trust, TrustSettings.Parse(desk.Trust.ToString()));
+
+        office.SetDeskTrust(desk.Id, TrustedAction.SafeRequests, TrustLevel.Alone, Now);
+        Assert.Equal("Journal=Tells", desk.Trust.ToString());
+        Assert.Equal(TrustSettings.Default, TrustSettings.Parse("Nonsense=AsksFirst;Journal=Never"));
+    }
+
+    [Fact]
     public void The_person_can_choose_a_birthday_and_give_it_back()
     {
         var (office, desk) = ECorpWithDesk();

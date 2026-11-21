@@ -49,6 +49,11 @@ public sealed class Desk
     /// <summary>A day and a month: chosen by the person, or picked from the desk's id.</summary>
     public Birthday Birthday => ChosenBirthday ?? Birthday.FromSeed(Id.Value);
 
+    /// <summary>How much it does on its own, per kind of action; what is not set is today's behaviour.</summary>
+    public TrustSettings Trust { get; private set; } = TrustSettings.Default;
+
+    internal void Entrust(TrustedAction action, TrustLevel level) => Trust = Trust.With(action, level);
+
     internal void BeBorn(Personality personality) => Personality = personality;
 
     internal void CelebrateOn(Birthday? birthday) => ChosenBirthday = birthday;

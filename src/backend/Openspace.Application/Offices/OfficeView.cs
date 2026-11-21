@@ -88,13 +88,14 @@ public sealed record RoomView(
 /// <param name="Engine">What runs its agent: OpenCode or Claude Code.</param>
 /// <param name="Traits">Two or three, fixed at creation.</param>
 /// <param name="Birthday">A day and a month, never a year.</param>
+/// <param name="Trust">How much it does on its own, for every kind of action.</param>
 public sealed record DeskView(
     Guid Id, string Name, string AgentName, string? Model, Guid? RoleId, Spot? Spot, DeskLook? Look, AgentEngine Engine,
-    IReadOnlyList<Trait> Traits, BirthdayView Birthday)
+    IReadOnlyList<Trait> Traits, BirthdayView Birthday, IReadOnlyDictionary<TrustedAction, TrustLevel> Trust)
 {
     public static DeskView From(Desk desk) =>
         new(desk.Id.Value, desk.Name, desk.Agent.AgentName, desk.Agent.Model, desk.RoleId?.Value, desk.Spot, desk.Look, desk.Agent.Engine,
-            [.. desk.Traits], BirthdayView.From(desk));
+            [.. desk.Traits], BirthdayView.From(desk), desk.Trust.Levels);
 }
 
 /// <param name="Chosen">The person chose it; otherwise it was picked from the desk's id.</param>

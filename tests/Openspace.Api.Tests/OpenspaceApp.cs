@@ -11,7 +11,8 @@ using Openspace.Application.Weather;
 namespace Openspace.Api.Tests;
 
 /// <summary>The real API host on a private in-memory database.</summary>
-public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplicationFactory<Program>
+/// <param name="work">Work in flight to show agents, in place of the queue's.</param>
+public sealed class OpenspaceApp(IAgentRuntime? runtime = null, Openspace.Application.Brain.IWorkInProgress? work = null) : WebApplicationFactory<Program>
 {
     private readonly string _connectionString = $"Data Source=api-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private SqliteConnection? _keepAlive;
@@ -100,6 +101,11 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null) : WebApplication
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));
+        }
+
+        if (work is not null)
+        {
+            builder.ConfigureTestServices(services => services.AddSingleton(work));
         }
 
         builder.UseEnvironment("Testing");

@@ -152,13 +152,18 @@ the agent having to name it.
 
 | Tool | What it does |
 | --- | --- |
-| `get_task` | Returns the brief again: room rules, request, team notes |
+| `get_task` | Returns the brief again: room rules, request, what the brain says (see below), team notes |
 | `add_task_note` | `{ text }`: a note on the task signed by the desk |
 | `announce` | `{ text }`: sets the desk's speech bubble and logs the step |
 | `complete_step` | `{ step, evidence }`: reports a step of the task's required procedure as done |
 | `add_manual_check` | `{ what, how }`: lists something a person must try by hand before merging, and how |
 | `wait_for_person` | `{ question }`: the agent waits, spending nothing, until the person does or decides something (close an app, say) and answers "Done, go on" or "Stop" |
 | `permission` | Called by Claude Code itself before a tool its role does not allow outright |
+| `brain_search` | `{ query, office?, room?, path?, kind? }`: notes of the [brain](#brain) that match, ten at most, with path, kind, status, scope and an excerpt; office and room default to the caller's, so its own notes come first |
+| `brain_read` | `{ note }`: one note in full, front matter included; an error for a missing note or a path outside the vault |
+| `brain_journal` | `{ text }`: appends a dated line to `Inhabitants/<desk>/journal.md` of the calling desk only (made with `kind: journal` the first time); entries of a day go under one `## yyyy-mm-dd` heading; the commit is signed by the desk |
+| `brain_propose` | `{ kind, title, body, reasons, offices?, rooms?, paths? }`: creates a new note with `status: proposed`, author the desk, `from: task <id>`: a decision in `Decisions/<date>-<slug>.md`, a plan in `Plans/`, a study in `Studies/`, a note in `Offices/<office>/<slug>.md`; never overwrites (a taken name gets `-2`); offices default to the caller's; rules and journals are refused |
+| `brain_now` | Who else in the caller's office is working right now, and the files each is changing |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
 error the agent can read. There is no authentication: the endpoint is meant for
@@ -808,3 +813,11 @@ body; then the scope (for each of office, room and path asked, a note that names
 that applies everywhere, which beats one about others; paths are globs such as `src/web/**`);
 then the status (accepted, proposed, the rest); then the text's score; then the newest.
 
+Agents read the brain through the `brain_*` tools above, and their first brief (and `get_task`)
+has a "Before you start" part right after the task: the constitution's numbered rules, one line
+each; the accepted decisions that apply where the task works (not about another office, and
+about its room or the files it names or is already changing, or open on both), files first,
+then room, then office, eight at most with title, first line and path; the work in flight in
+the same office that shares its room or files; and the request to leave a journal line and to
+propose lasting choices. The part is capped at 3,500 characters (decisions go first, then work,
+then the last rules, and it says so); with an empty or unreadable vault the brief is as before.

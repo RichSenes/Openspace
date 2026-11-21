@@ -11,7 +11,7 @@ namespace Openspace.Api.Tests;
 /// <summary>Talks to the real /mcp endpoint with the official MCP client, as OpenCode would.</summary>
 public sealed class McpTests : IAsyncLifetime
 {
-    private readonly OpenspaceApp _app = new();
+    private readonly OpenspaceApp _app = new(work: new ListedWork());
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -75,7 +75,9 @@ public sealed class McpTests : IAsyncLifetime
 
         var tools = await client.ListToolsAsync();
 
-        Assert.Equal(["add_manual_check", "add_task_note", "announce", "complete_step", "get_task", "permission", "wait_for_person"], tools.Select(t => t.Name).Order());
+        Assert.Equal(
+            ["add_manual_check", "add_task_note", "announce", "brain_journal", "brain_now", "brain_propose", "brain_read", "brain_search", "complete_step", "get_task", "permission", "wait_for_person"],
+            tools.Select(t => t.Name).Order());
     }
 
     [Fact]
@@ -227,5 +229,103 @@ public sealed class McpTests : IAsyncLifetime
 
         Assert.True(result.IsError);
         Assert.Contains("no required procedure", Text(result), StringComparison.Ordinal);
+    }
+
+    private static async Task<string> GitAsync(string folder, params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = folder, RedirectStandardOutput = true };
+        args.ToList().ForEach(start.ArgumentList.Add);
+        using var git = System.Diagnostics.Process.Start(start)!;
+        var output = await git.StandardOutput.ReadToEndAsync();
+        await git.WaitForExitAsync();
+        return output.Trim();
+    }
+
+    [Fact]
+    public async Task An_agent_writes_in_its_own_journal_and_the_vault_commits_it_as_the_desk()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+
+        var result = await client.CallToolAsync("brain_journal", new Dictionary<string, object?> { ["text"] = "Added the button; the header is shared with admin." });
+
+        Assert.NotEqual(true, result.IsError);
+        Assert.Equal("Written in Inhabitants/Frontend/journal.md.", Text(result));
+        var journal = await File.ReadAllTextAsync(Path.Combine(_app.BrainFolder, "Inhabitants", "Frontend", "journal.md"));
+        Assert.StartsWith("---\nkind: journal\nauthor: Frontend\n---\n# Frontend's journal\n", journal, StringComparison.Ordinal);
+        Assert.Contains("Add a logout button: Added the button; the header is shared with admin.", journal, StringComparison.Ordinal);
+        Assert.Equal("Frontend: wrote in its journal", await GitAsync(_app.BrainFolder, "log", "-1", "--format=%s", "--", "Inhabitants/Frontend/journal.md"));
+        Assert.Equal("Frontend", await GitAsync(_app.BrainFolder, "log", "-1", "--format=%an"));
+    }
+
+    [Fact]
+    public async Task An_agent_proposes_a_decision_others_then_find_and_read()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+
+        var proposed = await client.CallToolAsync("brain_propose", new Dictionary<string, object?>
+        {
+            ["kind"] = "decision",
+            ["title"] = "Logout lives in the header",
+            ["body"] = "Every page shows Logout at the top right.",
+            ["reasons"] = "People looked for it there.",
+            ["rooms"] = new List<string> { "Web" },
+        });
+        Assert.NotEqual(true, proposed.IsError);
+        var path = $"Decisions/{DateTime.Now:yyyy-MM-dd}-logout-lives-in-the-header.md";
+        Assert.Equal($"Proposed as {path}. It is not in force until it is accepted.", Text(proposed));
+
+        var read = Text(await client.CallToolAsync("brain_read", new Dictionary<string, object?> { ["note"] = path }));
+        Assert.StartsWith("---\nkind: decision\nstatus: proposed\noffices: [E Corp]\nrooms: [Web]\n", read, StringComparison.Ordinal);
+        Assert.Contains($"from: task {taskId}\nauthor: Frontend\n", read, StringComparison.Ordinal);
+
+        // The watcher reads the new note into the index within moments.
+        var found = "";
+        for (var i = 0; i < 50 && !found.Contains(path, StringComparison.Ordinal); i++)
+        {
+            await Task.Delay(100);
+            found = Text(await client.CallToolAsync("brain_search", new Dictionary<string, object?> { ["query"] = "logout header", ["kind"] = "decision" }));
+        }
+
+        Assert.Contains($"- {path} · decision, proposed · Logout lives in the header", found, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Reading_outside_the_vault_is_refused()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+
+        var result = await client.CallToolAsync("brain_read", new Dictionary<string, object?> { ["note"] = "../../etc/passwd" });
+
+        Assert.True(result.IsError);
+        Assert.Contains("not inside the vault", Text(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_agent_sees_who_else_is_working_and_its_brief_reads_the_brain()
+    {
+        var taskId = await RunningTaskAsync();
+        await using var client = await ConnectAsync(taskId);
+        using var http = _app.CreateClient();
+        var office = (await http.GetFromJsonAsync<JsonElement>($"/api/tasks/{taskId}")).GetProperty("officeId").GetGuid();
+        ListedWork.Items.Add(new(Guid.NewGuid(), office, "E Corp", "Web", "Screens", "Restyle the footer", ["src/web/footer.css"]));
+
+        var now = Text(await client.CallToolAsync("brain_now"));
+        var brief = Text(await client.CallToolAsync("get_task"));
+
+        Assert.Contains("\"Restyle the footer\" at the desk \"Screens\" (room Web): changing src/web/footer.css", now, StringComparison.Ordinal);
+        Assert.Contains("Before you start:", brief, StringComparison.Ordinal);
+        Assert.Contains("1. Read before acting", brief, StringComparison.Ordinal);
+        Assert.Contains("Restyle the footer", brief, StringComparison.Ordinal);
+    }
+
+    /// <summary>Work in flight the test sets, shared by every host the class starts.</summary>
+    private sealed class ListedWork : Openspace.Application.Brain.IWorkInProgress
+    {
+        public static List<Openspace.Application.Brain.WorkInFlight> Items { get; } = [];
+
+        public IReadOnlyList<Openspace.Application.Brain.WorkInFlight> Current() => [.. Items];
     }
 }

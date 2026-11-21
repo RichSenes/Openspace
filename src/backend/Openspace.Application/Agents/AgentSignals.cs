@@ -24,6 +24,7 @@ public sealed partial class AgentSignals(
     IOptionsMonitor<AgentOptions> agentOptions,
     EngineLimits limits,
     LoopGuard loops,
+    AgentBrain brain,
     TimeProvider clock)
 {
     /// <param name="step">The agent's current todo item, if this update is about its plan.</param>
@@ -136,7 +137,7 @@ public sealed partial class AgentSignals(
             }
         }
 
-        return Briefing.ForNewTask(office, room, desk, task, before);
+        return Briefing.ForNewTask(office, room, desk, task, before, await brain.BriefAsync(office, room, task, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>A tool call ended: it goes in the task's log, once, with its evidence.</summary>

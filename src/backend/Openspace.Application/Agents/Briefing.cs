@@ -10,7 +10,8 @@ public static class Briefing
 {
     /// <summary>The first message of a task: who you are, where, what to do and how to report.</summary>
     /// <param name="before">The tasks this one builds on, already accepted and merged.</param>
-    public static string ForNewTask(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null)
+    /// <param name="brain">What the shared brain says about this work; nothing is added without it.</param>
+    public static string ForNewTask(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null, BrainBrief? brain = null)
     {
         ArgumentNullException.ThrowIfNull(office);
         ArgumentNullException.ThrowIfNull(room);
@@ -43,6 +44,11 @@ public static class Briefing
             }
         }
 
+        if (brain is not null)
+        {
+            text.AppendLine().Append(BeforeYouStart(brain));
+        }
+
         AppendProcedure(text, task);
         text.Append(PrivateRule(office.PrivatePaths));
 
@@ -69,23 +75,115 @@ public static class Briefing
     /// The brief of an agent taking over a task another engine started: the whole task, and
     /// where to find what was done so far.
     /// </summary>
-    public static string ForTakeOver(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null) =>
+    public static string ForTakeOver(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before = null, BrainBrief? brain = null) =>
         new StringBuilder()
-            .AppendLine(ForNewTask(office, room, desk, task, before))
+            .AppendLine(ForNewTask(office, room, desk, task, before, brain))
             .AppendLine()
             .AppendLine("Another agent already worked on this task in this working copy. Look at git status and git diff to see where it stands, then go on from there: the notes from the team above say what is still wrong.")
             .ToString();
 
     /// <summary>What an agent reads when it starts over after going in circles.</summary>
     /// <param name="why">What went wrong, as in "it tried the same thing 4 times…".</param>
-    public static string ForFreshStart(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before, string why) =>
+    public static string ForFreshStart(Office office, Room room, Desk desk, WorkTask task, IReadOnlyList<WorkTask>? before, string why, BrainBrief? brain = null) =>
         new StringBuilder()
-            .AppendLine(ForNewTask(office, room, desk, task, before))
+            .AppendLine(ForNewTask(office, room, desk, task, before, brain))
             .AppendLine()
             .AppendLine(CultureInfo.InvariantCulture, $"You already worked on this task in this working copy, in a conversation Openspace stopped because {why}.")
             .AppendLine("Start from what is there: look at git status and git diff to see what you already did, and do not redo it. A change that is already in a file is done: move on to what is left, or finish with your summary.")
             .Append("Do not try again what failed the same way more than once: find another way, or leave a note saying what blocks you.")
             .ToString();
+
+    /// <summary>The most the "Before you start" part may take: the brain informs the task, it must not bury it.</summary>
+    public const int BeforeYouStartLimit = 3500;
+
+    private const string AfterBrain =
+        "Search the brain with brain_search before guessing. Before you finish, write a line in your journal with brain_journal: what you did, learnt or left half done. "
+        + "If you made a lasting choice others must follow, propose it as a decision with brain_propose, with its reasons.";
+
+    /// <summary>
+    /// The rules, the decisions in force where the task works, the work next to it, and what to
+    /// leave in the brain at the end. When it would run too long, the decisions go first, then
+    /// the work in flight, then the last rules, and it says what was cut and where to find it.
+    /// </summary>
+    public static string BeforeYouStart(BrainBrief brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        var rules = brain.Rules.Select(r => Shorten(r, 220)).ToList();
+        var decisions = brain.Decisions.ToList();
+        var nearby = brain.Nearby.Take(AgentBrain.BriefingWork).ToList();
+        var moreDecisions = brain.MoreDecisions;
+        var moreWork = brain.Nearby.Count - nearby.Count;
+        var cutRules = 0;
+        var cut = false;
+
+        string Compose()
+        {
+            var text = new StringBuilder().AppendLine("Before you start:");
+            if (rules.Count > 0)
+            {
+                text.AppendLine("The constitution's rules (Constitution.md), which win over every other note:");
+                rules.ForEach(r => text.AppendLine(r));
+                if (cutRules > 0)
+                {
+                    text.AppendLine(CultureInfo.InvariantCulture, $"…and {cutRules} more: read them with brain_read Constitution.md.");
+                }
+            }
+
+            if (decisions.Count > 0 || moreDecisions > 0)
+            {
+                text.AppendLine("Decisions in force for this work; read one in full with brain_read when it bears on what you do:");
+                decisions.ForEach(d => text.AppendLine(CultureInfo.InvariantCulture, $"- {d.Title}{(d.Gist.Length > 0 ? ": " + d.Gist : "")} ({d.Path})"));
+                if (moreDecisions > 0)
+                {
+                    text.AppendLine(CultureInfo.InvariantCulture, $"{moreDecisions} more {(moreDecisions == 1 ? "decision applies" : "decisions apply")}: brain_search with kind \"decision\" finds {(moreDecisions == 1 ? "it" : "them")}.");
+                }
+            }
+
+            if (nearby.Count > 0 || moreWork > 0)
+            {
+                text.AppendLine("Work in flight next to yours: do not undo it, and keep off its files where you can:");
+                nearby.ForEach(n => text.AppendLine(CultureInfo.InvariantCulture, $"- {n.Doing}{(n.Shared.Count > 0 ? $"; shares {string.Join(", ", n.Shared.Take(4))} with you" : "")}"));
+                if (moreWork > 0)
+                {
+                    text.AppendLine(CultureInfo.InvariantCulture, $"{moreWork} more: brain_now lists all the work in flight.");
+                }
+            }
+
+            if (cut)
+            {
+                text.AppendLine("(Cut to keep this brief short: what is left out is in the brain.)");
+            }
+
+            return text.AppendLine(AfterBrain).ToString();
+        }
+
+        var composed = Compose();
+        while (composed.Length > BeforeYouStartLimit && (decisions.Count > 0 || nearby.Count > 0 || rules.Count > 1))
+        {
+            cut = true;
+            if (decisions.Count > 0)
+            {
+                decisions.RemoveAt(decisions.Count - 1);
+                moreDecisions++;
+            }
+            else if (nearby.Count > 0)
+            {
+                nearby.RemoveAt(nearby.Count - 1);
+                moreWork++;
+            }
+            else
+            {
+                rules.RemoveAt(rules.Count - 1);
+                cutRules++;
+            }
+
+            composed = Compose();
+        }
+
+        return composed;
+    }
+
+    private static string Shorten(string text, int max) => text.Length > max ? string.Concat(text.AsSpan(0, max).TrimEnd(), "…") : text;
 
     /// <summary>What an agent is asked when its accepted work no longer merges cleanly.</summary>
     public static string ForCatchUp(string targetBranch, IReadOnlyList<string> files)

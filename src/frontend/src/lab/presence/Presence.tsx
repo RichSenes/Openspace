@@ -9,6 +9,8 @@ import { RIGS } from './body/rig'
 import type { SkinId } from './body/shapes'
 import { ShioriBody } from './body/ShioriBody'
 import { focusFor, subtitles } from './subtitles'
+import type { Sky } from '../../api/types'
+import { HOURS, hourOf, SKIES, type Hour } from './world/city'
 import { CityBackdrop } from './world/CityBackdrop'
 import './presence.css'
 
@@ -19,14 +21,26 @@ const TICK = 50
 interface Prefs {
   skin: SkinId
   pixel: number
+  hour: Hour | 'auto'
+  sky: Sky
 }
+
+const DEFAULTS: Prefs = { skin: 'swarm', pixel: 3, hour: 'auto', sky: 'Rain' }
+
+const HOUR_LABELS: Record<Hour | 'auto', string> = { auto: 'Now', dawn: 'Dawn', day: 'Day', dusk: 'Dusk', night: 'Night' }
+const SKY_LABELS: Record<Sky, string> = { Clear: 'Clear', Cloudy: 'Cloudy', Fog: 'Fog', Drizzle: 'Drizzle', Rain: 'Rain', Snow: 'Snow', Storm: 'Storm' }
 
 function loadPrefs(): Prefs {
   try {
     const v = JSON.parse(localStorage.getItem(STORE) ?? '{}') as Partial<Prefs>
-    return { skin: SKINS.includes(v.skin as SkinId) ? (v.skin as SkinId) : 'swarm', pixel: [0, 2, 3, 4].includes(v.pixel ?? -1) ? v.pixel! : 3 }
+    return {
+      skin: SKINS.includes(v.skin as SkinId) ? (v.skin as SkinId) : DEFAULTS.skin,
+      pixel: [0, 2, 3, 4].includes(v.pixel ?? -1) ? v.pixel! : DEFAULTS.pixel,
+      hour: v.hour === 'auto' || HOURS.includes(v.hour as Hour) ? (v.hour as Hour | 'auto') : DEFAULTS.hour,
+      sky: SKIES.includes(v.sky as Sky) ? (v.sky as Sky) : DEFAULTS.sky,
+    }
   } catch {
-    return { skin: 'swarm', pixel: 3 }
+    return DEFAULTS
   }
 }
 
@@ -65,6 +79,11 @@ export function Presence() {
   const [drawer, setDrawer] = useState<'log' | 'board' | null>(null)
   const [labOpen, setLabOpen] = useState(() => window.innerWidth >= 1000)
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
+  const [clockHour, setClockHour] = useState<Hour>(() => hourOf(new Date()))
+  useEffect(() => {
+    const id = setInterval(() => setClockHour(hourOf(new Date())), 60_000)
+    return () => clearInterval(id)
+  }, [])
   const systemCalm = useReducedMotion()
   const calm = systemCalm || calmPick
   const root = useRef<HTMLDivElement>(null)
@@ -121,6 +140,8 @@ export function Presence() {
     const api = {
       skin: (s: SkinId) => pick({ skin: s }),
       pixel: (p: number) => pick({ pixel: p }),
+      hour: (h: Hour | 'auto') => pick({ hour: h }),
+      sky: (k: Sky) => pick({ sky: k }),
       state: (s: FaceState | null) => setForced(s),
       seek: (step: number | 'end', at: 'start' | 'mid' | 'end' = 'mid') => {
         setPlaying(false)
@@ -140,10 +161,11 @@ export function Presence() {
   const look = FACE_LOOKS[face]
   const sections = boardSections(snap.board)
   const progress = Math.round((t / timeline.duration) * 100)
+  const weather = { hour: prefs.hour === 'auto' ? clockHour : prefs.hour, sky: prefs.sky }
 
   return (
     <div ref={root} className={`pr${subs.long ? ' is-long' : ''}${calm ? ' is-calm' : ''}`} data-mode={snap.mode} style={{ '--mode': info.hex } as React.CSSProperties}>
-      <CityBackdrop pixel={prefs.pixel} calm={calm} />
+      <CityBackdrop pixel={prefs.pixel} calm={calm} weather={weather} />
       <div className="pr-shade" aria-hidden="true" />
       <ShioriBody state={face} skin={prefs.skin} mode={snap.mode} pixel={prefs.pixel} calm={calm} focus={focus} notes={subs.notes} />
 
@@ -157,11 +179,6 @@ export function Presence() {
             <span className="pr-session">Merge order after yesterday</span>
           </span>
         </div>
-        <p className="pr-state" aria-live="polite">
-          <i aria-hidden="true" />
-          {look.label}
-          <span className="pr-state-hint">{look.hint}</span>
-        </p>
         <nav className="pr-actions" aria-label="Session">
           <button type="button" className={`pr-btn${drawer === 'log' ? ' is-on' : ''}`} onClick={() => setDrawer(drawer === 'log' ? null : 'log')} aria-expanded={drawer === 'log'}>
             <MessagesSquare size={16} aria-hidden="true" />
@@ -179,7 +196,11 @@ export function Presence() {
       </header>
 
       <section className="pr-subs" aria-label="Last exchange" aria-live="polite" style={{ top: Math.round(focus.y * size.h + focus.size * (subs.long ? 1.05 : 1.12) + 18) }}>
-        <div className="pr-subs-inner" ref={subsRef}>
+        <p className="pr-state" aria-live="polite" title={look.hint}>
+          <i aria-hidden="true" />
+          {look.label}
+        </p>
+        <div className={`pr-subs-inner${subs.you || subs.shiori ? '' : ' is-empty'}`} ref={subsRef}>
           {subs.you && (
             <p className="pr-you">
               <span className="pr-who">You</span>
@@ -321,6 +342,27 @@ export function Presence() {
               ))}
             </div>
             <p className="pr-muted">Pixel: Shiori on the city's own grid and palette.</p>
+          </fieldset>
+          <fieldset>
+            <legend>Hour</legend>
+            <div className="pr-chips">
+              {(['auto', ...HOURS] as const).map((h) => (
+                <button key={h} type="button" className={`pr-chip${prefs.hour === h ? ' is-on' : ''}`} aria-pressed={prefs.hour === h} onClick={() => pick({ hour: h })}>
+                  {HOUR_LABELS[h]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Weather</legend>
+            <div className="pr-chips">
+              {SKIES.map((k) => (
+                <button key={k} type="button" className={`pr-chip${prefs.sky === k ? ' is-on' : ''}`} aria-pressed={prefs.sky === k} onClick={() => pick({ sky: k })}>
+                  {SKY_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            <p className="pr-muted">The same skies as Openspace's weather, so the city can follow the real one.</p>
           </fieldset>
           <fieldset>
             <legend>State</legend>

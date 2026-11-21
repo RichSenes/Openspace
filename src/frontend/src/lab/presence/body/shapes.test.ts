@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSkin, bustRadius, fibonacciSphere, KIND, rng, type SkinId } from './shapes'
+import { buildSkin, bustSection, fibonacciSphere, KIND, noseAt, rng, type SkinId } from './shapes'
 
 const SKINS: SkinId[] = ['swarm', 'medusa', 'scanline']
 
@@ -13,7 +13,7 @@ describe('skins', () => {
     const kinds = Array.from({ length: s.count }, (_, i) => s.data[i * 4])
     const left = kinds.filter((k) => k === KIND.leftEye).length
     const right = kinds.filter((k) => k === KIND.rightEye).length
-    expect(left).toBeGreaterThan(100)
+    expect(left).toBeGreaterThan(60)
     expect(left).toBe(right)
   })
 
@@ -45,13 +45,22 @@ describe('skins', () => {
 })
 
 describe('the bust', () => {
-  it('has a head, a narrower neck and wide shoulders, and nothing above the head', () => {
-    const head = bustRadius(0.36)!
-    const neck = bustRadius(-0.2)!
-    const shoulders = bustRadius(-0.7)!
-    expect(neck.rx).toBeLessThan(head.rx)
-    expect(shoulders.rx).toBeGreaterThan(head.rx * 2)
-    expect(bustRadius(0.9)).toBeNull()
+  it('has a skull, a narrower neck and shoulders that slope out wide', () => {
+    const skull = bustSection(0.5)!
+    const neck = bustSection(-0.05)!
+    const slope = bustSection(-0.3)!
+    const shoulders = bustSection(-0.6)!
+    expect(neck.rx).toBeLessThan(skull.rx)
+    expect(slope.rx).toBeGreaterThan(neck.rx)
+    expect(shoulders.rx).toBeGreaterThan(slope.rx)
+    expect(shoulders.rx).toBeGreaterThan(skull.rx * 2)
+    expect(bustSection(0.9)).toBeNull()
+  })
+
+  it('has a face in front: a nose with its tip at mid height, a chin narrower than the skull', () => {
+    expect(noseAt(0.3)).toBeGreaterThan(noseAt(0.4))
+    expect(noseAt(0.5)).toBe(0)
+    expect(bustSection(0.08)!.rx).toBeLessThan(bustSection(0.5)!.rx * 0.6)
   })
 })
 

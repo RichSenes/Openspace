@@ -161,7 +161,8 @@ void main(){
   // A surface seen from behind is dimmer; the bust hides its back like a solid head.
   vec3 nrm = uRot * normalize(vec3(aPos.x, uSkin > 1.5 ? 0.0 : aPos.y, aPos.z) + 1e-4);
   float facing = nrm.z;
-  if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing);
+  // Seen edge-on, dashes pile up at the outline: let them fade there.
+  if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing) * mix(0.3, 1.0, clamp(facing, 0.0, 1.0));
 
   float m = 0.0;
   if (eye) {
@@ -188,7 +189,7 @@ void main(){
   float depth = clamp(v.z * 0.5 + 0.5, 0.0, 1.0);
   float bright = (0.28 + 0.72 * depth) * (0.55 + 0.6 * uEnergy);
   float size = uPoint * (0.7 + 0.6 * depth);
-  if (uSkin > 1.5) { size *= 2.2; bright *= 0.42; }
+  if (uSkin > 1.5) { size *= 1.9; bright *= 0.46; }
   if (uSkin > 0.5 && uSkin < 1.5) {
     if (kind > 0.5 && kind < 1.5) { size *= 0.75; bright *= 0.7; }
     else if (!eye) bright *= 0.62;

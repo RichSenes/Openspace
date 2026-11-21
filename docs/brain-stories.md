@@ -138,7 +138,8 @@ the vault opens in Obsidian with its history.
   plus a GitHub search for animation libraries, detailed and themed pixel art assets with free
   licences, interface kits, shader effects and local voice (listening tests of Kokoro, Piper and
   others in Italian, English and Japanese). For each: what it gives, licence, weight, fit. Written
-  into `Studies/`.
+  to [docs/studies/interface.md](studies/interface.md) (the listening tests are proposed there,
+  to run with the person).
 - **S2.2 Direction**: two or three prototypes of the same screens (the building with the brain's
   place, Shiori's chat and face) for the person to choose.
 - **S2.3 onwards**: the redesign, view by view, one story per view, lanes by folder.

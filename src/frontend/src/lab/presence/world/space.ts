@@ -15,24 +15,43 @@ export interface Space {
   galaxy: { x: number; y: number; r: number; arms: number }
   giant: { x: number; y: number; r: number }
   moon: { orbit: number; r: number }
-  distant: { x: number; y: number; r: number }
+  /** Planets far away, each its own kind. */
+  planets: { x: number; y: number; r: number; kind: number; ring: boolean; tilt: number }[]
+  /** Galaxies so far they are smudges. */
+  smudges: { x: number; y: number; r: number; tilt: number }[]
   lights: { lat: number; lon: number }[]
 }
 
 export function makeSpace(w: number, h: number, seed = 41): Space {
   const r = rng(seed)
   const sill = Math.round(h * 0.9)
-  const stars = Array.from({ length: Math.round(w * h * 0.006) }, () => ({ x: r() * w, y: r() * sill, layer: Math.floor(r() * 3), k: r() }))
-  const giantR = Math.round(Math.min(w * 0.42, h * 0.55))
+  // Mostly faint, far stars; a few near ones.
+  const stars = Array.from({ length: Math.round(w * h * 0.014) }, () => {
+    const k = r()
+    return { x: r() * w, y: r() * sill, layer: k < 0.75 ? 0 : k < 0.95 ? 1 : 2, k: r() }
+  })
+  const giantR = Math.round(Math.min(w * 0.2, h * 0.28))
+  // Planets keep clear of the middle, where Shiori is, and of each other.
+  const planets: Space['planets'] = []
+  for (let i = 0; i < 60 && planets.length < 7; i++) {
+    const x = Math.round(r() * w)
+    const y = Math.round(sill * (0.14 + r() * 0.7))
+    const pr = 2 + Math.round(r() ** 2 * 6)
+    const middle = Math.abs(x - w / 2) < w * 0.2 && y < sill * 0.75
+    if (middle || planets.some((p) => Math.hypot(p.x - x, p.y - y) < 40)) continue
+    planets.push({ x, y, r: pr, kind: Math.floor(r() * 5), ring: r() < 0.3, tilt: r() * 0.6 - 0.3 })
+  }
+  const smudges = Array.from({ length: 5 }, () => ({ x: Math.round(r() * w), y: Math.round(r() * sill * 0.8), r: 3 + Math.round(r() * 4), tilt: r() * Math.PI }))
   return {
     w,
     h,
     sill,
     stars,
-    galaxy: { x: Math.round(w * 0.2), y: Math.round(h * 0.22), r: Math.round(Math.min(w, h) * 0.12), arms: 2 },
-    giant: { x: Math.round(w * 0.86), y: Math.round(h * 1.02), r: giantR },
-    moon: { orbit: giantR * 1.25, r: Math.max(3, Math.round(h * 0.035)) },
-    distant: { x: Math.round(w * 0.12), y: Math.round(h * 0.62), r: Math.max(3, Math.round(h * 0.025)) },
+    galaxy: { x: Math.round(w * 0.17), y: Math.round(h * 0.2), r: Math.round(Math.min(w, h) * 0.07), arms: 2 },
+    giant: { x: Math.round(w * 0.9), y: Math.round(h * 0.86), r: giantR },
+    moon: { orbit: giantR * 1.5, r: Math.max(2, Math.round(h * 0.018)) },
+    planets,
+    smudges,
     lights: Array.from({ length: 160 }, () => ({ lat: r() * 2 - 1, lon: r() })),
   }
 }
@@ -40,11 +59,19 @@ export function makeSpace(w: number, h: number, seed = 41): Space {
 /** Where the star stands, by hour: rising over the giant's limb, high, setting, or hidden. */
 export function sunAt(s: Space, hour: Hour): { x: number; y: number; r: number } | null {
   if (hour === 'night') return null
-  const r = Math.max(4, Math.round(s.h * 0.04))
+  const r = Math.max(3, Math.round(s.h * 0.025))
   if (hour === 'dawn') return { x: Math.round(s.giant.x - s.giant.r * 0.55), y: Math.round(s.giant.y - s.giant.r * 0.86), r }
   if (hour === 'dusk') return { x: Math.round(s.w * 0.05), y: Math.round(s.h * 0.7), r: Math.round(r * 1.3) }
   return { x: Math.round(s.w * 0.55), y: Math.round(s.h * 0.12), r }
 }
+
+const PLANET_KINDS: [string, string, string][] = [
+  ['#2a2228', '#5a4a48', '#8a7a6a'],
+  ['#2a3a4a', '#6a9ab0', '#c8e8f0'],
+  ['#3a2a1a', '#8a6a3a', '#d0a86a'],
+  ['#0a1a3a', '#2a5a8a', '#6ab0d0'],
+  ['#2a0a08', '#8a2a1a', '#ff7a3a'],
+]
 
 const NEBULA: Record<Hour, string[]> = {
   night: ['#02030a', '#0a0c26', '#1c1450', '#3a1a6a', '#6a2a80'],
@@ -198,14 +225,40 @@ export function drawSpace(g: CanvasRenderingContext2D, s: Space, neb: HTMLCanvas
 
   galaxy(g, s, t, sky === 'Cloudy' || sky === 'Fog')
 
-  // A small planet far away, with its own thin ring.
-  const d = s.distant
-  g.fillStyle = '#3a6a8a'
-  disc(g, d.x, d.y, d.r)
-  g.fillStyle = '#7ab0c8'
-  disc(g, d.x - 1, d.y - 1, Math.max(1, d.r - 2))
-  g.fillStyle = '#a0b8c0'
-  for (let x = -d.r * 2; x <= d.r * 2; x++) g.fillRect(d.x + x, d.y + Math.round(x * 0.2), 1, 1)
+  // Galaxies so far away they are smudges.
+  for (const m of s.smudges) {
+    g.fillStyle = '#6a5a8a'
+    for (let dy = -m.r; dy <= m.r; dy++)
+      for (let dx = -m.r * 2; dx <= m.r * 2; dx++) {
+        const rx = dx * Math.cos(m.tilt) + dy * Math.sin(m.tilt)
+        const ry = -dx * Math.sin(m.tilt) + dy * Math.cos(m.tilt)
+        const d = Math.hypot(rx / 2, ry * 1.4) / m.r
+        if (d < 1 && bayerAt(m.x + dx, m.y + dy) < (1 - d) * 0.7) g.fillRect(m.x + dx, m.y + dy, 1, 1)
+      }
+    g.fillStyle = '#d8c8ff'
+    g.fillRect(m.x, m.y, 1, 1)
+  }
+
+  // Distant planets: rocky, ice, banded, ocean, lava; some ringed.
+  for (const p of s.planets) {
+    const [dark, mid, light] = PLANET_KINDS[p.kind]
+    for (let dy = -p.r; dy <= p.r; dy++)
+      for (let dx = -p.r; dx <= p.r; dx++) {
+        const d = dx * dx + dy * dy
+        if (d > p.r * p.r) continue
+        const lit = (-dx - dy * 0.5) / p.r
+        const band = p.kind === 2 && Math.abs((dy + p.r) % 3) < 1
+        g.fillStyle = lit > 0.35 ? light : lit > -0.3 ? (band ? dark : mid) : dark
+        g.fillRect(p.x + dx, p.y + dy, 1, 1)
+      }
+    if (p.ring) {
+      g.fillStyle = '#a89a8a'
+      for (let x = -p.r * 2; x <= p.r * 2; x++) {
+        const y = Math.round(x * p.tilt)
+        if (Math.abs(x) > p.r || y > 0) g.fillRect(p.x + x, p.y + y, 1, 1)
+      }
+    }
+  }
 
   const sun = sunAt(s, weather.hour)
   if (sun) {

@@ -204,69 +204,84 @@ export function noseAt(y: number): number {
   return y >= 0.31 ? 0.06 * ((0.45 - y) / 0.14) : 0.06 * ((y - 0.28) / 0.03)
 }
 
-/** Where the face shows through the hair: the front, within this sine of the angle. */
-const FACE_OPEN = 0.5
-/** The fringe: hair covers the forehead down to here. */
-const FRINGE = 0.535
+/** The hairline over the face at an angle around the head (sn: 1 at the front). */
+export function hairlineAt(sn: number): number {
+  // High over the forehead, coming down toward the temples.
+  return 0.6 - 0.14 * Math.max(0, 1 - sn) ** 1.5
+}
 
 /**
- * Long straight hair with a blunt fringe, as a shell around the head: a cap over the skull,
- * curtains down the sides and the back, ending in uneven tips below the shoulders. Null where
- * there is no hair at that height and angle.
+ * Long hair, loose and parted in the middle: close over the skull (not a shell around it), open
+ * on the face from the hairline down, falling from the temples past the jaw in two locks over
+ * the front of the shoulders, and down the back. The ends are uneven. Null where there is no
+ * hair at that height and angle.
  */
 export function hairAt(y: number, phi: number, tip: number): { r: number; depth: number } | null {
-  if (y > 0.91 || y < -0.62 + tip) return null
+  if (y > 0.875 || y < -0.58 + tip) return null
   const sn = Math.sin(phi)
-  const head = bustSection(Math.min(0.86, Math.max(0.42, y)))!
-  const skullTop = y > 0.84 ? Math.sqrt(Math.max(0, 1 - ((y - 0.84) / 0.07) ** 2)) : 1
-  if (y >= FRINGE) {
-    // The cap: all around, a little outside the skull.
-    const k = y > 0.84 ? skullTop : 1
-    return { r: (head.rx + 0.035) * k, depth: ((sn >= 0 ? head.front : head.back) + 0.04) * k }
+  const c = Math.cos(phi)
+  // A soft wave along the length, different on each side.
+  const wave = 0.008 * Math.sin(y * 22 + phi * 3)
+  if (y >= 0.4) {
+    const head = bustSection(Math.min(0.86, y))!
+    const k = y > 0.84 ? Math.sqrt(Math.max(0, 1 - ((y - 0.84) / 0.035) ** 2)) : 1
+    // The face, below the hairline.
+    if (sn > 0.3 && y < hairlineAt(sn)) return null
+    // The parting.
+    if (y > 0.66 && sn > 0.3 && Math.abs(c) < 0.05) return null
+    // Hair lies close on top and gains volume as it comes down the sides.
+    const volume = 0.012 + 0.03 * Math.max(0, (0.75 - y) / 0.35) * (1 - Math.max(0, sn) ** 2)
+    return { r: (head.rx + volume + wave) * k, depth: ((sn >= 0 ? head.front : head.back) + volume) * k }
   }
-  if (sn > FACE_OPEN) return null
-  if (y >= 0.1) return { r: head.rx + 0.045 + 0.02 * (1 - y), depth: sn >= 0 ? head.front * 0.85 : head.back + 0.05 }
-  // Below the chin the hair falls straight: two curtains over the front of the shoulders, and
-  // the back. The front of the chest stays clear.
-  const fall = Math.min(1, (0.1 - y) / 0.6)
-  const c = Math.abs(Math.cos(phi))
-  if (sn > 0 && c < 0.6) return null
+  // Beside the face: only at the sides and back.
+  if (y >= 0.08) {
+    if (sn > 0.25) return null
+    const head = bustSection(0.4)!
+    const out = 0.03 + 0.02 * ((0.4 - y) / 0.32)
+    return { r: head.rx + out + wave, depth: sn >= 0 ? head.front * 0.75 : head.back + out }
+  }
+  // Below the jaw: two locks in front of the shoulders, the rest down the back.
+  const fall = Math.min(1, (0.08 - y) / 0.6)
+  if (sn > 0 && Math.abs(c) < 0.7) return null
   const body = bustSection(y)
-  const r = 0.27 + 0.07 * fall
-  if (body && body.rx > r - 0.02 && sn > 0) {
-    // Over a shoulder: lie on it.
-    return { r, depth: body.front + 0.03 }
-  }
-  return { r, depth: sn >= 0 ? 0.16 + 0.05 * fall : 0.27 + 0.05 * fall }
+  const r = 0.25 + 0.06 * fall + wave
+  if (body && body.rx > r - 0.02 && sn > 0) return { r, depth: body.front + 0.025 }
+  return { r, depth: sn >= 0 ? 0.15 + 0.04 * fall : 0.26 + 0.05 * fall }
 }
 
 /**
  * Scanline: the bust drawn as horizontal dashes, line by line, like a scan. `data.z` is the
  * line's index (0..1, bottom to top), `data.w` the angle around the body; `extra.x` is 1 for hair.
  */
-export function scanline(lines = 82, spacing = 0.031, eyes = 90): PointSet {
+export function scanline(lines = 82, spacing = 0.031, eyes = 70): PointSet {
   const b = new Builder()
   const r = rng(31)
-  const top = 0.91
+  const top = 0.875
   const bottom = -0.98
   // Every column of hair ends at its own length.
   const tips = Array.from({ length: 64 }, () => r() * 0.16)
   for (let l = 0; l < lines; l++) {
     const y = bottom + ((top - bottom) * l) / (lines - 1)
+    const line = l / (lines - 1)
+    // Hair and skin each get as many dashes as their own girth needs, so density stays even.
+    const hn = Math.round((2 * Math.PI * 0.36) / spacing)
+    for (let i = 0; i < hn; i++) {
+      const phi = (i / hn) * Math.PI * 2
+      const hair = hairAt(y, phi, tips[Math.floor((i / hn) * tips.length)])
+      if (hair) b.add([Math.cos(phi) * hair.r, y, Math.sin(phi) * hair.depth], [KIND.body, r(), line, phi], [1, 0])
+    }
     const sec = bustSection(y)
-    const around = sec ? 2 * Math.PI * Math.sqrt((sec.rx * sec.rx + ((sec.front + sec.back) / 2) ** 2) / 2) : 1.4
-    const n = Math.max(24, Math.round(Math.max(around, 1.9) / spacing))
+    if (!sec) continue
+    const around = 2 * Math.PI * Math.sqrt((sec.rx * sec.rx + ((sec.front + sec.back) / 2) ** 2) / 2)
+    const n = Math.max(8, Math.round(around / spacing))
     for (let i = 0; i < n; i++) {
       const phi = (i / n) * Math.PI * 2
-      const c = Math.cos(phi)
-      const sn = Math.sin(phi)
-      const hair = hairAt(y, phi, tips[Math.floor((i / n) * tips.length)])
-      if (hair) b.add([c * hair.r, y, sn * hair.depth], [KIND.body, r(), l / (lines - 1), phi], [1, 0])
       // Skin only where the hair does not cover it.
-      if (!sec || (hair && y > 0.05)) continue
+      if (y > 0.05 && hairAt(y, phi, 0)) continue
+      const sn = Math.sin(phi)
       const nose = noseAt(y) * Math.max(0, sn) ** 40
       const depth = sn >= 0 ? sec.front + nose : sec.back
-      b.add([c * sec.rx, y, sn * depth], [KIND.body, r(), l / (lines - 1), phi])
+      b.add([Math.cos(phi) * sec.rx, y, sn * depth], [KIND.body, r(), line, phi])
     }
   }
   addEyes(b, eyes, (rr) => [rr() * 0.5 - 0.25, 0.2 + rr() * 0.5, 0.2], 32)

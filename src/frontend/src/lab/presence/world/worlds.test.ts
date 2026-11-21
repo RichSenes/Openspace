@@ -30,6 +30,16 @@ describe('space', () => {
     expect(day.y).toBeLessThan(dawn.y)
   })
 
+  it('keeps its distant planets small and out of the middle', () => {
+    const s = makeSpace(400, 300)
+    expect(s.planets.length).toBeGreaterThan(3)
+    for (const p of s.planets) {
+      expect(p.r).toBeLessThanOrEqual(8)
+      expect(Math.abs(p.x - 200) >= 80 || p.y >= s.sill * 0.75).toBe(true)
+    }
+    expect(s.giant.r).toBeLessThanOrEqual(84)
+  })
+
   it('is the same sky for the same size', () => {
     expect(makeSpace(300, 200).stars).toEqual(makeSpace(300, 200).stars)
   })
@@ -60,6 +70,13 @@ describe('the machine', () => {
   it('keeps its chips off the middle, where Shiori stands', () => {
     const m = makeMachine(400, 300)
     for (const c of m.chips) expect(c.x + c.w <= 400 * 0.3 || c.x >= 400 * 0.7 || c.y >= m.floor * 0.8).toBe(true)
+  })
+
+  it('is dense: many traces, a fine layer under them and small parts everywhere', () => {
+    const m = makeMachine(400, 300)
+    expect(m.traces.length).toBeGreaterThan(80)
+    expect(m.fine.length).toBeGreaterThan(m.traces.length)
+    expect(m.parts.length).toBeGreaterThan(300)
   })
 
   it('is busier by day than asleep at night', () => {

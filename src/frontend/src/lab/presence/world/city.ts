@@ -129,10 +129,19 @@ export function makeCity(w: number, h: number, seed = 7, kind: CityKind = 'burni
   const mid = row(r, w, horizon, 10, 26, 0.12, tokyo ? 0.5 : 0.42, tokyo ? 0.24 : 0.16)
   const near = row(r, w, roof - horizon + Math.round(h * 0.12), 14, 34, 0.55, 1, 0.1)
   const tw = Math.max(8, Math.round(w * 0.05))
-  const tower = { x: Math.round(w * 0.16), w: tw, h: Math.round(horizon * 0.78) }
+  const tower = tokyo
+    ? { x: Math.round(w * 0.24), w: Math.max(12, Math.round(horizon * 0.72 * 0.26)), h: Math.round(horizon * 0.72) }
+    : { x: Math.round(w * 0.16), w: tw, h: Math.round(horizon * 0.78) }
+  // In Tokyo, the blocks around the tower stay low so it stands clear down to its arch.
+  if (tokyo) {
+    const from = tower.x - tower.w - 6
+    const to = tower.x + tower.w + 6
+    for (const b of mid) if (b.x + b.w > from && b.x < to) b.h = Math.min(b.h, Math.round(horizon * 0.06))
+  }
+  const clearOfTower = (b: Building) => !tokyo || b.x + b.w + 12 < tower.x - tower.w || b.x - 12 > tower.x + tower.w
   const plumes = tokyo ? [] : [0.07, 0.33, 0.62, 0.9].map((k) => ({ x: Math.round(w * k + (r() - 0.5) * w * 0.05), seed: r() }))
   // Signs hang on the side of tall blocks: one in the burning city, many in Tokyo.
-  const tall = mid.filter((b) => b.x > 6 && b.x + b.w < w - 12 && b.h > horizon * 0.18)
+  const tall = mid.filter((b) => b.x > 6 && b.x + b.w < w - 12 && b.h > horizon * 0.18 && clearOfTower(b))
   const chosen = tokyo
     ? tall.filter((_, i) => i % 2 === 0).slice(0, 7)
     : [tall.filter((b) => b.x > w * 0.7).sort((a, b) => b.h - a.h)[0] ?? mid[mid.length - 1]]
@@ -287,34 +296,68 @@ function sign(g: CanvasRenderingContext2D, s: Sign, t: number, calm: boolean, ho
   g.globalAlpha = 1
 }
 
-/** Tokyo's lattice tower: red and white, two decks, a glow at night. */
+/**
+ * Tokyo's tower: four legs that splay out from an arch, a slim lattice body, the main deck, the
+ * top deck and the antenna. By day it is orange and white; by night a dark frame lit warm along
+ * its edges, as its floodlights do.
+ */
 function tokyoTower(g: CanvasRenderingContext2D, city: City, hour: Hour, t: number) {
   const base = city.horizon + 1
-  const height = Math.round(city.horizon * 0.62)
-  const cx = Math.round(city.w * 0.24)
-  const half = Math.max(8, Math.round(height * 0.22))
+  const height = city.tower.h
+  const cx = city.tower.x
+  const foot = city.tower.w
   const night = hour === 'night' || hour === 'dusk'
+  const body = night ? '#1a0e14' : '#c8442c'
+  const white = night ? '#2a1a1e' : '#e8e2dc'
+  const edge = night ? '#ff9a3a' : '#a83420'
+  const glow = '#ffd08a'
+  const mainDeck = 0.36
+  const topDeck = 0.68
+  const halfAt = (k: number) => {
+    // Legs splay fast near the ground, then the body tapers slowly; above the top deck, a mast.
+    if (k > topDeck) return Math.max(0, 1.5 * (1 - (k - topDeck) / (1 - topDeck)))
+    return 1.5 + (foot - 1.5) * (1 - k / topDeck) ** 3.2
+  }
   for (let y = 0; y < height; y++) {
     const k = y / height
-    const hw = Math.max(0, Math.round(half * (1 - k) ** 1.7))
-    const band = Math.floor(k * 9) % 2 === 0
-    g.fillStyle = night ? (band ? '#ff7a2a' : '#ffd0a0') : band ? '#d8402a' : '#e8e0d8'
-    g.fillRect(cx - hw, base - y, 1, 1)
-    g.fillRect(cx + hw, base - y, 1, 1)
-    // The lattice: crosses between the legs.
-    if (hw > 2 && y % 4 === 0) for (let x = -hw + 1; x < hw; x += 2) if ((x + y) % 4 === 0) g.fillRect(cx + x, base - y, 1, 1)
+    const hw = halfAt(k)
+    const left = Math.round(cx - hw)
+    const right = Math.round(cx + hw)
+    const striped = !night && (Math.floor(k * 14) % 2 === 1) && k < topDeck
+    // The arch: below a fifth of the height the legs stand apart.
+    const arch = k < 0.16 ? Math.round(hw * (1 - k / 0.16) ** 0.6 * 0.8) : 0
+    g.fillStyle = striped ? white : body
+    if (arch > 0) {
+      g.fillRect(left, base - y, Math.max(1, Math.round(hw - arch)), 1)
+      g.fillRect(cx + arch, base - y, Math.max(1, right - cx - arch + 1), 1)
+    } else g.fillRect(left, base - y, right - left + 1, 1)
+    // The lattice shows as a darker cross pattern inside the body.
+    if (hw > 3 && !arch) {
+      g.fillStyle = night ? '#0a0508' : '#8a2a1a'
+      for (let x = left + 1; x < right; x++) if ((x - cx + y) % 6 === 0 || (x - cx - y) % 6 === 0) g.fillRect(x, base - y, 1, 1)
+    }
+    g.fillStyle = edge
+    g.fillRect(left, base - y, 1, 1)
+    g.fillRect(right, base - y, 1, 1)
+    if (night && k < topDeck && y % 2 === 0) {
+      g.fillStyle = glow
+      g.fillRect(left + 1, base - y, 1, 1)
+      g.fillRect(right - 1, base - y, 1, 1)
+    }
   }
-  for (const [k, w] of [
-    [0.36, 0.42],
-    [0.66, 0.2],
+  for (const [k, extra, rows] of [
+    [mainDeck, 3, 4],
+    [topDeck, 2, 2],
   ] as const) {
     const y = base - Math.round(height * k)
-    const hw = Math.round(half * w + 2)
-    g.fillStyle = night ? '#ffe0b0' : '#e8e0d8'
-    g.fillRect(cx - hw, y - 2, hw * 2 + 1, 3)
+    const hw = Math.round(halfAt(k)) + extra
+    g.fillStyle = night ? '#2a1a1e' : '#e8e2dc'
+    g.fillRect(cx - hw, y - rows, hw * 2 + 1, rows)
+    g.fillStyle = night ? glow : '#6a7a8a'
+    for (let x = cx - hw + 1; x < cx + hw; x += 2) g.fillRect(x, y - rows + 1, 1, rows - 2 || 1)
   }
-  g.fillStyle = night && Math.sin(t * 3) > 0 ? '#ff2a3a' : '#a02a2a'
-  g.fillRect(cx, base - height - 4, 1, 4)
+  g.fillStyle = night && Math.sin(t * 3) > 0 ? '#ff2a3a' : '#7a2a2a'
+  g.fillRect(cx, base - height - 1, 1, 2)
 }
 
 /** The sky tree: very tall, very thin, two pods, lit blue or purple at night. */

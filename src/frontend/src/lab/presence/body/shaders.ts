@@ -167,7 +167,8 @@ void main(){
   float facing = nrm.z;
   // Seen edge-on, dashes pile up at the outline: let them fade there.
   bool isHair = uSkin > 1.5 && !eye && aExtra.x > 0.5;
-  if (isHair) alpha *= smoothstep(-0.45, 0.05, facing);
+  // Hair fades toward its outline too, so the head never reads as a hood.
+  if (isHair) alpha *= smoothstep(-0.45, 0.05, facing) * mix(0.35, 1.0, smoothstep(-0.1, 0.6, facing));
   else if (uSkin > 1.5 && !eye) alpha *= smoothstep(-0.05, 0.25, facing) * mix(0.3, 1.0, clamp(facing, 0.0, 1.0));
 
   float m = 0.0;
@@ -178,6 +179,8 @@ void main(){
     float tilt = side * 0.38 * uUnsure;
     q = mat2(cos(tilt), -sin(tilt), sin(tilt), cos(tilt)) * (q * (1.0 - 0.25 * uUnsure));
     q = mix(q, aExtra * vec2(1.0, 1.15), uPleased);
+    // A head has almond eyes: the disc pinched at its corners.
+    if (uSkin > 1.5) q.y *= mix(1.0, sqrt(max(0.0, 1.0 - q.x * q.x)) * 1.1, 1.0 - uPleased);
     vec3 local = vec3(side * uEyeSize.z + q.x * uEyeSize.x + uGaze.x * 0.08,
                       q.y * uEyeSize.y - uGaze.y * 0.06 - 0.03 * uUnsure, 0.0);
     local.z -= local.x * local.x * 0.6;
@@ -185,7 +188,7 @@ void main(){
     m = smoothstep(0.0, 1.0, clamp(uEyes * 1.7 - seed * 0.7, 0.0, 1.0));
     v = mix(v, target, m);
     alpha = mix(alpha * 0.6, 1.0, m);
-    vDash = mix(vDash, 0.0, m);
+    if (uSkin < 1.5) vDash = mix(vDash, 0.0, m);
   }
 
   float persp = 3.0 / (3.0 - v.z);
@@ -212,11 +215,18 @@ void main(){
     // Strands: each thin column of hair has its own brightness.
     float strand = fract(sin(floor(aData.w * 38.0) * 12.9898) * 43758.5453);
     col = mix(col, uHot, 0.45);
-    bright *= 0.45 + 0.7 * strand;
+    bright *= 0.3 + 0.55 * strand;
   }
   col = mix(col, uEye, m);
-  bright = mix(bright, 0.42 + 0.5 * rim, m);
-  size = mix(size, uPoint * 0.95, m);
+  if (uSkin > 1.5 && eye) {
+    // An iris that follows the gaze, inside a dim eye.
+    float iris = smoothstep(0.5, 0.3, length(aData.zw - uGaze * vec2(0.35, -0.3)));
+    bright = mix(bright, 0.14 + 0.5 * iris, m);
+    size = mix(size, uPoint * 1.05, m);
+  } else {
+    bright = mix(bright, 0.42 + 0.5 * rim, m);
+    size = mix(size, uPoint * 0.95, m);
+  }
   if (uPixel > 0.5) size = max(1.0, floor(size + 0.5));
   gl_PointSize = size;
   vColor = col * bright * alpha;

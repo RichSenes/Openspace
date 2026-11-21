@@ -57,15 +57,23 @@ describe('the bust', () => {
     expect(bustSection(0.9)).toBeNull()
   })
 
-  it('has long hair that frames the face and falls below the shoulders', () => {
+  it('lies close on the skull instead of standing off it like a helmet', () => {
+    const skull = bustSection(0.8)!
+    const hair = hairAt(0.8, -Math.PI / 2, 0)!
+    expect(hair.depth - skull.back).toBeLessThan(0.03)
+  })
+
+  it('has long hair parted in the middle that frames the face and falls below the shoulders', () => {
     const front = Math.PI / 2
     const back = -Math.PI / 2
     expect(hairAt(0.4, front, 0)).toBeNull()
-    expect(hairAt(0.58, front, 0)).not.toBeNull()
+    expect(hairAt(0.55, front, 0)).toBeNull()
+    expect(hairAt(0.7, front + 0.4, 0)).not.toBeNull()
+    expect(hairAt(0.7, front, 0)).toBeNull()
     expect(hairAt(0.4, back, 0)).not.toBeNull()
     expect(hairAt(-0.4, back, 0)).not.toBeNull()
     expect(hairAt(-0.7, back, 0)).toBeNull()
-    expect(hairAt(-0.55, back, 0.1)).toBeNull()
+    expect(hairAt(-0.5, back, 0.1)).toBeNull()
   })
 
   it('has a face in front: a nose with its tip at mid height, a chin narrower than the skull', () => {

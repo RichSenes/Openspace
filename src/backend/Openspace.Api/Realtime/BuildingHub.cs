@@ -8,7 +8,8 @@ namespace Openspace.Api.Realtime;
 /// refetch; <c>DeskActivity(activity)</c> carries the activity itself, as it is not stored;
 /// <c>TaskLogChanged(taskId)</c> says a task's audit log grew; <c>RolesChanged()</c> says
 /// a role was defined or changed (deleting one is told by the HTTP answer); <c>EpicsChanged()</c>
-/// says the supervisor opened an epic.
+/// says the supervisor opened an epic; <c>ShioriText</c>, <c>ShioriMessage</c>, <c>ShioriBoard</c>
+/// and <c>ShioriState</c> follow Shiori's sessions.
 /// </summary>
 public sealed class BuildingHub : Hub
 {

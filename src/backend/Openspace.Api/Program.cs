@@ -28,6 +28,7 @@ builder.Services.AddSingleton<Openspace.Api.Sounds.SoundStore>();
 builder.Services.AddSingleton<IDomainEventPublisher, SignalRDomainEventPublisher>();
 builder.Services.AddSingleton<IActivityPublisher, SignalRActivityPublisher>();
 builder.Services.AddSingleton<Openspace.Application.Routines.IRoutineProgress, SignalRRoutineProgress>();
+builder.Services.AddSingleton<Openspace.Application.Shiori.IShioriPublisher, SignalRShioriPublisher>();
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration.GetConnectionString("Openspace")
@@ -73,8 +74,15 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ErrorHandling>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMcpServer(o => o.ServerInfo = new() { Name = "openspace", Version = "1.0.0" })
-    .WithHttpTransport(o => o.Stateless = true)
-    .WithTools<OpenspaceTools>();
+    .WithHttpTransport(o =>
+    {
+        o.Stateless = true;
+
+        // Desks and Shiori share the server; each sees only its own tools.
+        o.ConfigureSessionOptions = McpToolSets.ConfigureAsync;
+    })
+    .WithTools<OpenspaceTools>()
+    .WithTools<ShioriMcpTools>();
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -104,6 +112,7 @@ app.MapVersionEndpoints();
 app.MapSecurityAuditEndpoints();
 app.MapBrainEndpoints();
 app.MapWikiEndpoints();
+app.MapShioriEndpoints();
 Openspace.Api.Sounds.SoundEndpoints.MapSoundEndpoints(app);
 app.MapHub<BuildingHub>(BuildingHub.Path);
 app.MapMcp("/mcp");

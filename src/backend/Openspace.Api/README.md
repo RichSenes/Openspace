@@ -17,7 +17,7 @@ Openspace is and how to start it, see the [main README](../../../README.md).
 [Agents going in circles](#agents-going-in-circles) · [Sounds](#sounds) ·
 [Private folders](#private-folders) · [Usage limits](#usage-limits) ·
 [Claude Code](#claude-code) · [Skills](#skills) · [Security audits](#security-audits) · [Guests](#guests) ·
-[Brain](#brain)
+[Brain](#brain) · [Shiori](#shiori)
 
 Errors come back as problem details: 404 for what does not exist, 422 with a
 readable `detail` (and often a `code`) for what breaks a rule.
@@ -125,6 +125,12 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | PUT | `/api/brain/notes/{path}` | `{ text, summary? }`: the person writes the whole file (front matter and Markdown), committed with `Operator:Name` as author and `summary` (else "wrote" or "edited" the note) as message; `201` for a new note, `200` otherwise, with the note as `GET` gives it. The only route that changes `Constitution.md`; `422` with code `brain-now` for `Now.md`, `brain-path` for a path outside the vault, `brain-too-long` over 1 MB; `400` without `text` |
 | GET | `/api/brain/why?path=&office=` | "Why is this so?": the accepted decisions whose `paths` cover a file of a repository (relative to its root), only those about `office` or every office when it is given: `[{ path, title, decided, offices, rooms, covering, from, review, modified }]`, newest first by the date their file name starts with; `covering` are the globs that matched, `from` the task, routine or session it came from; `400` without `path` |
 | POST | `/api/brain/decisions/{path}/{answer}` | The person's answer on a decision, `answer` one of `fine` (accepted by Shiori: reviewed), `undo` (accepted: rejected), `accept`, `reject` (proposed), `keep` (accepted: review in three months), `supersede`; optional `{ reason }` for undo and reject, written in the proposing desk's journal. Returns the note; `404` for no such note or answer, `422` with code `decision-status` when the answer does not fit its status |
+| GET | `/api/shiori/sessions` | Shiori's sessions, the most recently changed first: `[{ id, title, mode, note, messages, createdAt, updatedAt, endedAt, answering }]`. See [Shiori](#shiori) |
+| POST | `/api/shiori/sessions` | `{ title?, mode? }` (`brainstorm` by default, or `decide`, `organise`): opens a session and its note in `Sessions/`; `201` with the session |
+| GET | `/api/shiori/sessions/{id}` | One session: `{ id, title, mode, note, transcript: [{ role, text, mode, at }], board: [{ id, kind, text, done, office, note }], createdAt, updatedAt, endedAt, answering }`; `role` is `Person`, `Shiori`, `Mode`, `Failed` or `Ended`, `kind` is `Idea`, `Doubt`, `Decision` or `Task` |
+| POST | `/api/shiori/sessions/{id}/messages` | `{ text }`: records the person's message and returns it at once (`202`); the answer streams over the hub, then is saved. `422` with code `shiori-busy` while an answer is being written, `shiori-ended` once the session ended |
+| PUT | `/api/shiori/sessions/{id}/mode` | `{ mode }`: switches the mode, recorded in the transcript and in force for the next tool call and message |
+| POST | `/api/shiori/sessions/{id}/end` | Ends the session: proposes the whiteboard's decisions, stops an answer being written, writes the note's last copy; `{ session, proposed: [paths] }`. Ending again changes nothing |
 | POST | `/api/engines/claude-usage` | Reads the Claude account's usage now, with a one-word question to Haiku; `409` when Claude Code is not there |
 | GET | `/api/usage/desks` | Tokens each desk spent over all its tasks, the most first |
 | GET | `/api/settings` | What a person can change from Openspace: `{ autonomy, seats, claudeSupervises, supervisorModel, claudeReviews, reviewModel, draftModel, openCodeReviewModel }` |
@@ -175,7 +181,9 @@ the agent having to name it.
 | `brain_now` | Who else in the caller's office is working right now, and the files each is changing |
 
 Tools only act on tasks whose agent is working; otherwise they answer with an
-error the agent can read. There is no authentication: the endpoint is meant for
+error the agent can read. Shiori's sessions reach the same endpoint with the header
+`X-Openspace-Shiori: <session secret>` and see only [their own tools](#shiori); requests
+without it never see those. There is no authentication: the endpoint is meant for
 OpenCode running on the same machine.
 
 ## Live updates
@@ -196,6 +204,10 @@ SignalR hub at `/hubs/building`, server to client only:
 | `RolesChanged` | none | a role was defined or changed |
 | `EpicsChanged` | none | the supervisor opened an epic |
 | `ReportsChanged` | none | a report was written |
+| `ShioriText` | session id, a piece of text | Shiori writes the next piece of an answer |
+| `ShioriMessage` | session id, a transcript line | a line is saved: the person's message, a whole answer, a mode change, a failed answer |
+| `ShioriBoard` | session id, the whole whiteboard | an item is added, moved, done, removed or linked to its proposal, and at the end |
+| `ShioriState` | `{ sessionId, mode, answering, ended, error }` | an answer starts or ends (with `error` when it failed), the mode changes, the session ends |
 
 `OfficeChanged` and `TaskChanged` carry ids and clients refetch; they come from
 domain events after each successful save. `DeskActivity`, `DeskContext`, `DeskInterns`,
@@ -869,3 +881,39 @@ commits, merges diffed against their first parent. The person edits through `PUT
 /api/brain/notes/{path}`, the one way the constitution changes (agents only propose, and rules
 are refused to them); `Now.md` is refused there because Openspace rewrites it. "Why" weighs only
 accepted decisions that name paths, with the same globs as search.
+
+## Shiori
+
+Shiori's chat engine (S3.2 and S3.3 of [docs/brain-stories.md](../../../docs/brain-stories.md));
+the page comes with the new interface. A session is a row of the `ShioriSessions` table (title,
+mode, transcript and whiteboard as JSON, the engine conversation's id, a secret for the tools);
+its note `Sessions/<date>-<slug>.md` (`kind: session`, author Shiori, `session` and `mode` in the
+front matter, `## Transcript` then `## Whiteboard` by column) is a copy rewritten when the session
+opens, after each answer, on a mode switch and at the end, not on every piece of text. The
+database is the source of truth: a hand edit of the note is replaced at the next write.
+
+Each answer is one `claude -p` with `--include-partial-messages`, on the model of Settings ›
+Models for Shiori, resuming the conversation (`--session-id` for the first answer, `--resume`
+after, the id chosen by Openspace and kept in the database, so a restart resumes it). Shiori has
+none of Claude Code's tools (`--tools ""`), no permission prompts, and `--allowedTools` lists only
+the mode's Openspace tools. Its system prompt, built for every answer, says who Shiori is, the
+constitution's rules, what the mode allows, the offices with rooms and desks, and to cite notes as
+`[[path]]`; the message itself starts with `[Mode: …]`. Shiori on OpenCode is refused for now
+(code `shiori-engine`), as is a machine without Claude Code.
+
+Shiori's tools, named by the session's secret, and checked against the session's mode at each call:
+
+| Tool | Modes | What it does |
+| --- | --- | --- |
+| `search_brain` | all | `{ query, office?, kind? }`: notes that match, ten at most |
+| `read_note` | all | `{ note }`: one note in full |
+| `list_offices` | all | Offices with rooms and desks, and those without a repository |
+| `whiteboard` | all | `{ action: add\|move\|done\|remove, item?, kind?, text?, position?, office? }`: items `w1`, `w2`… of kind idea, doubt, decision or task; move changes column, place (1 the top) or text |
+| `propose_decision` | decide | `{ title, body, reasons, kind?: decision\|rule, offices?, rooms?, paths?, item? }`: a proposal in `Decisions/`, author Shiori, `from: session <id>`; `item` links it to its whiteboard item |
+| `accept_decision` | decide | `{ note }`: accepts a proposal (`accepted_by: Shiori`, `reviewed: false`) within the acceptor's rules; what those keep for the person is refused with the reason |
+| `plan_work` | organise | `{ office, request }`: the office's supervisor plans in the background (a `SupervisorJobs` job of kind `shiori`), the tasks arrive proposed under an epic requested by Shiori; the request goes on the whiteboard as a task |
+
+A tool the mode does not allow answers with an error saying which mode it needs (code
+`shiori-mode`). Ending a session proposes every decision item of the whiteboard not linked to a
+proposal yet (scoped to its office when it has one), so the acceptor and the person take them
+from there.

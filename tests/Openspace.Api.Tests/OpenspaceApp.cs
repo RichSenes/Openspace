@@ -12,7 +12,10 @@ namespace Openspace.Api.Tests;
 
 /// <summary>The real API host on a private in-memory database.</summary>
 /// <param name="work">Work in flight to show agents, in place of the queue's.</param>
-public sealed class OpenspaceApp(IAgentRuntime? runtime = null, Openspace.Application.Brain.IWorkInProgress? work = null) : WebApplicationFactory<Program>
+/// <param name="shiori">Shiori's engine, in place of Claude Code's.</param>
+public sealed class OpenspaceApp(
+    IAgentRuntime? runtime = null, Openspace.Application.Brain.IWorkInProgress? work = null, Openspace.Application.Shiori.IShioriRuntime? shiori = null)
+    : WebApplicationFactory<Program>
 {
     private readonly string _connectionString = $"Data Source=api-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private SqliteConnection? _keepAlive;
@@ -101,6 +104,11 @@ public sealed class OpenspaceApp(IAgentRuntime? runtime = null, Openspace.Applic
         if (runtime is not null)
         {
             builder.ConfigureTestServices(services => services.AddSingleton(runtime));
+        }
+
+        if (shiori is not null)
+        {
+            builder.ConfigureTestServices(services => services.AddSingleton(shiori));
         }
 
         if (work is not null)

@@ -31,6 +31,7 @@ ports, which `Openspace.Infrastructure` implements.
 | `Review/` | `TaskReviewer` and `PendingReviews`: Claude reads finished work and leaves a note before a person does |
 | `Checks/` | `MergeChecks`: each room's check command on a merged branch |
 | `Brain/` | Shiori's vault: `Note` and `VaultFormat` (Markdown with YAML front matter, wikilinks), `VaultPath` (paths kept inside the vault), `BrainSearch` (words, then scope, status and recency; superseded last), `BrainOptions` |
+| `Shiori/` | `ShioriSessions` (open, talk, switch mode, change the whiteboard, end; answers written in the background and streamed through `IShioriPublisher`), `ShioriActions` (what Shiori's tools do, checked against the mode), `ShioriTools` (tool names per mode), `ShioriPrompt` (the system prompt), `Whiteboard`, `SessionNote` (the session as a note of `Sessions/`), `ShioriProposals` (decisions and rules Shiori proposes) |
 | `Reports/` | `ReportWriter` (a day, an epic or a changelog, from the audit log, in a chosen language), `ReportFacts`, `ChangelogFacts`, `ReportQueries` |
 | `LocalModels/` | `GpuArbiter` (who has the graphics card), `GpuShift` (loads, unloads, gives way), `LocalChat` (routines asking a local model through the arbiter) |
 | `Guests/` | `GuestWatcher` and `GuestBoard`: Claude Code sessions started outside Openspace, as guests of the office whose repository they work in |
@@ -91,7 +92,8 @@ Settings of each kind are described in the
 | `IPullRequests` | `GitHubPullRequests`, through `gh` |
 | `ICheckRunner` | `ShellCheckRunner` |
 | `IVault`, `IBrainIndex` | `FileVault` (the notes on disk, a commit per write), `BrainIndex` (SQLite FTS5) |
-| `IActivityPublisher`, `IDomainEventPublisher`, `IRoutineProgress` | SignalR in the API; null publishers when there is no hub |
+| `IShioriSessionStore`, `IShioriRuntime` | `ShioriSessionStore` (the `ShioriSessions` table), `ClaudeShioriRuntime` (Claude Code, one `claude -p` per answer) |
+| `IActivityPublisher`, `IDomainEventPublisher`, `IRoutineProgress`, `IShioriPublisher` | SignalR in the API; null publishers when there is no hub |
 | `ILocalModelServer`, `ILocalModelApi`, `IGpuProbe`, `IDecider` | `LocalModelServer`, `LlamaServerApi`, `GpuProbe`, `DeciderClient` |
 | `IClaudeSessions` | `ClaudeSessionLogs`: the tail of Claude Code's own session logs |
 | `IGoogleAccounts`, `IMailbox`, `IAgenda` | `GoogleAccounts`, `GmailMailbox`, `GoogleAgenda` |

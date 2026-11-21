@@ -46,7 +46,7 @@ src/
   weather/    Words for the weather
   lab/        The sprite lab: open the page with ?lab
               Shiori's chat, face and whiteboard in three directions: ?lab=shiori
-              Shiori at the centre of the dystopian city, three bodies, pixel or smooth: ?lab=presence
+              Shiori at the centre of four worlds, three bodies, pixel or smooth: ?lab=presence
   ui/         Toasts, dialogs, status pills, the one format for dates and times
 ```
 

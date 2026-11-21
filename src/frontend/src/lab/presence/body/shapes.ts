@@ -163,33 +163,34 @@ const smooth = (a: number, b: number, x: number) => {
 
 /**
  * The bust at height y, as a cross-section: half width, and depth toward the front and the
- * back. A faceless head (skull, brow, nose, lips, chin, jaw), a neck, and shoulders that slope
- * down from it. Null above the head.
+ * back. A woman's head drawn by a scanner: skull, soft brow, small nose, full lips, a narrow
+ * chin, high cheekbones, a slender neck and shoulders that slope down from it. Null above it.
  */
 export function bustSection(y: number): { rx: number; front: number; back: number } | null {
   if (y > 0.86) return null
   let rx = 0
   let front = 0
   let back = 0
-  // Head: skull above, jaw narrowing to the chin below.
-  if (y >= 0.04) {
+  // Head: skull above, a jaw that narrows softly to a small chin below.
+  if (y >= 0.05) {
     const skull = Math.sqrt(Math.max(0, 1 - ((y - 0.47) / 0.39) ** 2))
-    rx = y >= 0.42 ? 0.31 * skull : 0.12 + 0.18 * smooth(0.04, 0.42, y) ** 0.7
-    back = y >= 0.3 ? Math.max(0.15, 0.39 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.4) ** 2))) : 0.15
-    const forehead = 0.36 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.37) ** 2))
-    front = y > 0.56 ? forehead : 0.33
-    front += 0.025 * bump(y, 0.53, 0.025) - 0.03 * bump(y, 0.46, 0.035)
-    front += 0.02 * bump(y, 0.215, 0.015) - 0.015 * bump(y, 0.195, 0.006) + 0.018 * bump(y, 0.175, 0.014)
-    front += 0.02 * bump(y, 0.09, 0.03)
-    front = front * smooth(0.0, 0.1, y) + 0.13 * (1 - smooth(0.0, 0.1, y))
+    rx = y >= 0.42 ? 0.29 * skull : 0.1 + 0.18 * smooth(0.05, 0.42, y) ** 0.6
+    rx += 0.014 * bump(y, 0.36, 0.05)
+    back = y >= 0.3 ? Math.max(0.13, 0.37 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.4) ** 2))) : 0.13
+    const forehead = 0.34 * Math.sqrt(Math.max(0, 1 - ((y - 0.5) / 0.37) ** 2))
+    front = y > 0.56 ? forehead : 0.31
+    front += 0.012 * bump(y, 0.53, 0.025) - 0.025 * bump(y, 0.46, 0.035)
+    front += 0.028 * bump(y, 0.215, 0.016) - 0.018 * bump(y, 0.197, 0.006) + 0.026 * bump(y, 0.178, 0.016)
+    front += 0.015 * bump(y, 0.1, 0.03)
+    front = front * smooth(0.0, 0.11, y) + 0.11 * (1 - smooth(0.0, 0.11, y))
   }
-  // Neck, then the trapezius sloping to the shoulders, then the chest and arms.
-  if (y < 0.14) {
-    const t = Math.min(1, Math.max(0, (-0.1 - y) / 0.38))
-    const slope = 1 - (1 - t) ** 2.2
-    const nrx = y > -0.1 ? 0.14 : 0.14 + 0.66 * slope - (y < -0.48 ? 0.04 * ((-0.48 - y) / 0.5) : 0)
-    const nfront = 0.13 + 0.11 * slope
-    const nback = 0.15 + 0.07 * slope
+  // A slender neck, the shoulders sloping out, then the chest.
+  if (y < 0.15) {
+    const t = Math.min(1, Math.max(0, (-0.13 - y) / 0.38))
+    const slope = 1 - (1 - t) ** 2.4
+    const nrx = y > -0.13 ? 0.11 : 0.11 + 0.52 * slope - (y < -0.51 ? 0.03 * ((-0.51 - y) / 0.5) : 0)
+    const nfront = 0.11 + 0.09 * slope + 0.03 * bump(y, -0.74, 0.12)
+    const nback = 0.12 + 0.06 * slope
     rx = Math.max(rx, nrx)
     front = Math.max(front, nfront)
     back = Math.max(back, nback)
@@ -197,35 +198,75 @@ export function bustSection(y: number): { rx: number; front: number; back: numbe
   return { rx, front, back }
 }
 
-/** How far the nose stands out at height y (its tip at 0.3). */
+/** How far the nose stands out at height y (a small one, its tip at 0.31). */
 export function noseAt(y: number): number {
-  if (y > 0.45 || y < 0.27) return 0
-  return y >= 0.3 ? 0.085 * ((0.45 - y) / 0.15) : 0.085 * ((y - 0.27) / 0.03)
+  if (y > 0.45 || y < 0.28) return 0
+  return y >= 0.31 ? 0.06 * ((0.45 - y) / 0.14) : 0.06 * ((y - 0.28) / 0.03)
+}
+
+/** Where the face shows through the hair: the front, within this sine of the angle. */
+const FACE_OPEN = 0.5
+/** The fringe: hair covers the forehead down to here. */
+const FRINGE = 0.535
+
+/**
+ * Long straight hair with a blunt fringe, as a shell around the head: a cap over the skull,
+ * curtains down the sides and the back, ending in uneven tips below the shoulders. Null where
+ * there is no hair at that height and angle.
+ */
+export function hairAt(y: number, phi: number, tip: number): { r: number; depth: number } | null {
+  if (y > 0.91 || y < -0.62 + tip) return null
+  const sn = Math.sin(phi)
+  const head = bustSection(Math.min(0.86, Math.max(0.42, y)))!
+  const skullTop = y > 0.84 ? Math.sqrt(Math.max(0, 1 - ((y - 0.84) / 0.07) ** 2)) : 1
+  if (y >= FRINGE) {
+    // The cap: all around, a little outside the skull.
+    const k = y > 0.84 ? skullTop : 1
+    return { r: (head.rx + 0.035) * k, depth: ((sn >= 0 ? head.front : head.back) + 0.04) * k }
+  }
+  if (sn > FACE_OPEN) return null
+  if (y >= 0.1) return { r: head.rx + 0.045 + 0.02 * (1 - y), depth: sn >= 0 ? head.front * 0.85 : head.back + 0.05 }
+  // Below the chin the hair falls straight: two curtains over the front of the shoulders, and
+  // the back. The front of the chest stays clear.
+  const fall = Math.min(1, (0.1 - y) / 0.6)
+  const c = Math.abs(Math.cos(phi))
+  if (sn > 0 && c < 0.6) return null
+  const body = bustSection(y)
+  const r = 0.27 + 0.07 * fall
+  if (body && body.rx > r - 0.02 && sn > 0) {
+    // Over a shoulder: lie on it.
+    return { r, depth: body.front + 0.03 }
+  }
+  return { r, depth: sn >= 0 ? 0.16 + 0.05 * fall : 0.27 + 0.05 * fall }
 }
 
 /**
  * Scanline: the bust drawn as horizontal dashes, line by line, like a scan. `data.z` is the
- * line's index (0..1, bottom to top), `data.w` the angle around the body.
+ * line's index (0..1, bottom to top), `data.w` the angle around the body; `extra.x` is 1 for hair.
  */
-export function scanline(lines = 78, spacing = 0.032, eyes = 90): PointSet {
+export function scanline(lines = 82, spacing = 0.031, eyes = 90): PointSet {
   const b = new Builder()
   const r = rng(31)
-  const top = 0.86
+  const top = 0.91
   const bottom = -0.98
+  // Every column of hair ends at its own length.
+  const tips = Array.from({ length: 64 }, () => r() * 0.16)
   for (let l = 0; l < lines; l++) {
     const y = bottom + ((top - bottom) * l) / (lines - 1)
     const sec = bustSection(y)
-    if (!sec) continue
-    const around = 2 * Math.PI * Math.sqrt((sec.rx * sec.rx + ((sec.front + sec.back) / 2) ** 2) / 2)
-    const n = Math.max(8, Math.round(around / spacing))
+    const around = sec ? 2 * Math.PI * Math.sqrt((sec.rx * sec.rx + ((sec.front + sec.back) / 2) ** 2) / 2) : 1.4
+    const n = Math.max(24, Math.round(Math.max(around, 1.9) / spacing))
     for (let i = 0; i < n; i++) {
       const phi = (i / n) * Math.PI * 2
       const c = Math.cos(phi)
       const sn = Math.sin(phi)
-      const ear = y > 0.28 && y < 0.48 && sn < 0.25 ? 0.045 * bump(y, 0.37, 0.05) * Math.abs(c) ** 10 : 0
+      const hair = hairAt(y, phi, tips[Math.floor((i / n) * tips.length)])
+      if (hair) b.add([c * hair.r, y, sn * hair.depth], [KIND.body, r(), l / (lines - 1), phi], [1, 0])
+      // Skin only where the hair does not cover it.
+      if (!sec || (hair && y > 0.05)) continue
       const nose = noseAt(y) * Math.max(0, sn) ** 40
       const depth = sn >= 0 ? sec.front + nose : sec.back
-      b.add([c * (sec.rx + ear), y, sn * depth], [KIND.body, r(), l / (lines - 1), phi])
+      b.add([c * sec.rx, y, sn * depth], [KIND.body, r(), l / (lines - 1), phi])
     }
   }
   addEyes(b, eyes, (rr) => [rr() * 0.5 - 0.25, 0.2 + rr() * 0.5, 0.2], 32)

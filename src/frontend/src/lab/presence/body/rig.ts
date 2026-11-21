@@ -79,17 +79,17 @@ export const RIGS: Record<SkinId, SkinRig> = {
   },
   scanline: {
     label: 'Scanline',
-    line: 'A head drawn by a scanner, line by line',
+    line: 'A woman drawn by a scanner, line by line',
     bodyScale: 0.95,
     lift: 0.02,
-    eyeCenter: [0, 0.455, 0.335],
-    eyeSize: [0.036, 0.02, 0.105],
+    eyeCenter: [0, 0.455, 0.31],
+    eyeSize: [0.038, 0.018, 0.1],
     cool: [0.82, 0.84, 1.0],
     hot: [1.0, 0.33, 0.22],
     eye: [1.0, 1.0, 1.0],
     eyesTurn: true,
     parts: [
-      { name: 'CORTEX', at: [0.2, 0.76, 0.22] },
+      { name: 'CORTEX', at: [0.22, 0.78, 0.24] },
       { name: 'VOICE', at: [0.0, 0.2, 0.34] },
       { name: 'SPINE', at: [-0.1, -0.25, 0.13] },
     ],
@@ -133,15 +133,3 @@ export const MODE_HEAT: Record<string, V3> = {
 export function mix3(a: V3, b: V3, t: number): V3 {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
-
-/** The dystopian world's palette for pixel mode: night, smog, neon, fire. Black stays black. */
-export const DYSTOPIA_PALETTE: V3[] = [
-  [0, 0, 0],
-  [0.1, 0.07, 0.22],
-  [0.2, 0.19, 0.5],
-  [0.31, 0.49, 1.0],
-  [0.61, 0.42, 1.0],
-  [1.0, 0.3, 0.6],
-  [1.0, 0.62, 0.34],
-  [0.95, 0.96, 1.0],
-]

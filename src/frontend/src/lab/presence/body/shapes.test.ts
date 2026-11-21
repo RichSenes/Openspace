@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSkin, bustSection, fibonacciSphere, KIND, noseAt, rng, type SkinId } from './shapes'
+import { buildSkin, bustSection, fibonacciSphere, hairAt, KIND, noseAt, rng, type SkinId } from './shapes'
 
 const SKINS: SkinId[] = ['swarm', 'medusa', 'scanline']
 
@@ -55,6 +55,17 @@ describe('the bust', () => {
     expect(shoulders.rx).toBeGreaterThan(slope.rx)
     expect(shoulders.rx).toBeGreaterThan(skull.rx * 2)
     expect(bustSection(0.9)).toBeNull()
+  })
+
+  it('has long hair that frames the face and falls below the shoulders', () => {
+    const front = Math.PI / 2
+    const back = -Math.PI / 2
+    expect(hairAt(0.4, front, 0)).toBeNull()
+    expect(hairAt(0.58, front, 0)).not.toBeNull()
+    expect(hairAt(0.4, back, 0)).not.toBeNull()
+    expect(hairAt(-0.4, back, 0)).not.toBeNull()
+    expect(hairAt(-0.7, back, 0)).toBeNull()
+    expect(hairAt(-0.55, back, 0.1)).toBeNull()
   })
 
   it('has a face in front: a nose with its tip at mid height, a chin narrower than the skull', () => {

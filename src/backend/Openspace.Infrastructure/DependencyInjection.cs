@@ -45,6 +45,9 @@ public static class DependencyInjection
         services.AddHostedService<BrainService>();
         services.AddHostedService<AcceptorService>();
 
+        // Shiori's sessions: kept in the database, so their engine conversations resume after a restart.
+        services.AddSingleton<Application.Shiori.IShioriSessionStore, Shiori.ShioriSessionStore>();
+
         // Who is changing which files, read from the running tasks' copies into Now.md.
         services.AddHostedService<NowService>();
 
@@ -62,6 +65,8 @@ public static class DependencyInjection
             .ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton<OpenCodeContextWindows>();
         services.AddSingleton<ClaudeCodeRuntime>();
+        services.AddSingleton<Shiori.ClaudeShioriRuntime>();
+        services.AddSingleton<Application.Shiori.IShioriRuntime>(sp => sp.GetRequiredService<Shiori.ClaudeShioriRuntime>());
         services.AddSingleton<Skills.SkillCatalog>();
         services.AddSingleton<ISkillCatalog>(sp => sp.GetRequiredService<Skills.SkillCatalog>());
         services.AddSingleton<ISecurityAuditRecords, Security.SecurityAuditRecords>();

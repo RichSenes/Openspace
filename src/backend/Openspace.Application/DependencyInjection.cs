@@ -80,6 +80,11 @@ public static class DependencyInjection
         services.AddScoped<IRoutineKind, Routines.Kinds.DecisionReviews>();
         services.AddScoped<IRoutineKind, Routines.Kinds.TomorrowMorning>();
         services.AddScoped<OfferInbox>();
+
+        // Shiori's sessions outlive the request that sends a message: the answer is written in the background.
+        services.AddSingleton<Shiori.ShioriSessions>();
+        services.AddScoped<Shiori.ShioriActions>();
+        services.TryAddSingleton<Shiori.IShioriPublisher, Shiori.NoShioriPublisher>();
         return services;
     }
 }

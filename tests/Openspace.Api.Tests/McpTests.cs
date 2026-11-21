@@ -277,7 +277,8 @@ public sealed class McpTests : IAsyncLifetime
         Assert.Equal($"Proposed as {path}. It is not in force until it is accepted.", Text(proposed));
 
         var read = Text(await client.CallToolAsync("brain_read", new Dictionary<string, object?> { ["note"] = path }));
-        Assert.StartsWith("---\nkind: decision\nstatus: proposed\noffices: [E Corp]\nrooms: [Web]\n", read, StringComparison.Ordinal);
+        // Shiori's acceptor runs in the background and may already have accepted it: either is right.
+        Assert.Matches("^---\nkind: decision\nstatus: (proposed|accepted)\noffices: \\[E Corp\\]\nrooms: \\[Web\\]\n", read);
         Assert.Contains($"from: task {taskId}\nauthor: Frontend\n", read, StringComparison.Ordinal);
 
         // The watcher reads the new note into the index within moments.
@@ -288,7 +289,7 @@ public sealed class McpTests : IAsyncLifetime
             found = Text(await client.CallToolAsync("brain_search", new Dictionary<string, object?> { ["query"] = "logout header", ["kind"] = "decision" }));
         }
 
-        Assert.Contains($"- {path} · decision, proposed · Logout lives in the header", found, StringComparison.Ordinal);
+        Assert.Matches($"- {System.Text.RegularExpressions.Regex.Escape(path)} · decision, (proposed|accepted) · Logout lives in the header", found);
     }
 
     [Fact]

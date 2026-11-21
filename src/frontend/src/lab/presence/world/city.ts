@@ -131,16 +131,9 @@ export function makeCity(w: number, h: number, seed = 7, kind: CityKind = 'burni
   const tw = Math.max(8, Math.round(w * 0.05))
   // Tokyo's tower stands far away, behind the distant blocks: a detail of the skyline.
   const tower = tokyo
-    ? { x: Math.round(w * 0.27), w: Math.max(6, Math.round(horizon * 0.56 * 0.17)), h: Math.round(horizon * 0.56) }
+    ? { x: Math.round(w * 0.3), w: Math.max(4, Math.round(horizon * 0.68 * 0.08)), h: Math.round(horizon * 0.68) }
     : { x: Math.round(w * 0.16), w: tw, h: Math.round(horizon * 0.78) }
   const clearOfTower = (b: Building) => !tokyo || b.x + b.w + 4 < tower.x - tower.w || b.x - 4 > tower.x + tower.w
-  // Around it the far and middle blocks stay low, so its legs show above the skyline.
-  if (tokyo)
-    for (const [row, k] of [
-      [far, 0.1],
-      [mid, 0.08],
-    ] as const)
-      for (const b of row) if (b.x + b.w > tower.x - tower.w - 3 && b.x < tower.x + tower.w + 3) b.h = Math.min(b.h, Math.round(horizon * k))
   const plumes = tokyo ? [] : [0.07, 0.33, 0.62, 0.9].map((k) => ({ x: Math.round(w * k + (r() - 0.5) * w * 0.05), seed: r() }))
   // Signs hang on the side of tall blocks: one in the burning city, many in Tokyo.
   const tall = mid.filter((b) => b.x > 6 && b.x + b.w < w - 12 && b.h > horizon * 0.18 && clearOfTower(b))
@@ -308,25 +301,15 @@ function tokyoTower(g: CanvasRenderingContext2D, city: City, hour: Hour, t: numb
   const cx = city.tower.x
   const foot = city.tower.w
   const night = hour === 'night' || hour === 'dusk'
-  const red = night ? '#8a2a2a' : '#a83a30'
-  const pale = night ? '#5a2026' : '#b8a8a0'
+  g.fillStyle = night ? '#6a2228' : '#9a3a32'
   for (let y = 0; y < height; y++) {
     const k = y / height
-    const hw = k > 0.72 ? 0 : Math.round(0.5 + (foot - 0.5) * (1 - k / 0.72) ** 2)
-    const band = !night && k < 0.72 && Math.floor(k * 10) % 2 === 1
-    g.fillStyle = band ? pale : red
-    if (hw === 0) g.fillRect(cx, base - y, 1, 1)
-    else {
-      g.fillRect(cx - hw, base - y, 1, 1)
-      g.fillRect(cx + hw, base - y, 1, 1)
-      if (y % 3 === 0 || hw < 2) g.fillRect(cx - hw, base - y, hw * 2 + 1, 1)
-    }
+    const hw = k > 0.8 ? 0 : Math.round(foot * (1 - k / 0.8) ** 1.3)
+    g.fillRect(cx - hw, base - y, hw * 2 + 1, 1)
   }
-  g.fillStyle = night ? '#d86a3a' : red
-  for (const k of [0.34, 0.6]) {
-    const y = base - Math.round(height * k)
-    const hw = Math.round(0.5 + (foot - 0.5) * (1 - k / 0.72) ** 2) + 1
-    g.fillRect(cx - hw, y, hw * 2 + 1, 1)
+  for (const k of [0.42, 0.66]) {
+    const hw = Math.round(foot * (1 - k / 0.8) ** 1.3) + 1
+    g.fillRect(cx - hw, base - Math.round(height * k), hw * 2 + 1, 1)
   }
   if (night && Math.sin(t * 2.5) > 0.3) {
     g.fillStyle = '#ff3a3a'

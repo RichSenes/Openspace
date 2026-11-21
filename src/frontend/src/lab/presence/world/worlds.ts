@@ -1,4 +1,5 @@
 import { cityScene } from './city'
+import { kyotoScene } from './kyoto'
 import { machineScene } from './machine'
 import { spaceScene } from './space'
 import { EARTH_HOURS, EARTH_SKIES, type WorldDef, type WorldId } from './types'
@@ -41,6 +42,24 @@ export const WORLDS: Record<WorldId, WorldDef> = {
     hours: EARTH_HOURS,
     create: (w, h) => cityScene('tokyo', w, h),
   },
+  kyoto: {
+    id: 'kyoto',
+    label: 'Kyoto',
+    line: 'A pagoda on the hill, maples, a vermilion gate and stone lanterns; the calm one',
+    palette: [
+      [0, 0, 0],
+      [0.08, 0.06, 0.14],
+      [0.22, 0.2, 0.36],
+      [0.42, 0.5, 0.72],
+      [0.85, 0.3, 0.2],
+      [1.0, 0.55, 0.3],
+      [1.0, 0.82, 0.55],
+      [0.96, 0.95, 0.98],
+    ],
+    skies: EARTH_SKIES,
+    hours: EARTH_HOURS,
+    create: kyotoScene,
+  },
   space: {
     id: 'space',
     label: 'Space',
@@ -79,4 +98,4 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   },
 }
 
-export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'space', 'machine']
+export const WORLD_ORDER: WorldId[] = ['city', 'tokyo', 'kyoto', 'space', 'machine']

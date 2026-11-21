@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { along, makeMachine, PACE } from './machine'
 import { bayerAt, fbm, valueNoise } from './pixels'
 import { makeSpace, sunAt } from './space'
+import { KYOTO_LIGHTS, makeKyoto } from './kyoto'
 import { HOURS, SKIES } from './types'
 import { WORLD_ORDER, WORLDS } from './worlds'
 
@@ -103,5 +104,26 @@ describe('pixel tools', () => {
       expect(fbm(b, i * 0.37, i * 0.21)).toBe(v)
     }
     expect(Math.abs(a(1.5, 1.5) - a(1.51, 1.5))).toBeLessThan(0.05)
+  })
+})
+
+describe('Kyoto', () => {
+  it('keeps the middle clear for Shiori and its pond and lanterns on the ground', () => {
+    const k = makeKyoto(400, 300)
+    for (const r of k.roofs) expect(Math.abs(r.x - 200)).toBeGreaterThanOrEqual(400 * 0.18)
+    for (const l of k.lanterns) expect(l.y).toBe(k.floor - 2)
+    expect(k.pond.y).toBeGreaterThan(k.horizon)
+    expect(k.pond.y + k.pond.h).toBeLessThan(k.floor)
+  })
+
+  it('lights its lanterns after dark only', () => {
+    expect(KYOTO_LIGHTS.day.lantern).toBe(0)
+    expect(KYOTO_LIGHTS.night.lantern).toBe(1)
+  })
+
+  it('lays its ridges far to near, the nearest lowest on the sky', () => {
+    const k = makeKyoto(400, 300)
+    expect(k.ridges).toHaveLength(3)
+    for (const r of k.ridges) expect(r).toHaveLength(400)
   })
 })

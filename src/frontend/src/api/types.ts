@@ -718,6 +718,85 @@ export interface GoogleStatusView {
   accounts: GoogleAccountView[]
 }
 
+/** A bot routines can write with: its name and its topic in the group, never its token. */
+export interface TelegramBotView {
+  name: string
+  /** The group's topic it writes in; null for the main chat. */
+  topic: number | null
+}
+
+/** The person's Telegram: the bots, and the group they write in (null until chosen). */
+export interface TelegramStatusView {
+  folder: string
+  chat: number | null
+  bots: TelegramBotView[]
+}
+
+export interface TelegramTopicView {
+  id: number
+  name: string
+}
+
+/** A chat a bot was added to or written in, with the topics seen there. */
+export interface TelegramChatView {
+  id: number
+  title: string
+  /** Telegram's own word: private, group, supergroup, channel. */
+  kind: string
+  topics: TelegramTopicView[]
+}
+
+/** An office's setup as a file: rooms, desks, roles, routines and its own settings. Never repository, folders, accounts or keys. */
+export interface OfficeSetup {
+  format: 'openspace-office'
+  version: number
+  name: string
+  theme: string | null
+  localOnly: boolean
+  holdOverlappingWork: boolean
+  reserveModels: string[]
+  roles: RoleSetup[]
+  rooms: RoomSetup[]
+  routines: RoutineSetup[]
+}
+
+export interface RoleSetup {
+  name: string
+  description: string | null
+  instructions: string | null
+  model: string | null
+  permissions: { edit: PermissionLevel; bash: PermissionLevel; web: PermissionLevel; helpers: PermissionLevel } | null
+  skills: string[] | null
+}
+
+export interface RoomSetup {
+  name: string
+  context: string | null
+  procedure: string[]
+  check: string | null
+  mood: string | null
+  desks: DeskSetup[]
+}
+
+export interface DeskSetup {
+  name: string
+  agentName: string
+  model: string | null
+  engine: AgentEngine
+  /** A role's name, in the file or already here; null for a plain agent. */
+  role: string | null
+}
+
+export interface RoutineSetup {
+  name: string
+  kind: string
+  schedule: ScheduleView
+  /** The kind's settings; null for its defaults. */
+  settings: Record<string, unknown> | null
+  enabled: boolean
+  askFirst: boolean
+}
+
 /** What bringing a branch into another did. */
 export type BranchMergeResult = 'UpToDate' | 'FastForward' | 'Merged'
 

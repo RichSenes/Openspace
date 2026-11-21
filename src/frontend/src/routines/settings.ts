@@ -12,6 +12,14 @@ const ACCOUNT_KINDS = new Set(['mail', 'newsletters', 'followup', 'weekly'])
 
 export const usesAccount = (kind: string): boolean => ACCOUNT_KINDS.has(kind)
 
+/** Whether a routine delivers to Telegram: its kind's defaults, or its own settings, name a channel. */
+export function usesChannel(settings: string, defaults: string | undefined): boolean {
+  return [settings, defaults ?? ''].some((text) => objectOf(text)?.channel !== undefined)
+}
+
+/** The channel a routine writes with, as the bots are named: upper case, empty for none. */
+export const channelOf = (settings: string): string => readText(settings, 'channel').trim().toUpperCase()
+
 /** A text setting of a routine, empty when it is missing or the settings are not valid JSON. */
 export function readText(settings: string, key: string): string {
   const value = objectOf(settings)?.[key]

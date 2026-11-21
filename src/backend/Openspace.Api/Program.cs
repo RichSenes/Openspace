@@ -103,6 +103,7 @@ app.MapGpuEndpoints();
 app.MapRoutineEndpoints();
 app.MapRoutineHelpEndpoints();
 app.MapGoogleEndpoints();
+app.MapTelegramEndpoints();
 app.MapSettingsEndpoints();
 app.MapWeatherEndpoints();
 app.MapLocalAiEndpoints();

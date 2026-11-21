@@ -25,6 +25,15 @@ public interface IGoogleAccounts
     /// <summary>Gives the key back to Google and forgets it.</summary>
     Task DisconnectAsync(string email, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Keeps the OAuth client the person downloaded from Google Cloud, after checking it is one;
+    /// it replaces the one there was. Its secret is never shown again.
+    /// </summary>
+    Task SaveClientAsync(string json, CancellationToken cancellationToken);
+
+    /// <summary>Asks Google for a fresh token for the account, so the person knows its key still works.</summary>
+    Task CheckAsync(string email, CancellationToken cancellationToken);
+
     /// <summary>A short-lived token to call Google for this account.</summary>
     Task<string> AccessTokenAsync(string email, CancellationToken cancellationToken);
 }

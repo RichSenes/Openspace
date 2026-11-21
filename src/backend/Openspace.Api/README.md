@@ -30,6 +30,8 @@ readable `detail` (and often a `code`) for what breaks a rule.
 | GET | `/api/offices` | All offices with rooms and desks |
 | GET | `/api/offices/{id}` | One office |
 | POST | `/api/offices` | Open an office: `{ name }` |
+| GET | `/api/offices/{id}/setup` | The office's setup as a file: rooms (context, procedure, check, mood), desks, the roles they use, routines (without the Google `account`) and its own settings; never the repository, private folders, tasks or keys |
+| POST | `/api/offices/import` | `{ setup, name? }`: a new office from a setup (a template's or a file's), all or nothing; roles already here with the same name are used as they are; `422` with a `code` (`setup-format`, `setup-version`, `setup-role-missing`, `setup-routine-kind`) |
 | PUT | `/api/offices/{id}/name` | Rename the office: `{ name }`; `422` when blank |
 | PUT | `/api/offices/{id}/theme` | Draw the office with another mood: `{ theme }`, one word such as `cozy` or `neonDistrict` |
 | POST | `/api/offices/{id}/rooms` | Open a room: `{ name }` |
@@ -324,6 +326,15 @@ clock, some days of the week (every day when none), every week or every few week
 | POST | `/api/google/connect` | `{ url }`: Google's page to say yes on; it comes back to the callback |
 | GET | `/api/google/callback` | Where Google sends the browser back: keeps the account's key, answers with a small page |
 | DELETE | `/api/google/accounts/{email}` | Gives the account's key back to Google and forgets it |
+| PUT | `/api/google/client` | `{ json }`: the OAuth client file chosen in the page, checked (`422`, code `google-client`, when it is not one) and kept readable by the person only |
+| POST | `/api/google/accounts/{email}/check` | Asks Google for a fresh token: `204` when the account works, `422` with the reason |
+| GET | `/api/telegram` | The bots by name with their topic, and the group's number: never a token |
+| POST | `/api/telegram/bots` | `{ name, token, topic? }`: checks the token with Telegram (`getMe`), then keeps it in `telegram.env`; answers `{ username }` |
+| DELETE | `/api/telegram/bots/{name}` | Forgets the bot and its topic |
+| PUT | `/api/telegram/bots/{name}/topic` | `{ topic }`: the group's topic it writes in; null for the main chat |
+| GET | `/api/telegram/bots/{name}/chats` | The chats the bot was added to or written in lately, with the topics seen there (read without marking anything read) |
+| POST | `/api/telegram/bots/{name}/test` | A short test message where the bot's routines write |
+| PUT | `/api/telegram/chat` | `{ chat }`: the group the bots write in |
 
 Routines run one at a time in the background. A run missed while the computer was
 off happens once when it is back on, and the next one is counted from then. A run
@@ -338,7 +349,8 @@ routine asks first; deleting, replying or applying always waits for a yes.
 What a routine makes goes to the person's Telegram group: its settings name a bot
 (`"channel": "KAWARABAN"`), whose token is in `telegram.env` and whose topic is in
 `telegram.json`, both in `Telegram:Folder` (`~/.config/openspace` by default, never
-in a repository). Long text is split on line breaks; files go as documents. A
+in a repository). Both files are written by *Settings › Connections* (readable by the
+person only, written whole) and can still be edited by hand. Long text is split on line breaks; files go as documents. A
 routine without a channel delivers nothing; tests point the folder somewhere empty.
 
 Routines whose proposals ask in the chat (job offers) put yes and no buttons under each

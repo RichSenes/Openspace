@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isSection, onSectionRequest, requestSettingsSection, SECTIONS } from './sections'
+import { isSection, onOpenSettings, onSectionRequest, openSettings, requestSettingsSection, SECTIONS } from './sections'
 
 describe('settings sections', () => {
   it('starts from the engines and ends with the system', () => {
@@ -15,5 +15,20 @@ describe('settings sections', () => {
     stop()
     requestSettingsSection('system')
     expect(heard.mock.calls).toEqual([['engines']])
+  })
+})
+
+describe('opening settings from a view', () => {
+  it('asks for the section and for Settings itself', () => {
+    const opened = vi.fn()
+    const heard = vi.fn()
+    const stopOpen = onOpenSettings(opened)
+    const stopSection = onSectionRequest(heard)
+    openSettings('connections')
+    stopOpen()
+    stopSection()
+    openSettings('system')
+    expect(opened).toHaveBeenCalledTimes(1)
+    expect(heard.mock.calls).toEqual([['connections']])
   })
 })

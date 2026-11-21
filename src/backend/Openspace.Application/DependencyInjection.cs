@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<OfficeCommands>();
         services.AddScoped<OfficeQueries>();
+        services.AddScoped<OfficeSetups>();
         services.AddScoped<WorkTaskCommands>();
         services.AddScoped<WorkTaskQueries>();
         services.AddScoped<FeedQueries>();

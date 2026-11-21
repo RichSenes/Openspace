@@ -80,6 +80,9 @@ internal static class OfficeEndpoints
 
     public sealed record DeskRoleRequest(Guid? RoleId);
 
+    /// <param name="Name">The new office's name; the file's when null.</param>
+    public sealed record ImportRequest(OfficeSetup Setup, string? Name);
+
     public static void MapOfficeEndpoints(this IEndpointRouteBuilder app)
     {
         var offices = app.MapGroup("/api/offices").WithTags("Offices");
@@ -95,6 +98,21 @@ internal static class OfficeEndpoints
         offices.MapPost("/", async (NameRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             var id = await commands.OpenOfficeAsync(request.Name, ct);
+            return Results.Created($"/api/offices/{id.Value}", new { id = id.Value });
+        });
+
+        // An office's setup as a file, and a new office opened from one (or from a template, which is one).
+        offices.MapGet("/{officeId:guid}/setup", (Guid officeId, OfficeSetups setups, CancellationToken ct) =>
+            setups.ExportAsync(new OfficeId(officeId), ct));
+
+        offices.MapPost("/import", async (ImportRequest request, OfficeSetups setups, CancellationToken ct) =>
+        {
+            if (request.Setup is null)
+            {
+                return Results.Problem("The office file is empty.", statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            var id = await setups.ImportAsync(request.Setup, request.Name, ct);
             return Results.Created($"/api/offices/{id.Value}", new { id = id.Value });
         });
 

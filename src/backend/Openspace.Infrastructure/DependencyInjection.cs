@@ -181,6 +181,11 @@ public static class DependencyInjection
             http.Timeout = TimeSpan.FromSeconds(40);
         });
         services.AddHostedService<Telegram.TelegramListener>();
+        services.AddHttpClient<Application.Telegram.ITelegramSetup, Telegram.TelegramSetup>(http =>
+        {
+            http.BaseAddress = new Uri("https://api.telegram.org/");
+            http.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         // Google accounts connected with the person's own OAuth client; their mail for the mail routine.
         services.AddHttpClient(Google.GoogleHttp.Name).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(1));

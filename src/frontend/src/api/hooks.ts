@@ -15,6 +15,9 @@ import type {
   GpuView,
   KanjiCourseView,
   GoogleStatusView,
+  OfficeSetup,
+  TelegramChatView,
+  TelegramStatusView,
   ProposalView,
   RoutineKindView,
   RoutineRunView,
@@ -96,6 +99,7 @@ export const keys = {
   sounds: ['sounds'] as const,
   deskUsage: ['usage', 'desks'] as const,
   google: ['google'] as const,
+  telegram: ['telegram'] as const,
   skills: ['skills'] as const,
   supervisorJobs: ['supervisor-jobs'] as const,
   securityAudits: (officeId: string) => ['security-audits', officeId] as const,
@@ -942,6 +946,77 @@ export function useConnectGoogle() {
 
 export function useDisconnectGoogle() {
   return useWrite((email: string) => request<void>('DELETE', `/api/google/accounts/${encodeURIComponent(email)}`), keys.google)
+}
+
+/** Keeps the OAuth client file the person chose; its text goes to this computer's API and nowhere else. */
+export function useSaveGoogleClient() {
+  return useWrite((json: string) => request<void>('PUT', '/api/google/client', { json }), keys.google)
+}
+
+/** Asks Google for a fresh token for the account: it says whether the account still works. */
+export function useCheckGoogle() {
+  return useMutation({ mutationFn: (email: string) => request<void>('POST', `/api/google/accounts/${encodeURIComponent(email)}/check`) })
+}
+
+/** The person's Telegram bots and group, by name: never a token. */
+export function useTelegram() {
+  return useQuery({ queryKey: keys.telegram, queryFn: () => request<TelegramStatusView>('GET', '/api/telegram') })
+}
+
+/** A Telegram change also changes the channels routines can choose from. */
+function useTelegramWrite<TInput, TResult>(fn: (input: TInput) => Promise<TResult>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: keys.telegram }), client.invalidateQueries({ queryKey: [...keys.routines, 'channels'] })]),
+  })
+}
+
+export function useAddTelegramBot() {
+  return useTelegramWrite((input: { name: string; token: string; topic: number | null }) => request<{ username: string }>('POST', '/api/telegram/bots', input))
+}
+
+export function useRemoveTelegramBot() {
+  return useTelegramWrite((name: string) => request<void>('DELETE', `/api/telegram/bots/${encodeURIComponent(name)}`))
+}
+
+export function useSetTelegramChat() {
+  return useTelegramWrite((chat: number) => request<void>('PUT', '/api/telegram/chat', { chat }))
+}
+
+export function useSetTelegramTopic() {
+  return useTelegramWrite((input: { name: string; topic: number | null }) =>
+    request<void>('PUT', `/api/telegram/bots/${encodeURIComponent(input.name)}/topic`, { topic: input.topic }),
+  )
+}
+
+/** The chats a bot was added to or written in lately: asked for when the person presses the button. */
+export function useFindTelegramChats() {
+  return useMutation({ mutationFn: (name: string) => request<TelegramChatView[]>('GET', `/api/telegram/bots/${encodeURIComponent(name)}/chats`) })
+}
+
+export function useTestTelegramBot() {
+  return useMutation({ mutationFn: (name: string) => request<void>('POST', `/api/telegram/bots/${encodeURIComponent(name)}/test`) })
+}
+
+/** An office's setup, to save as a file. */
+export function exportOfficeSetup(officeId: string) {
+  return request<OfficeSetup>('GET', `/api/offices/${officeId}/setup`)
+}
+
+/** Opens a new office from a setup: a template's or a file's. Roles may be added, so they are read again too. */
+export function useImportOffice() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { setup: OfficeSetup; name: string }) => request<Created>('POST', '/api/offices/import', input),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: keys.offices }),
+        client.invalidateQueries({ queryKey: keys.roles }),
+        client.invalidateQueries({ queryKey: keys.routines }),
+      ]),
+  })
 }
 
 /** The skills installed for the agents, to choose from in a role. */

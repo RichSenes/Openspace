@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readAgenda, readText, usesAccount, withAgenda, withText } from './settings'
+import { channelOf, readAgenda, readText, usesAccount, usesChannel, withAgenda, withText } from './settings'
 
 describe('routine text settings', () => {
   it('reads a text setting, empty when missing or not text', () => {
@@ -30,5 +30,19 @@ describe('routines on a Google account', () => {
   it('asks for the account in mail, newsletter, follow-up and weekly routines only', () => {
     expect(['mail', 'newsletters', 'followup', 'weekly'].every(usesAccount)).toBe(true)
     expect(usesAccount('morning-paper')).toBe(false)
+  })
+})
+
+describe('routine channels', () => {
+  it('asks for a channel when the kind or the routine has one', () => {
+    expect(usesChannel('{}', '{"channel":""}')).toBe(true)
+    expect(usesChannel('{"channel":"PAPER"}', undefined)).toBe(true)
+    expect(usesChannel('{"account":""}', '{"account":""}')).toBe(false)
+    expect(usesChannel('{"channel":', undefined)).toBe(false)
+  })
+
+  it('reads the channel as bots are named', () => {
+    expect(channelOf('{"channel":" paper "}')).toBe('PAPER')
+    expect(channelOf('{}')).toBe('')
   })
 })

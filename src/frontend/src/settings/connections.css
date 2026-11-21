@@ -1,0 +1,127 @@
+/* Guided setups in Connections: numbered steps, each with what to do, its status and its button. */
+.guide {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide > li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: var(--radius);
+}
+
+.guide > li.next {
+  background: var(--raised);
+}
+
+.guide-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--mute);
+  border-radius: 50%;
+  font-size: 12px;
+}
+
+.guide > li.done .guide-mark {
+  border-color: var(--st-running);
+  background: var(--st-running);
+  color: var(--bg);
+}
+
+.guide-body {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.guide-body > p,
+.guide-body > ol {
+  margin: 0;
+}
+
+.guide-body ol {
+  display: grid;
+  gap: 2px;
+  padding-left: 20px;
+  color: var(--mute);
+}
+
+.guide-body a {
+  color: var(--accent);
+}
+
+.guide-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+}
+
+.guide-form .field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.guide-form .btn {
+  margin-top: 22px;
+}
+
+.connection-status {
+  margin: 0;
+  font-weight: 500;
+}
+
+.telegram-bots,
+.telegram-chats {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.telegram-bots > li,
+.telegram-chats > li {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.guide > li.next .telegram-bots > li,
+.guide > li.next .telegram-chats > li {
+  background: var(--bg);
+}
+
+.telegram-bot-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide-body .google-accounts {
+  width: 100%;
+}
+
+/* Once the form wraps, the button sits under the fields: no gap to line it up with them. */
+@media (max-width: 600px) {
+  .guide-form .btn {
+    margin-top: 0;
+  }
+}

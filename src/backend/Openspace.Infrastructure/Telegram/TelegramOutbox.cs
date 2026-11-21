@@ -194,11 +194,12 @@ internal sealed class TelegramOutbox(HttpClient http, IOptionsMonitor<TelegramOp
 /// <summary>The person's bots: each one's token, the group chat and the bot's topic in it.</summary>
 internal static class Bots
 {
-    public static (string Token, string Chat, string? Topic) Read(string folder, string channel)
+    /// <param name="needsChat">False when only the token is wanted, before a group is chosen.</param>
+    public static (string Token, string Chat, string? Topic) Read(string folder, string channel, bool needsChat = true)
     {
         var tokens = Path.Combine(folder, "telegram.env");
         var targets = Path.Combine(folder, "telegram.json");
-        if (!File.Exists(tokens) || !File.Exists(targets))
+        if (!File.Exists(tokens) || (needsChat && !File.Exists(targets)))
         {
             throw new InvalidOperationException($"Telegram is not set up: {tokens} and {targets} are needed.");
         }
@@ -209,6 +210,11 @@ internal static class Bots
             .Select(line => (Name: line[..line.IndexOf('=', StringComparison.Ordinal)].Trim().ToUpperInvariant(), Value: line[(line.IndexOf('=', StringComparison.Ordinal) + 1)..].Trim()))
             .FirstOrDefault(pair => pair.Name == channel).Value
             ?? throw new InvalidOperationException($"No Telegram bot called {channel} in {tokens}.");
+
+        if (!needsChat)
+        {
+            return (token, string.Empty, null);
+        }
 
         using var document = JsonDocument.Parse(File.ReadAllText(targets));
         var root = document.RootElement;

@@ -7,7 +7,7 @@ export const SECTIONS: { id: SettingsSection; label: string; hint: string }[] = 
   { id: 'local', label: 'Local AI', hint: 'Models on this machine and who comes first on the card' },
   { id: 'models', label: 'Models', hint: 'Which engine and model does each job: Shiori, reviews, digests, journals' },
   { id: 'agents', label: 'How agents work', hint: 'Permissions and how many work at once' },
-  { id: 'connections', label: 'Connections', hint: 'Google accounts for the routines' },
+  { id: 'connections', label: 'Connections', hint: 'Telegram and Google accounts for the routines, set up step by step' },
   { id: 'look', label: 'Look and sound', hint: 'Sounds and the weather at the windows' },
   { id: 'system', label: 'System', hint: 'Version and backups' },
 ]
@@ -42,4 +42,18 @@ export function onSectionRequest(callback: (section: SettingsSection) => void): 
   }
   bus.addEventListener(EVENT, listener)
   return () => bus.removeEventListener(EVENT, listener)
+}
+
+const OPEN = 'open'
+
+/** Asks the page to show Settings at a section, from a view that cannot change the view itself. */
+export function openSettings(section: SettingsSection) {
+  requestSettingsSection(section)
+  bus.dispatchEvent(new Event(OPEN))
+}
+
+/** Calls back when a view asks to open Settings; gives back how to stop listening. */
+export function onOpenSettings(callback: () => void): () => void {
+  bus.addEventListener(OPEN, callback)
+  return () => bus.removeEventListener(OPEN, callback)
 }

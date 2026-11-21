@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, LoaderCircle, Plus, Trash2 } from 'lucide-react'
+import { openSettings } from '../settings/sections'
 import { useCreateRoutine, useRoutineChannels, useRoutineModels, useTestBoard, useUpdateRoutine, type FeedTest } from '../api/hooks'
 import type { RoutineView, Weekday } from '../api/types'
 import { useToast } from '../ui/toastContext'
@@ -372,7 +373,12 @@ function Channel({ jobs, onChange }: { jobs: Jobs; onChange: (next: (j: Jobs) =>
       label="Telegram"
       hint={
         channels.data && known.length === 0
-          ? 'No bots set up yet: offers wait in Openspace.'
+          ? <>
+              {'No bots set up yet: offers wait in Openspace. '}
+              <button type="button" className="link-button" onClick={() => openSettings('connections')}>
+                Set up Telegram in Settings › Connections
+              </button>
+            </>
           : 'The bot that sends each offer with its yes and no; Openspace listens to it, so it must be this routine’s alone.'
       }
     >

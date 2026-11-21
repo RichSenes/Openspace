@@ -173,6 +173,64 @@ internal sealed class GoogleAccounts(HttpClient http, IOptionsMonitor<GoogleOpti
         _tokens.TryRemove(email, out _);
     }
 
+    /// <summary>A client file is a few hundred bytes; anything much larger is not one.</summary>
+    private const int MaxClientLength = 16 * 1024;
+
+    public Task SaveClientAsync(string json, CancellationToken cancellationToken)
+    {
+        var text = json?.Trim() ?? string.Empty;
+        if (ClientProblem(text) is { } problem)
+        {
+            throw new Application.RejectedException("google-client", problem);
+        }
+
+        PrivateFiles.Write(Path.Combine(Folder, ClientFile), text);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>What is wrong with a client file, in words; null when it is one Google gave.</summary>
+    internal static string? ClientProblem(string text)
+    {
+        const string Download = "Download it from Google Cloud: APIs and services, Credentials, your OAuth client (a desktop app), Download JSON.";
+        if (text.Length == 0 || text.Length > MaxClientLength)
+        {
+            return $"This is not an OAuth client file. {Download}";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return $"This is not an OAuth client file. {Download}";
+            }
+
+            var client = root.TryGetProperty("installed", out var installed) ? installed : root.TryGetProperty("web", out var web) ? web : root;
+            if (client.ValueKind != JsonValueKind.Object || !client.TryGetProperty("client_id", out var id) || id.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(id.GetString()))
+            {
+                return root.TryGetProperty("type", out var type) && type.GetString() == "service_account"
+                    ? $"This is a service account key, not an OAuth client. {Download}"
+                    : $"The file has no client_id. {Download}";
+            }
+
+            return !client.TryGetProperty("client_secret", out var secret) || secret.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(secret.GetString())
+                ? $"The file has no client_secret. {Download}"
+                : null;
+        }
+        catch (JsonException)
+        {
+            return $"This file is not valid JSON. {Download}";
+        }
+    }
+
+    public async Task CheckAsync(string email, CancellationToken cancellationToken)
+    {
+        // Not the token kept in memory: a new one, from the key on disk.
+        _tokens.TryRemove(email, out _);
+        await AccessTokenAsync(email, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<string> AccessTokenAsync(string email, CancellationToken cancellationToken)
     {
         if (_tokens.TryGetValue(email, out var cached) && cached.Until > clock.GetUtcNow())

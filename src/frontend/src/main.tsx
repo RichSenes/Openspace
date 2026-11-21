@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.tsx'
 import { SpriteLab } from './lab/SpriteLab'
 import { ShioriLab } from './lab/shiori/ShioriLab'
+import { Presence } from './lab/presence/Presence'
 
 console.info('Hello, friend.')
 
@@ -20,7 +21,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        {lab === 'shiori' ? <ShioriLab /> : lab !== null ? <SpriteLab /> : <App />}
+        {lab === 'shiori' ? <ShioriLab /> : lab === 'presence' ? <Presence /> : lab !== null ? <SpriteLab /> : <App />}
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

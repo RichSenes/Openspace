@@ -29,6 +29,7 @@ own. *Reference only*: look, do not copy (licence or fit forbids it). *Avoid*: d
 - [6. Shaders and 3D: the dome and Shiori's face](#6-shaders-and-3d-the-dome-and-shioris-face)
 - [7. Voice](#7-voice)
 - [8. Ready-made projects on GitHub](#8-ready-made-projects-on-github)
+- [9. The second prototype: Shiori at the centre](#9-the-second-prototype-shiori-at-the-centre)
 - [Licences and risks](#licences-and-risks)
 - [Proposed prototypes](#proposed-prototypes)
 - [Open questions for the person](#open-questions-for-the-person)
@@ -527,6 +528,37 @@ The density itself comes from drawing at a smaller scale with more pixels (see b
 4. **Art made, not bought.** Drawn by us in the sprite format with Pixelorama or Aseprite as
    help, effects made with Pixel-Composer, and CC0 packs as raw material. Paid packs at 32/48 px
    (LimeZu and others) only in the person's local fan pack.
+
+## 9. The second prototype: Shiori at the centre
+
+After the first prototype the person chose (2026-11-21):
+
+- **One visual language: dense pixel art.** Worlds and themes change places, palettes, light and
+  objects, not the drawing technique. The density is the point: small pixels, many of them, as in
+  Waneella's and Kirokaze's scenes, instead of today's large ones.
+- **Shiori is the protagonist**, at the centre and large; the chat becomes subtitles under her
+  (the last question and her answer as she writes it), with the whole conversation and the board
+  in drawers. A long answer turns into a card and Shiori steps back to make room.
+- **One being, several bodies.** The person's references (animated studies of light creatures,
+  point clouds, scanned heads, ASCII dissolves, HUD callouts) share a mood: an AI in a dystopian
+  future, the two of you working together while the world burns, close to *Akira* and
+  *Evangelion*. No realism and no real faces.
+- Shiori may step a little outside the world's style, but must not clash with it.
+
+`?lab=presence` is that prototype:
+
+| Part | How it is made |
+|---|---|
+| Bodies | **Swarm** (a membrane of 2,600 points deformed by noise, with worms of light crawling on it), **Medusa** (a pulsing bell and 30 tentacles with signals running down them), **Scanline** (a faceless bust drawn as horizontal dashes that turns to follow its gaze and dissolves at the base) |
+| Character | One set of numbers per state (energy, speed, eyes, opening, pleased, unsure, lean, heat) shared by every body; blinks, double blinks and saccades; a voice envelope while she answers |
+| Eyes | Points that leave the body and gather into two eyes when she looks at you, dissolve back while she thinks, turn into arcs when she is pleased, tilt and shrink when she is unsure |
+| HUD | Tags hung on parts of her body on springs, with live coordinates; the notes she reads or cites replace the part names |
+| Changes | A new body dissolves into 5×7 pixel glyphs with a glitch and comes back; a mode switch half-dissolves and takes the mode's colour |
+| Drawing | One WebGL2 canvas, no new dependency: points into an offscreen target, then glow, ASCII, glitch and, in pixel mode, the world's 8-colour palette with ordered dithering, enlarged without smoothing. A **Smooth / Pixel ×2 ×3 ×4** switch shows both ways |
+| World | The first world, a city at night with fires on the horizon, smoke, embers, lit and flickering windows, a beacon, a stuttering neon sign and rain, drawn on a canvas at the art's own size at 12 frames a second |
+
+Calm motion slows everything, drops the glitch and keeps the colours. The 3D noise in the shader
+is Ashima Arts' (MIT).
 
 ## Licences and risks
 

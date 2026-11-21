@@ -28,6 +28,7 @@ own. *Reference only*: look, do not copy (licence or fit forbids it). *Avoid*: d
 - [5. Components, chat, wiki and whiteboard](#5-components-chat-wiki-and-whiteboard)
 - [6. Shaders and 3D: the dome and Shiori's face](#6-shaders-and-3d-the-dome-and-shioris-face)
 - [7. Voice](#7-voice)
+- [8. Ready-made projects on GitHub](#8-ready-made-projects-on-github)
 - [Licences and risks](#licences-and-risks)
 - [Proposed prototypes](#proposed-prototypes)
 - [Open questions for the person](#open-questions-for-the-person)
@@ -443,6 +444,89 @@ machine, played blind in a random order, scored 1–5 for naturalness and for pr
 | microWakeWord | TensorFlow training framework, synthetic samples | Apache-2.0, ~40 stars | Reference only |
 | **Porcupine** (Picovoice) | Italian and Japanese, WASM SDK | SDK Apache-2.0, but every engine needs an **AccessKey** from Picovoice Console checked at start-up. Picovoice's FAQ says there are no plans for personal or non-commercial use (enterprise trial only); a community report says free-tier keys were disabled on 2026-06-30 | **Avoid** |
 | Whisper on VAD segments + name match | No model to train: VAD wakes a short whisper pass, a regex catches "Shiori" (what J.A.R.V.I.S does with the browser recogniser) | — | **Fallback**: simple, local, slower and hungrier |
+
+## 8. Ready-made projects on GitHub
+
+A second pass, after the person chose their references (Waneella, Kirokaze and Mark Ferrari for
+pixel art; *Her*, EVE, the hologram of *Blade Runner 2049*, Iron Man's J.A.R.V.I.S and *Akira* for
+Shiori and the atmosphere, all to become themes). It searched GitHub by stars for projects that
+could be used as they are or with small changes: agents in pixel worlds, pixel effects and
+generators, sci-fi interfaces, voice orbs, shaders. Checked on 2026-11-21 through the GitHub API.
+
+**What the search says first.** The high-density pixel art the person likes (Waneella,
+Kirokaze, Ferrari) is hand-made and is not on GitHub under an open licence. Nothing can be
+downloaded that looks like it. What GitHub does give is the *machinery* that makes such scenes
+feel alive: colour cycling, lights, effects, procedural planets and props, sci-fi frames, orbs.
+The density itself comes from drawing at a smaller scale with more pixels (see below).
+
+### Agents in pixel worlds (closest to Openspace)
+
+| Project | What it is | Licence | Stars, last push | Verdict |
+|---|---|---|---|---|
+| **pixel-agents-hq/pixel-agents** | AI agents (Claude Code and others) as characters in a pixel office: layout editor, wardrobe of bodies, hair, clothes, a pixel editor, external asset packs, phone view | MIT code; characters based on JIK-A-4 *Metro City* (an itch.io pack with its own terms) | ~10.3k, 2026-11 | **Competitor; take ideas**: the asset-pack format and the wardrobe. Its art is the low-density look the person does not want |
+| **androoAGI/starnet** | A living pixel-art space station where local agents do real work | MIT code only; the station artwork and sprites are **not** licensed | ~1.9k, 2026-11 | **Competitor; reference only** for the art |
+| **a16z-infra/ai-town** | A town where LLM characters live, talk and remember (Convex, PixiJS) | MIT; art from OpenGameArt packs and itch.io UI, each with its own terms | ~10.8k, 2026-11 | **Take ideas** for conversations between inhabitants and memory (phase 5) |
+| **joonspk-research/generative_agents** | The Stanford "Smallville" paper's code: memory stream, reflection, planning | Apache-2.0 | ~22k, 2024 | **Take ideas** for relationships from real events and daily plans (phases 4–5) |
+| srizzon/git-city | A GitHub profile as a 3D pixel building in a city | AGPL-3.0 | ~6k | Reference only (AGPL) |
+| amilich/isometric-city, victorqribeiro/isocity | Isometric city builders in the browser | MIT | ~2.4k, ~3.3k | Take ideas if a theme goes isometric |
+
+### Making pixel scenes feel alive
+
+| Project | What it gives | Licence | Stars, last push | Verdict |
+|---|---|---|---|---|
+| **jhuckaby/canvascycle** | Mark Ferrari's colour cycling in canvas: water, rain, fire and neon animated by rotating palette entries, with no extra frames | MIT code (the Ferrari scenes in its demo are his and are **not** covered) | ~430, 2024 | **Use the technique**: a PixiJS filter that cycles palette ranges gives water, signs, screens and rain for free on dense art |
+| **Deep-Fold/PixelPlanets** | Procedural pixel planets, stars, asteroids, black holes as shaders | MIT | ~1.4k, 2024 | **Use**: the galaxy theme of the brain map, and the sky of a night world |
+| **mxgmn/MarkovJunior** | Rule-based procedural generation (rooms, cities, mazes) | MIT | ~8.5k, 2026-03 | Take ideas for generating props and districts |
+| mxgmn/WaveFunctionCollapse | Tilemaps generated from one example | custom (MIT-like, not checked) | ~25k | Take ideas |
+| **Ttanasart-pt/Pixel-Composer** | Node-based VFX editor for pixel art (a desktop app) | MIT | ~1.5k, 2026-11 | **Tool**: make effect sprite sheets (smoke, holograms, sparks) to import |
+| **patch-gg/pixelfx** | 244 pixel effects as small pieces of code | MIT | ~8.6k, 2026-11 | Use (already chosen above) |
+| **Orama-Interactive/Pixelorama** | A full pixel art editor | MIT | ~11k, 2026-11 | **Tool** for drawing at higher density, beside Aseprite |
+| Siilwyn/awesome-pixel-art | A curated list of pixel art tools, tutorials and resources | CC0 | ~1.3k | Reading list |
+
+### Sci-fi interfaces (J.A.R.V.I.S, *Blade Runner*, *Akira*)
+
+| Project | What it gives | Licence | Stars, last push | Verdict |
+|---|---|---|---|---|
+| **arwes/arwes** | A futuristic sci-fi UI framework for the web: animated frames, text that types itself, sounds, backgrounds | MIT | ~7.6k, 2026-07 | **Use or take ideas** for a sci-fi / J.A.R.V.I.S theme of the interface |
+| **propjockey/augmented-ui** | Cyberpunk cut corners and borders in pure CSS | BSD-2-Clause | ~1.4k, 2024 | **Use** for an *Akira* / neon theme |
+| GitSquared/edex-ui | The famous sci-fi terminal with monitors | GPL-3.0, archived | ~45k, 2021 | Reference only |
+| Prompt-Surfer/obsidian-jarvis-ui | A 3D vault graph for Obsidian in Iron Man style | AGPL-3.0 | ~70 | Reference only: proof that "brain map as J.A.R.V.I.S" works |
+
+### Shiori's face: orbs and shaders
+
+| Project | What it gives | Licence | Stars, last push | Verdict |
+|---|---|---|---|---|
+| **elevenlabs/ui** (Orb component) | A voice-agent orb with listening, thinking and speaking states, on shadcn | MIT | ~2.5k, 2026-11 | **Take ideas / use** the orb as a starting point for Shiori's states |
+| **paper-design/shaders** | Zero-dependency canvas shaders (neuro noise, orbits, mesh gradients, dithering) | Apache-2.0 | ~4k, 2026-11 | **Use**: fills the orb, the hologram and backgrounds |
+| **oframe/ogl** | Minimal WebGL (~30 KB) | Unlicense | ~4.8k, 2025 | **Use** for a hand-made orb or hologram shader, far lighter than three.js |
+| weeeha/AI-Orb, mbenhard/lalia, imuvrays1/voice-orb | Audio-reactive orbs for voice agents in one shader | MIT | under 50 | Take ideas (small projects) |
+| niccolofanton/dithering-shader | Bayer dithering as a post effect | MIT | ~300 | Take ideas: a hologram that breaks into pixels, as in *Blade Runner 2049* |
+| andydbc/HologramShader | A hologram material (Unity) | MIT | ~1k | Take ideas: scanlines, rim glow, flicker |
+| Inochi2D/inochi2d | Rigged 2D puppets (an open Live2D) | BSD-2-Clause | ~1.9k | Reference only: only if Shiori ever gets a body |
+| kopiro/siriwave | Siri's waveform in JS | MIT | ~1.7k | Take ideas for the "speaking" line under the orb |
+
+### Animated React components
+
+| Project | Licence | Verdict |
+|---|---|---|
+| **magicuidesign/magicui** (~23k stars): animated text, beams, particles, borders to copy and paste | MIT | **Take ideas / copy** single components |
+| DavidHDev/react-bits (~52k stars): the largest set of animated components | **MIT + Commons Clause**: code cannot be sold or resold as is | **Reference only** in a public MIT repository |
+| codrops (many demos: rain, transitions, distortions) | per demo, mostly unstated | Take ideas |
+| patriciogonzalezvivo/lygia (shader library) | **Prosperity licence**: free only for non-commercial use | **Avoid** |
+
+### How to get the density the person wants
+
+1. **Smaller pixels, more of them.** Today a character is about 16 px tall and drawn at 3–4×.
+   Waneella's and Kirokaze's scenes use about 2× on the screen, with characters 24–48 px tall and
+   rooms full of small props. The new building should be drawn at native size 2× (3× on phones
+   only when needed), with sprites two to three times taller than today.
+2. **Light is half the detail.** Coloured lights, glow on screens and signs, colour cycling for
+   water, rain and neon, a night tint: pixi-filters plus our own colour-cycling filter.
+3. **Layers and depth.** Parallax backgrounds (city, sky, PixelPlanets), foreground silhouettes,
+   rain and steam as particles.
+4. **Art made, not bought.** Drawn by us in the sprite format with Pixelorama or Aseprite as
+   help, effects made with Pixel-Composer, and CC0 packs as raw material. Paid packs at 32/48 px
+   (LimeZu and others) only in the person's local fan pack.
 
 ## Licences and risks
 

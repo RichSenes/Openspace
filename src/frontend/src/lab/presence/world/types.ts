@@ -27,7 +27,7 @@ export interface Scene {
 
 type V3 = [number, number, number]
 
-export type WorldId = 'city' | 'tokyo' | 'kyoto' | 'space' | 'machine'
+export type WorldId = 'city' | 'tokyo' | 'kyoto' | 'library' | 'space' | 'machine'
 
 export interface WorldDef {
   id: WorldId

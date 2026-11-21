@@ -473,6 +473,19 @@ offer's CV in answer to it.
   whose `review` date has come; once it has looked they wait under **needs you**
   (Keep moves the date three months on, Supersede retires the decision), and
   `channel`, when set, gets the list. Nothing due, nothing sent.
+- **Tomorrow morning** (`tomorrow`): run in the evening (before noon it prepares the
+  day it is in), it gathers the day's events and the tasks due, late ones included,
+  from the Google `account` (none leaves them out), everything under **needs you**,
+  the tasks queued in each office, and the unticked list items under an "open" or
+  "next" heading (*Open points*, *Next steps*, *Punti aperti*, *Prossimi passi*) of
+  the `Sessions/` notes changed in the last `sessionDays` (7). It writes
+  `Agenda/<date>.md` (`kind: agenda`, by Shiori) and posts a short message to
+  `channel`. Both are in `language` (Italian by default; Italian or English words
+  around the opening). The opening lines come from the model of *Digests and
+  summaries* (Settings › Models); an OpenCode model that may be a free online one
+  (named `…-free` or `…:free`, or OpenCode's default) never sees the calendar, and
+  then, or when no model answers, a plain template opens it and the log says why.
+  `title` replaces "Domani"/"Oggi".
 - **Job offers** (`job-offers`): the newest offers of the `boards`, honestly
   identified; boards that turn automatic readers away are left out. `japan-dev` is
   Japan Dev, read through its public list page and each offer's schema.org posting.

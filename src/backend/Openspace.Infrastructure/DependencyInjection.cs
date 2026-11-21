@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddSingleton<ClaudeCodeUsage>();
         services.AddScoped<IAgentRuntime, AgentRuntimeRouter>();
         services.AddScoped<IAgentEngines, AgentEngines>();
+        services.AddScoped<Application.Functions.IEngineText, EngineText>();
         services.AddHttpClient(OpenCodeEventListener.HttpClientName, ConfigureOpenCode)
             .ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
         // Plain AddSingleton: AddHostedService would deduplicate two factories of the same return type.

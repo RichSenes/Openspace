@@ -48,12 +48,16 @@ internal sealed class OpenCodeRuntime(
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken)
+    public Task<string> DraftAsync(string instructions, string text, CancellationToken cancellationToken) =>
+        DraftAsync(instructions, text, null, cancellationToken);
+
+    /// <param name="model">The model that writes it; null for the draft model, or OpenCode's default.</param>
+    public async Task<string> DraftAsync(string instructions, string text, string? model, CancellationToken cancellationToken)
     {
         // A scratch folder with nothing in it.
         var folder = Path.Combine(workspaces.Value.Root, "drafts");
         Directory.CreateDirectory(folder);
-        using var reply = await AskReadOnlyAsync(folder, "Openspace draft", instructions, text, null, cancellationToken).ConfigureAwait(false);
+        using var reply = await AskReadOnlyAsync(folder, "Openspace draft", instructions, text, null, cancellationToken, model: model).ConfigureAwait(false);
         return string.Join(
             "\n",
             reply.RootElement.GetProperty("parts").EnumerateArray()

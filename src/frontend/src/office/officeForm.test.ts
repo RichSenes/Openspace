@@ -24,6 +24,12 @@ describe('changedParts', () => {
     expect(changedParts(office, form)).toEqual(['repository', 'name', 'localOnly', 'reserveModels'])
   })
 
+  it('holds overlapping work unless the office turned it off', () => {
+    expect(formOf(office).holdOverlaps).toBe(true)
+    expect(formOf({ ...office, holdOverlappingWork: false }).holdOverlaps).toBe(false)
+    expect(changedParts(office, { ...formOf(office), holdOverlaps: false })).toEqual(['holdOverlaps'])
+  })
+
   it('counts a new order of the reserves as a change', () => {
     expect(changedParts(office, { ...formOf(office), reserveModels: [...office.reserveModels!].reverse() })).toEqual(['reserveModels'])
   })

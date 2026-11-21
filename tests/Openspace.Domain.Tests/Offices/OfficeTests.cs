@@ -22,6 +22,18 @@ public class OfficeTests
     }
 
     [Fact]
+    public void An_office_holds_overlapping_work_until_told_otherwise()
+    {
+        var office = ECorp();
+        Assert.True(office.HoldOverlappingWork);
+
+        office.HoldOverlaps(false, Now);
+
+        Assert.False(office.HoldOverlappingWork);
+        Assert.Equal(new OfficeHoldOverlapsSet(office.Id, false, Now), office.DomainEvents[^1]);
+    }
+
+    [Fact]
     public void Renaming_an_office_raises_an_event()
     {
         var office = ECorp();

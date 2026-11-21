@@ -93,6 +93,36 @@ internal sealed class GitWorkspaceManager(IOptions<WorkspaceOptions> options) : 
         return await GitCli.RunAsync(workspacePath, cancellationToken, "diff", "HEAD").ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<string>> ChangedFilesAsync(string repositoryPath, string workspacePath, CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(workspacePath))
+        {
+            return [];
+        }
+
+        // The base is where the task branch left the repository's checkout: what the agent
+        // committed in its copy counts as much as what it has not committed yet.
+        var head = (await GitCli.RunAsync(repositoryPath, cancellationToken, "rev-parse", "HEAD").ConfigureAwait(false)).Trim();
+        var fork = (await GitCli.RunAsync(workspacePath, cancellationToken, "merge-base", "HEAD", head).ConfigureAwait(false)).Trim();
+
+        // No staging (unlike DiffAsync): this runs every few seconds while the agent works in the copy.
+        var tracked = await GitCli.RunAsync(workspacePath, cancellationToken, "-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", fork).ConfigureAwait(false);
+        var untracked = await GitCli.RunAsync(workspacePath, cancellationToken, "-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard").ConfigureAwait(false);
+        return Lines(tracked + "\n" + untracked);
+    }
+
+    public async Task<IReadOnlyList<string>> BranchFilesAsync(
+        string repositoryPath, string branch, string targetBranch, CancellationToken cancellationToken)
+    {
+        // Three dots: what the branch changed since it left the target, not what the target did meanwhile.
+        var files = await GitCli.RunAsync(
+            repositoryPath, cancellationToken, "-c", "core.quotePath=false", "diff", "--name-only", "--no-renames", $"{targetBranch}...{branch}").ConfigureAwait(false);
+        return Lines(files);
+    }
+
+    private static List<string> Lines(string output) =>
+        [.. output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+
     public async Task CommitAsync(
         string repositoryPath, string workspacePath, string message, CancellationToken cancellationToken)
     {

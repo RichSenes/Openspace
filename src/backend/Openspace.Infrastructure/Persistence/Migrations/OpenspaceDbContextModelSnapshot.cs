@@ -28,6 +28,9 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.Property<int?>("FloorWidth")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("HoldOverlappingWork")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("LocalOnly")
                         .HasColumnType("INTEGER");
 

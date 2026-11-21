@@ -11,4 +11,7 @@ public sealed class QueueOptions
     public bool Enabled { get; set; } = true;
 
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>How often the files changed by running tasks are read again for Now.md.</summary>
+    public TimeSpan NowInterval { get; set; } = TimeSpan.FromSeconds(5);
 }

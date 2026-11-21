@@ -175,6 +175,8 @@ export interface OfficeView {
   privatePaths?: string[]
   /** The project stays on this machine: no push, no pull request. */
   localOnly?: boolean
+  /** A queued task waits while another task of the office changes the files it names; on by default. */
+  holdOverlappingWork?: boolean
   /** OpenCode models that go on with tasks while their desk's account is over its limits, in order. */
   reserveModels?: string[]
 }

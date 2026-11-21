@@ -290,6 +290,7 @@ export function useSaveOffice(officeId: string) {
     repository: (f, initialize) => request<void>('PUT', `${base}/repository`, { path: f.repositoryPath.trim(), initialize }),
     name: (f) => request<void>('PUT', `${base}/name`, { name: f.name }),
     localOnly: (f) => request<void>('PUT', `${base}/local-only`, { localOnly: f.localOnly }),
+    holdOverlaps: (f) => request<void>('PUT', `${base}/hold-overlaps`, { hold: f.holdOverlaps }),
     privatePaths: (f) => request<void>('PUT', `${base}/private-paths`, { paths: pathsOf(f.privatePaths) }),
     reserveModels: (f) => request<void>('PUT', `${base}/reserve-models`, { models: f.reserveModels }),
   }

@@ -22,6 +22,9 @@ internal static class OfficeEndpoints
     /// <param name="LocalOnly">True keeps the project on this machine: no push, no pull request.</param>
     public sealed record LocalOnlyRequest(bool LocalOnly);
 
+    /// <param name="Hold">True makes a queued task wait while another task of the office changes the files it names.</param>
+    public sealed record HoldOverlapsRequest(bool Hold);
+
     /// <param name="Paths">Absolute folders no agent of the office may touch; empty clears them.</param>
     public sealed record PrivatePathsRequest(IReadOnlyList<string>? Paths);
 
@@ -160,6 +163,13 @@ internal static class OfficeEndpoints
             Guid officeId, LocalOnlyRequest request, OfficeCommands commands, CancellationToken ct) =>
         {
             await commands.KeepLocalAsync(new OfficeId(officeId), request.LocalOnly, ct);
+            return Results.NoContent();
+        });
+
+        offices.MapPut("/{officeId:guid}/hold-overlaps", async (
+            Guid officeId, HoldOverlapsRequest request, OfficeCommands commands, CancellationToken ct) =>
+        {
+            await commands.HoldOverlapsAsync(new OfficeId(officeId), request.Hold, ct);
             return Results.NoContent();
         });
 

@@ -80,6 +80,42 @@ public sealed class GitWorkspaceManagerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Changed_files_count_commits_edits_and_new_files_without_staging_anything()
+    {
+        var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, "style.css"), "body {}\n");
+        await GitCli.RunAsync(workspace.Path, default, "add", "style.css");
+        await GitCli.RunAsync(workspace.Path, default, "commit", "--quiet", "--message", "Style");
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, "index.html"), "<header><button>Logout</button></header>\n");
+        Directory.CreateDirectory(Path.Combine(workspace.Path, "src"));
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, "src", "logout.js"), "logout();\n");
+
+        // The repository moving on meanwhile changes nothing of what the task changed.
+        await File.WriteAllTextAsync(Path.Combine(Repo, "README.md"), "# E Corp\n");
+        await Git("add", "README.md");
+        await Git("commit", "--quiet", "--message", "Readme");
+
+        var files = await _manager.ChangedFilesAsync(Repo, workspace.Path, default);
+
+        Assert.Equal(["index.html", "src/logout.js", "style.css"], files);
+        Assert.Empty((await GitCli.RunAsync(workspace.Path, default, "diff", "--cached", "--name-only")).Trim());
+        Assert.Empty(await _manager.ChangedFilesAsync(Repo, Path.Combine(_root, "gone"), default));
+    }
+
+    [Fact]
+    public async Task Branch_files_are_what_the_branch_changed_since_it_left_the_target()
+    {
+        var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);
+        await File.WriteAllTextAsync(Path.Combine(workspace.Path, "logout.js"), "logout();\n");
+        await _manager.CommitAsync(Repo, workspace.Path, "Add a logout button", default);
+        await File.WriteAllTextAsync(Path.Combine(Repo, "README.md"), "# E Corp\n");
+        await Git("add", "README.md");
+        await Git("commit", "--quiet", "--message", "Readme");
+
+        Assert.Equal(["logout.js"], await _manager.BranchFilesAsync(Repo, workspace.Branch, "main", default));
+    }
+
+    [Fact]
     public async Task Committing_keeps_the_branch_and_removes_the_worktree()
     {
         var workspace = await _manager.PrepareAsync(Repo, "a1b2c3d4", "Logout", default);

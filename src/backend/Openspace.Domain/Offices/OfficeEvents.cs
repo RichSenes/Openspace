@@ -13,6 +13,8 @@ public sealed record DeskAdded(OfficeId OfficeId, RoomId RoomId, DeskId DeskId, 
 
 public sealed record OfficeLocalOnlySet(OfficeId OfficeId, bool LocalOnly, DateTimeOffset OccurredAt) : IDomainEvent;
 
+public sealed record OfficeHoldOverlapsSet(OfficeId OfficeId, bool Hold, DateTimeOffset OccurredAt) : IDomainEvent;
+
 public sealed record OfficePrivatePathsSet(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record OfficeReserveModelsSet(OfficeId OfficeId, DateTimeOffset OccurredAt) : IDomainEvent;

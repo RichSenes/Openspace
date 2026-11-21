@@ -69,7 +69,7 @@ internal static class VaultTemplate
             Written by Openspace only: the tasks running right now and the files each is changing.
             Edits made here are replaced on the next update.
 
-            Nobody is working yet.
+            Nobody is working right now.
 
             """),
         ("Decisions/README.md", """

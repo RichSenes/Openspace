@@ -39,6 +39,9 @@ internal static class BrainEndpoints
         group.MapGet("/search", (string? q, string? office, string? room, string? path, string? kind, int? limit, BrainSearch search, CancellationToken ct) =>
             search.SearchAsync(new BrainQuery(q, office, room, path, kind, limit ?? BrainSearch.DefaultLimit), ct));
 
+        // Who is changing what right now: each running task with the files it changed and those it named.
+        group.MapGet("/now", (IWorkInProgress work) => work.Current());
+
         // The path is the note's place in the vault; ".md" may be left out.
         group.MapGet("/notes/{**path}", async (string path, IVault vault, CancellationToken ct) =>
             await vault.ReadAsync(path, ct) is { } note ? Results.Ok(NoteView.Of(note)) : Results.NotFound());

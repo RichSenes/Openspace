@@ -119,7 +119,7 @@ internal sealed class Harness
     }
 
     public TaskRunner Runner(int seats = 1) => new(
-        new QueueDispatcher(Tasks, Offices, Limits, Gpu, Waits, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
+        new QueueDispatcher(Tasks, Offices, Limits, Gpu, Waits, Work, UnitOfWork, new LiveOptions<QueueOptions>(() => new QueueOptions { Seats = seats }), Clock),
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Workspaces, Activity, Signals(), Loops, BrainTools(), Clock, NullLogger<TaskRunner>.Instance);
 
     public Routines.RoutineRunner RoutineRunner() =>

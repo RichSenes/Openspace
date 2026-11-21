@@ -162,6 +162,17 @@ public sealed class PersistenceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Holding_overlapping_work_is_on_by_default_and_survives_a_round_trip()
+    {
+        var (office, _, _) = await FurnishECorpAsync();
+        Assert.True((await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).HoldOverlappingWork);
+
+        await InScope(sp => sp.GetRequiredService<OfficeCommands>().HoldOverlapsAsync(office, false, default));
+
+        Assert.False((await InScope(sp => sp.GetRequiredService<OfficeQueries>().GetAsync(office, default))).HoldOverlappingWork);
+    }
+
+    [Fact]
     public async Task The_office_theme_survives_a_round_trip()
     {
         var (office, _, _) = await FurnishECorpAsync();

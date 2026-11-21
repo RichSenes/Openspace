@@ -32,6 +32,8 @@ export interface FrameUniforms {
   worms?: Float32Array
   /** The portrait's drawing, which its points take their light from. */
   sprite?: HTMLCanvasElement
+  /** Pixel mode, small: one point per stride×stride art pixels, averaged. */
+  stride?: number
   wormLength: number
 }
 
@@ -151,7 +153,7 @@ export class BodyRenderer {
     this.blit = compile(gl, QUAD_VS, BLIT_FS)
     this.spriteTex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, this.spriteTex)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
@@ -249,6 +251,7 @@ export class BodyRenderer {
     const u3 = (n: string, v: [number, number, number]) => gl.uniform3f(P.u[n], v[0], v[1], v[2])
     const minSide = Math.min(w, h)
     u1('uSkin', SKIN_INDEX[f.skin])
+    u2('uRes', [w, h])
     u1('uPhase', f.phase)
     u1('uTime', f.time)
     u1('uEnergy', f.energy)
@@ -280,9 +283,12 @@ export class BodyRenderer {
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, this.spriteTex)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, f.sprite)
+      gl.generateMipmap(gl.TEXTURE_2D)
       gl.uniform1i(P.u.uSprite, 0)
+      gl.uniform1f(P.u.uStride, f.stride ?? 1)
+      gl.uniform2f(P.u.uArt, f.sprite.width, f.sprite.height)
       // One art pixel of the portrait on the target: its height spans PORTRAIT_UNITS of body space.
-      gl.uniform1f(P.u.uArtPx, Math.max(1, ((PORTRAIT_UNITS * f.bodyScale * f.scale * h) / 2 / f.sprite.height) * (pixel ? 1 : 1.05)))
+      gl.uniform1f(P.u.uArtPx, Math.max(1, ((PORTRAIT_UNITS * f.bodyScale * f.scale * h) / 2 / f.sprite.height) * (f.stride ?? 1) * (pixel ? 1 : 1.05)))
     }
     if (this.body!.count) {
       if (f.sprite && pixel) gl.blendEquation(gl.MAX)

@@ -326,6 +326,11 @@
   text-shadow: 0 1px 10px #000, 0 0 2px #000;
 }
 
+.pr.is-long .pr-you {
+  margin: 0 0 12px;
+  max-width: none;
+}
+
 .pr.is-long .pr-answer {
   font-size: 16px;
   max-width: none;

@@ -4,7 +4,7 @@ import type { Mode } from '../../shiori/modes'
 import { approach, blinkOpen, LOOKS, makeLife, POSES, stepLife, voiceLevel, type Pose } from './character'
 import { BodyRenderer } from './renderer'
 import { bodyRotation, mix3, MODE_HEAT, project, RIGS } from './rig'
-import { rng, type SkinId } from './shapes'
+import { PORTRAIT_UNITS, rng, type SkinId } from './shapes'
 import { changeAt, type Change } from './transition'
 import { expressionOf, makeFace, stepFace } from '../portrait/face'
 import { drawPortrait, PORTRAIT_H, PORTRAIT_W } from '../portrait/portrait'
@@ -120,7 +120,20 @@ export function ShioriBody(props: BodyProps) {
         }
         sprite = art
       }
-      const scale = (p.focus.size * 2) / rect.height / 0.8
+      let scale = (p.focus.size * 2) / rect.height / 0.8
+      // In pixel mode the portrait is drawn at a whole number of pixels per art pixel, or, when
+      // smaller, one pixel per 2×2 or 3×3 art pixels averaged: in between, its points fall between
+      // pixels and the face breaks up into lines and noise.
+      let stride = 1
+      if (shownSkin === 'portrait' && p.pixel) {
+        const rows = H / p.pixel
+        const perArt = (PORTRAIT_UNITS * rig.bodyScale * scale * rows) / 2 / PORTRAIT_H
+        if (perArt >= 0.75) scale *= Math.max(1, Math.round(perArt)) / perArt
+        else {
+          stride = Math.min(4, Math.max(2, Math.round(1 / perArt)))
+          scale *= 1 / stride / perArt
+        }
+      }
       const offset: [number, number] = [p.focus.x * 2 - 1, 1 - p.focus.y * 2]
       const { rot, eyeRot } = bodyRotation(shownSkin, phase, time * motion, life.gaze, pose.lean)
       const modeHeat = MODE_HEAT[shownMode]
@@ -156,6 +169,7 @@ export function ShioriBody(props: BodyProps) {
           worms: wormBuf,
           wormLength: WORM_LENGTH,
           sprite,
+          stride,
         },
         { pixel: p.pixel, palette: p.pixel ? p.palette : [] },
         WORMS,

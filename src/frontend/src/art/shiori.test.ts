@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hologram, HOLOGRAM, SHIORI_COLORS, SHIORI_FRAME, shioriBubble, shioriPixels } from './shiori'
+import { hologram, HOLOGRAM, SCAN_EVERY, SHIORI_COLORS, SHIORI_FRAME, shioriBubble, shioriPixels } from './shiori'
 import * as sheets from './sheets/shiori'
 import { problemsOf, type SpriteDef } from './sprite'
 
@@ -36,21 +36,35 @@ describe("Shiori's sprites", () => {
     expect(right.some((p) => p.x >= 19 && p.y === 20)).toBe(false)
   })
 
-  it('glows as a hologram: a rim around her, a pool at her feet, dimmed with the lights off', () => {
+  it('glows as a hologram: a thin edge along her outline, a pool at her feet, dimmed with the lights off', () => {
     const body = shioriPixels({ facing: 'front', step: 0, mode: 'idle' }, 0)
-    const lit = hologram(body, 59)
+    const lit = hologram(body, 5)
     expect(lit.body).toHaveLength(body.length)
     expect(lit.glow.every((p) => p.glow && p.x >= 0 && p.x < SHIORI_FRAME.width && p.y < SHIORI_FRAME.height)).toBe(true)
     expect(colorsAt(lit.glow, 32 + SHIORI_FRAME.y)).toEqual(new Set([HOLOGRAM.floor]))
     const taken = new Set(lit.body.map((p) => `${p.x},${p.y}`))
     expect(lit.glow.some((p) => taken.has(`${p.x},${p.y}`))).toBe(false)
-    const dark = hologram(body, 59, '#101020')
+    // Never in a gap with her on both sides, such as between the legs.
+    for (const p of lit.glow.filter((g) => g.y < 32 + SHIORI_FRAME.y)) {
+      const near = (dx: number, dy: number) => taken.has(`${p.x + dx},${p.y + dy}`) || taken.has(`${p.x + 2 * dx},${p.y + 2 * dy}`)
+      expect(near(-1, 0) && near(1, 0)).toBe(false)
+      expect(near(0, -1) && near(0, 1)).toBe(false)
+    }
+    const dark = hologram(body, 5, { night: '#101020' })
     expect(dark.body.some((p, i) => p.color !== lit.body[i].color)).toBe(true)
-    // Now and then a lighter line runs down her.
-    const scanned = hologram(body, 20).body.filter((p) => p.y === 20 + SHIORI_FRAME.y)
-    const plain = lit.body.filter((p) => p.y === 20 + SHIORI_FRAME.y)
-    expect(scanned.some((p, i) => p.color !== plain[i].color)).toBe(true)
-    expect(colorsAt(lit.body, 20 + SHIORI_FRAME.y).has(HOLOGRAM.scan)).toBe(false)
+  })
+
+  it('scans her dress with a faint line only when asked, never her face', () => {
+    const body = shioriPixels({ facing: 'front', step: 0, mode: 'idle' }, 0)
+    const still = hologram(body, 3)
+    expect(still.body.map((p) => p.color)).toEqual(body.map((p) => p.color))
+    for (let tick = 0; tick < SCAN_EVERY; tick++) {
+      const moving = hologram(body, tick, { scan: true }).body
+      const changed = moving.filter((p, i) => p.color !== still.body[i].color)
+      expect(changed.every((p) => p.y - SHIORI_FRAME.y >= 17)).toBe(true)
+      expect(new Set(changed.map((p) => p.y)).size).toBeLessThanOrEqual(1)
+    }
+    expect(hologram(body, 3, { scan: true }).body.some((p, i) => p.color !== still.body[i].color)).toBe(true)
   })
 
   it('brings a different icon for each piece of news', () => {

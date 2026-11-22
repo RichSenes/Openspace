@@ -16,7 +16,7 @@ import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import { GLASS, skyPixels, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { Sky } from '../api/types'
 import { walkerPixels, WALKER } from '../art/walker'
-import { hologram, SHIORI_FRAME, shioriBubble, shioriPixels } from '../art/shiori'
+import { GLOW_ALPHA, hologram, SHIORI_FRAME, shioriBubble, shioriPixels, tint } from '../art/shiori'
 import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { placesOf } from '../building/stations'
@@ -104,6 +104,9 @@ function walkScene(stage: WalkStage, tick: number, theme: Theme): Pixel[] {
   ]
   return roomPixels(theme, roomShell(theme, room.width, room.height - WALL_HEIGHT / TILE), items, false)
 }
+
+/** The page behind the lab's pictures. */
+const LAB_GROUND = '#07060d'
 
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
 function Pixels({ width, height, pixels, scale, label }: { width: number; height: number; pixels: Pixel[]; scale: number; label: string }) {
@@ -424,9 +427,11 @@ export function SpriteLab() {
                     { facing: 'right', step: 0, mode: 'talking' },
                   ] as const
                 ).flatMap((pose, i) => {
-                  const holo = hologram(shioriPixels(pose, tick), tick, night)
-                  const bubble = pose.mode === 'talking' ? shioriBubble('waiting').map((p) => ({ ...p, x: p.x - 1, y: p.y })) : []
-                  return [...holo.glow, ...holo.body, ...bubble].map((p) => ({ ...p, x: p.x + SHIORI_FRAME.width * i, y: p.y + 8 }))
+                  const holo = hologram(shioriPixels(pose, tick), tick, { night })
+                  // The glow as the building draws it: faint over the dark page behind it.
+                  const glow = holo.glow.map((p) => ({ ...p, color: tint(LAB_GROUND, p.color, night ? GLOW_ALPHA.dark : GLOW_ALPHA.lit) }))
+                  const bubble = pose.mode === 'talking' ? shioriBubble('waiting').map((p) => ({ ...p, x: p.x - 4, y: p.y - 4 })) : []
+                  return [...glow, ...holo.body, ...bubble].map((p) => ({ ...p, x: p.x + SHIORI_FRAME.width * i, y: p.y + 8 }))
                 })}
                 scale={small}
                 label={night ? 'Shiori, lights off' : 'Shiori'}

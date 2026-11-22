@@ -78,18 +78,30 @@ export function shioriPixels(now: Pick<ShioriNow, 'facing' | 'step' | 'mode'>, t
   return now.facing === 'left' ? pixels.map((p) => ({ ...p, x: WALKER.width - 1 - p.x })) : pixels
 }
 
+/** How she is projected: dimmed with the lights off (the night colour), and whether the scan line runs. */
+export interface Projection {
+  night?: string
+  /** Only in the building, where she moves: still pictures never carry it. */
+  scan?: boolean
+}
+
+/** The first row of her dress: the scan line never crosses her face. */
+const BODY_TOP = 17
+
 /**
- * The hologram around her pixels, in SHIORI_FRAME: the body (with a lighter line that runs
- * down her now and then, and dimmed with the lights off), and apart from it the glow,
- * meant to be drawn half see-through: a one pixel rim and a small pool at her feet.
+ * The hologram around her pixels, in SHIORI_FRAME: the body (dimmed with the lights off,
+ * and, when asked, a faint lighter line that runs down her dress now and then), and apart
+ * from it the glow, meant to be drawn faint: a one pixel edge along her outline only (never
+ * filling the gaps between her legs or arms) and a small pool at her feet.
  */
-export function hologram(body: Pixel[], tick: number, night?: string): { body: Pixel[]; glow: Pixel[] } {
+export function hologram(body: Pixel[], tick: number, projection: Projection = {}): { body: Pixel[]; glow: Pixel[] } {
   const { x: ox, y: oy } = SHIORI_FRAME
   const filled = new Set(body.map((p) => `${p.x},${p.y}`))
-  const scan = tick % SCAN_EVERY
+  const has = (x: number, y: number) => filled.has(`${x},${y}`)
+  const scan = projection.scan ? BODY_TOP + (tick % SCAN_EVERY) : -1
   const shown = body.map((p) => {
-    const base = night ? dim(p.color, night) : p.color
-    return { x: p.x + ox, y: p.y + oy, color: p.y === scan ? halfway(base, HOLOGRAM.scan) : base }
+    const base = projection.night ? dim(p.color, projection.night) : p.color
+    return { x: p.x + ox, y: p.y + oy, color: p.y === scan ? tint(base, HOLOGRAM.scan, 0.2) : base }
   })
   const rim: Pixel[] = []
   const seen = new Set<string>()
@@ -100,26 +112,40 @@ export function hologram(body: Pixel[], tick: number, night?: string): { body: P
       [0, 1],
       [0, -1],
     ]) {
-      const k = `${p.x + dx},${p.y + dy}`
-      if (filled.has(k) || seen.has(k)) continue
+      const [x, y] = [p.x + dx, p.y + dy]
+      const k = `${x},${y}`
+      if (has(x, y) || seen.has(k)) continue
       seen.add(k)
-      rim.push({ x: p.x + dx + ox, y: p.y + dy + oy, color: HOLOGRAM.rim, glow: true })
+      // A gap of one or two pixels with her on both sides (between the feet, under an arm) is not her edge.
+      const across = (has(x - 1, y) || has(x - 2, y)) && (has(x + 1, y) || has(x + 2, y))
+      const down = (has(x, y - 1) || has(x, y - 2)) && (has(x, y + 1) || has(x, y + 2))
+      if (across || down) continue
+      rim.push({ x: x + ox, y: y + oy, color: HOLOGRAM.rim, glow: true })
     }
   const feet = WALKER.height + oy
   const pool: Pixel[] = []
-  for (let x = 5; x < WALKER.width - 5; x++) pool.push({ x: x + ox, y: feet, color: HOLOGRAM.floor, glow: true })
-  for (let x = 8; x < WALKER.width - 8; x++) pool.push({ x: x + ox, y: feet + 1, color: HOLOGRAM.floor, glow: true })
+  for (let x = 6; x < WALKER.width - 6; x++) pool.push({ x: x + ox, y: feet, color: HOLOGRAM.floor, glow: true })
   return { body: shown, glow: [...pool, ...rim.filter((p) => p.y < feet)] }
 }
 
-/** Frames between two passes of the line that scans her, from her head down: about every twelve seconds. */
+/** Frames between two passes of the line that scans her dress: about every twelve seconds. */
 export const SCAN_EVERY = 60
 
-const halfway = (a: string, b: string) =>
-  '#' + [1, 3, 5].map((i) => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('')
+/** How strongly the glow shows over what is behind her: faint, a little more in the dark. */
+export const GLOW_ALPHA = { lit: 0.3, dark: 0.5 } as const
+
+/** A colour moved part of the way towards another. */
+export const tint = (a: string, b: string, t: number) =>
+  '#' +
+  [1, 3, 5]
+    .map((i) => {
+      const [x, y] = [parseInt(a.slice(i, i + 2), 16), parseInt(b.slice(i, i + 2), 16)]
+      return Math.round(x + (y - x) * t).toString(16).padStart(2, '0')
+    })
+    .join('')
 
 /** With the lights off she keeps some of her own light: halfway to the dark the room sinks to. */
-const dim = (color: string, night: string) => halfway(color, unlit(color, night))
+const dim = (color: string, night: string) => tint(color, unlit(color, night), 0.5)
 
 /** Her bubble while she talks: the round one of a chat, with the icon of her news inside. */
 export const shioriBubble = (event: ShioriEvent): Pixel[] => [...pixelsOf(CHAT_BUBBLE, 0, colors), ...pixelsOf(SHIORI_GLYPHS, GLYPH[event], colors, 2, 2)]

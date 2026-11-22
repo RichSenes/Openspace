@@ -17,7 +17,7 @@ import { InternStage } from '../activity/interns'
 import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { WALKER } from '../art/walker'
-import { hologram, SHIORI_FRAME, shioriBubble, shioriPixels } from '../art/shiori'
+import { GLOW_ALPHA, hologram, SHIORI_FRAME, shioriBubble, shioriPixels } from '../art/shiori'
 import { ShioriStage, shioriWorld } from './shiori'
 import { placesOf } from './stations'
 import { isGuestDesk } from './guests'
@@ -363,7 +363,7 @@ function shioriPainter(layout: BuildingLayout, scene: Scene, stage: ShioriStage,
   const glow = spriteOf(paintInto(canvas.glow, SHIORI_FRAME.width, SHIORI_FRAME.height, []), 0, 0)
   const bubble = spriteOf(paintInto(canvas.bubble, 11, 10, []), 0, 0)
   body.alpha = 0.9
-  glow.alpha = scene.dark ? 0.7 : 0.45
+  glow.alpha = scene.dark ? GLOW_ALPHA.dark : GLOW_ALPHA.lit
   const group = new Container()
   group.addChild(glow, body, bubble)
   world.addChildAt(group, world.getChildIndex(under))
@@ -375,7 +375,7 @@ function shioriPainter(layout: BuildingLayout, scene: Scene, stage: ShioriStage,
       const she = stage.at(now)
       group.visible = Boolean(she)
       if (!she) return
-      const holo = hologram(shioriPixels(she, tick), tick, scene.dark ? theme.colors.night : undefined)
+      const holo = hologram(shioriPixels(she, tick), tick, { night: scene.dark ? theme.colors.night : undefined, scan: true })
       paintInto(canvas.body, SHIORI_FRAME.width, SHIORI_FRAME.height, holo.body)
       paintInto(canvas.glow, SHIORI_FRAME.width, SHIORI_FRAME.height, holo.glow)
       body.texture.source.update()

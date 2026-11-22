@@ -17,6 +17,8 @@ import { InternStage } from '../activity/interns'
 import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { WALKER } from '../art/walker'
+import { hologram, SHIORI_FRAME, shioriBubble, shioriPixels } from '../art/shiori'
+import { ShioriStage, shioriWorld } from './shiori'
 import { placesOf } from './stations'
 import { isGuestDesk } from './guests'
 import { agentStateOf, lookOf } from './agents'
@@ -82,6 +84,8 @@ interface Props {
   arrange?: ArrangeControls
   /** A click on an agent or its bubble, with where it happened on the canvas; null for a click elsewhere. */
   onPickDesk?: (pick: DeskPick | null) => void
+  /** A click on Shiori, walking the building: opens her own view. */
+  onPickShiori?: () => void
 }
 
 export interface DeskPick {
@@ -115,13 +119,16 @@ export interface ArrangeControls {
 const EDGE_CURSORS: Record<Edge, string> = { left: 'ew-resize', top: 'ns-resize', right: 'ew-resize', bottom: 'ns-resize', corner: 'nwse-resize' }
 
 /** Draws the selected office as a pixel-art building you can zoom, pan and fly through. */
-export function BuildingCanvas({ office, tasks, activities, states, contexts, interns, dark, weather, minimap, controls, arrange, onPickDesk }: Props) {
+export function BuildingCanvas({ office, tasks, activities, states, contexts, interns, dark, weather, minimap, controls, arrange, onPickDesk, onPickShiori }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const draw = useRef<() => void>(() => {})
   const fitAll = useRef<() => void>(() => {})
   const arrangeRef = useRef(arrange)
   const pickRef = useRef(onPickDesk)
+  const pickShioriRef = useRef(onPickShiori)
+  // Where Shiori is and what she is about, across redraws; she appears instead of walking for less motion.
+  const shiori = useRef(new ShioriStage({ motion: !reducedMotion() }))
   // Remembers who stands beside each desk across redraws, so arrivals and departures can puff.
   const stage = useRef(new InternStage())
   // Remembers who is away from their desk, so walks carry on across redraws.
@@ -133,6 +140,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
   useEffect(() => {
     arrangeRef.current = arrange
     pickRef.current = onPickDesk
+    pickShioriRef.current = onPickShiori
     draw.current = () => {
       const app = appRef.current
       if (!app) return
@@ -153,6 +161,9 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
       view.map = mapPainter(layout, drawn.scene, mapCanvas.current, mapFrame.current, app)
       view.walk = walking ? walker(layout, drawn.scene, walking) : undefined
       view.walk?.()
+      // Shiori stays out of the way while rooms are arranged.
+      view.shiori = arrange ? undefined : shioriPainter(layout, drawn.scene, shiori.current, drawn.world, drawn.bubbleLayer)
+      view.shiori?.paint(view.tick)
       view.map?.paint(view.tick)
       if (view.auto) view.camera = fit(worldRect(layout), app.screen)
       apply(view)
@@ -200,7 +211,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
         view.auto = true
         if (view.layout) flyTo(view, fit(worldRect(view.layout), app.screen))
       }
-      listeners.push(...attachNavigation(app, () => arrangeRef.current, (pick) => pickRef.current?.(pick)))
+      listeners.push(...attachNavigation(app, () => arrangeRef.current, (pick) => pickRef.current?.(pick), () => pickShioriRef.current?.()))
       draw.current()
       // The art moves at its own pace; people who prefer less motion get still rooms.
       if (!reducedMotion()) {
@@ -208,6 +219,7 @@ export function BuildingCanvas({ office, tasks, activities, states, contexts, in
           const view = viewOf(app)
           view.tick++
           view.walk?.()
+          view.shiori?.paint(view.tick)
           view.rooms?.forEach((room) => room.paint(view.tick))
           view.map?.paint(view.tick)
         }, 1000 / FPS)
@@ -302,6 +314,8 @@ interface View {
   map?: MapPainter
   /** Moves the agents away from their desks on, once a frame. */
   walk?: () => void
+  /** Moves Shiori on and repaints her, once a frame; where she is, to be clicked. */
+  shiori?: ShioriPainter
 }
 
 const views = new WeakMap<Application, View>()
@@ -319,6 +333,68 @@ function apply(view: View) {
   view.world?.position.set(Math.round(view.camera.x), Math.round(view.camera.y))
   view.world?.scale.set(view.camera.scale)
   view.map?.follow(view.camera)
+}
+
+/** The state of every desk of the building. */
+function deskStates(layout: BuildingLayout, scene: Scene): Map<string, AgentState> {
+  return new Map(
+    layout.rooms.flatMap((room) => room.desks.map((d) => [d.id, scene.states?.get(d.id) ?? agentStateOf(d.id, scene.tasks, scene.activities.get(d.id))] as const)),
+  )
+}
+
+interface ShioriPainter {
+  paint: (tick: number) => void
+  /** Where her frame is now, in world pixels; undefined while she has no place. */
+  box: () => { x: number; y: number; width: number; height: number } | undefined
+}
+
+/**
+ * Shiori in the world: a hologram above the rooms and under the speech bubbles, half
+ * see-through so she never hides a desk, her glow apart and fainter, and her round bubble
+ * with the icon of her news while she talks at a desk.
+ */
+function shioriPainter(layout: BuildingLayout, scene: Scene, stage: ShioriStage, world: Container, under: Container): ShioriPainter | undefined {
+  if (layout.rooms.length === 0) return undefined
+  const walkable = shioriWorld(layout)
+  const states = deskStates(layout, scene)
+  const theme = themeOf(scene.office.theme)
+  const canvas = { body: document.createElement('canvas'), glow: document.createElement('canvas'), bubble: document.createElement('canvas') }
+  const body = spriteOf(paintInto(canvas.body, SHIORI_FRAME.width, SHIORI_FRAME.height, []), 0, 0)
+  const glow = spriteOf(paintInto(canvas.glow, SHIORI_FRAME.width, SHIORI_FRAME.height, []), 0, 0)
+  const bubble = spriteOf(paintInto(canvas.bubble, 11, 10, []), 0, 0)
+  body.alpha = 0.9
+  glow.alpha = scene.dark ? 0.7 : 0.45
+  const group = new Container()
+  group.addChild(glow, body, bubble)
+  world.addChildAt(group, world.getChildIndex(under))
+  let box: ReturnType<ShioriPainter['box']>
+  return {
+    paint: (tick) => {
+      const now = Date.now()
+      stage.update(walkable, states, now)
+      const she = stage.at(now)
+      group.visible = Boolean(she)
+      if (!she) return
+      const holo = hologram(shioriPixels(she, tick), tick, scene.dark ? theme.colors.night : undefined)
+      paintInto(canvas.body, SHIORI_FRAME.width, SHIORI_FRAME.height, holo.body)
+      paintInto(canvas.glow, SHIORI_FRAME.width, SHIORI_FRAME.height, holo.glow)
+      body.texture.source.update()
+      glow.texture.source.update()
+      const x = she.x - SHIORI_FRAME.x
+      const y = she.y - SHIORI_FRAME.y
+      body.position.set(x, y)
+      glow.position.set(x, y)
+      bubble.visible = Boolean(she.talk)
+      if (she.talk) {
+        paintInto(canvas.bubble, 11, 10, shioriBubble(she.talk.event))
+        bubble.texture.source.update()
+        // Above her head, on the side away from the desk she talks to.
+        bubble.position.set(she.facing === 'left' ? she.x + 14 : she.x - 1, she.y - 6)
+      }
+      box = { x: she.x, y: she.y, width: WALKER.width, height: WALKER.height }
+    },
+    box: () => box,
+  }
 }
 
 /** What every desk is up to, for the walks: its state and its step. */
@@ -422,6 +498,7 @@ function attachNavigation(
   app: Application,
   arrange: () => ArrangeControls | undefined,
   pickDesk: (pick: DeskPick | null) => void,
+  pickShiori: () => void,
 ): (() => void)[] {
   const canvas = app.canvas
   const view = viewOf(app)
@@ -451,6 +528,11 @@ function attachNavigation(
     return view.layout?.rooms
       .flatMap((r) => r.desks)
       .find((d) => world.x >= d.x && world.x < d.x + STATION.width && world.y >= d.y && world.y < d.y + STATION.height)?.id
+  }
+  /** Whether Shiori stands under a point of the world. */
+  const shioriAt = (world: { x: number; y: number }) => {
+    const box = view.shiori?.box()
+    return Boolean(box && world.x >= box.x + 4 && world.x < box.x + box.width - 4 && world.y >= box.y && world.y < box.y + box.height)
   }
   const cutAt = (world: { x: number; y: number }) =>
     view.layout?.cuts.findIndex((c) => world.x >= c.x * TILE && world.x < (c.x + c.width) * TILE && world.y >= c.y * TILE && world.y < (c.y + c.height) * TILE) ?? -1
@@ -542,7 +624,8 @@ function attachNavigation(
         const hover = gripAt(e)
         canvas.style.cursor = hover?.kind === 'stretch' ? EDGE_CURSORS[hover.edge] : hover ? 'move' : 'grab'
       } else {
-        canvas.style.cursor = deskAt(toWorld(view.camera, point(e))) ? 'pointer' : 'grab'
+        const world = toWorld(view.camera, point(e))
+        canvas.style.cursor = shioriAt(world) || deskAt(world) ? 'pointer' : 'grab'
       }
       return
     }
@@ -621,8 +704,14 @@ function attachNavigation(
     } else if (!controls && drag.moved < 4) {
       // A click on an agent opens what belongs to it; anywhere else closes it.
       const at = point(e)
-      const desk = deskAt(toWorld(view.camera, at))
-      pickDesk(desk ? { deskId: desk, ...at } : null)
+      const world = toWorld(view.camera, at)
+      if (shioriAt(world)) {
+        pickDesk(null)
+        pickShiori()
+      } else {
+        const desk = deskAt(world)
+        pickDesk(desk ? { deskId: desk, ...at } : null)
+      }
     }
     drag = undefined
     grip = undefined
@@ -715,6 +804,8 @@ function drawBuilding(
   selection: Graphics
   scene: Scene
   bubbles: PlacedBubble[]
+  /** The speech bubbles' layer: Shiori walks just under it. */
+  bubbleLayer: Container
 } {
   const world = new Container()
   const labels = new Container()
@@ -771,7 +862,7 @@ function drawBuilding(
   // Names go over floors and walls, so they can spill over them, but under people and
   // furniture, which walk and stand in front of them; bubbles go on top of everything.
   world.addChild(labels, ...[...rooms.values()].map((r) => r.standing), bubbles, selection)
-  return { world, rooms, hall: hall.painter, walls, names, selection, scene, bubbles: placed }
+  return { world, rooms, hall: hall.painter, walls, names, selection, scene, bubbles: placed, bubbleLayer: bubbles }
 }
 
 /** Frames the room being arranged, or the building, and inside it the thing picked. */

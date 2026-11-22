@@ -16,6 +16,7 @@ import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import { GLASS, skyPixels, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { Sky } from '../api/types'
 import { walkerPixels, WALKER } from '../art/walker'
+import { hologram, SHIORI_FRAME, shioriBubble, shioriPixels } from '../art/shiori'
 import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { placesOf } from '../building/stations'
@@ -399,6 +400,36 @@ export function SpriteLab() {
                 ]}
                 scale={small}
                 label={`person ${i + 1}`}
+              />
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Shiori (front, walking, back, right, left, talking; then with the lights off)</h2>
+        <div className="lab-pieces">
+          {[undefined, '#141a2e'].map((night) => (
+            <figure key={night ?? 'day'}>
+              <Pixels
+                width={SHIORI_FRAME.width * 6}
+                height={SHIORI_FRAME.height + 8}
+                pixels={(
+                  [
+                    { facing: 'front', step: 0, mode: 'idle' },
+                    { facing: 'front', step: tick, mode: 'walking' },
+                    { facing: 'back', step: tick, mode: 'walking' },
+                    { facing: 'right', step: tick, mode: 'walking' },
+                    { facing: 'left', step: tick + 1, mode: 'walking' },
+                    { facing: 'right', step: 0, mode: 'talking' },
+                  ] as const
+                ).flatMap((pose, i) => {
+                  const holo = hologram(shioriPixels(pose, tick), tick, night)
+                  const bubble = pose.mode === 'talking' ? shioriBubble('waiting').map((p) => ({ ...p, x: p.x - 1, y: p.y })) : []
+                  return [...holo.glow, ...holo.body, ...bubble].map((p) => ({ ...p, x: p.x + SHIORI_FRAME.width * i, y: p.y + 8 }))
+                })}
+                scale={small}
+                label={night ? 'Shiori, lights off' : 'Shiori'}
               />
             </figure>
           ))}

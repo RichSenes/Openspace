@@ -149,6 +149,7 @@ export function BuildingView({ office, onView, onOpenRoutines, onOpenTask }: Pro
           else if (pick && routineStates.has(pick.deskId)) onOpenRoutines()
           else setPicked(pick ? { pick, style: cardPlace(pick, wrapper.current?.getBoundingClientRect()) } : undefined)
         }}
+        onPickShiori={() => onView('shiori')}
         office={shown}
         tasks={tasks.data ?? noTasks}
         activities={bubbles}

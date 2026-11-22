@@ -133,6 +133,31 @@ public sealed class WeeklyRecap(IAgenda agenda, IRoutineRepository routines, ILo
             }
         }
 
+        // The week's chronicle, as the vault keeps it: a line a day per office, read, never written here.
+        var today = DateOnly.FromDateTime(local.DateTime);
+        IReadOnlyList<Characters.ChronicleSection> life = [];
+        try
+        {
+            life = await Characters.Chronicle.RoundupAsync(vault, today.AddDays(-1), LastWeek.Days, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException ex)
+        {
+            context.Write($"The chronicle could not be read ({ex.Message}).");
+        }
+
+        if (life.Count > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"\n\n{words.OfficeLife}");
+            foreach (var section in life)
+            {
+                text.Append(CultureInfo.InvariantCulture, $"\n{section.Office}");
+                foreach (var line in section.Lines)
+                {
+                    text.Append(CultureInfo.InvariantCulture, $"\n• {Short(line, 200)}");
+                }
+            }
+        }
+
         await context.DeliverAsync(text.ToString(), null, cancellationToken).ConfigureAwait(false);
         try
         {
@@ -251,7 +276,7 @@ public sealed record WeeklySettings(string Title, string Account, string Languag
 
 /// <summary>The recap's few fixed words, in the person's language.</summary>
 internal sealed record WeeklyWords(
-    string Ahead, string Free, string Behind, string Due, string Waiting, string LastWeek, Func<int, int, string> Runs, string Task, string WholeDay, CultureInfo Culture)
+    string Ahead, string Free, string Behind, string Due, string Waiting, string LastWeek, Func<int, int, string> Runs, string Task, string WholeDay, CultureInfo Culture, string OfficeLife)
 {
     public static WeeklyWords For(string language) => language.Trim().ToUpperInvariant() is "ITALIAN" or "ITALIANO" ? Italian : English;
 
@@ -265,7 +290,8 @@ internal sealed record WeeklyWords(
         (runs, failed) => (runs == 1 ? "1 giro" : $"{runs} giri") + (failed == 0 ? string.Empty : failed == 1 ? ", 1 non riuscito" : $", {failed} non riusciti"),
         "Da fare",
         "Tutto il giorno",
-        CultureInfo.GetCultureInfo("it-IT"));
+        CultureInfo.GetCultureInfo("it-IT"),
+        "La vita in ufficio");
 
     private static readonly WeeklyWords English = new(
         "The days ahead",
@@ -277,5 +303,6 @@ internal sealed record WeeklyWords(
         (runs, failed) => (runs == 1 ? "1 run" : $"{runs} runs") + (failed == 0 ? string.Empty : $", {failed} failed"),
         "To do",
         "All day",
-        CultureInfo.GetCultureInfo("en-GB"));
+        CultureInfo.GetCultureInfo("en-GB"),
+        "Office life");
 }

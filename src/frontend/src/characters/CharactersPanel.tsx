@@ -1,9 +1,16 @@
 import { useState } from 'react'
 import type { OfficeView } from '../api/types'
 import { useToast } from '../ui/toastContext'
-import { formatMoment } from '../ui/dates'
-import { useChangeDesk, useCharacters } from './api'
+import { formatDay, formatMoment } from '../ui/dates'
+import { useAgenda, useAgreements, useChangeDesk, useCharacters, useDecideAgreement } from './api'
 import {
+  AGENDA_KIND_LABELS,
+  AGREEMENT_STATUS_LABELS,
+  agreementOutcome,
+  agreementsInOrder,
+  agendaDays,
+  agendaTime,
+  localDay,
   affinityWord,
   birthdayLabel,
   daysIn,
@@ -40,6 +47,9 @@ export function CharactersPanel({ office }: { office: OfficeView }) {
         </p>
       </header>
 
+      <AgendaPanel officeId={office.id} />
+      <AgreementsPanel officeId={office.id} />
+
       {board.isPending ? (
         <p className="hint">Reading the office…</p>
       ) : board.error ? (
@@ -63,6 +73,120 @@ export function CharactersPanel({ office }: { office: OfficeView }) {
           </div>
         </>
       )}
+    </section>
+  )
+}
+
+/** The office's shared agenda: what is expected in the next days, one line each. */
+function AgendaPanel({ officeId }: { officeId: string }) {
+  const agenda = useAgenda(officeId)
+  const days = agenda.data ? agendaDays(agenda.data) : []
+
+  return (
+    <section className="characters-panel" aria-labelledby="agenda-title">
+      <h2 id="agenda-title">Agenda</h2>
+      {agenda.isPending ? (
+        <p className="hint">Reading the next days…</p>
+      ) : agenda.error ? (
+        <p className="characters-error" role="alert">The agenda could not be read: {agenda.error.message}</p>
+      ) : (
+        <>
+          {days.length === 0 ? (
+            <p className="hint">Nothing planned in the next days: no queued work, routine runs or reviews.</p>
+          ) : (
+            <ol className="agenda-days">
+              {days.map((d) => (
+                <li key={d.date}>
+                  <h3>{formatDay(localDay(d.date))}</h3>
+                  <ul className="agenda-lines">
+                    {d.lines.map((l, i) => (
+                      <li key={`${l.kind}-${l.title}-${i}`}>
+                        <span className="agenda-time">{agendaTime(l.time)}</span>
+                        <span className="hint">{AGENDA_KIND_LABELS[l.kind]}</span>
+                        <span>
+                          {l.title}
+                          {l.detail && <span className="hint"> · {l.detail}</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          )}
+          {agenda.data.calendarProblem ? (
+            <p className="characters-error" role="alert">{agenda.data.calendarProblem}</p>
+          ) : (
+            <p className="hint">
+              {agenda.data.calendar ? `With the calendar of ${agenda.data.calendar}.` : 'Connect a Google account in Settings › Connections to see its calendar here too.'}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Agreements between desks whose planned work clashed: each side's proposal, the rule that
+ * settled it, and, when the rules did not, the person's answer right here.
+ */
+function AgreementsPanel({ officeId }: { officeId: string }) {
+  const agreements = useAgreements(officeId)
+  const decide = useDecideAgreement(officeId)
+  const toast = useToast()
+  const list = agreements.data ? agreementsInOrder(agreements.data) : []
+
+  return (
+    <section className="characters-panel" aria-labelledby="agreements-title">
+      <h2 id="agreements-title">Agreements</h2>
+      {agreements.isPending ? (
+        <p className="hint">Reading the agreements…</p>
+      ) : agreements.error ? (
+        <p className="characters-error" role="alert">The agreements could not be read: {agreements.error.message}</p>
+      ) : list.length === 0 ? (
+        <p className="hint">No agreements yet: when two desks plan to change the same files at the same time, they agree here on who goes first.</p>
+      ) : (
+        <ol className="agreement-list">
+          {list.map((a) => (
+            <li key={a.id}>
+              <details open={a.status === 'WaitingForPerson'}>
+                <summary>
+                  {a.firstDeskName} and {a.secondDeskName} on {a.subject} · <span className="hint">{AGREEMENT_STATUS_LABELS[a.status]}</span>
+                  {agreementOutcome(a) && <> · {agreementOutcome(a)}</>}
+                </summary>
+                <ul className="agreement-proposals">
+                  <li>{a.firstProposal}</li>
+                  <li>{a.secondProposal}</li>
+                </ul>
+                <p>{a.reason}</p>
+                <p className="hint">
+                  {a.turns} of 4 turns · opened {formatMoment(a.openedAt)} · minutes in {a.minutesPath}
+                </p>
+                {a.status === 'WaitingForPerson' && (
+                  <div className="agreement-answers">
+                    {[
+                      { task: a.firstTaskId, title: a.firstTaskTitle },
+                      { task: a.secondTaskId, title: a.secondTaskTitle },
+                    ].map((side) => (
+                      <button
+                        key={side.task}
+                        className="btn"
+                        type="button"
+                        disabled={decide.isPending}
+                        onClick={() => decide.mutate({ id: a.id, goesFirst: side.task }, { onSuccess: () => toast(`“${side.title}” goes first`) })}
+                      >
+                        “{side.title}” first
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </details>
+            </li>
+          ))}
+        </ol>
+      )}
+      {decide.error && <p className="characters-error" role="alert">{decide.error.message}</p>}
     </section>
   )
 }

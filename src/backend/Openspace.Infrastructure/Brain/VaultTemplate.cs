@@ -142,6 +142,14 @@ internal static class VaultTemplate
             the wiki.
 
             """),
+        ("Agreements/README.md", """
+            # Agreements
+
+            Minutes of the agreements between inhabitants whose planned work clashed: what each
+            proposed, the rule of the constitution that settled who goes first, or the question
+            left to you. Written by Openspace.
+
+            """),
         (".gitignore", """
             # Obsidian's window layout and bin change all the time and are nobody's notes.
             .obsidian/workspace*.json

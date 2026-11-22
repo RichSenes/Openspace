@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { affinityWord, birthdayLabel, daysIn, moodPath, moodWord, signed, tiesOf, trustOf, type RelationshipView } from './characters'
+import { agendaDays, agendaTime, agreementOutcome, agreementsInOrder, localDay, type AgreementView, affinityWord, birthdayLabel, daysIn, moodPath, moodWord, signed, tiesOf, trustOf, type RelationshipView } from './characters'
 
 describe('birthdays', () => {
   it('name a day and a month, never a year', () => {
@@ -51,5 +51,39 @@ describe('tiesOf', () => {
     const tie: RelationshipView = { firstId: 'a', firstName: 'Frontend', secondId: 'b', secondName: 'Screens', affinity: 2, history: [] }
     expect(tiesOf({ relationships: [tie] }, 'b')).toEqual([{ other: 'Frontend', tie }])
     expect(tiesOf({ relationships: [tie] }, 'c')).toEqual([])
+  })
+})
+
+describe('agreements', () => {
+  const agreement = (id: string, status: AgreementView['status'], openedAt: string): AgreementView => ({
+    id, officeId: 'o', status, subject: 'cart.ts', firstDeskId: 'a', firstDeskName: 'Frontend', firstTaskId: 't1', firstTaskTitle: 'Fix the total',
+    firstProposal: '', secondDeskId: 'b', secondDeskName: 'Screens', secondTaskId: 't2', secondTaskTitle: 'Restyle the cart', secondProposal: '',
+    goesFirst: null, reason: '', turns: 4, minutesPath: '', openedAt, closedAt: null, decidedBy: null,
+  })
+
+  it('say which task goes first, once someone said', () => {
+    expect(agreementOutcome(agreement('1', 'WaitingForPerson', '2026-11-22'))).toBeNull()
+    expect(agreementOutcome({ ...agreement('1', 'Settled', '2026-11-22'), goesFirst: 't2' })).toBe('“Restyle the cart” goes first')
+  })
+
+  it('put the questions for the person first, then the newest', () => {
+    const list = [agreement('old', 'Settled', '2026-11-20'), agreement('new', 'Settled', '2026-11-22'), agreement('ask', 'WaitingForPerson', '2026-11-19')]
+    expect(agreementsInOrder(list).map((a) => a.id)).toEqual(['ask', 'new', 'old'])
+  })
+})
+
+describe('the agenda', () => {
+  const line = (date: string, time: string | null, title: string) => ({ date, time, kind: 'Task' as const, title, detail: '' })
+
+  it('groups lines by day in their order', () => {
+    const days = agendaDays({ lines: [line('2026-11-22', '20:00:00', 'A'), line('2026-11-22', null, 'B'), line('2026-11-24', '07:00:00', 'C')] })
+    expect(days.map((d) => [d.date, d.lines.map((l) => l.title)])).toEqual([['2026-11-22', ['A', 'B']], ['2026-11-24', ['C']]])
+  })
+
+  it('reads days on the local clock and shows hours without seconds', () => {
+    const day = localDay('2026-11-22')
+    expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([2026, 10, 22])
+    expect(agendaTime('20:00:00')).toBe('20:00')
+    expect(agendaTime(null)).toBe('')
   })
 })

@@ -55,4 +55,29 @@ public sealed class CharacterApiTests : IDisposable
         Assert.Equal(Application.Characters.Mood.BaselineOf([Domain.Offices.Trait.Shy, Domain.Offices.Trait.Meticulous]), character.GetProperty("mood").GetProperty("value").GetInt32());
         Assert.Empty(board.GetProperty("relationships").EnumerateArray());
     }
+
+    [Fact]
+    public async Task The_agenda_reads_the_next_days_and_leaves_the_calendar_out_without_an_account()
+    {
+        var office = await IdOf(await _http.PostAsJsonAsync("/api/offices", new { name = "E Corp" }));
+
+        var agenda = await _http.GetFromJsonAsync<JsonElement>($"/api/offices/{office}/agenda?days=3");
+
+        var (from, until) = (DateOnly.Parse(agenda.GetProperty("from").GetString()!, System.Globalization.CultureInfo.InvariantCulture),
+            DateOnly.Parse(agenda.GetProperty("until").GetString()!, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(3, until.DayNumber - from.DayNumber);
+        Assert.Equal(JsonValueKind.Null, agenda.GetProperty("calendar").ValueKind);
+        Assert.Empty(agenda.GetProperty("lines").EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await _http.GetAsync($"/api/offices/{Guid.NewGuid()}/agenda")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Agreements_are_listed_per_office_and_an_unknown_one_cannot_be_decided()
+    {
+        var office = await IdOf(await _http.PostAsJsonAsync("/api/offices", new { name = "E Corp" }));
+
+        Assert.Empty((await _http.GetFromJsonAsync<JsonElement>($"/api/offices/{office}/characters/agreements")).EnumerateArray());
+        var unknown = await _http.PostAsJsonAsync($"/api/agreements/{Guid.NewGuid()}/decide", new { goesFirst = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
 }

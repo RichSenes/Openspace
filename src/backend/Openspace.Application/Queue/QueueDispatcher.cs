@@ -22,7 +22,8 @@ public sealed class QueueDispatcher(
     IWorkInProgress work,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    Characters.AgreementKeeper? agreements = null)
 {
     /// <returns>The tasks that just started and now need an agent.</returns>
     /// <remarks>Every queued task that does not start gets the reason it waits, for the board.</remarks>
@@ -31,6 +32,11 @@ public sealed class QueueDispatcher(
         var running = await tasks.ListAsync(null, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false);
         var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
         var seats = options.CurrentValue.Seats;
+
+        // Desks whose planned work clashes agree first on who goes first; the second waits.
+        IReadOnlyDictionary<Guid, string> agreed = queued.Count > 0 && agreements is not null
+            ? (await agreements.RoundAsync(cancellationToken).ConfigureAwait(false)).Hold
+            : new Dictionary<Guid, string>();
         var freeSeats = seats - running.Count;
         var reasons = new Dictionary<Guid, string>();
         var seatsTaken = $"Waits for a free seat: {seats} {(seats == 1 ? "agent works" : "agents work")} at a time.";
@@ -70,6 +76,19 @@ public sealed class QueueDispatcher(
             if (busyDesks.Contains(desk))
             {
                 reasons[task.Id.Value] = "Its desk is busy with another task.";
+                continue;
+            }
+
+            if (agreed.TryGetValue(task.Id.Value, out var agreement))
+            {
+                reasons[task.Id.Value] = agreement;
+                continue;
+            }
+
+            // A desk on the day or night shift takes work only while it is in.
+            if (await ShiftWaitAsync(task, desk, now, officeCache, cancellationToken).ConfigureAwait(false) is { } offShift)
+            {
+                reasons[task.Id.Value] = offShift;
                 continue;
             }
 
@@ -165,6 +184,35 @@ public sealed class QueueDispatcher(
         }
 
         return null;
+    }
+
+    /// <summary>Why the desk's task waits for its shift, or null when the desk is in now.</summary>
+    private async Task<string?> ShiftWaitAsync(WorkTask task, DeskId desk, DateTimeOffset now, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
+    {
+        if (!cache.TryGetValue(task.OfficeId, out var office))
+        {
+            if (await offices.FindAsync(task.OfficeId, cancellationToken).ConfigureAwait(false) is not { } found)
+            {
+                return null;
+            }
+
+            office = cache[task.OfficeId] = found;
+        }
+
+        if (!office.HasDesk(desk))
+        {
+            return null;
+        }
+
+        var shift = office.Locate(desk).Desk.Shift;
+        var local = TimeOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, clock.LocalTimeZone).DateTime);
+        if (shift.IsIn(local))
+        {
+            return null;
+        }
+
+        var from = shift == Shift.Night ? Shifts.NightStarts : Shifts.DayStarts;
+        return $"Waits for its shift, from {from.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)}.";
     }
 
     /// <summary>Why a task whose desk is over its limits found no reserve to go on with.</summary>

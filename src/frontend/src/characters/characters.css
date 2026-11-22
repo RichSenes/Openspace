@@ -28,6 +28,84 @@
   background: var(--panel);
 }
 
+/* Office-wide panels above the cards: the agenda, the agreements. */
+.characters-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  min-width: 0;
+}
+
+.characters-panel h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.characters-panel h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.characters-panel p {
+  margin: 0;
+}
+
+.agenda-days,
+.agenda-lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda-lines {
+  gap: 2px;
+}
+
+.agenda-lines li {
+  display: grid;
+  grid-template-columns: 6ch 7ch minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.agenda-time {
+  font-family: var(--mono);
+}
+
+.agreement-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agreement-list summary {
+  cursor: pointer;
+}
+
+.agreement-list details > :not(summary) {
+  margin-top: 6px;
+}
+
+.agreement-proposals {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.agreement-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .characters-error {
   margin: 0;
   color: var(--danger);

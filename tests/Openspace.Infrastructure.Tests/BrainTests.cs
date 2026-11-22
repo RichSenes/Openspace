@@ -14,7 +14,7 @@ namespace Openspace.Infrastructure.Tests;
 /// <summary>The vault in a throwaway folder with real git, and its index in a private in-memory database.</summary>
 public sealed class BrainTests : IAsyncLifetime
 {
-    private static readonly string[] Folders = ["Decisions", "Plans", "Studies", "Sessions", "Digests", "Offices", "Inhabitants", "Chronicle"];
+    private static readonly string[] Folders = ["Decisions", "Plans", "Studies", "Sessions", "Digests", "Offices", "Inhabitants", "Chronicle", "Agreements"];
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"openspace-brain-{Guid.NewGuid():N}");
     private readonly string _connectionString = $"Data Source=brain-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";

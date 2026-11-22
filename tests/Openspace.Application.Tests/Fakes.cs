@@ -453,6 +453,18 @@ internal sealed class InMemoryEpics : IEpicRepository
     public void Add(Epic epic) => Items.Add(epic);
 }
 
+internal sealed class InMemoryAgreements : IAgreementRepository
+{
+    public List<Agreement> Items { get; } = [];
+
+    public Task<Agreement?> FindAsync(AgreementId id, CancellationToken cancellationToken) => Task.FromResult(Items.Find(a => a.Id == id));
+
+    public Task<IReadOnlyList<Agreement>> ListAsync(OfficeId? officeId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Agreement>>([.. Items.Where(a => officeId is null || a.OfficeId == officeId).OrderByDescending(a => a.OpenedAt)]);
+
+    public void Add(Agreement agreement) => Items.Add(agreement);
+}
+
 internal sealed class InMemoryReports : IReportRepository
 {
     public List<Domain.Reports.Report> Items { get; } = [];

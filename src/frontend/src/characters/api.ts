@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from '../api/client'
-import type { CharacterBoardView, Shift, TrustedAction, TrustLevel } from './characters'
+import type { AgendaView, AgreementView, CharacterBoardView, Shift, TrustedAction, TrustLevel } from './characters'
 
 const key = (officeId: string) => ['characters', officeId] as const
 
@@ -10,6 +10,36 @@ export function useCharacters(officeId: string) {
     queryKey: key(officeId),
     queryFn: () => request<CharacterBoardView>('GET', `/api/offices/${officeId}/characters`),
     refetchInterval: 60_000,
+  })
+}
+
+/** The office's next days: queued work, routines, reviews and, when connected, the calendar. */
+export function useAgenda(officeId: string) {
+  return useQuery({
+    queryKey: ['agenda', officeId],
+    queryFn: () => request<AgendaView>('GET', `/api/offices/${officeId}/agenda`),
+    refetchInterval: 5 * 60_000,
+  })
+}
+
+/** Agreements between desks whose planned work clashed. */
+export function useAgreements(officeId: string) {
+  return useQuery({
+    queryKey: ['agreements', officeId],
+    queryFn: () => request<AgreementView[]>('GET', `/api/offices/${officeId}/characters/agreements`),
+    refetchInterval: 60_000,
+  })
+}
+
+/** The person's answer to an agreement the rules did not settle: which task goes first. */
+export function useDecideAgreement(officeId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, goesFirst }: { id: string; goesFirst: string }) => request<AgreementView>('POST', `/api/agreements/${id}/decide`, { goesFirst }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['agreements', officeId] })
+      await client.invalidateQueries({ queryKey: ['needs-you'] })
+    },
   })
 }
 

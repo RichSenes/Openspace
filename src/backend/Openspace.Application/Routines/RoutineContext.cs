@@ -70,7 +70,7 @@ public sealed class RoutineContext(
         var proposal = Proposal.Make(
             Run, action, title, body, payload is null ? null : payload as string ?? JsonSerializer.Serialize(payload, JsonSerializerOptions.Web), Now);
         routines.AddProposal(proposal);
-        if (Routine.AskFirst || kind is null || !kind.CanUndo(action))
+        if (kind is null || !Domain.Offices.TrustSettings.ActsAlone(Routine.Trust, kind.CanUndo(action)))
         {
             Write($"Proposed: {title}");
             return proposal;

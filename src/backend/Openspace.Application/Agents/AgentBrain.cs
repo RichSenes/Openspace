@@ -21,9 +21,14 @@ public sealed partial class AgentBrain(
     IBrainIndex index,
     BrainSearch search,
     IWorkInProgress work,
+    IAuditLog audit,
+    IUnitOfWork unitOfWork,
     TimeProvider clock,
     ILogger<AgentBrain> logger)
 {
+    /// <summary>Where a journal line that waits for the person is kept until it is accepted.</summary>
+    public static string WaitingJournalFolder(string desk) => $"Inhabitants/{Journals.FolderName(desk)}/waiting";
+
     /// <summary>At most this many decisions go in a briefing; the rest are a search away.</summary>
     public const int BriefingDecisions = 8;
 
@@ -83,14 +88,57 @@ public sealed partial class AgentBrain(
         return VaultFormat.Write(found);
     }
 
-    /// <summary>Appends a dated line to the calling desk's own journal, and only to that one.</summary>
-    /// <returns>The journal's path.</returns>
+    /// <summary>
+    /// Appends a dated line to the calling desk's own journal, and only to that one, as its trust
+    /// says: alone, alone with a line in the feed, or as a proposal the person accepts first.
+    /// </summary>
+    /// <returns>The journal's path, or the waiting note's path when the desk asks first.</returns>
     public async Task<string> JournalAsync(WorkTaskId taskId, string text, CancellationToken cancellationToken)
     {
         var caller = await CallerAsync(taskId, cancellationToken).ConfigureAwait(false);
         var line = Guard(text, "A journal entry", 2000).ReplaceLineEndings(" ");
-        return await Journals.AppendAsync(
-            vault, caller.Desk.Name, clock.GetLocalNow(), $"{caller.Task.Title}: {line}", caller.Desk.Name, "wrote in its journal", cancellationToken).ConfigureAwait(false);
+        var entry = $"{caller.Task.Title}: {line}";
+        var now = clock.GetLocalNow();
+        switch (caller.Desk.Trust.LevelOf(TrustedAction.Journal))
+        {
+            case TrustLevel.AsksFirst:
+                var stem = $"{WaitingJournalFolder(caller.Desk.Name)}/{now.ToString("yyyy-MM-dd-HHmm", CultureInfo.InvariantCulture)}-{Slug(caller.Task.Title)}";
+                var waiting = await FreePathAsync(stem, cancellationToken).ConfigureAwait(false);
+                var note = new Note(
+                    waiting, Attention.DecisionRules.JournalKind, NoteStatus.Proposed, $"Journal line of {caller.Desk.Name}",
+                    [caller.Office.Name], [caller.Room.Name], [], null, null, $"task {caller.Task.Id.Value}", caller.Desk.Name,
+                    $"# Journal line of {caller.Desk.Name}\n\n{entry}\n", [new(Attention.DecisionRules.AskFirst, " true")]);
+                await vault.WriteAsync(note, caller.Desk.Name, cancellationToken, $"asked to write in its journal: {waiting}").ConfigureAwait(false);
+                return waiting;
+            case TrustLevel.Tells:
+                var path = await Journals.AppendAsync(vault, caller.Desk.Name, now, entry, caller.Desk.Name, "wrote in its journal", cancellationToken).ConfigureAwait(false);
+                await TellAsync(caller.Task, "Wrote in its journal", line, cancellationToken).ConfigureAwait(false);
+                return path;
+            default:
+                return await Journals.AppendAsync(vault, caller.Desk.Name, now, entry, caller.Desk.Name, "wrote in its journal", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Whether a journal call wrote the line, or left it waiting for the person.</summary>
+    public static bool IsWaiting(string path) => path.Contains("/waiting/", StringComparison.Ordinal);
+
+    /// <summary>A line in the building's feed, on the task: what a trusted desk did and told.</summary>
+    private async Task TellAsync(WorkTask task, string summary, string detail, CancellationToken cancellationToken)
+    {
+        audit.Add(AuditEntry.Record(task.Id, clock.GetUtcNow(), AuditKind.Note, summary, detail));
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The path with a number when the name is taken: what an agent writes only ever adds.</summary>
+    private async Task<string> FreePathAsync(string stem, CancellationToken cancellationToken)
+    {
+        var path = $"{stem}.md";
+        for (var n = 2; await vault.ReadAsync(path, cancellationToken).ConfigureAwait(false) is not null; n++)
+        {
+            path = $"{stem}-{n}.md";
+        }
+
+        return path;
     }
 
     /// <summary>Creates a new note with <c>status: proposed</c>; it never changes an existing one.</summary>
@@ -123,11 +171,8 @@ public sealed partial class AgentBrain(
             : $"{folder}/{clock.GetLocalNow().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-{Slug(name)}";
 
         // A proposal only ever adds: a name already taken gets a number.
-        var path = $"{stem}.md";
-        for (var n = 2; await vault.ReadAsync(path, cancellationToken).ConfigureAwait(false) is not null; n++)
-        {
-            path = $"{stem}-{n}.md";
-        }
+        var path = await FreePathAsync(stem, cancellationToken).ConfigureAwait(false);
+        var trust = caller.Desk.Trust.LevelOf(TrustedAction.Proposals);
 
         // "*" means every office, which the front matter says by naming none; the person then
         // decides, since an agent's word for every office is not Shiori's to accept.
@@ -137,8 +182,14 @@ public sealed partial class AgentBrain(
             path, what, NoteStatus.Proposed, name,
             about, List(rooms), List(paths), null, null,
             $"task {caller.Task.Id.Value}", caller.Desk.Name,
-            $"# {name}\n\n{text}\n\n## Reasons\n\n{why}\n", []);
+            $"# {name}\n\n{text}\n\n## Reasons\n\n{why}\n",
+            trust == TrustLevel.AsksFirst ? [new(Attention.DecisionRules.AskFirst, " true")] : []);
         await vault.WriteAsync(note, caller.Desk.Name, cancellationToken, $"proposed {path}").ConfigureAwait(false);
+        if (trust == TrustLevel.Tells)
+        {
+            await TellAsync(caller.Task, $"Proposed “{name}” to the brain", path, cancellationToken).ConfigureAwait(false);
+        }
+
         return path;
     }
 

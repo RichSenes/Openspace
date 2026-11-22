@@ -55,6 +55,13 @@ public sealed record TrustSettings
         _ => TrustLevel.Alone,
     };
 
+    /// <summary>
+    /// Whether something is done without asking: the trust allows it and it can be undone.
+    /// What cannot be undone always waits for a person, whatever the trust. Desks and routines
+    /// decide with this one rule.
+    /// </summary>
+    public static bool ActsAlone(TrustLevel level, bool canUndo) => canUndo && level != TrustLevel.AsksFirst;
+
     public TrustLevel LevelOf(TrustedAction action) => _levels.TryGetValue(action, out var level) ? level : DefaultOf(action);
 
     /// <summary>The same settings with <paramref name="action"/> at <paramref name="level"/>.</summary>

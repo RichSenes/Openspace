@@ -33,7 +33,13 @@ internal sealed partial class OpenspaceTools
     public Task<string> BrainJournalAsync(
         [Description("One or two sentences, e.g. \"Added the logout button; the header is shared with admin, so I left its layout alone.\"")] string text,
         CancellationToken cancellationToken) =>
-        RunAsync(async task => $"Written in {await brain.JournalAsync(task, text, cancellationToken)}.");
+        RunAsync(async task =>
+        {
+            var path = await brain.JournalAsync(task, text, cancellationToken);
+            return Application.Agents.AgentBrain.IsWaiting(path)
+                ? $"Your desk asks the person first: the line waits in {path} and goes in your journal once accepted."
+                : $"Written in {path}.";
+        });
 
     [McpServerTool(Name = "brain_propose")]
     [Description("Propose a lasting choice others must follow (a decision), or a plan, a study or an office note. It is saved as proposed: Shiori or the person accepts it or sends it back. Not for progress: use add_task_note for that.")]

@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IEpicRepository, EpicRepository>();
+        services.AddScoped<IAgreementRepository, AgreementRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<IRoutineRepository, RoutineRepository>();
         services.TryAddSingleton<IDomainEventPublisher>(NullDomainEventPublisher.Instance);
@@ -44,6 +45,9 @@ public static class DependencyInjection
         services.AddSingleton<Application.Brain.IBrainIndex>(sp => new Brain.BrainIndex(connectionString, sp.GetRequiredService<Application.Brain.IVault>()));
         services.AddHostedService<BrainService>();
         services.AddHostedService<AcceptorService>();
+
+        // Yesterday's chronicle, written once a day.
+        services.AddHostedService<ChronicleService>();
 
         // Shiori's sessions: kept in the database, so their engine conversations resume after a restart.
         services.AddSingleton<Application.Shiori.IShioriSessionStore, Shiori.ShioriSessionStore>();

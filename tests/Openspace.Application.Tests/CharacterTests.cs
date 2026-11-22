@@ -51,7 +51,7 @@ public class CharacterTests
 
     private Desk Desk(string name) => _h.Office.AddDesk(_h.Room.Id, name, AgentProfile.Create("dev"), _h.Clock.GetUtcNow());
 
-    private CharacterQueries Queries() => new(_h.Offices, _h.Tasks, _h.Audit, _h.Clock);
+    private CharacterQueries Queries() => new(_h.Offices, _h.Tasks, _h.Audit, new InMemoryAgreements(), _h.Clock);
 
     /// <summary>A desk whose traits move neither its baseline nor its changes.</summary>
     private Desk Plain(string name) =>
@@ -293,6 +293,60 @@ public class CharacterTests
         Assert.Single(_engines.Asked, _ => true);
         Assert.Equal("E Corp", Assert.Single(again.Sections).Office);
         Assert.Contains("Screens: “Add the header” was merged.", again.Sections[0].Lines);
+    }
+
+    [Fact]
+    public async Task Yesterdays_chronicle_is_kept_once_a_day_after_its_hour()
+    {
+        ADayOfWork();
+        var day = Today;
+        var options = new ChronicleOptions { At = new TimeOnly(1, 0) };
+        _h.Clock.Advance(new DateTimeOffset(2015, 6, 25, 0, 30, 0, TimeSpan.Zero) - _h.Clock.GetUtcNow());
+
+        Assert.Null(await Chronicle().KeepYesterdayAsync(options, default));
+
+        _h.Clock.Advance(TimeSpan.FromHours(1));
+        var written = await Chronicle().KeepYesterdayAsync(options, default);
+
+        Assert.Equal(day, written?.Day);
+        Assert.True(_h.Vault.Notes.ContainsKey(Characters.Chronicle.PathOf(day)));
+        Assert.Null(await Chronicle().KeepYesterdayAsync(options, default));
+        Assert.Null(await Chronicle().KeepYesterdayAsync(new ChronicleOptions { Enabled = false }, default));
+    }
+
+    [Fact]
+    public async Task The_kept_chronicle_never_goes_to_a_free_online_model()
+    {
+        ADayOfWork();
+        _engines.Answer = "Gossip.";
+        _h.Clock.Advance(TimeSpan.FromDays(1));
+        var free = new Chronicle(
+            _h.Offices, _h.Tasks, _h.Audit, _h.Vault, new NoChat(), _engines,
+            new LiveOptions<Functions.FunctionModelOptions>(() => new() { Journals = new() { Engine = Functions.ModelEngine.OpenCode, Model = "opencode/big-pickle-free" } }),
+            new LiveOptions<LocalModels.LocalModelOptions>(() => new()), _h.Clock);
+
+        var written = await free.KeepYesterdayAsync(new ChronicleOptions { At = TimeOnly.MinValue }, default);
+
+        Assert.False(written!.ByModel);
+        Assert.Empty(_engines.Asked);
+    }
+
+    [Fact]
+    public async Task The_weeks_roundup_takes_a_line_a_day_per_office_from_the_vault()
+    {
+        for (var d = 0; d < 7; d++)
+        {
+            var date = Today.AddDays(-d);
+            _h.Vault.Put(Characters.Chronicle.PathOf(date), $"# Chronicle\n\n## E Corp\n\n- Day {d} first.\n- Day {d} second.\n");
+        }
+
+        _h.Vault.Put(Characters.Chronicle.PathOf(Today.AddDays(-2)), "# Chronicle\n\n## E Corp\n\n- Day 2 first.\n\n## Allsafe\n\n- Allsafe met.\n");
+
+        var week = await Characters.Chronicle.RoundupAsync(_h.Vault, Today, 7, default);
+
+        Assert.Equal(["E Corp", "Allsafe"], week.Select(s => s.Office));
+        Assert.Equal(["Day 4 first.", "Day 3 first.", "Day 2 first.", "Day 1 first.", "Day 0 first."], week[0].Lines);
+        Assert.Equal(["Allsafe met."], week[1].Lines);
     }
 
     [Fact]

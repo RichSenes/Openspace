@@ -326,6 +326,72 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.ToTable("SeenItems", (string)null);
                 });
 
+            modelBuilder.Entity("Openspace.Domain.Work.Agreement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ClosedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FirstDesk")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstProposal")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FirstTask")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("GoesFirst")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MinutesPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OfficeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OpenedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SecondDesk")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecondProposal")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SecondTask")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Turns")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfficeId", "OpenedAt");
+
+                    b.ToTable("Agreements", (string)null);
+                });
+
             modelBuilder.Entity("Openspace.Domain.Work.AuditEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -975,6 +1041,15 @@ namespace Openspace.Infrastructure.Persistence.Migrations
                     b.HasOne("Openspace.Domain.Routines.Routine", null)
                         .WithMany()
                         .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Openspace.Domain.Work.Agreement", b =>
+                {
+                    b.HasOne("Openspace.Domain.Offices.Office", null)
+                        .WithMany()
+                        .HasForeignKey("OfficeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

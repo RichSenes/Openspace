@@ -220,4 +220,33 @@ public class QueueDispatcherTests
 
         Assert.Equal([queued.Id], await Dispatcher(seats: 3).DispatchAsync(default));
     }
+
+    [Fact]
+    public async Task A_night_desk_takes_no_work_by_day_and_says_when_its_shift_starts()
+    {
+        Offices.Add(_office);
+        _office.SetDeskShift(_alice.Id, Shift.Night, _clock.GetUtcNow());
+        var night = Enqueue(_alice, "Rotate the keys");
+        var day = Enqueue(_bob, "Review the rules");
+
+        Assert.Equal([day.Id], await Dispatcher(seats: 3).DispatchAsync(default));
+        Assert.Equal("Waits for its shift, from 20:00.", Assert.Single(Waits.Snapshot(), w => w.TaskId == night.Id.Value).Reason);
+
+        // At night it starts.
+        _clock.Advance(TimeSpan.FromHours(12));
+        Assert.Equal([night.Id], await Dispatcher(seats: 3).DispatchAsync(default));
+    }
+
+    [Fact]
+    public async Task A_day_desk_waits_through_the_night_in_the_offices_own_time()
+    {
+        Offices.Add(_office);
+        // 09:00 UTC is 22:00 in a zone thirteen hours ahead.
+        _clock.SetLocalTimeZone(TimeZoneInfo.CreateCustomTimeZone("Far east", TimeSpan.FromHours(13), "Far east", "Far east"));
+        _office.SetDeskShift(_bob.Id, Shift.Day, _clock.GetUtcNow());
+        var task = Enqueue(_bob, "Review the rules");
+
+        Assert.Empty(await Dispatcher(seats: 3).DispatchAsync(default));
+        Assert.Equal("Waits for its shift, from 08:00.", Assert.Single(Waits.Snapshot(), w => w.TaskId == task.Id.Value).Reason);
+    }
 }

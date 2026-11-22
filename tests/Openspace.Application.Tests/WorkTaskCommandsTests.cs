@@ -34,7 +34,7 @@ public class WorkTaskCommandsTests
     private Agents.AgentBrain Brain()
     {
         var vault = new InMemoryVault();
-        return new(_offices, _tasks, vault, new InMemoryBrainIndex(vault), new Application.Brain.BrainSearch(new InMemoryBrainIndex(vault)), new FakeWorkInProgress(), _clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<Agents.AgentBrain>.Instance);
+        return new(_offices, _tasks, vault, new InMemoryBrainIndex(vault), new Application.Brain.BrainSearch(new InMemoryBrainIndex(vault)), new FakeWorkInProgress(), new InMemoryAuditLog(), _unitOfWork, _clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<Agents.AgentBrain>.Instance);
     }
 
     [Fact]

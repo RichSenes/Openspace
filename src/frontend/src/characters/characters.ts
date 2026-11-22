@@ -104,8 +104,8 @@ export const TRUST_LEVELS: { id: TrustLevel; label: string }[] = [
 
 export const TRUSTED_ACTIONS: { id: TrustedAction; label: string; hint: string }[] = [
   { id: 'SafeRequests', label: 'Safe requests', hint: 'Edits and harmless commands inside its own copy. Risky ones always ask you.' },
-  { id: 'Journal', label: 'Journal lines', hint: 'Lines in its own journal in the brain. Not followed yet.' },
-  { id: 'Proposals', label: 'Proposals', hint: 'Decisions and notes it proposes to the brain. Not followed yet.' },
+  { id: 'Journal', label: 'Journal lines', hint: 'Lines in its own journal in the brain. Asks first: each line waits for you under Needs you.' },
+  { id: 'Proposals', label: 'Proposals', hint: 'Decisions and notes it proposes to the brain. Asks first: Shiori leaves them to you.' },
 ]
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -171,4 +171,100 @@ export function tiesOf(board: Pick<CharacterBoardView, 'relationships'>, deskId:
   return board.relationships
     .filter((r) => r.firstId === deskId || r.secondId === deskId)
     .map((r) => ({ other: r.firstId === deskId ? r.secondName : r.firstName, tie: r }))
+}
+
+export type AgendaLineKind = 'Task' | 'Routine' | 'Review' | 'Event' | 'Due'
+
+export interface AgendaLine {
+  /** "2026-11-22", on the office's clock. */
+  date: string
+  /** "20:00:00"; null for what has a day but no hour. */
+  time: string | null
+  kind: AgendaLineKind
+  title: string
+  detail: string
+}
+
+export interface AgendaView {
+  officeId: string
+  from: string
+  until: string
+  lines: AgendaLine[]
+  /** The Google account whose calendar was read; null when none is connected with it. */
+  calendar: string | null
+  calendarProblem: string | null
+}
+
+export const AGENDA_KIND_LABELS: Record<AgendaLineKind, string> = {
+  Task: 'Work',
+  Routine: 'Routine',
+  Review: 'Review',
+  Event: 'Event',
+  Due: 'To do',
+}
+
+/** A "2026-11-22" day as a local date: `new Date("2026-11-22")` would be midnight in London. */
+export function localDay(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1)
+}
+
+/** "20:00" from "20:00:00"; empty for a line with no hour. */
+export function agendaTime(time: string | null): string {
+  return time ? time.slice(0, 5) : ''
+}
+
+export type AgreementStatus = 'Settled' | 'WaitingForPerson' | 'DecidedByPerson' | 'Dropped'
+
+export interface AgreementView {
+  id: string
+  officeId: string
+  status: AgreementStatus
+  subject: string
+  firstDeskId: string
+  firstDeskName: string
+  firstTaskId: string
+  firstTaskTitle: string
+  firstProposal: string
+  secondDeskId: string
+  secondDeskName: string
+  secondTaskId: string
+  secondTaskTitle: string
+  secondProposal: string
+  goesFirst: string | null
+  reason: string
+  turns: number
+  minutesPath: string
+  openedAt: string
+  closedAt: string | null
+  decidedBy: string | null
+}
+
+export const AGREEMENT_STATUS_LABELS: Record<AgreementStatus, string> = {
+  Settled: 'Settled by the rules',
+  WaitingForPerson: 'Waits for your answer',
+  DecidedByPerson: 'Decided by you',
+  Dropped: 'Dropped: a task left the queue',
+}
+
+/** "“Restyle the cart” goes first", or null while nobody has said. */
+export function agreementOutcome(a: Pick<AgreementView, 'goesFirst' | 'firstTaskId' | 'firstTaskTitle' | 'secondTaskTitle'>): string | null {
+  if (!a.goesFirst) return null
+  return `“${a.goesFirst === a.firstTaskId ? a.firstTaskTitle : a.secondTaskTitle}” goes first`
+}
+
+/** The agreements waiting for the person first, then the newest. */
+export function agreementsInOrder(list: AgreementView[]): AgreementView[] {
+  return [...list].sort((a, b) => Number(b.status === 'WaitingForPerson') - Number(a.status === 'WaitingForPerson') || b.openedAt.localeCompare(a.openedAt))
+}
+
+/** The agenda's lines grouped by day, in order; days with nothing are left out. */
+export function agendaDays(view: Pick<AgendaView, 'lines'>): { date: string; lines: AgendaLine[] }[] {
+  const days: { date: string; lines: AgendaLine[] }[] = []
+  for (const line of view.lines) {
+    const last = days.at(-1)
+    if (last?.date === line.date) last.lines.push(line)
+    else days.push({ date: line.date, lines: [line] })
+  }
+  return days
 }

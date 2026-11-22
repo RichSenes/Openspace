@@ -80,7 +80,8 @@ A project. It holds its rooms and their desks, and says how agents may treat it.
   `TrustSettings.ActsAlone` is the one rule desks and routines share; a routine's
   "ask first" switch reads as `Routine.Trust` (asks first, or tells: a routine has no
   silent level, every action it takes alone is written in its run, so the switch
-  stays a yes/no in storage and in the API). A `Shift`: day, night or around the clock.
+  stays a yes/no in storage and in the API). A `Shift`: day (08:00–20:00), night or around the clock;
+  the queue gives a desk work only while it is in ("Waits for its shift, from 20:00.").
 
 ## Role
 

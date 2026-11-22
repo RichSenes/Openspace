@@ -73,6 +73,13 @@ public sealed class QueueDispatcher(
                 continue;
             }
 
+            // A desk on the day or night shift takes work only while it is in.
+            if (await ShiftWaitAsync(task, desk, now, officeCache, cancellationToken).ConfigureAwait(false) is { } offShift)
+            {
+                reasons[task.Id.Value] = offShift;
+                continue;
+            }
+
             // Work that builds on other tasks waits until they are accepted and merged.
             if (await BlockerAsync(task, cancellationToken).ConfigureAwait(false) is { } blocker)
             {
@@ -165,6 +172,35 @@ public sealed class QueueDispatcher(
         }
 
         return null;
+    }
+
+    /// <summary>Why the desk's task waits for its shift, or null when the desk is in now.</summary>
+    private async Task<string?> ShiftWaitAsync(WorkTask task, DeskId desk, DateTimeOffset now, Dictionary<OfficeId, Office> cache, CancellationToken cancellationToken)
+    {
+        if (!cache.TryGetValue(task.OfficeId, out var office))
+        {
+            if (await offices.FindAsync(task.OfficeId, cancellationToken).ConfigureAwait(false) is not { } found)
+            {
+                return null;
+            }
+
+            office = cache[task.OfficeId] = found;
+        }
+
+        if (!office.HasDesk(desk))
+        {
+            return null;
+        }
+
+        var shift = office.Locate(desk).Desk.Shift;
+        var local = TimeOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, clock.LocalTimeZone).DateTime);
+        if (shift.IsIn(local))
+        {
+            return null;
+        }
+
+        var from = shift == Shift.Night ? Shifts.NightStarts : Shifts.DayStarts;
+        return $"Waits for its shift, from {from.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)}.";
     }
 
     /// <summary>Why a task whose desk is over its limits found no reserve to go on with.</summary>

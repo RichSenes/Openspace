@@ -30,7 +30,7 @@ export interface Pose {
 }
 
 export const POSES: Record<FaceState, Pose> = {
-  idle: { energy: 0.35, speed: 0.55, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0, heat: 0.15, lid: 0.18, lidTilt: 0.1, wide: 0 },
+  idle: { energy: 0.35, speed: 0.55, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0, heat: 0.15, lid: 0.06, lidTilt: -0.12, wide: 0.1 },
   listening: { energy: 0.55, speed: 0.75, eyes: 1, open: 1.15, pleased: 0, unsure: 0, lean: 1, heat: 0.1, lid: 0, lidTilt: 0, wide: 1 },
   thinking: { energy: 0.75, speed: 1.9, eyes: 0, open: 0.8, pleased: 0, unsure: 0, lean: 0, heat: 0.8, lid: 0.45, lidTilt: -0.4, wide: 0 },
   speaking: { energy: 0.8, speed: 1.1, eyes: 1, open: 1, pleased: 0, unsure: 0, lean: 0.3, heat: 0.35, lid: 0.08, lidTilt: 0, wide: 0.3 },

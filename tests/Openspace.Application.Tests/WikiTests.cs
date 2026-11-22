@@ -197,4 +197,38 @@ public class WikiTests
 
         Assert.Null(await new Wiki(vault, new NoHistory()).BacklinksAsync("Plans/b", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task The_graph_lists_every_note_and_each_resolved_link_once()
+    {
+        var vault = new InMemoryVault();
+        vault.Put("Plans/release.md", "---\nkind: plan\nauthor: darlene\noffices: [Allsafe]\n---\n# Release\n\n[[release]] [[Decisions/a]] and [[a|again]], [[nowhere]].");
+        vault.Put("Decisions/a.md", "---\nkind: decision\nstatus: accepted\n---\n# A\n\nPart of [[release#Costs]].");
+        vault.Put("Studies/alone.md", "# Alone\n");
+
+        var graph = await new Wiki(vault, new NoHistory()).GraphAsync(CancellationToken.None);
+
+        Assert.Equal(["Decisions/a.md", "Plans/release.md", "Studies/alone.md"], graph.Notes.Select(n => n.Path));
+        Assert.Equal(
+            [new WikiGraphLink("Decisions/a.md", "Plans/release.md"), new WikiGraphLink("Plans/release.md", "Decisions/a.md")],
+            graph.Links);
+        var release = graph.Notes[1];
+        Assert.Equal(("Release", "plan", "darlene", "Allsafe"), (release.Title, release.Kind, release.Author, Assert.Single(release.Offices)));
+    }
+
+    [Fact]
+    public async Task The_text_of_a_note_keeps_its_front_matter_and_fields_Openspace_does_not_know()
+    {
+        var vault = new InMemoryVault();
+        vault.Put("Decisions/a.md", "---\nkind: decision\nstatus: accepted\nmood: calm\n---\n# A\n\nBody.\n");
+        var wiki = new Wiki(vault, new NoHistory());
+
+        var text = await wiki.TextAsync("Decisions/a", CancellationToken.None);
+
+        Assert.NotNull(text);
+        Assert.StartsWith("---\nkind: decision\nstatus: accepted\n", text, StringComparison.Ordinal);
+        Assert.Contains("mood: calm", text, StringComparison.Ordinal);
+        Assert.EndsWith("# A\n\nBody.\n", text, StringComparison.Ordinal);
+        Assert.Null(await wiki.TextAsync("Decisions/missing", CancellationToken.None));
+    }
 }

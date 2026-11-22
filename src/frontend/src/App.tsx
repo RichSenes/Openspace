@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AgentsPanel } from './agents/AgentsPanel'
 import { useOffices } from './api/hooks'
 import { Board } from './board/Board'
+import { BrainPage } from './brain/BrainPage'
 import { BuildingView } from './building/BuildingView'
 import { Sidebar } from './layout/Sidebar'
 import { TopBar, type View } from './layout/TopBar'
@@ -68,6 +69,8 @@ export default function App() {
                 setView('settings')
               }}
             />
+          ) : view === 'brain' ? (
+            <BrainPage />
           ) : offices.isPending ? (
             <div className="empty">
               <p>Opening the building…</p>

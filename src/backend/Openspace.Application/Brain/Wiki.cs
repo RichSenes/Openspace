@@ -9,6 +9,15 @@ public sealed record WikiTreeNote(string Path, string Name, string Title, string
 /// <summary>A folder of the vault with what is inside it; the root has an empty name and path.</summary>
 public sealed record WikiFolder(string Name, string Path, IReadOnlyList<WikiFolder> Folders, IReadOnlyList<WikiTreeNote> Notes);
 
+/// <summary>A note as the map draws it: where it lives, what it is, who wrote it, without its body.</summary>
+public sealed record WikiGraphNote(string Path, string Title, string? Kind, string? Status, IReadOnlyList<string> Offices, string? Author);
+
+/// <summary>A <c>[[wikilink]]</c> from one note to another, both resolved to their paths.</summary>
+public sealed record WikiGraphLink(string From, string To);
+
+/// <summary>Every note and every link between them: what the map lays out.</summary>
+public sealed record WikiGraph(IReadOnlyList<WikiGraphNote> Notes, IReadOnlyList<WikiGraphLink> Links);
+
 /// <summary>A note the person wrote, and whether it is new.</summary>
 public sealed record WikiWrite(Note Note, bool Created);
 
@@ -30,6 +39,18 @@ public sealed class Wiki(IVault vault, IVaultHistory history)
 
     public async Task<WikiFolder> TreeAsync(CancellationToken cancellationToken) =>
         Tree(await vault.ListAsync(cancellationToken).ConfigureAwait(false));
+
+    public async Task<WikiGraph> GraphAsync(CancellationToken cancellationToken) =>
+        Graph(await vault.ListAsync(cancellationToken).ConfigureAwait(false));
+
+    /// <summary>
+    /// The whole file of a note as an editor shows it, front matter included; null when there is no
+    /// such note. Written back from what was read, so fields Openspace does not know are kept.
+    /// </summary>
+    public async Task<string?> TextAsync(string path, CancellationToken cancellationToken) =>
+        await vault.ReadAsync(VaultPath.Normalize(path), cancellationToken).ConfigureAwait(false) is { } note
+            ? VaultFormat.Write(note)
+            : null;
 
     /// <summary>The notes that link to the one at <paramref name="path"/>; null when there is no such note.</summary>
     public async Task<IReadOnlyList<Note>?> BacklinksAsync(string path, CancellationToken cancellationToken)
@@ -76,6 +97,31 @@ public sealed class Wiki(IVault vault, IVaultHistory history)
 
     public async Task<IReadOnlyList<WikiReason>> WhyAsync(string file, string? office, string? room, CancellationToken cancellationToken) =>
         WikiWhy.For(file, office, await vault.ListAsync(cancellationToken).ConfigureAwait(false), room);
+
+    /// <summary>
+    /// The notes in path order and their links, each pair once: links to no note, and a note's
+    /// links to itself, are left out.
+    /// </summary>
+    public static WikiGraph Graph(IReadOnlyList<Note> notes)
+    {
+        ArgumentNullException.ThrowIfNull(notes);
+        var ordered = notes.OrderBy(n => n.Path, StringComparer.Ordinal).ToList();
+        var resolver = new WikiLinks(ordered.Select(n => n.Path));
+        var links = new List<WikiGraphLink>();
+        foreach (var note in ordered)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var link in note.Links)
+            {
+                if (resolver.Resolve(link, note.Path) is { } to && to != note.Path && seen.Add(to))
+                {
+                    links.Add(new WikiGraphLink(note.Path, to));
+                }
+            }
+        }
+
+        return new WikiGraph([.. ordered.Select(n => new WikiGraphNote(n.Path, n.Title, n.Kind, n.Status, n.Offices, n.Author))], links);
+    }
 
     /// <summary>The notes in their folders: folders first, then notes, each by name.</summary>
     public static WikiFolder Tree(IEnumerable<Note> notes)

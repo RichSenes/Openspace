@@ -13,6 +13,10 @@ internal static class CharacterEndpoints
         characters.MapGet("/", (Guid officeId, CharacterQueries queries, CancellationToken ct) =>
             queries.GetAsync(new OfficeId(officeId), ct));
 
+        // The office's next days: queued work, routines, reviews, and the calendar when connected.
+        app.MapGet("/api/offices/{officeId:guid}/agenda", (Guid officeId, int? days, OfficeAgenda agenda, CancellationToken ct) =>
+            agenda.GetAsync(new OfficeId(officeId), days, ct)).WithTags("Characters");
+
         // The chronicle covers every office: a day's lines, written the first time they are asked.
         var chronicle = app.MapGroup("/api/chronicle").WithTags("Characters");
         chronicle.MapGet("/{day}", (DateOnly day, string? language, Chronicle writer, CancellationToken ct) =>

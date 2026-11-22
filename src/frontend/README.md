@@ -39,7 +39,7 @@ src/
   routines/   Routines, their runs, proposals, the paper's kanji
   reports/    Reports and changelogs
   characters/ The character monitor: traits, birthdays, shifts, trust, seniority,
-              mood and relationships of the inhabitants
+              mood and relationships of the inhabitants; the office agenda
   security/   Security audits: runs, reports, findings, fixes
   engines/    OpenCode and Claude Code, usage limits, the graphics card
   settings/   Settings, weather, version, backups, Google accounts

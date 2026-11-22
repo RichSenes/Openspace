@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import type { OfficeView } from '../api/types'
 import { useToast } from '../ui/toastContext'
-import { formatMoment } from '../ui/dates'
-import { useChangeDesk, useCharacters } from './api'
+import { formatDay, formatMoment } from '../ui/dates'
+import { useAgenda, useChangeDesk, useCharacters } from './api'
 import {
+  AGENDA_KIND_LABELS,
+  agendaDays,
+  agendaTime,
+  localDay,
   affinityWord,
   birthdayLabel,
   daysIn,
@@ -40,6 +44,8 @@ export function CharactersPanel({ office }: { office: OfficeView }) {
         </p>
       </header>
 
+      <AgendaPanel officeId={office.id} />
+
       {board.isPending ? (
         <p className="hint">Reading the office…</p>
       ) : board.error ? (
@@ -61,6 +67,56 @@ export function CharactersPanel({ office }: { office: OfficeView }) {
               <CharacterCard key={c.deskId} officeId={office.id} character={c} board={board.data} now={board.dataUpdatedAt} />
             ))}
           </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+/** The office's shared agenda: what is expected in the next days, one line each. */
+function AgendaPanel({ officeId }: { officeId: string }) {
+  const agenda = useAgenda(officeId)
+  const days = agenda.data ? agendaDays(agenda.data) : []
+
+  return (
+    <section className="characters-panel" aria-labelledby="agenda-title">
+      <h2 id="agenda-title">Agenda</h2>
+      {agenda.isPending ? (
+        <p className="hint">Reading the next days…</p>
+      ) : agenda.error ? (
+        <p className="characters-error" role="alert">The agenda could not be read: {agenda.error.message}</p>
+      ) : (
+        <>
+          {days.length === 0 ? (
+            <p className="hint">Nothing planned in the next days: no queued work, routine runs or reviews.</p>
+          ) : (
+            <ol className="agenda-days">
+              {days.map((d) => (
+                <li key={d.date}>
+                  <h3>{formatDay(localDay(d.date))}</h3>
+                  <ul className="agenda-lines">
+                    {d.lines.map((l, i) => (
+                      <li key={`${l.kind}-${l.title}-${i}`}>
+                        <span className="agenda-time">{agendaTime(l.time)}</span>
+                        <span className="hint">{AGENDA_KIND_LABELS[l.kind]}</span>
+                        <span>
+                          {l.title}
+                          {l.detail && <span className="hint"> · {l.detail}</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          )}
+          {agenda.data.calendarProblem ? (
+            <p className="characters-error" role="alert">{agenda.data.calendarProblem}</p>
+          ) : (
+            <p className="hint">
+              {agenda.data.calendar ? `With the calendar of ${agenda.data.calendar}.` : 'Connect a Google account in Settings › Connections to see its calendar here too.'}
+            </p>
+          )}
         </>
       )}
     </section>

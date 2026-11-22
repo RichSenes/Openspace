@@ -949,3 +949,14 @@ A tool the mode does not allow answers with an error saying which mode it needs 
 proposal yet (scoped to its office when it has one), so the acceptor and the person take them
 from there, and writes its task items not done as a `## Next` section of unticked items
 (`- [ ] text (office)`) at the end of the note, where the `tomorrow` routine finds them.
+
+## Inhabitants
+
+For the person only; none of it is an MCP tool.
+
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/api/offices/{id}/characters` | The character monitor: traits, birthday, shift, trust, seniority, mood, relationships |
+| PUT | `/api/offices/{id}/desks/{deskId}/shift`, `/trust`, `/birthday` | What the person sets on a desk |
+| GET, POST | `/api/chronicle/{day}?language=` | A day's chronicle: read (written the first time) or written again. Yesterday's is written on its own every night after `Chronicle:At` (01:00, `Chronicle:Enabled`, `Chronicle:Language`) |
+| GET | `/api/offices/{id}/agenda?days=7` | The next days (1–31): queued tasks with when their desk takes them (shifts count), routine runs, decisions due for review, and the events and tasks of the first Google account connected with the calendar (`calendar`, or `calendarProblem` when it cannot be read) |

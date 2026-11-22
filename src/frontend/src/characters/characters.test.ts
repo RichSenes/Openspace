@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { affinityWord, birthdayLabel, daysIn, moodPath, moodWord, signed, tiesOf, trustOf, type RelationshipView } from './characters'
+import { agendaDays, agendaTime, localDay, affinityWord, birthdayLabel, daysIn, moodPath, moodWord, signed, tiesOf, trustOf, type RelationshipView } from './characters'
 
 describe('birthdays', () => {
   it('name a day and a month, never a year', () => {
@@ -51,5 +51,21 @@ describe('tiesOf', () => {
     const tie: RelationshipView = { firstId: 'a', firstName: 'Frontend', secondId: 'b', secondName: 'Screens', affinity: 2, history: [] }
     expect(tiesOf({ relationships: [tie] }, 'b')).toEqual([{ other: 'Frontend', tie }])
     expect(tiesOf({ relationships: [tie] }, 'c')).toEqual([])
+  })
+})
+
+describe('the agenda', () => {
+  const line = (date: string, time: string | null, title: string) => ({ date, time, kind: 'Task' as const, title, detail: '' })
+
+  it('groups lines by day in their order', () => {
+    const days = agendaDays({ lines: [line('2026-11-22', '20:00:00', 'A'), line('2026-11-22', null, 'B'), line('2026-11-24', '07:00:00', 'C')] })
+    expect(days.map((d) => [d.date, d.lines.map((l) => l.title)])).toEqual([['2026-11-22', ['A', 'B']], ['2026-11-24', ['C']]])
+  })
+
+  it('reads days on the local clock and shows hours without seconds', () => {
+    const day = localDay('2026-11-22')
+    expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([2026, 10, 22])
+    expect(agendaTime('20:00:00')).toBe('20:00')
+    expect(agendaTime(null)).toBe('')
   })
 })

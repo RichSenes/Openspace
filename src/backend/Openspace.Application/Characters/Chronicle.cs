@@ -34,7 +34,8 @@ public sealed class Chronicle(
     IEngineText engines,
     IOptionsMonitor<FunctionModelOptions> models,
     IOptionsMonitor<LocalModelOptions> local,
-    TimeProvider clock)
+    TimeProvider clock,
+    IAgreementRepository? agreements = null)
 {
     public const string Folder = "Chronicle";
 
@@ -123,7 +124,8 @@ public sealed class Chronicle(
         {
             var all = await tasks.ListAsync(office.Id, null, cancellationToken).ConfigureAwait(false);
             var log = await CharacterQueries.LogSinceAsync(audit, all, end - Relationships.Window, cancellationToken).ConfigureAwait(false);
-            var facts = Facts(office, all, [.. log.Where(e => e.At < end)], day, start, end);
+            var agreed = agreements is null ? [] : await agreements.ListAsync(office.Id, cancellationToken).ConfigureAwait(false);
+            var facts = Facts(office, all, [.. log.Where(e => e.At < end)], day, start, end, agreed);
             if (facts.Count == 0)
             {
                 continue;
@@ -145,7 +147,8 @@ public sealed class Chronicle(
     /// failed or conflicting, what tied two desks, and birthdays. Computed by code only.
     /// </summary>
     public static IReadOnlyList<string> Facts(
-        Office office, IReadOnlyList<Domain.Work.WorkTask> all, IReadOnlyList<Domain.Work.AuditEntry> log, DateOnly day, DateTimeOffset start, DateTimeOffset end)
+        Office office, IReadOnlyList<Domain.Work.WorkTask> all, IReadOnlyList<Domain.Work.AuditEntry> log, DateOnly day, DateTimeOffset start, DateTimeOffset end,
+        IReadOnlyList<Domain.Work.Agreement>? agreements = null)
     {
         ArgumentNullException.ThrowIfNull(office);
         var names = office.Rooms.SelectMany(r => r.Desks).ToDictionary(d => d.Id, d => d.Name);
@@ -156,7 +159,7 @@ public sealed class Chronicle(
             facts.Add($"{names[e.Desk]}: {Mood.ReasonOf(e)}.");
         }
 
-        foreach (var tie in Relationships.Of(all, log, names, end))
+        foreach (var tie in Relationships.Of(all, log, names, end, agreements))
         {
             facts.AddRange(tie.History.Where(h => h.At >= start && h.At < end).Select(h => $"{h.Text}."));
         }

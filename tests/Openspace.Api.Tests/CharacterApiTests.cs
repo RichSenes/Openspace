@@ -70,4 +70,14 @@ public sealed class CharacterApiTests : IDisposable
         Assert.Empty(agenda.GetProperty("lines").EnumerateArray());
         Assert.Equal(HttpStatusCode.NotFound, (await _http.GetAsync($"/api/offices/{Guid.NewGuid()}/agenda")).StatusCode);
     }
+
+    [Fact]
+    public async Task Agreements_are_listed_per_office_and_an_unknown_one_cannot_be_decided()
+    {
+        var office = await IdOf(await _http.PostAsJsonAsync("/api/offices", new { name = "E Corp" }));
+
+        Assert.Empty((await _http.GetFromJsonAsync<JsonElement>($"/api/offices/{office}/characters/agreements")).EnumerateArray());
+        var unknown = await _http.PostAsJsonAsync($"/api/agreements/{Guid.NewGuid()}/decide", new { goesFirst = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
 }

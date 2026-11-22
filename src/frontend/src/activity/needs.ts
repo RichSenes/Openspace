@@ -3,7 +3,7 @@ import type { DecisionVerb, NeedsYouItem, NeedsYouKind } from '../api/types'
 /** Where an item opens: the Board on a task, or the Routines of an office. */
 export interface NeedsYouTarget {
   officeId: string
-  view: 'board' | 'routines'
+  view: 'board' | 'routines' | 'characters'
   taskId?: string
 }
 
@@ -17,6 +17,7 @@ export const GROUPS: { kind: NeedsYouKind; heading: string; open: string }[] = [
   { kind: 'DecisionToReview', heading: 'Shiori accepted, to review', open: 'Open' },
   { kind: 'DecisionToAccept', heading: 'Decisions to accept', open: 'Open' },
   { kind: 'DecisionDue', heading: 'Decisions to look at again', open: 'Open' },
+  { kind: 'Agreement', heading: 'Desks ask who goes first', open: 'Answer in Characters' },
 ]
 
 /** A decision's answers, in the order shown; the first is the primary one. "Open" comes after them. */
@@ -57,6 +58,7 @@ export function grouped(items: NeedsYouItem[]): { kind: NeedsYouKind; heading: s
 
 /** Where opening an item takes the person. */
 export function targetOf(item: NeedsYouItem): NeedsYouTarget {
+  if (item.kind === 'Agreement') return { officeId: item.officeId, view: 'characters' }
   return item.kind === 'Proposal' || item.kind === 'RoutineFailed'
     ? { officeId: item.officeId, view: 'routines' }
     : { officeId: item.officeId, view: 'board', taskId: item.id }

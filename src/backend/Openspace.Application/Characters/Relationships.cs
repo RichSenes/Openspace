@@ -17,6 +17,12 @@ public enum TieKind
 
     /// <summary>One's work stopped merging after the other's went in on the same files.</summary>
     MergeConflict,
+
+    /// <summary>They clashed on planned work and the rules settled who goes first.</summary>
+    Agreed,
+
+    /// <summary>They clashed on planned work and had to ask the person.</summary>
+    Disagreed,
 }
 
 /// <param name="Text">What happened, naming both desks and the work.</param>
@@ -50,10 +56,14 @@ public static class Relationships
     public const int SameFilesChange = 1;
     public const int FixChange = 3;
     public const int ConflictChange = -2;
+    public const int AgreedChange = 1;
+    public const int DisagreedChange = -1;
 
     /// <param name="names">The desks' names, for the history's text; desks not in it are left out.</param>
+    /// <param name="agreements">Agreements between desks: settled by the rules brings them closer, asking the person a little apart.</param>
     public static IReadOnlyList<Relationship> Of(
-        IReadOnlyList<WorkTask> tasks, IReadOnlyList<AuditEntry> log, IReadOnlyDictionary<DeskId, string> names, DateTimeOffset now)
+        IReadOnlyList<WorkTask> tasks, IReadOnlyList<AuditEntry> log, IReadOnlyDictionary<DeskId, string> names, DateTimeOffset now,
+        IReadOnlyList<Agreement>? agreements = null)
     {
         ArgumentNullException.ThrowIfNull(tasks);
         ArgumentNullException.ThrowIfNull(log);
@@ -122,6 +132,19 @@ public static class Relationships
                 ties.Add((conflict.Desk, cause.Desk, new TieEvent(conflict.At, TieKind.MergeConflict, ConflictChange,
                     $"{Name(conflict.Desk)}'s “{conflict.Title}” no longer merged after {Name(cause.Desk)}'s “{cause.Title}” went in")));
             }
+        }
+
+        foreach (var a in agreements ?? [])
+        {
+            if (!names.ContainsKey(a.FirstDesk) || !names.ContainsKey(a.SecondDesk))
+            {
+                continue;
+            }
+
+            var pair = $"{Name(a.FirstDesk)} and {Name(a.SecondDesk)}";
+            ties.Add(a.Status == AgreementStatus.Settled
+                ? (a.FirstDesk, a.SecondDesk, new TieEvent(a.ClosedAt ?? a.OpenedAt, TieKind.Agreed, AgreedChange, $"{pair} agreed who goes first on {a.Subject}"))
+                : (a.FirstDesk, a.SecondDesk, new TieEvent(a.OpenedAt, TieKind.Disagreed, DisagreedChange, $"{pair} could not agree who goes first on {a.Subject} and asked the person")));
         }
 
         return [.. ties

@@ -22,7 +22,8 @@ public sealed class QueueDispatcher(
     IWorkInProgress work,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    Characters.AgreementKeeper? agreements = null)
 {
     /// <returns>The tasks that just started and now need an agent.</returns>
     /// <remarks>Every queued task that does not start gets the reason it waits, for the board.</remarks>
@@ -31,6 +32,11 @@ public sealed class QueueDispatcher(
         var running = await tasks.ListAsync(null, WorkTaskStatus.Running, cancellationToken).ConfigureAwait(false);
         var queued = await tasks.ListAsync(null, WorkTaskStatus.Queued, cancellationToken).ConfigureAwait(false);
         var seats = options.CurrentValue.Seats;
+
+        // Desks whose planned work clashes agree first on who goes first; the second waits.
+        IReadOnlyDictionary<Guid, string> agreed = queued.Count > 0 && agreements is not null
+            ? (await agreements.RoundAsync(cancellationToken).ConfigureAwait(false)).Hold
+            : new Dictionary<Guid, string>();
         var freeSeats = seats - running.Count;
         var reasons = new Dictionary<Guid, string>();
         var seatsTaken = $"Waits for a free seat: {seats} {(seats == 1 ? "agent works" : "agents work")} at a time.";
@@ -70,6 +76,12 @@ public sealed class QueueDispatcher(
             if (busyDesks.Contains(desk))
             {
                 reasons[task.Id.Value] = "Its desk is busy with another task.";
+                continue;
+            }
+
+            if (agreed.TryGetValue(task.Id.Value, out var agreement))
+            {
+                reasons[task.Id.Value] = agreement;
                 continue;
             }
 

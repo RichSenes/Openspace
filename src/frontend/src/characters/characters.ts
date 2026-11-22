@@ -214,6 +214,50 @@ export function agendaTime(time: string | null): string {
   return time ? time.slice(0, 5) : ''
 }
 
+export type AgreementStatus = 'Settled' | 'WaitingForPerson' | 'DecidedByPerson' | 'Dropped'
+
+export interface AgreementView {
+  id: string
+  officeId: string
+  status: AgreementStatus
+  subject: string
+  firstDeskId: string
+  firstDeskName: string
+  firstTaskId: string
+  firstTaskTitle: string
+  firstProposal: string
+  secondDeskId: string
+  secondDeskName: string
+  secondTaskId: string
+  secondTaskTitle: string
+  secondProposal: string
+  goesFirst: string | null
+  reason: string
+  turns: number
+  minutesPath: string
+  openedAt: string
+  closedAt: string | null
+  decidedBy: string | null
+}
+
+export const AGREEMENT_STATUS_LABELS: Record<AgreementStatus, string> = {
+  Settled: 'Settled by the rules',
+  WaitingForPerson: 'Waits for your answer',
+  DecidedByPerson: 'Decided by you',
+  Dropped: 'Dropped: a task left the queue',
+}
+
+/** "“Restyle the cart” goes first", or null while nobody has said. */
+export function agreementOutcome(a: Pick<AgreementView, 'goesFirst' | 'firstTaskId' | 'firstTaskTitle' | 'secondTaskTitle'>): string | null {
+  if (!a.goesFirst) return null
+  return `“${a.goesFirst === a.firstTaskId ? a.firstTaskTitle : a.secondTaskTitle}” goes first`
+}
+
+/** The agreements waiting for the person first, then the newest. */
+export function agreementsInOrder(list: AgreementView[]): AgreementView[] {
+  return [...list].sort((a, b) => Number(b.status === 'WaitingForPerson') - Number(a.status === 'WaitingForPerson') || b.openedAt.localeCompare(a.openedAt))
+}
+
 /** The agenda's lines grouped by day, in order; days with nothing are left out. */
 export function agendaDays(view: Pick<AgendaView, 'lines'>): { date: string; lines: AgendaLine[] }[] {
   const days: { date: string; lines: AgendaLine[] }[] = []

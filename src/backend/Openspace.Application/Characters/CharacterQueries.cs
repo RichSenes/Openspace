@@ -9,7 +9,7 @@ namespace Openspace.Application.Characters;
 /// The character monitor: who each inhabitant is and how they are doing, for the person only.
 /// Agents never see these numbers: no tool and no briefing reads them.
 /// </summary>
-public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskRepository tasks, IAuditLog audit, TimeProvider clock)
+public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskRepository tasks, IAuditLog audit, IAgreementRepository agreements, TimeProvider clock)
 {
     /// <summary>Lines of the log read per page.</summary>
     private const int Page = 1000;
@@ -43,7 +43,8 @@ public sealed class CharacterQueries(IOfficeRepository offices, IWorkTaskReposit
             .Select(s => new RoomExpertView(s.Room.Value, office.Rooms.First(r => r.Id == s.Room).Name, s.Desk.Value, office.Locate(s.Desk).Desk.Name, s.Done))
             .ToList();
         var names = office.Rooms.SelectMany(r => r.Desks).ToDictionary(d => d.Id, d => d.Name);
-        var relationships = Relationships.Of(all, log, names, now)
+        var agreed = await agreements.ListAsync(officeId, cancellationToken).ConfigureAwait(false);
+        var relationships = Relationships.Of(all, log, names, now, agreed)
             .Select(r => new RelationshipView(r.First.Value, names[r.First], r.Second.Value, names[r.Second], r.Affinity, r.History))
             .ToList();
         return new CharacterBoardView(office.Id.Value, office.Name, characters, experts, relationships);

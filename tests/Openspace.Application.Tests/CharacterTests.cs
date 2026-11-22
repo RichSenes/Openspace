@@ -51,7 +51,7 @@ public class CharacterTests
 
     private Desk Desk(string name) => _h.Office.AddDesk(_h.Room.Id, name, AgentProfile.Create("dev"), _h.Clock.GetUtcNow());
 
-    private CharacterQueries Queries() => new(_h.Offices, _h.Tasks, _h.Audit, _h.Clock);
+    private CharacterQueries Queries() => new(_h.Offices, _h.Tasks, _h.Audit, new InMemoryAgreements(), _h.Clock);
 
     /// <summary>A desk whose traits move neither its baseline nor its changes.</summary>
     private Desk Plain(string name) =>

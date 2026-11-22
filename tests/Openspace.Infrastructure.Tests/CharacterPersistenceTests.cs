@@ -76,4 +76,35 @@ public sealed class CharacterPersistenceTests : IAsyncLifetime
             Assert.Equal((TrustLevel.Alone, Shift.Always), (desks[plain.Value].Trust[TrustedAction.SafeRequests], desks[plain.Value].Shift));
         }
     }
+
+    [Fact]
+    public async Task An_agreement_survives_a_round_trip_with_its_answer()
+    {
+        OfficeId office;
+        Domain.Work.AgreementId id;
+        var (firstTask, secondTask) = (Domain.Work.WorkTaskId.New(), Domain.Work.WorkTaskId.New());
+        var now = new DateTimeOffset(2015, 6, 24, 9, 0, 0, TimeSpan.Zero);
+        await using (var scope = _db.Scope())
+        {
+            var commands = scope.ServiceProvider.GetRequiredService<OfficeCommands>();
+            office = await commands.OpenOfficeAsync("E Corp", default);
+            var room = await commands.OpenRoomAsync(office, "Web", default);
+            var a = await commands.AddDeskAsync(office, room, "Frontend", "frontend-dev", null, null, default);
+            var b = await commands.AddDeskAsync(office, room, "Screens", "designer", null, null, default);
+            var agreement = Domain.Work.Agreement.Open(office, a, firstTask, b, secondTask, "src/web/cart.ts", now);
+            agreement.Record("Frontend first.", "Screens first.", 4, null, "Even.", "Agreements/x.md", now);
+            agreement.Decide(secondTask, "elliot", now.AddHours(1));
+            id = agreement.Id;
+            scope.ServiceProvider.GetRequiredService<Application.Abstractions.IAgreementRepository>().Add(agreement);
+            await scope.ServiceProvider.GetRequiredService<Application.Abstractions.IUnitOfWork>().SaveChangesAsync(default);
+        }
+
+        await using (var scope = _db.Scope())
+        {
+            var found = Assert.Single(await scope.ServiceProvider.GetRequiredService<Application.Abstractions.IAgreementRepository>().ListAsync(office, default));
+            Assert.Equal(id, found.Id);
+            Assert.Equal((Domain.Work.AgreementStatus.DecidedByPerson, secondTask, firstTask, "elliot", 4), (found.Status, found.GoesFirst, found.GoesSecond, found.DecidedBy, found.Turns));
+            Assert.Equal(("Frontend first.", "Agreements/x.md", now.AddHours(1)), (found.FirstProposal, found.MinutesPath, found.ClosedAt));
+        }
+    }
 }

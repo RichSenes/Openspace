@@ -642,6 +642,7 @@ export type NeedsYouKind =
   | 'DecisionToReview'
   | 'DecisionToAccept'
   | 'DecisionDue'
+  | 'Agreement'
 
 export interface NeedsYouItem {
   kind: NeedsYouKind

@@ -31,6 +31,9 @@ public enum NeedsYouKind
 
     /// <summary>An accepted decision whose review date came, brought back by a decision-reviews routine.</summary>
     DecisionDue,
+
+    /// <summary>Two desks whose work clashes could not settle who goes first: one question, with both proposals.</summary>
+    Agreement,
 }
 
 /// <param name="Id">The task, the proposal or the routine.</param>
@@ -45,7 +48,8 @@ public sealed record NeedsYouItem(NeedsYouKind Kind, Guid OfficeId, string Offic
 /// questions come from the activity board, as they happen. Decisions come from the vault: those
 /// Shiori accepted, those it left for the person, and those a decision-reviews routine brought back.
 /// </summary>
-public sealed class NeedsYouQueries(IOfficeRepository offices, IWorkTaskRepository tasks, IRoutineRepository routines, IVault vault, TimeProvider clock)
+public sealed class NeedsYouQueries(
+    IOfficeRepository offices, IWorkTaskRepository tasks, IRoutineRepository routines, IVault vault, TimeProvider clock, IAgreementRepository? agreements = null)
 {
     /// <summary>The kind of routine that brings decisions back when their review date comes.</summary>
     public const string ReviewsKind = "decision-reviews";
@@ -109,6 +113,18 @@ public sealed class NeedsYouQueries(IOfficeRepository offices, IWorkTaskReposito
         }
 
         await AddDecisionsAsync(items, names, reviewed, cancellationToken).ConfigureAwait(false);
+        if (agreements is not null)
+        {
+            foreach (var agreement in (await agreements.ListAsync(null, cancellationToken).ConfigureAwait(false)).Where(a => a.Status == AgreementStatus.WaitingForPerson))
+            {
+                if (names.TryGetValue(agreement.OfficeId, out var office))
+                {
+                    items.Add(new NeedsYouItem(
+                        NeedsYouKind.Agreement, agreement.OfficeId.Value, office, agreement.Id.Value, $"Who goes first on {agreement.Subject}?",
+                        $"{agreement.FirstProposal} {agreement.SecondProposal}", agreement.OpenedAt, agreement.MinutesPath));
+                }
+            }
+        }
 
         // By kind, in the order above; within a kind, the oldest first: it has waited longest.
         return [.. items.OrderBy(i => i.Kind).ThenBy(i => i.Since)];

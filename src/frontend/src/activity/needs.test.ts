@@ -25,6 +25,7 @@ describe('what needs the person', () => {
   it('opens tasks on the Board and routines in Routines, in their office', () => {
     expect(targetOf(item('TaskToReview', 'Logout'))).toEqual({ officeId: 'o1', view: 'board', taskId: 'id-Logout' })
     expect(targetOf(item('RoutineFailed', 'Paper'))).toEqual({ officeId: 'o1', view: 'routines' })
+    expect(targetOf(item('Agreement', 'Who goes first'))).toEqual({ officeId: 'o1', view: 'characters' })
   })
 
   it('says how long an item waited', () => {

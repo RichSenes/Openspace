@@ -24,6 +24,8 @@ public sealed class OpenspaceDbContext(
 
     public DbSet<Epic> Epics => Set<Epic>();
 
+    public DbSet<Agreement> Agreements => Set<Agreement>();
+
     public DbSet<Domain.Reports.Report> Reports => Set<Domain.Reports.Report>();
 
     public DbSet<Domain.Routines.Routine> Routines => Set<Domain.Routines.Routine>();
@@ -67,6 +69,7 @@ public sealed class OpenspaceDbContext(
         configurationBuilder.Properties<WorkTaskId>().HaveConversion<IdConverters.WorkTaskIdConverter>();
         configurationBuilder.Properties<RoleId>().HaveConversion<IdConverters.RoleIdConverter>();
         configurationBuilder.Properties<EpicId>().HaveConversion<IdConverters.EpicIdConverter>();
+        configurationBuilder.Properties<AgreementId>().HaveConversion<IdConverters.AgreementIdConverter>();
         configurationBuilder.Properties<Domain.Reports.ReportId>().HaveConversion<IdConverters.ReportIdConverter>();
         configurationBuilder.Properties<Domain.Routines.RoutineId>().HaveConversion<IdConverters.RoutineIdConverter>();
         configurationBuilder.Properties<Domain.Routines.RoutineRunId>().HaveConversion<IdConverters.RoutineRunIdConverter>();

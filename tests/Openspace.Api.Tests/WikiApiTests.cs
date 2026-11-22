@@ -197,4 +197,37 @@ public sealed class WikiApiTests : IDisposable
         using var none = await _http.GetAsync("/api/brain/why");
         Assert.Equal(HttpStatusCode.BadRequest, none.StatusCode);
     }
+
+    private sealed record GraphNote(string Path, string Title, string? Kind, string? Status);
+
+    private sealed record GraphLink(string From, string To);
+
+    private sealed record Graph(List<GraphNote> Notes, List<GraphLink> Links);
+
+    private sealed record Source(string Text);
+
+    [Fact]
+    public async Task The_graph_has_every_note_and_the_links_that_reach_one()
+    {
+        using (await PutAsync("Plans/checkout", "# Checkout\n\nSee [[2026-11-20-cart-totals]].\n")) { }
+
+        var graph = (await _http.GetFromJsonAsync<Graph>("/api/brain/graph", Json))!;
+
+        Assert.Contains(graph.Notes, n => n.Path == "Constitution.md");
+        Assert.Contains(graph.Notes, n => n.Path == "Decisions/2026-11-20-cart-totals.md" && n.Kind == "decision" && n.Status == "accepted");
+        Assert.Contains(new GraphLink("Decisions/2026-11-20-cart-totals.md", "Plans/checkout.md"), graph.Links);
+        Assert.Contains(new GraphLink("Decisions/2026-10-01-old-totals.md", "Plans/checkout.md"), graph.Links);
+        Assert.Contains(new GraphLink("Plans/checkout.md", "Decisions/2026-11-20-cart-totals.md"), graph.Links);
+    }
+
+    [Fact]
+    public async Task The_text_of_a_note_comes_whole_for_the_editor()
+    {
+        var source = (await _http.GetFromJsonAsync<Source>("/api/brain/notes/Decisions/2026-11-20-cart-totals/text", Json))!;
+
+        Assert.StartsWith("---\nkind: decision\nstatus: accepted\n", source.Text, StringComparison.Ordinal);
+        Assert.Contains("# Cart totals", source.Text, StringComparison.Ordinal);
+        using var missing = await _http.GetAsync("/api/brain/notes/Decisions/nowhere/text");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
 }

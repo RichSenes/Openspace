@@ -15,6 +15,7 @@ internal static class WikiEndpoints
 {
     private const string Backlinks = "/backlinks";
     private const string History = "/history";
+    private const string Text = "/text";
 
     public static void MapWikiEndpoints(this IEndpointRouteBuilder app)
     {
@@ -23,16 +24,28 @@ internal static class WikiEndpoints
         // Every note in its folder, folders first, without bodies.
         group.MapGet("/tree", (Wiki wiki, CancellationToken ct) => wiki.TreeAsync(ct));
 
-        // ".../notes/{path}/backlinks", ".../history" and ".../history/{commit}". A route that catches
-        // the whole path must end there, so the verb is read off its end; the constraint keeps plain
-        // reads of a note on the route that serves them, and makes this route the stronger match.
-        group.MapGet("/notes/{**rest:regex(^.+/(backlinks|history|history/\\w+)$)}", async (string rest, int? limit, Wiki wiki, CancellationToken ct) =>
+        // Every note and the links between them, for the map.
+        group.MapGet("/graph", (Wiki wiki, CancellationToken ct) => wiki.GraphAsync(ct));
+
+        // ".../notes/{path}/backlinks", ".../text", ".../history" and ".../history/{commit}". A route
+        // that catches the whole path must end there, so the verb is read off its end; the constraint
+        // keeps plain reads of a note on the route that serves them, and makes this route the stronger match.
+        group.MapGet("/notes/{**rest:regex(^.+/(backlinks|text|history|history/\\w+)$)}", async (string rest, int? limit, Wiki wiki, CancellationToken ct) =>
         {
             var trimmed = rest.TrimEnd('/');
             if (trimmed.EndsWith(Backlinks, StringComparison.OrdinalIgnoreCase))
             {
                 return await wiki.BacklinksAsync(trimmed[..^Backlinks.Length], ct) is { } notes
                     ? Results.Ok(notes.Select(n => new BacklinkView(n.Path, n.Title, n.Kind, n.Status, n.Modified)))
+                    : Results.NotFound();
+            }
+
+            // The whole file for the editor, front matter included.
+            if (trimmed.EndsWith(Text, StringComparison.OrdinalIgnoreCase))
+            {
+                var path = trimmed[..^Text.Length];
+                return await wiki.TextAsync(path, ct) is { } text
+                    ? Results.Ok(new WikiEdit(text, null))
                     : Results.NotFound();
             }
 

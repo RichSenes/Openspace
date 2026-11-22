@@ -46,6 +46,8 @@ src/
   sounds/     Built-in sounds, your own files, the rules of when they play
   release/    The new version banner
   weather/    Words for the weather
+  brain/      Shiori's brain: wiki (tree, search, note with [[links]], history and diffs,
+              "why", editing) and map (force layout, galaxy and city on canvas)
   shiori/     Shiori's page: her sessions over the API and the hub, the streamed answer as
               subtitles, face state from real events, Conversation, Board and Sessions
               drawers, the look (body, drawing, world, hour, weather) kept per browser
@@ -91,6 +93,24 @@ drawer (resume one, start a new one, read the ended ones) work on the saved
 sessions; End writes the session's note and turns the board's decisions into
 proposals. A failed answer says why and where to fix it. Body, drawing, world,
 hour and weather are chosen under the palette button and kept in this browser.
+
+**Brain.** Shiori's brain in two tabs. *Wiki*: the vault as a folder tree with kind
+and status badges (filter by kind), full-text search, the open note rendered from
+Markdown with `[[links]]` that open the note they point at (unknown ones stay muted
+words), its decision facts (status, review date, offices, files), who links to it,
+its history with a numbered diff per version, "Why is this so?" (a repository file
+in, the accepted decisions about it out), and Edit: the whole file, front matter
+included, saved with a summary under the person's name. *Now.md* is read only; the
+constitution is edited here and only here. *Map*: every note and link on a canvas,
+filtered by folder, kind and author, in two themes. *Galaxy* is a small
+deterministic force layout (no library) of glowing points over drifting pixel stars
+that turns slowly; *City* puts each folder in a block of lit buildings, taller with
+more links. Point at a note for its links, click to open it in the wiki (on touch,
+tap then Open); drag to pan, wheel to zoom, Fit to frame it all. The world is drawn
+on one layer that the compositor turns, pans and scales, the highlight and titles on
+an upright layer above it, so a frame costs about a millisecond with 500 notes and a
+full redraw happens only when the layout changes or the map comes to rest. Reduced
+motion settles the layout at once and stops the drift and the windows.
 
 **Board.** Tasks in columns by status, searchable, filtered by epic. Ask the
 supervisor to split a request into tasks and approve them. A queued task says why

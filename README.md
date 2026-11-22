@@ -176,7 +176,9 @@ scripts/openspace restart
 2. **While it works**, its steps become speech bubbles, a battery shows how full
    its conversation is, helpers it calls in stand beside it as interns, and it
    walks to the furniture of its room (shelves to read, server racks to run
-   commands, the coffee machine on a break). Permissions are answered by
+   commands, the coffee machine on a break). Shiori, walking the building,
+   comes over to talk when its task starts, fails, needs you or goes to review.
+   Permissions are answered by
    Openspace or wait for you behind the **needs you** button.
 3. **When it stops**, the task goes to review with the agent's summary, the diff,
    the checks you should try by hand and the tokens it spent. A reviewer reads it

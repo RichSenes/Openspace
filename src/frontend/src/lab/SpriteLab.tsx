@@ -16,6 +16,7 @@ import { THEMES, type Theme, type ThemeName } from '../art/themes'
 import { GLASS, skyPixels, windowPixels, WINDOW_SIZE, type DayPhase } from '../art/windows'
 import type { Sky } from '../api/types'
 import { walkerPixels, WALKER } from '../art/walker'
+import { GLOW_ALPHA, hologram, SHIORI_FRAME, shioriBubble, shioriPixels, tint } from '../art/shiori'
 import { WalkStage, type DeskDoing } from '../activity/walks'
 import { walkerItems } from '../art/chat'
 import { placesOf } from '../building/stations'
@@ -103,6 +104,9 @@ function walkScene(stage: WalkStage, tick: number, theme: Theme): Pixel[] {
   ]
   return roomPixels(theme, roomShell(theme, room.width, room.height - WALL_HEIGHT / TILE), items, false)
 }
+
+/** The page behind the lab's pictures. */
+const LAB_GROUND = '#07060d'
 
 /** Shows a picture made of pixels, scaled by a whole number and never smoothed. */
 function Pixels({ width, height, pixels, scale, label }: { width: number; height: number; pixels: Pixel[]; scale: number; label: string }) {
@@ -399,6 +403,38 @@ export function SpriteLab() {
                 ]}
                 scale={small}
                 label={`person ${i + 1}`}
+              />
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Shiori (front, walking, back, right, left, talking; then with the lights off)</h2>
+        <div className="lab-pieces">
+          {[undefined, '#141a2e'].map((night) => (
+            <figure key={night ?? 'day'}>
+              <Pixels
+                width={SHIORI_FRAME.width * 6}
+                height={SHIORI_FRAME.height + 8}
+                pixels={(
+                  [
+                    { facing: 'front', step: 0, mode: 'idle' },
+                    { facing: 'front', step: tick, mode: 'walking' },
+                    { facing: 'back', step: tick, mode: 'walking' },
+                    { facing: 'right', step: tick, mode: 'walking' },
+                    { facing: 'left', step: tick + 1, mode: 'walking' },
+                    { facing: 'right', step: 0, mode: 'talking' },
+                  ] as const
+                ).flatMap((pose, i) => {
+                  const holo = hologram(shioriPixels(pose, tick), tick, { night })
+                  // The glow as the building draws it: faint over the dark page behind it.
+                  const glow = holo.glow.map((p) => ({ ...p, color: tint(LAB_GROUND, p.color, night ? GLOW_ALPHA.dark : GLOW_ALPHA.lit) }))
+                  const bubble = pose.mode === 'talking' ? shioriBubble('waiting').map((p) => ({ ...p, x: p.x - 4, y: p.y - 4 })) : []
+                  return [...glow, ...holo.body, ...bubble].map((p) => ({ ...p, x: p.x + SHIORI_FRAME.width * i, y: p.y + 8 }))
+                })}
+                scale={small}
+                label={night ? 'Shiori, lights off' : 'Shiori'}
               />
             </figure>
           ))}

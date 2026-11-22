@@ -72,6 +72,12 @@ plan, the coffee machine on a break), hurry back when they need you, and stop fo
 a chat when they meet. Claude Code sessions started outside Openspace sit in the
 guest room. Windows show the real weather of your town. The minimap in the corner
 sketches the whole building; the Activity panel follows the office live.
+Shiori walks the building too, a faint hologram in her dark dress and red sash:
+she crosses rooms through their doors, stops beside a desk whose task just started,
+failed, needs you or went to review and talks there for a few seconds (an icon in
+her bubble), visits the office's shelves and boards now and then, and opens her
+own view when clicked. With the lights off she glows; with reduced motion she
+appears where she goes instead of walking (`building/shiori.ts`).
 **Arrange** lets you draw rooms and the building by hand: sizes, desks, furniture,
 doors, windows and the building's shape. Nobody walks while you arrange or when
 the system asks for reduced motion.

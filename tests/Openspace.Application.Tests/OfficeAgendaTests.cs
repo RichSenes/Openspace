@@ -73,6 +73,17 @@ public sealed class OfficeAgendaTests
         Assert.Single(view.Lines);
     }
 
+    [Fact]
+    public async Task Times_are_given_to_the_minute()
+    {
+        _h.Clock.Advance(TimeSpan.FromSeconds(83.5));
+        _h.Enqueue();
+
+        var line = Assert.Single((await Agenda().GetAsync(_h.Office.Id, null, default)).Lines);
+
+        Assert.Equal(new TimeOnly(9, 1), line.Time);
+    }
+
     [Theory]
     [InlineData(Shift.Day, 6, "2015-06-24T08:00")]
     [InlineData(Shift.Day, 21, "2015-06-25T08:00")]

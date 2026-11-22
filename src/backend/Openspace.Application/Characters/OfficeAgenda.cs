@@ -72,7 +72,7 @@ public sealed class OfficeAgenda(
             {
                 var desk = office.Locate(deskId).Desk;
                 var at = ExpectedStart(desk.Shift, local);
-                lines.Add(new AgendaLine(DateOnly.FromDateTime(at.DateTime), TimeOnly.FromDateTime(at.DateTime), AgendaLineKind.Task, task.Title, $"expected at {desk.Name}"));
+                lines.Add(new AgendaLine(DateOnly.FromDateTime(at.DateTime), Minute(at), AgendaLineKind.Task, task.Title, $"expected at {desk.Name}"));
             }
         }
 
@@ -87,7 +87,7 @@ public sealed class OfficeAgenda(
                     break;
                 }
 
-                lines.Add(new AgendaLine(day, TimeOnly.FromDateTime(at.DateTime), AgendaLineKind.Routine, routine.Name, next < now ? "due now" : "routine"));
+                lines.Add(new AgendaLine(day, Minute(at), AgendaLineKind.Routine, routine.Name, next < now ? "due now" : "routine"));
                 if (next < now)
                 {
                     break;
@@ -115,6 +115,9 @@ public sealed class OfficeAgenda(
             [.. lines.OrderBy(l => l.Date).ThenBy(l => l.Time ?? TimeOnly.MinValue).ThenBy(l => l.Kind).ThenBy(l => l.Title, StringComparer.Ordinal)],
             account, problem);
     }
+
+    /// <summary>The clock time to the minute: an agenda says 09:41, not 09:41:23.47.</summary>
+    private static TimeOnly Minute(DateTimeOffset at) => new(at.Hour, at.Minute);
 
     /// <summary>When a desk on <paramref name="shift"/> takes work: now if it is in, else when its shift starts.</summary>
     public static DateTimeOffset ExpectedStart(Shift shift, DateTimeOffset local)

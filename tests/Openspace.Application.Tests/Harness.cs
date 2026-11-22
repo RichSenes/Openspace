@@ -140,7 +140,7 @@ internal sealed class Harness
         new LiveOptions<AgentOptions>(() => new AgentOptions { Autonomy = Autonomy }), Limits, Loops, BrainTools(), Clock);
 
     public AgentBrain BrainTools() =>
-        new(Offices, Tasks, Vault, new InMemoryBrainIndex(Vault), new Brain.BrainSearch(new InMemoryBrainIndex(Vault)), Work, Clock, NullLogger<AgentBrain>.Instance);
+        new(Offices, Tasks, Vault, new InMemoryBrainIndex(Vault), new Brain.BrainSearch(new InMemoryBrainIndex(Vault)), Work, Audit, UnitOfWork, Clock, NullLogger<AgentBrain>.Instance);
 
     public Review.TaskReviewer Reviewer() => new(Offices, Tasks, UnitOfWork, Runtime, Audit, Clock, NullLogger<Review.TaskReviewer>.Instance, Reviews);
 

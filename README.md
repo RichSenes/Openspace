@@ -218,7 +218,8 @@ More of what it does, in short:
   review them afterwards under **needs you** and can undo them. Decisions come back when their review
   date comes, and the weekly recap is kept there as weekly and monthly digests.
 - Every desk is an inhabitant: traits fixed at birth, a birthday without a year, a
-  shift, a trust level per kind of action, seniority in its room (the room's expert
+  shift, a trust level per kind of action (a desk that asks first sends its journal
+  lines and proposals to **needs you**; one that tells leaves a line in the feed), seniority in its room (the room's expert
   leads its briefing notes), a mood and relationships computed from real events. The
   **Characters** view shows them all with their history; agents never see the numbers.
   A daily chronicle of office life goes to `Chronicle/` and into the morning paper.

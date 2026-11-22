@@ -59,6 +59,14 @@ public sealed class DecisionCommands(IVault vault, TimeProvider clock)
         };
 
         await vault.WriteAsync(changed, who, cancellationToken, summary).ConfigureAwait(false);
+        if (verb == DecisionVerb.Accept && IsJournalLine(note))
+        {
+            // A journal line its desk asked the person about: accepted, it goes in the journal.
+            var now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+            await Journals.AppendAsync(vault, note.Author!.Trim(), now, JournalLineOf(note), note.Author.Trim(), $"wrote in its journal, as {who} accepted", cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (verb is DecisionVerb.Undo or DecisionVerb.Reject)
         {
             await TellProposerAsync(note, verb, reason, cancellationToken).ConfigureAwait(false);
@@ -86,6 +94,17 @@ public sealed class DecisionCommands(IVault vault, TimeProvider clock)
         await Journals.AppendAsync(
             vault, desk, now, $"{DecisionRules.Shiori}: {what} [[{DecisionRules.Link(note.Path)}|{note.Title}]]. {why}", DecisionRules.Shiori,
             $"told {desk} about {note.Path}", cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>A journal line that waited for the person, with the desk that wrote it.</summary>
+    public static bool IsJournalLine(Note note) =>
+        note is not null && string.Equals(note.Kind, DecisionRules.JournalKind, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(note.Author);
+
+    /// <summary>The line itself: the body without its heading.</summary>
+    public static string JournalLineOf(Note note)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        return string.Join(' ', note.Body.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')));
     }
 
     private static bool IsAccepted(Note note) => string.Equals(note.Status, NoteStatus.Accepted, StringComparison.OrdinalIgnoreCase);

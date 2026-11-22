@@ -74,8 +74,13 @@ A project. It holds its rooms and their desks, and says how agents may treat it.
   with the role, and a `Birthday` (day and month, never a year). Both are chosen
   or picked from the desk's id; desks stored before traits get those of their id.
 - `TrustSettings`: per `TrustedAction`, does it alone, does it and tells, or asks
-  first; what is never set is today's behaviour (alone). A `Shift`: day, night or
-  around the clock.
+  first; what is never set is today's behaviour (alone). The journal and proposals
+  honour it: "asks first" leaves the line or proposal for the person (front matter
+  `ask_first: true`, never accepted by Shiori), "tells" adds a line to the feed.
+  `TrustSettings.ActsAlone` is the one rule desks and routines share; a routine's
+  "ask first" switch reads as `Routine.Trust` (asks first, or tells: a routine has no
+  silent level, every action it takes alone is written in its run, so the switch
+  stays a yes/no in storage and in the API). A `Shift`: day, night or around the clock.
 
 ## Role
 

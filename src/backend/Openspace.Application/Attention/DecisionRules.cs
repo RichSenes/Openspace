@@ -19,6 +19,15 @@ public static class DecisionRules
 
     public const string Reviewed = "reviewed";
 
+    /// <summary>
+    /// Set by a desk whose trust says it asks first (for its journal or its proposals): Shiori
+    /// leaves the note for the person, who accepts or turns it down from the inbox.
+    /// </summary>
+    public const string AskFirst = "ask_first";
+
+    /// <summary>The kind of a journal line that waits for the person before it goes in.</summary>
+    public const string JournalKind = "journal";
+
     /// <summary>How long a kept decision waits before it comes back.</summary>
     public const int KeepMonths = 3;
 
@@ -36,6 +45,14 @@ public static class DecisionRules
         if (string.Equals(proposal.Kind, "rule", StringComparison.OrdinalIgnoreCase))
         {
             return "A rule of the constitution: only you change those.";
+        }
+
+        if (AsksFirst(proposal))
+        {
+            var who = string.IsNullOrWhiteSpace(proposal.Author) ? "Its desk" : proposal.Author.Trim();
+            return string.Equals(proposal.Kind, JournalKind, StringComparison.OrdinalIgnoreCase)
+                ? $"{who} asks you first before writing in its journal, as its trust says."
+                : $"{who} asks you first, as its trust says: Shiori leaves its proposals to you.";
         }
 
         // An agent proposing for every office speaks for offices it never worked in.
@@ -61,6 +78,10 @@ public static class DecisionRules
     /// <summary>Written by a desk while it worked on a task: brain_propose signs its notes "from: task …".</summary>
     public static bool FromAgent(Note note) =>
         note?.From?.Trim().StartsWith("task ", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>Written by a desk that asks the person first: Shiori never accepts it.</summary>
+    public static bool AsksFirst(Note note) =>
+        note is not null && string.Equals(Field(note, AskFirst), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether the note is an accepted decision, the kind proposals are weighed against.</summary>
     public static bool IsAcceptedDecision(Note note) =>

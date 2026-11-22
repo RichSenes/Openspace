@@ -49,6 +49,13 @@ public sealed class Routine : AggregateRoot<RoutineId>
     /// </summary>
     public bool AskFirst { get; private set; }
 
+    /// <summary>
+    /// The switch as a trust level, the same concept desks have: "ask first" asks, "automatic"
+    /// does what can be undone and tells (a line in the run). Routines have no silent level: what
+    /// a routine does on its own is always written in its run.
+    /// </summary>
+    public TrustLevel Trust => AskFirst ? TrustLevel.AsksFirst : TrustLevel.Tells;
+
     public DateTimeOffset CreatedAt { get; }
 
     public DateTimeOffset? LastRunAt { get; private set; }

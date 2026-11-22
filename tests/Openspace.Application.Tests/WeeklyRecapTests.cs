@@ -130,6 +130,21 @@ public sealed class WeeklyRecapTests
     }
 
     [Fact]
+    public async Task The_weeks_chronicle_closes_the_digest_as_office_life()
+    {
+        var routine = Create();
+        SundayEvening();
+        _vault.Put("Chronicle/2015-06-26.md", "# Chronicle\n\n## E Corp\n\n- Screens and Frontend shared the header.\n- Another line.\n");
+        _vault.Put("Chronicle/2015-06-28.md", "# Chronicle\n\n## E Corp\n\n- Today is not in the past week yet.\n");
+
+        await RunAsync(routine);
+
+        var (_, text, _) = Assert.Single(_h.Outbox.Sent);
+        Assert.EndsWith("\n\nOffice life\nE Corp\n• Screens and Frontend shared the header.", text, StringComparison.Ordinal);
+        Assert.Contains("Office life", (await _vault.ReadAsync("Digests/2015-W26.md", default))!.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task In_the_morning_it_starts_from_today()
     {
         var routine = Create();

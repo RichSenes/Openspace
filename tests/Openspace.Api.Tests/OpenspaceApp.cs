@@ -80,6 +80,7 @@ public sealed class OpenspaceApp(
             ["Skills:PluginsFolder"] = Path.Combine(Path.GetTempPath(), $"openspace-no-plugins-{Guid.NewGuid():N}"),
             ["SecurityAudits:Folder"] = AuditsFolder,
             ["Queue:Enabled"] = "false",
+            ["Chronicle:Enabled"] = "false",
 
             // Never the person's own Claude Code sessions: no guests are looked for.
             ["Guests:Enabled"] = "false",

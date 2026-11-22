@@ -45,6 +45,9 @@ public static class DependencyInjection
         services.AddHostedService<BrainService>();
         services.AddHostedService<AcceptorService>();
 
+        // Yesterday's chronicle, written once a day.
+        services.AddHostedService<ChronicleService>();
+
         // Shiori's sessions: kept in the database, so their engine conversations resume after a restart.
         services.AddSingleton<Application.Shiori.IShioriSessionStore, Shiori.ShioriSessionStore>();
 

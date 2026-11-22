@@ -55,6 +55,62 @@ public sealed class Chronicle(
         return note is not null ? Read(day, note) : await WriteAsync(day, language, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The daily write: yesterday's lines, once, as soon as the hour of <see cref="ChronicleOptions.At"/>
+    /// has come. A day already in the vault (written by the morning paper, by hand) is left alone.
+    /// </summary>
+    /// <returns>The day written now, or null when there was nothing to do.</returns>
+    public async Task<ChronicleDay?> KeepYesterdayAsync(ChronicleOptions options, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var local = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+        if (!options.Enabled || TimeOnly.FromDateTime(local.DateTime) < options.At)
+        {
+            return null;
+        }
+
+        var yesterday = DateOnly.FromDateTime(local.DateTime).AddDays(-1);
+        if (await vault.ReadAsync(PathOf(yesterday), cancellationToken).ConfigureAwait(false) is not null)
+        {
+            return null;
+        }
+
+        return await WriteAsync(yesterday, options.Language, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The week's office life for the weekly digest: the lines kept in the vault for the
+    /// <paramref name="days"/> days up to <paramref name="last"/>, by office, at most
+    /// <see cref="MostLines"/> each, oldest first. Reads only: a day never written is left out.
+    /// </summary>
+    public static async Task<IReadOnlyList<ChronicleSection>> RoundupAsync(IVault vault, DateOnly last, int days, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+        var byOffice = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var order = new List<string>();
+        for (var day = last.AddDays(1 - days); day <= last; day = day.AddDays(1))
+        {
+            if (await vault.ReadAsync(PathOf(day), cancellationToken).ConfigureAwait(false) is not { } note)
+            {
+                continue;
+            }
+
+            foreach (var section in Read(day, note).Sections.Where(s => s.Lines.Count > 0))
+            {
+                if (!byOffice.TryGetValue(section.Office, out var lines))
+                {
+                    byOffice[section.Office] = lines = [];
+                    order.Add(section.Office);
+                }
+
+                // A line a day, so a busy day does not fill the whole week.
+                lines.Add(section.Lines[0]);
+            }
+        }
+
+        return [.. order.Select(o => new ChronicleSection(o, [.. byOffice[o].TakeLast(MostLines)]))];
+    }
+
     /// <summary>Writes the day's lines into the vault, replacing what was there.</summary>
     public async Task<ChronicleDay> WriteAsync(DateOnly day, string language, CancellationToken cancellationToken)
     {
@@ -212,4 +268,18 @@ public sealed class Chronicle(
     }
 
     private sealed record LinesAnswer(IReadOnlyList<string>? Lines);
+}
+
+/// <summary>When the chronicle of the day before is written on its own, and in which language.</summary>
+public sealed class ChronicleOptions
+{
+    public const string SectionName = "Chronicle";
+
+    /// <summary>Off, the chronicle is written only when the paper or the page asks for it.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>The local hour from which yesterday's lines are written: the day is over, the night is quiet.</summary>
+    public TimeOnly At { get; set; } = new(1, 0);
+
+    public string Language { get; set; } = "English";
 }

@@ -222,7 +222,8 @@ More of what it does, in short:
   lines and proposals to **needs you**; one that tells leaves a line in the feed), seniority in its room (the room's expert
   leads its briefing notes), a mood and relationships computed from real events. The
   **Characters** view shows them all with their history; agents never see the numbers.
-  A daily chronicle of office life goes to `Chronicle/` and into the morning paper.
+  A daily chronicle of office life is written every night to `Chronicle/`, printed in
+  the morning paper and rounded up in the weekly digest.
 
 ## Repository layout
 

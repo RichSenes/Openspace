@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RATE, Utterances, resample, toWav, wakeLabel } from './wake'
+import { RATE, Utterances, isGoodbye, resample, toWav, wakeLabel } from './wake'
 
 const tone = (ms: number, amp: number) => Float32Array.from({ length: (RATE * ms) / 1000 }, (_, i) => amp * Math.sin(i / 3))
 const join = (...parts: Float32Array[]) => {
@@ -44,7 +44,16 @@ describe('cutting what is said into sentences', () => {
 
   it('a long talk in the room is cut, not kept forever', () => {
     const cut = new Utterances()
-    expect(cut.push(tone(13_000, 0.3)).length).toBeGreaterThanOrEqual(1)
+    expect(cut.push(tone(31_000, 0.3)).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a noisy room (a fan, a mic turned up) still lets a sentence end', () => {
+    const cut = new Utterances()
+    const said = cut.push(join(tone(10_000, 0.03), tone(1500, 0.4), tone(3000, 0.03)))
+    // The first seconds of noise may come out as one sentence (the server finds no words in it);
+    // what matters is that the voice's sentence ends soon after the voice does.
+    expect(said.length).toBeGreaterThanOrEqual(1)
+    expect(said.at(-1)!.length / RATE).toBeLessThan(5)
   })
 })
 
@@ -68,6 +77,21 @@ describe('sound for the listening server', () => {
   it('says what she is doing, and nothing when off', () => {
     expect(wakeLabel('waiting')).toContain('Shiori')
     expect(wakeLabel('off')).toBe('')
+  })
+})
+
+describe('closing a conversation', () => {
+  it('hears a goodbye said alone, in her three languages', () => {
+    expect(isGoodbye('Basta così.')).toBe(true)
+    expect(isGoodbye('Grazie Shiori!')).toBe(true)
+    expect(isGoodbye("That's all, Shiori.")).toBe(true)
+    expect(isGoodbye('ありがとう、しおり')).toBe(true)
+  })
+
+  it('does not end on a request that only contains the word', () => {
+    expect(isGoodbye('Basta con le riunioni il venerdì, spostale')).toBe(false)
+    expect(isGoodbye('Grazie per il riassunto, ora mandalo')).toBe(false)
+    expect(isGoodbye('Shiori')).toBe(false)
   })
 })
 

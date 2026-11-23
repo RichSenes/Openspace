@@ -336,8 +336,24 @@
   text-align: center;
 }
 
-.sp-ears.is-recording {
+.sp-ears.is-recording,
+.sp-ears.is-talking {
   color: var(--mode);
+}
+
+.sp-ears-end {
+  margin-left: 10px;
+  padding: 2px 8px;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--mode) 60%, transparent);
+  cursor: pointer;
+}
+
+.sp-ears-end:hover,
+.sp-ears-end:focus-visible {
+  background: color-mix(in srgb, var(--mode) 18%, transparent);
 }
 
 .sp-ears.is-denied,

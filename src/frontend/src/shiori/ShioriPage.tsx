@@ -1,4 +1,4 @@
-import { CircleStop, History, MessagesSquare, Mic, Palette, Send, StickyNote, X } from 'lucide-react'
+import { CircleStop, Ear, History, MessagesSquare, Mic, Palette, Send, StickyNote, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   useCreateShioriSession,
@@ -28,7 +28,9 @@ import { loadLook, saveLook, type Look } from './look'
 import { LookPanel } from './LookPanel'
 import { adviceFor, apiMode, faceFor, liveSubtitles, modeOf, pickSession, stageLayout, titleFrom } from './talk'
 import { useEars } from './useEars'
-import { afterHearing, earsLabel, isTalkKey } from './voice'
+import { useWake } from './useWake'
+import { loadByName, saveByName, wakeLabel } from './wake'
+import { afterHearing, earsLabel, isTalkKey, type Heard } from './voice'
 import { Words } from './Words'
 import '../lab/presence/presence.css'
 import './shiori-page.css'
@@ -112,22 +114,29 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   useEffect(() => {
     textRef.current = text
   })
-  const voice = useEars(
-    (heard) => {
-      const next = afterHearing(heard, textRef.current)
-      setText(next.compose)
-      if (next.send) void submitRef.current(next.send)
-    },
-    (message) => setProblem(message),
-  )
+  const onHeard = (heard: Heard) => {
+    const next = afterHearing(heard, textRef.current)
+    setText(next.compose)
+    if (next.send) void submitRef.current(next.send)
+  }
+  const voice = useEars(onHeard, (message) => setProblem(message))
   const ended = !!view?.endedAt
+  // Or call her by name: the microphone stays open and only "Shiori…" is listened to.
+  const [byName, setByName] = useState(loadByName)
+  const wake = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking', onHeard, (message) => setProblem(message))
+  // Holding the mic says what the mic does; otherwise always listening tells its state.
+  const byNameShown = wake !== 'off' && voice.ears === 'idle'
+  const toggleByName = () => {
+    setByName(!byName)
+    saveByName(!byName)
+  }
   const answering = !!view?.answering
   const sending = send.isPending || create.isPending
   const busy = answering || sending
   const mode = view?.mode ?? nextMode
   const info = MODES[modeOf(mode)]
   const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error)
-  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording', sending: sending || voice.ears === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
+  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'called', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
   // A failure with its advice needs the room of a long answer, not its card.
   const { focus, subsTop } = stageLayout(size.w, size.h, size.top, size.dock, subs.long || !!subs.failed)
@@ -429,6 +438,16 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
             >
               <Mic size={18} />
             </button>
+            <button
+              type="button"
+              className={`pr-mic${byName ? ' is-on' : ''}`}
+              aria-pressed={byName}
+              aria-label="Listen for her name"
+              title={byName ? 'Listening for “Shiori…”: click to stop' : 'Listen for her name: say “Shiori…” instead of holding the mic'}
+              onClick={toggleByName}
+            >
+              <Ear size={18} />
+            </button>
             <textarea
               ref={field}
               className="pr-field sp-field"
@@ -452,8 +471,8 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
           </form>
         )}
         {!ended && (
-          <p className={`sp-ears is-${voice.ears}`} aria-live="polite">
-            {earsLabel(voice.ears, voice.ms)}
+          <p className={`sp-ears is-${byNameShown ? wake : voice.ears}`} aria-live="polite">
+            {byNameShown ? wakeLabel(wake) : earsLabel(voice.ears, voice.ms)}
           </p>
         )}
       </footer>

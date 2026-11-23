@@ -69,6 +69,11 @@ recording to the local listening server (`tools/voice/listen-server.py`, faster-
 the text back. Nothing said leaves the machine. Pure logic in `shiori/voice.ts`, the recorder in
 `shiori/useEars.ts`.
 
+Or turn on the ear beside the mic and call her by name: "Shiori, che tempo fa domani?", or just
+"Shiori" and then the request. The microphone stays open, the page cuts what it hears into
+sentences on its own (`shiori/wake.ts`, an AudioWorklet in `shiori/useWake.ts`) and the listening
+server keeps only those that start with her name. The choice is remembered in this browser.
+
 ## Views
 
 **Building.** The office drawn in pixel art, in its theme, with a mood per room.

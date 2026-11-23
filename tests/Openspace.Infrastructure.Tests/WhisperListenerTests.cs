@@ -35,7 +35,7 @@ public sealed class WhisperListenerTests
     public async Task It_sends_the_recording_and_returns_the_words_and_their_language()
     {
         var server = new Server(HttpStatusCode.OK, """{"text":"  Ciao Shiori, com'è andata la notte?  ","language":"it","seconds":1.2}""");
-        var heard = await Listener(server).HearAsync(new MemoryStream([1, 2, 3]), null, CancellationToken.None);
+        var heard = await Listener(server).HearAsync(new MemoryStream([1, 2, 3]), null, false, CancellationToken.None);
 
         Assert.Equal("Ciao Shiori, com'è andata la notte?", heard.Text);
         Assert.Equal("it", heard.Language);
@@ -49,14 +49,25 @@ public sealed class WhisperListenerTests
     public async Task A_chosen_language_is_passed_on()
     {
         var server = new Server(HttpStatusCode.OK, """{"text":"こんにちは","language":"ja","seconds":0.8}""");
-        await Listener(server).HearAsync(new MemoryStream([1]), "ja", CancellationToken.None);
+        await Listener(server).HearAsync(new MemoryStream([1]), "ja", false, CancellationToken.None);
         Assert.Equal("?language=ja", server.Asked!.Query);
+    }
+
+    [Fact]
+    public async Task Listening_for_her_name_asks_for_it_and_says_whether_she_was_called()
+    {
+        var server = new Server(HttpStatusCode.OK, """{"text":"che ore sono?","language":"it","seconds":0.6,"called":true}""");
+        var heard = await Listener(server).HearAsync(new MemoryStream([1]), "it", true, CancellationToken.None);
+
+        Assert.Equal("?language=it&wake=1", server.Asked!.Query);
+        Assert.True(heard.Called);
+        Assert.Equal("che ore sono?", heard.Text);
     }
 
     [Fact]
     public async Task A_server_that_is_not_running_says_how_to_start_it()
     {
-        var e = await Assert.ThrowsAsync<ListenerException>(() => Listener(new Down()).HearAsync(new MemoryStream([1]), null, CancellationToken.None));
+        var e = await Assert.ThrowsAsync<ListenerException>(() => Listener(new Down()).HearAsync(new MemoryStream([1]), null, false, CancellationToken.None));
         Assert.Contains("listen-server.py", e.Message);
         var status = await Listener(new Down()).StatusAsync(CancellationToken.None);
         Assert.False(status.Ready);
@@ -67,7 +78,7 @@ public sealed class WhisperListenerTests
     public async Task Audio_it_cannot_read_comes_back_as_its_reason()
     {
         var server = new Server(HttpStatusCode.BadRequest, """{"error":"the audio could not be read"}""");
-        var e = await Assert.ThrowsAsync<ListenerException>(() => Listener(server).HearAsync(new MemoryStream([1]), null, CancellationToken.None));
+        var e = await Assert.ThrowsAsync<ListenerException>(() => Listener(server).HearAsync(new MemoryStream([1]), null, false, CancellationToken.None));
         Assert.Equal("the audio could not be read", e.Message);
     }
 

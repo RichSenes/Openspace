@@ -12,14 +12,16 @@ public sealed class VoiceApiTests : IDisposable
     {
         public string? Language { get; private set; }
         public int Bytes { get; private set; }
+        public bool Wake { get; private set; }
 
-        public async Task<Heard> HearAsync(Stream audio, string? language, CancellationToken cancellationToken)
+        public async Task<Heard> HearAsync(Stream audio, string? language, bool wake, CancellationToken cancellationToken)
         {
             using var copy = new MemoryStream();
             await audio.CopyToAsync(copy, cancellationToken);
             Bytes = (int)copy.Length;
             Language = language;
-            return new Heard("Shiori, cosa c'è in coda oggi?", "it", 0.9);
+            Wake = wake;
+            return new Heard(wake ? "cosa c'è in coda oggi?" : "Shiori, cosa c'è in coda oggi?", "it", 0.9, wake);
         }
 
         public Task<ListenerStatus> StatusAsync(CancellationToken cancellationToken) => Task.FromResult(new ListenerStatus(true, "medium", "cpu", null));
@@ -42,6 +44,17 @@ public sealed class VoiceApiTests : IDisposable
         Assert.Equal("Shiori, cosa c'è in coda oggi?", heard!.Text);
         Assert.Equal(1234, _ears.Bytes);
         Assert.Null(_ears.Language);
+    }
+
+    [Fact]
+    public async Task Always_listening_only_keeps_what_follows_her_name()
+    {
+        using var body = new ByteArrayContent(new byte[64]);
+        var heard = await (await Client().PostAsync("/api/voice/hear?wake=true", body)).Content.ReadFromJsonAsync<Heard>();
+
+        Assert.True(_ears.Wake);
+        Assert.True(heard!.Called);
+        Assert.Equal("cosa c'è in coda oggi?", heard.Text);
     }
 
     [Fact]

@@ -157,6 +157,20 @@ public class ShioriSessionsTests
     }
 
     [Fact]
+    public async Task A_message_said_aloud_asks_for_a_short_spoken_answer()
+    {
+        var (sessions, session) = await OpenAsync();
+
+        await sessions.SendAsync(session.Id, "Che c'è oggi?", spoken: true, default);
+        await sessions.Completion(session.Id);
+        await SayAsync(sessions, session.Id, "And in writing?");
+
+        Assert.Equal("[Mode: brainstorm] [Said aloud] Che c'è oggi?", _s.Runtime.Turns[0].Text);
+        Assert.Equal("[Mode: brainstorm] And in writing?", _s.Runtime.Turns[1].Text);
+        Assert.Contains("one to three short sentences", _s.Runtime.Turns[0].Instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Shiori_is_told_who_it_is_the_constitution_the_offices_and_how_to_cite()
     {
         _s.H.Vault.Put("Constitution.md", "# Constitution\n\n1. Read before acting.\n2. Every change comes with a test.\n");

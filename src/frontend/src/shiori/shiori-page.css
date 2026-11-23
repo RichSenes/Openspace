@@ -360,3 +360,21 @@
 .sp-ears.is-unavailable {
   color: #f7a072;
 }
+
+.sp-skip {
+  display: block;
+  margin: 8px auto 0;
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--mode) 55%, transparent);
+  cursor: pointer;
+}
+
+.sp-skip:hover,
+.sp-skip:focus-visible {
+  background: color-mix(in srgb, var(--mode) 18%, transparent);
+}

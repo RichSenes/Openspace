@@ -38,6 +38,9 @@ public sealed partial class ShioriSessions(
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
     private readonly ConcurrentDictionary<Guid, Task> _answering = new();
 
+    // Whether the last message of a session was said aloud: its answer is then a spoken one.
+    private readonly ConcurrentDictionary<Guid, bool> _spoken = new();
+
     public void Dispose()
     {
         foreach (var gate in _locks.Values)
@@ -87,7 +90,11 @@ public sealed partial class ShioriSessions(
         View(await FindAsync(id, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Records the person's message and starts the answer; returns the message as recorded.</summary>
-    public async Task<TranscriptEntry> SendAsync(Guid id, string text, CancellationToken cancellationToken)
+    public Task<TranscriptEntry> SendAsync(Guid id, string text, CancellationToken cancellationToken) =>
+        SendAsync(id, text, spoken: false, cancellationToken);
+
+    /// <summary>As <see cref="SendAsync(Guid, string, CancellationToken)"/>; a <paramref name="spoken"/> message gets a short, spoken answer.</summary>
+    public async Task<TranscriptEntry> SendAsync(Guid id, string text, bool spoken, CancellationToken cancellationToken)
     {
         var message = text?.Trim();
         if (string.IsNullOrEmpty(message))
@@ -110,6 +117,7 @@ public sealed partial class ShioriSessions(
             }
 
             entry = new TranscriptEntry(TranscriptRole.Person, message, s.Mode, clock.GetUtcNow());
+            _spoken[s.Id] = spoken;
             s.Transcript.Add(entry);
 
             // Marked before the lock opens, so a second message sent at once is refused.
@@ -350,7 +358,7 @@ public sealed partial class ShioriSessions(
         var person = session.Transcript.Last(e => e.Role == TranscriptRole.Person);
         return new ShioriTurn(
             session.Id, session.RuntimeSessionId, session.RuntimeStarted, session.Mode, model.Engine, model.Model,
-            ShioriPrompt.Instructions(session.Mode, constitution, offices), ShioriPrompt.Message(session.Mode, person.Text),
+            ShioriPrompt.Instructions(session.Mode, constitution, offices), ShioriPrompt.Message(session.Mode, person.Text, _spoken.GetValueOrDefault(session.Id)),
             session.Token, ShioriTools.For(session.Mode));
     }
 

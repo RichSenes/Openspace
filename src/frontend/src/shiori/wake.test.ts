@@ -81,17 +81,36 @@ describe('sound for the listening server', () => {
 })
 
 describe('closing a conversation', () => {
-  it('hears a goodbye said alone, in her three languages', () => {
-    expect(isGoodbye('Basta così.')).toBe(true)
-    expect(isGoodbye('Grazie Shiori!')).toBe(true)
-    expect(isGoodbye("That's all, Shiori.")).toBe(true)
-    expect(isGoodbye('ありがとう、しおり')).toBe(true)
+  it('closes on a goodbye with polite words around it', () => {
+    for (const said of [
+      'Basta così.',
+      'Basta così, grazie.',
+      'No grazie, per ora va bene così.',
+      'Apposto così, grazie Shiori!',
+      'A posto così.',
+      'Ok, ho finito.',
+      'Per ora è tutto, grazie mille.',
+      "That's all for now, thanks.",
+      'Otsukare!',
+      '以上です。',
+      'しおり、お疲れ様でした',
+      'ありがとう、またね',
+    ])
+      expect(isGoodbye(said), said).toBe(true)
   })
 
-  it('does not end on a request that only contains the word', () => {
-    expect(isGoodbye('Basta con le riunioni il venerdì, spostale')).toBe(false)
-    expect(isGoodbye('Grazie per il riassunto, ora mandalo')).toBe(false)
-    expect(isGoodbye('Shiori')).toBe(false)
+  it('does not close on a request that only contains the words', () => {
+    for (const said of [
+      'Basta con le riunioni il venerdì, spostale',
+      'È tutto pronto per domani?',
+      'Va bene così la lista, mandala a Marco',
+      'Grazie per il riassunto, ora mandalo',
+      'Grazie.',
+      'Shiori',
+      'ありがとう',
+      '以上の三つをまとめて',
+    ])
+      expect(isGoodbye(said), said).toBe(false)
   })
 })
 

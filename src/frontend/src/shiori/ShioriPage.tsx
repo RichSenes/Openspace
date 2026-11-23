@@ -26,7 +26,8 @@ import { BoardDrawer, ConversationDrawer, SessionsDrawer } from './Drawers'
 import { useLive } from './liveStore'
 import { loadLook, saveLook, type Look } from './look'
 import { LookPanel } from './LookPanel'
-import { adviceFor, apiMode, faceFor, liveSubtitles, modeOf, pickSession, stageLayout, titleFrom } from './talk'
+import { adviceFor, answerText, apiMode, faceFor, liveSubtitles, modeOf, pickSession, stageLayout, titleFrom } from './talk'
+import { useReveal } from './reveal'
 import { useEars } from './useEars'
 import { useWake } from './useWake'
 import { loadByName, saveByName, wakeLabel } from './wake'
@@ -142,8 +143,10 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const busy = answering || sending
   const mode = view?.mode ?? nextMode
   const info = MODES[modeOf(mode)]
-  const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error)
-  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'talking', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
+  const latest = answerText(view?.transcript ?? [], live.draft, answering)
+  const reveal = useReveal(latest.turn, latest.text.length)
+  const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error, reveal.shown)
+  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'talking', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: (answering && live.draft.length > 0) || reveal.behind, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
   // A failure with its advice needs the room of a long answer, not its card.
   const { focus, subsTop } = stageLayout(size.w, size.h, size.top, size.dock, subs.long || !!subs.failed)
@@ -155,7 +158,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   useEffect(() => {
     const el = subsRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [live.draft, view?.transcript.length])
+  }, [reveal.shown, view?.transcript.length])
 
   // Another session, another ending to tell.
   const [shownId, setShownId] = useState(id)
@@ -166,6 +169,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     setProblem(null)
   }
 
+  // Words said (not typed) get a short, spoken answer.
   const submit = async (said?: string) => {
     const message = (said ?? text).trim()
     if (!message || busy || ended) return
@@ -179,7 +183,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         setWanted(created.id)
       }
       if (said === undefined) setText('')
-      await send.mutateAsync({ sessionId: target, text: message })
+      await send.mutateAsync({ sessionId: target, text: message, spoken: said !== undefined })
       void session.refetch()
     } catch (e) {
       setText(message)
@@ -352,6 +356,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
               <p className="pr-answer">
                 <Words tokens={subs.answer.tokens} streaming={subs.answer.streaming} />
               </p>
+            )}
+            {subs.answer && reveal.behind && (
+              <button type="button" className="sp-skip" onClick={reveal.skip}>
+                Show it all
+              </button>
             )}
             {subs.failed && (
               <div className="sp-failed" role="alert">

@@ -11,7 +11,8 @@ internal static class ShioriEndpoints
 {
     public sealed record SessionRequest(string? Title, ShioriMode Mode = ShioriMode.Brainstorm);
 
-    public sealed record MessageRequest(string Text);
+    /// <summary>A message; <c>Spoken</c> when it was said aloud, for a short spoken answer.</summary>
+    public sealed record MessageRequest(string Text, bool Spoken = false);
 
     public sealed record ModeRequest(ShioriMode Mode);
 
@@ -30,7 +31,7 @@ internal static class ShioriEndpoints
         sessions.MapGet("/{id:guid}", (Guid id, ShioriSessions shiori, CancellationToken ct) => shiori.GetAsync(id, ct));
 
         sessions.MapPost("/{id:guid}/messages", async (Guid id, MessageRequest request, ShioriSessions shiori, CancellationToken ct) =>
-            Results.Accepted($"/api/shiori/sessions/{id}", await shiori.SendAsync(id, request.Text, ct)));
+            Results.Accepted($"/api/shiori/sessions/{id}", await shiori.SendAsync(id, request.Text, request.Spoken, ct)));
 
         sessions.MapPut("/{id:guid}/mode", (Guid id, ModeRequest request, ShioriSessions shiori, CancellationToken ct) =>
             shiori.SetModeAsync(id, request.Mode, ct));

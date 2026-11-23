@@ -45,9 +45,14 @@ focused) and talk; let go and what you said is sent as your message. If somethin
 typed, the spoken words are added to it instead, for you to send. **Esc** while holding drops it.
 
 Or turn on the **ear** beside the mic and call her: "Shiori" (or "Shiori, cosa c'è oggi?")
-opens a conversation, with a soft rising chime. From then on every sentence is a message, without
-her name, until a goodbye said alone ("basta così", "grazie Shiori", "that's all", "ありがとう"),
-a minute of quiet, or **Stop talking**; a falling chime says she stopped listening. Her name
+opens a conversation, with a soft rising chime. From then on you just talk, without her name: what
+you say goes to her as one message once you have been quiet for about two seconds, so a pause to
+think does not cut you off. Her answers to spoken messages are short and spoken, and appear at
+reading pace (**Show it all** skips ahead). A goodbye closes the conversation, with a falling
+chime: "basta così, grazie", "no grazie, per ora va bene così", "apposto così", "ho finito",
+"that's all", "以上です", "お疲れ様" — alone, or as the last sentence of what you said; a request
+that only contains the words ("è tutto pronto?") does not. So do a minute of quiet and **Stop
+talking**. Her name
 is matched by `wake.py` (also "hey Shiori", "ねえ、しおり"); only Italian, English and Japanese
 are considered, so a short sentence is not taken for another language.
 

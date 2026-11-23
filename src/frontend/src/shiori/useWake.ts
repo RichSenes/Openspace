@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Heard } from './voice'
-import { QUIET_MS, Utterances, isGoodbye, resample, toWav, type Wake } from './wake'
+import { QUIET_MS, TURN_MS, Utterances, isGoodbye, resample, toWav, type Wake } from './wake'
 
 // Hands the raw microphone to the page in pieces; nothing is played back.
 const TAP = `class Tap extends AudioWorkletProcessor {
@@ -75,6 +75,10 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
     let nodes: AudioNode[] = []
     let talking = false
     let quietTimer = 0
+    let turnTimer = 0
+    // The sentences of the turn being said, sent together once the person stops.
+    let turn: string[] = []
+    let language = ''
     let busy = false
     const queue: Float32Array[] = []
     const cut = new Utterances()
@@ -93,10 +97,28 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
     const close = () => {
       if (talking && ctx) chime(ctx, false)
       talking = false
+      turn = []
+      clearTimeout(turnTimer)
       clearTimeout(quietTimer)
       if (!stopped) settle()
     }
     closer.current = close
+
+    const endOfTurn = () => {
+      clearTimeout(turnTimer)
+      turnTimer = window.setTimeout(() => {
+        // Still talking, or a sentence still being heard: the turn is not over.
+        if (cut.speaking || busy || queue.length) return endOfTurn()
+        // A goodbye said as its own last sentence closes too, after what came before it.
+        const last = turn.length > 1 && isGoodbye(turn[turn.length - 1])
+        const said = (last ? turn.slice(0, -1) : turn).join(' ').trim()
+        turn = []
+        if (!said || stopped) return
+        if (isGoodbye(said)) return close()
+        live.current.onRequest({ text: said, language, seconds: 0 })
+        if (last) close()
+      }, TURN_MS)
+    }
 
     const hear = async (sentence: Float32Array) => {
       const inConversation = talking
@@ -106,14 +128,13 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
       }
       const heard = await ask(toWav(sentence), !inConversation)
       if (stopped) return
-      if (!inConversation) {
-        if (!heard.called) return
-        open()
-        if (heard.text.trim()) live.current.onRequest(heard)
-        return
+      if (!inConversation && !heard.called) return
+      if (!inConversation) open()
+      if (heard.text.trim()) {
+        turn.push(heard.text.trim())
+        language = heard.language
+        endOfTurn()
       }
-      if (isGoodbye(heard.text)) close()
-      else if (heard.text.trim()) live.current.onRequest(heard)
     }
 
     // One sentence at a time, in the order they were said.
@@ -183,6 +204,7 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
       stopped = true
       closer.current = () => {}
       clearTimeout(quietTimer)
+      clearTimeout(turnTimer)
       stream?.getTracks().forEach((t) => t.stop())
       nodes.forEach((n) => n.disconnect())
       nodes = []

@@ -1182,8 +1182,8 @@ export function useCreateShioriSession() {
 
 export function useSendShioriMessage() {
   return useMutation({
-    mutationFn: (input: { sessionId: string; text: string }) =>
-      request<TranscriptEntry>('POST', `/api/shiori/sessions/${input.sessionId}/messages`, { text: input.text }),
+    mutationFn: (input: { sessionId: string; text: string; spoken?: boolean }) =>
+      request<TranscriptEntry>('POST', `/api/shiori/sessions/${input.sessionId}/messages`, { text: input.text, spoken: input.spoken ?? false }),
   })
 }
 

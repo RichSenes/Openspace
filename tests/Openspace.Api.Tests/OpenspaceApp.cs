@@ -60,7 +60,7 @@ public sealed class OpenspaceApp(
             // Tests must never reach a real OpenCode: port 9 (discard) refuses at once.
             ["OpenCode:BaseUrl"] = "http://127.0.0.1:9",
             // Never the person's listening server.
-            ["Voice:ListenUrl"] = "http://127.0.0.1:9",
+            ["Voice:ListenUrl"] = "http://127.0.0.1:9", ["Voice:SpeakUrl"] = "http://127.0.0.1:9",
             ["OpenCode:ListenToEvents"] = "false",
 
             // Never the Claude Code of the machine running the tests: it would use a real account.

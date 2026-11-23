@@ -143,7 +143,7 @@ everything:
 
 ```bash
 scripts/openspace status           # what is running
-scripts/openspace logs api         # follow a log (api, web, opencode or ears)
+scripts/openspace logs api         # follow a log (api, web, opencode, ears or voice)
 scripts/openspace restart api      # after changing the code: rebuild and restart the API
 scripts/openspace stop
 scripts/openspace restore FILE     # put a database backup back
@@ -151,7 +151,8 @@ scripts/openspace kanji-data       # once, only for the morning paper's kanji of
 ```
 
 To talk to Shiori by voice, install faster-whisper once (`tools/voice/README.md`):
-`scripts/openspace start` then starts her ears too, and skips them when it is missing.
+`scripts/openspace start` then starts her ears too, and skips them when it is missing. Her own
+voice (Qwen3-TTS or Kokoro) is started the same way once a voice model is configured.
 Variables can be kept in `~/.config/openspace/openspace.env`, one `KEY=value` a line.
 
 Logs and process ids live in `~/.local/state/openspace`. Ports change with
@@ -249,7 +250,7 @@ src/backend/
   Openspace.Api/             ASP.NET Core host: HTTP, SignalR, MCP tools for agents
 src/frontend/                React + PixiJS: the building and the panels
 tests/                       Architecture, domain, application, infrastructure and API tests
-tools/                       Helper scripts (pixelgrid.py: pictures to sprites; voice/: Shiori's ears)
+tools/                       Helper scripts (pixelgrid.py: pictures to sprites; voice/: Shiori's ears and voice)
 ```
 
 Each project has its own README:

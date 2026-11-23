@@ -57,6 +57,41 @@ public sealed class VoiceApiTests : IDisposable
         Assert.Equal("cosa c'è in coda oggi?", heard.Text);
     }
 
+    private sealed class Voice : ISpeaker
+    {
+        public string? Language { get; private set; }
+
+        public Task<byte[]> SpeakAsync(string text, string language, CancellationToken cancellationToken)
+        {
+            Language = language;
+            return Task.FromResult<byte[]>([82, 73, 70, 70]);
+        }
+
+        public Task<SpeakerStatus> StatusAsync(CancellationToken cancellationToken) => Task.FromResult(new SpeakerStatus(true, "qwen", "shiori", null));
+    }
+
+    [Fact]
+    public async Task Her_words_come_back_as_her_voice_in_one_of_her_languages()
+    {
+        var voice = new Voice();
+        var client = _app.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<ISpeaker>(voice))).CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/voice/speak", new { text = "Ciao!", language = "xx" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("audio/wav", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal([82, 73, 70, 70], await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("it", voice.Language);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/voice/speak", new { text = " " })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Without_her_voice_running_the_page_is_told_how_to_start_it()
+    {
+        var response = await _app.CreateClient().PostAsJsonAsync("/api/voice/speak", new { text = "Ciao", language = "it" });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
     [Fact]
     public async Task An_empty_recording_is_refused()
     {

@@ -73,7 +73,10 @@ Or turn on the ear beside the mic and call her by name: "Shiori" opens a convers
 chime); what you say then goes to her as one message after about two seconds of quiet, until a
 goodbye ("basta così, grazie", "以上です"), a minute of quiet or Stop talking (a falling chime).
 Spoken messages are sent marked as such, for a short spoken answer, and every answer appears at
-reading pace with Show it all to skip (`shiori/reveal.ts`). The microphone stays open, the page cuts what
+reading pace with Show it all to skip (`shiori/reveal.ts`). Answers to spoken messages are also said aloud, a sentence at
+a time as she writes (`shiori/speech.ts`, `shiori/useVoice.ts`), by the local speech server
+through `/api/voice/speak`; she stops listening while she speaks, and holding the mic, Esc or
+Quiet stops her. The microphone stays open, the page cuts what
 it hears into sentences on its own (`shiori/wake.ts`, an AudioWorklet in `shiori/useWake.ts`) and,
 before her name, the listening server keeps only a sentence that starts with it. Words said while
 she is answering are sent together once she is done. The choice is remembered in this browser.

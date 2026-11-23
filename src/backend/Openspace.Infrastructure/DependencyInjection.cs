@@ -99,6 +99,7 @@ public static class DependencyInjection
 
         // Shiori's ears: speech to text on this machine.
         services.AddHttpClient<Application.Voice.IListener, Voice.WhisperListener>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(2));
+        services.AddHttpClient<Application.Voice.ISpeaker, Voice.LocalSpeaker>().ConfigureHttpClient(http => http.Timeout = TimeSpan.FromMinutes(2));
 
         // The graphics card: local models load when desks need them and give way to the programs listed first.
         services.AddHttpClient(LocalModelServer.HttpClientName).ConfigureHttpClient(http => http.Timeout = TimeSpan.FromSeconds(5));

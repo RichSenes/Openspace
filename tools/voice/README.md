@@ -58,4 +58,38 @@ are considered, so a short sentence is not taken for another language.
 
 ## Speaking (text to speech)
 
-Not yet: the voice that answers is being chosen by listening tests in the three languages.
+`speak-server.py` gives Shiori her voice, on this machine. Her answers to what you said aloud are
+spoken back a sentence at a time while she writes them; meanwhile she does not listen, so she
+never hears herself. Holding the mic, **Esc** or **Quiet** under her words stops her.
+
+Two engines, both Apache-2.0:
+
+- `qwen`, [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) Base 1.7B: clones one voice and makes
+  it speak Italian, English and Japanese, so she sounds the same in all three. Wants a graphics
+  card (about 4–5 GB).
+- `kokoro`, [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M): tiny and quick, also on a
+  processor, but each language has its own preset voice.
+
+Her voice is designed once from a description with `design-voice.py` (Qwen3-TTS VoiceDesign),
+which writes a folder with a clip of it; the server clones that clip for every sentence:
+
+```bash
+python3 -m venv ~/.local/share/openspace/tts-venv
+~/.local/share/openspace/tts-venv/bin/pip install qwen-tts soundfile   # or: kokoro misaki[ja]
+~/.local/share/openspace/tts-venv/bin/python tools/voice/design-voice.py \
+  --model DIR/Qwen3-TTS-12Hz-1.7B-VoiceDesign --out ~/.local/share/openspace/voices/shiori \
+  --describe "A young woman in her late twenties, warm and calm, soft mid-low pitch, gentle"
+```
+
+Then in `~/.config/openspace/openspace.env`, and `scripts/openspace start` starts it with the rest
+(it is skipped while `OPENSPACE_VOICE_MODEL` is empty):
+
+```bash
+OPENSPACE_VOICE_PYTHON=~/.local/share/openspace/tts-venv/bin/python
+OPENSPACE_VOICE_ENGINE=qwen                       # or kokoro
+OPENSPACE_VOICE_MODEL=DIR/Qwen3-TTS-12Hz-1.7B-Base # kokoro: the Kokoro-82M folder
+OPENSPACE_VOICE_DIR=~/.local/share/openspace/voices/shiori   # qwen only
+```
+
+`POST /speak {"text": "...", "language": "it"}` returns WAV; Openspace reaches it through
+`/api/voice/speak` (`Voice:SpeakUrl`, port 8177).

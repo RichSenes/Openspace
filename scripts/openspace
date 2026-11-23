@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Starts, stops and restarts everything Openspace needs: the API, the web page, the
-# OpenCode server and Shiori's ears (speech to text, when faster-whisper is installed).
+# OpenCode server, Shiori's ears (speech to text, when faster-whisper is installed) and her
+# voice (text to speech, when a voice model is configured).
 # Each runs in its own process group, with its log in the state folder.
 #
 #   scripts/openspace start            start what is not running yet
@@ -37,8 +38,15 @@ EARS_MODEL="${OPENSPACE_EARS_MODEL:-medium}"
 EARS_WAKE_MODEL="${OPENSPACE_EARS_WAKE_MODEL:-base}"
 EARS_DEVICE="${OPENSPACE_EARS_DEVICE:-auto}"
 EARS_MODELS="${OPENSPACE_EARS_MODELS:-$HOME/.local/share/openspace/whisper}"
+# Her voice: the Python with the engine, the engine, its model folder and, for qwen, her voice.
+VOICE_PORT="${OPENSPACE_VOICE_PORT:-8177}"
+VOICE_PYTHON="${OPENSPACE_VOICE_PYTHON:-python3}"
+VOICE_ENGINE="${OPENSPACE_VOICE_ENGINE:-qwen}"
+VOICE_MODEL="${OPENSPACE_VOICE_MODEL:-}"
+VOICE_DIR="${OPENSPACE_VOICE_DIR:-}"
+VOICE_DEVICE="${OPENSPACE_VOICE_DEVICE:-auto}"
 STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
-SERVICES=(opencode ears api web)
+SERVICES=(opencode ears voice api web)
 # The API writes the OpenCode provider of the local models here; OpenCode merges it with
 # the person's own configuration (restart opencode after the first time).
 OPENCODE_LOCAL="${LocalModels__OpenCodeConfigPath:-$STATE/opencode-local.json}"
@@ -61,6 +69,7 @@ port_of() {
     web) echo "$WEB_PORT" ;;
     opencode) echo "$OPENCODE_PORT" ;;
     ears) echo "$EARS_PORT" ;;
+    voice) echo "$VOICE_PORT" ;;
   esac
 }
 
@@ -81,6 +90,7 @@ ready() {
     opencode) curl -fs "http://127.0.0.1:$OPENCODE_PORT/config" >/dev/null 2>&1 ;;
     web) listening "$WEB_PORT" ;;
     ears) curl -fs "http://127.0.0.1:$EARS_PORT/health" >/dev/null 2>&1 ;;
+    voice) curl -fs "http://127.0.0.1:$VOICE_PORT/health" >/dev/null 2>&1 ;;
   esac
 }
 
@@ -117,6 +127,19 @@ start_one() {
       say "ears: starting in the background on port $port (scripts/openspace status, logs ears)"
       return
       ;;
+    voice)
+      # Optional too: without a voice model she answers in writing only.
+      local package=qwen_tts
+      [ "$VOICE_ENGINE" = kokoro ] && package=kokoro
+      if [ -z "$VOICE_MODEL" ] || ! "$VOICE_PYTHON" -c "import $package" >/dev/null 2>&1; then
+        say "voice: skipped, no OPENSPACE_VOICE_MODEL or no $package in $VOICE_PYTHON (see tools/voice/README.md)"
+        return
+      fi
+      launch voice "$ROOT/tools/voice" "$VOICE_PYTHON" speak-server.py --port "$VOICE_PORT" --engine "$VOICE_ENGINE" \
+        --model "$VOICE_MODEL" ${VOICE_DIR:+--voice "$VOICE_DIR"} --device "$VOICE_DEVICE"
+      say "voice: starting in the background on port $port (scripts/openspace status, logs voice)"
+      return
+      ;;
     opencode)
       command -v opencode >/dev/null 2>&1 || fail "opencode is not installed (npm install -g opencode-ai)"
       if [ -f "$OPENCODE_LOCAL" ]; then
@@ -131,6 +154,7 @@ start_one() {
       launch api "$API_DIR" env ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}" \
         ASPNETCORE_URLS="http://localhost:$API_PORT" OpenCode__BaseUrl="http://127.0.0.1:$OPENCODE_PORT" \
         LocalModels__OpenCodeConfigPath="$OPENCODE_LOCAL" Voice__ListenUrl="${Voice__ListenUrl:-http://127.0.0.1:$EARS_PORT}" \
+        Voice__SpeakUrl="${Voice__SpeakUrl:-http://127.0.0.1:$VOICE_PORT}" \
         dotnet run --no-build --no-launch-profile
       ;;
     web)
@@ -183,7 +207,7 @@ status_one() {
 pick() {
   if [ $# -eq 0 ] || [ "$1" = all ]; then printf '%s\n' "${SERVICES[@]}"; return; fi
   for s in "$@"; do
-    case "$s" in api|web|opencode|ears) echo "$s" ;; *) fail "unknown service '$s': use api, web, opencode or ears" ;; esac
+    case "$s" in api|web|opencode|ears|voice) echo "$s" ;; *) fail "unknown service '$s': use api, web, opencode, ears or voice" ;; esac
   done
 }
 

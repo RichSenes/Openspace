@@ -9,6 +9,23 @@ _NAME = re.compile(r"^(" + "|".join(re.escape(n) for n in sorted(NAMES, key=len,
 _EDGE = " \t,.!?;:、。！？…-—'\"「」"
 
 
+def _distance(a: str, b: str) -> int:
+    row = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        nxt = [i]
+        for j, y in enumerate(b, 1):
+            nxt.append(min(row[j] + 1, nxt[j - 1] + 1, row[j - 1] + (x != y)))
+        row = nxt
+    return row[-1]
+
+
+def _sounds_like_her(word: str) -> bool:
+    """A real voice in a real room gets her name written many ways: one letter off is her,
+    two off only for a word of her length ("shuri", not "siri" or "shioriko")."""
+    d = _distance(word, "shiori")
+    return d <= 1 or (d == 2 and 5 <= len(word) <= 6)
+
+
 def called(text: str) -> tuple[bool, str]:
     """Whether the words start by calling Shiori, and what was asked after her name."""
     said = text.strip()
@@ -16,9 +33,11 @@ def called(text: str) -> tuple[bool, str]:
     for _ in range(3):
         rest = rest.lstrip(_EDGE)
         match = _NAME.match(rest)
-        if match:
+        word = re.match(r"^[a-zà-ÿ]+", rest)
+        end = match.end() if match else word.end() if word and _sounds_like_her(word.group(0)) else None
+        if end is not None:
             # Only the start was cut, so the tail lines up with the original and keeps its case.
-            tail = rest[match.end():]
+            tail = rest[end:]
             return True, said[len(said) - len(tail):].lstrip(_EDGE).rstrip(" ,") if tail.strip(_EDGE) else ""
         word = re.match(r"^[^\s,.!?、。]+", rest)
         if not word or word.group(0) not in FILLERS:

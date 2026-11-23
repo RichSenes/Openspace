@@ -70,6 +70,8 @@ def main():
     p.add_argument("--wake-model", default="base", help='"none" to use the main model for the name too')
     p.add_argument("--download-root", default=None)
     p.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
+    # Off by default: what is said near the mic is not written anywhere.
+    p.add_argument("--log-heard", action="store_true", help="print what each sentence was heard as, to tune the name")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8178)
     args = p.parse_args()
@@ -129,6 +131,8 @@ def main():
             # Her name, written the way the small model is nudged to write it.
             text, spoken = transcribe(waker, samples, language, hotwords="Shiori")
             yes, rest = called(text)
+            if args.log_heard:
+                print(f"heard ({spoken}, {'called' if yes else 'not called'}): {text}", file=sys.stderr, flush=True)
             if not yes or not rest or waker is model:
                 return self.reply(200, {"text": rest, "language": spoken, "seconds": took(), "called": yes})
             # Called with a request: the main model hears it properly.

@@ -1,5 +1,5 @@
 import { Check, Plus, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { ShioriSessionSummary, ShioriSessionView } from '../api/types'
 import { boardSections } from '../lab/shiori/board'
 import { MODES } from '../lab/shiori/modes'
@@ -76,12 +76,17 @@ export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onCl
 
 export function ConversationDrawer({ view, draft, onClose }: { view: ShioriSessionView | undefined; draft: string; onClose: () => void }) {
   const entries = view?.transcript ?? []
+  // Opens on the latest words, and follows them as they come.
+  const log = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    log.current?.lastElementChild?.scrollIntoView?.({ block: 'end' })
+  }, [entries.length, draft])
   return (
     <Drawer side="left" title="Conversation" onClose={onClose}>
       {entries.length === 0 ? (
         <p className="pr-muted pr-empty">Nothing said yet. What you write and what Shiori answers stays here, and in the session's note.</p>
       ) : (
-        <ol className="pr-log">
+        <ol className="pr-log" ref={log}>
           {entries.map((e, i) =>
             e.role === 'Person' ? (
               <li key={i} className="pr-log-you">

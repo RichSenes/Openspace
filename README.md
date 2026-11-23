@@ -245,7 +245,7 @@ src/backend/
   Openspace.Api/             ASP.NET Core host: HTTP, SignalR, MCP tools for agents
 src/frontend/                React + PixiJS: the building and the panels
 tests/                       Architecture, domain, application, infrastructure and API tests
-tools/                       Helper scripts (pixelgrid.py: pictures to sprites)
+tools/                       Helper scripts (pixelgrid.py: pictures to sprites; voice/: Shiori's ears)
 ```
 
 Each project has its own README:

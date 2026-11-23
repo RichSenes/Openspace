@@ -61,6 +61,14 @@ src/
 Pure logic lives in `.ts` files with a `.test.ts` next to them; components stay
 thin.
 
+## Talking to Shiori
+
+Hold the microphone button in the Shiori view, or the space bar when no field is focused, and
+talk; let go and the words are sent as your message. The browser records, the API sends the
+recording to the local listening server (`tools/voice/listen-server.py`, faster-whisper) and gets
+the text back. Nothing said leaves the machine. Pure logic in `shiori/voice.ts`, the recorder in
+`shiori/useEars.ts`.
+
 ## Views
 
 **Building.** The office drawn in pixel art, in its theme, with a mood per room.

@@ -1,4 +1,4 @@
-import { CircleStop, History, MessagesSquare, Palette, Send, StickyNote, X } from 'lucide-react'
+import { CircleStop, History, MessagesSquare, Mic, Palette, Send, StickyNote, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   useCreateShioriSession,
@@ -27,6 +27,8 @@ import { useLive } from './liveStore'
 import { loadLook, saveLook, type Look } from './look'
 import { LookPanel } from './LookPanel'
 import { adviceFor, apiMode, faceFor, liveSubtitles, modeOf, pickSession, stageLayout, titleFrom } from './talk'
+import { useEars } from './useEars'
+import { afterHearing, earsLabel, isTalkKey } from './voice'
 import { Words } from './Words'
 import '../lab/presence/presence.css'
 import './shiori-page.css'
@@ -104,6 +106,20 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     })
   }, [])
 
+  // Her ears: hold the mic (or the space bar) to talk; what is heard is sent like a typed message.
+  const submitRef = useRef<(said?: string) => Promise<void>>(async () => {})
+  const textRef = useRef(text)
+  useEffect(() => {
+    textRef.current = text
+  })
+  const voice = useEars(
+    (heard) => {
+      const next = afterHearing(heard, textRef.current)
+      setText(next.compose)
+      if (next.send) void submitRef.current(next.send)
+    },
+    (message) => setProblem(message),
+  )
   const ended = !!view?.endedAt
   const answering = !!view?.answering
   const sending = send.isPending || create.isPending
@@ -111,7 +127,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const mode = view?.mode ?? nextMode
   const info = MODES[modeOf(mode)]
   const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error)
-  const face = faceFor({ typing: focused && text.trim().length > 0, sending, answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
+  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording', sending: sending || voice.ears === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
   // A failure with its advice needs the room of a long answer, not its card.
   const { focus, subsTop } = stageLayout(size.w, size.h, size.top, size.dock, subs.long || !!subs.failed)
@@ -134,8 +150,8 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     setProblem(null)
   }
 
-  const submit = async () => {
-    const message = text.trim()
+  const submit = async (said?: string) => {
+    const message = (said ?? text).trim()
     if (!message || busy || ended) return
     setProblem(null)
     try {
@@ -146,7 +162,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         setFresh(created.id)
         setWanted(created.id)
       }
-      setText('')
+      if (said === undefined) setText('')
       await send.mutateAsync({ sessionId: target, text: message })
       void session.refetch()
     } catch (e) {
@@ -154,6 +170,28 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
       setProblem(e instanceof Error ? e.message : String(e))
     }
   }
+  useEffect(() => {
+    submitRef.current = submit
+  })
+
+  useEffect(() => {
+    if (ended) return
+    const down = (e: KeyboardEvent) => {
+      if (!isTalkKey(e, e.isComposing)) return
+      e.preventDefault()
+      void voice.start()
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') voice.stop()
+      if (e.code === 'Escape') voice.cancel()
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [ended, voice])
 
   const switchMode = (m: ShioriMode) => {
     if (m === mode) return
@@ -366,6 +404,31 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
               void submit()
             }}
           >
+            <button
+              type="button"
+              className={`pr-mic${voice.ears === 'recording' ? ' is-on' : ''}`}
+              aria-label="Hold to talk to Shiori"
+              title={earsLabel(voice.ears, voice.ms)}
+              disabled={voice.ears === 'unavailable' || voice.ears === 'hearing'}
+              style={{ '--level': voice.level } as React.CSSProperties}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                void voice.start()
+              }}
+              onPointerUp={() => voice.stop()}
+              onPointerCancel={() => voice.cancel()}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
+                  e.preventDefault()
+                  void voice.start()
+                }
+              }}
+              onKeyUp={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') voice.stop()
+              }}
+            >
+              <Mic size={18} />
+            </button>
             <textarea
               ref={field}
               className="pr-field sp-field"
@@ -387,6 +450,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
               <Send size={17} />
             </button>
           </form>
+        )}
+        {!ended && (
+          <p className={`sp-ears is-${voice.ears}`} aria-live="polite">
+            {earsLabel(voice.ears, voice.ms)}
+          </p>
         )}
       </footer>
 

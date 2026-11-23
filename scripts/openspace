@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Starts, stops and restarts everything Openspace needs: the API, the web page and the
-# OpenCode server. Each runs in its own process group, with its log in the state folder.
+# Starts, stops and restarts everything Openspace needs: the API, the web page, the
+# OpenCode server and Shiori's ears (speech to text, when faster-whisper is installed).
+# Each runs in its own process group, with its log in the state folder.
 #
 #   scripts/openspace start            start what is not running yet
 #   scripts/openspace restart api      after an update: rebuild and restart the API only
@@ -10,10 +11,18 @@
 #   scripts/openspace restore FILE     put a database backup back (stops and restarts the API)
 #   scripts/openspace kanji-data       download the dictionaries of the paper's kanji of the day
 #
-# Ports and folders can be changed with environment variables, e.g. OPENSPACE_API_PORT.
-# Anything else in the environment (ConnectionStrings__Openspace, Settings__Path...) is
-# passed on to the API.
+# Ports and folders can be changed with environment variables, e.g. OPENSPACE_API_PORT, also
+# written once in ~/.config/openspace/openspace.env (KEY=value lines). Anything else in the
+# environment (ConnectionStrings__Openspace, Settings__Path...) is passed on to the API.
 set -euo pipefail
+
+CONFIG="${OPENSPACE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/openspace/openspace.env}"
+if [ -f "$CONFIG" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CONFIG"
+  set +a
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_DIR="$ROOT/src/backend/Openspace.Api"
@@ -21,8 +30,15 @@ WEB_DIR="$ROOT/src/frontend"
 API_PORT="${OPENSPACE_API_PORT:-5145}"
 WEB_PORT="${OPENSPACE_WEB_PORT:-5173}"
 OPENCODE_PORT="${OPENSPACE_OPENCODE_PORT:-4096}"
+# Shiori's ears: the Python that has faster-whisper, the models, and where they are kept.
+EARS_PORT="${OPENSPACE_EARS_PORT:-8178}"
+EARS_PYTHON="${OPENSPACE_EARS_PYTHON:-python3}"
+EARS_MODEL="${OPENSPACE_EARS_MODEL:-medium}"
+EARS_WAKE_MODEL="${OPENSPACE_EARS_WAKE_MODEL:-base}"
+EARS_DEVICE="${OPENSPACE_EARS_DEVICE:-auto}"
+EARS_MODELS="${OPENSPACE_EARS_MODELS:-$HOME/.local/share/openspace/whisper}"
 STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
-SERVICES=(opencode api web)
+SERVICES=(opencode ears api web)
 # The API writes the OpenCode provider of the local models here; OpenCode merges it with
 # the person's own configuration (restart opencode after the first time).
 OPENCODE_LOCAL="${LocalModels__OpenCodeConfigPath:-$STATE/opencode-local.json}"
@@ -44,6 +60,7 @@ port_of() {
     api) echo "$API_PORT" ;;
     web) echo "$WEB_PORT" ;;
     opencode) echo "$OPENCODE_PORT" ;;
+    ears) echo "$EARS_PORT" ;;
   esac
 }
 
@@ -63,6 +80,7 @@ ready() {
     api) curl -fs "http://localhost:$API_PORT/health" >/dev/null 2>&1 ;;
     opencode) curl -fs "http://127.0.0.1:$OPENCODE_PORT/config" >/dev/null 2>&1 ;;
     web) listening "$WEB_PORT" ;;
+    ears) curl -fs "http://127.0.0.1:$EARS_PORT/health" >/dev/null 2>&1 ;;
   esac
 }
 
@@ -84,7 +102,20 @@ start_one() {
     return
   fi
 
+  local wait=90
   case "$name" in
+    ears)
+      # Optional: without faster-whisper Openspace runs as before, only without voice.
+      if ! "$EARS_PYTHON" -c 'import faster_whisper' >/dev/null 2>&1; then
+        say "ears: skipped, $EARS_PYTHON has no faster-whisper (see tools/voice/README.md)"
+        return
+      fi
+      mkdir -p "$EARS_MODELS"
+      # The first start downloads the models: give it time.
+      wait=600
+      launch ears "$ROOT/tools/voice" "$EARS_PYTHON" listen-server.py --port "$EARS_PORT" --model "$EARS_MODEL" \
+        --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS"
+      ;;
     opencode)
       command -v opencode >/dev/null 2>&1 || fail "opencode is not installed (npm install -g opencode-ai)"
       if [ -f "$OPENCODE_LOCAL" ]; then
@@ -98,7 +129,7 @@ start_one() {
       (cd "$API_DIR" && dotnet build -v q -nologo >"$STATE/logs/api-build.log" 2>&1) || fail "the API does not build: see $STATE/logs/api-build.log"
       launch api "$API_DIR" env ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}" \
         ASPNETCORE_URLS="http://localhost:$API_PORT" OpenCode__BaseUrl="http://127.0.0.1:$OPENCODE_PORT" \
-        LocalModels__OpenCodeConfigPath="$OPENCODE_LOCAL" \
+        LocalModels__OpenCodeConfigPath="$OPENCODE_LOCAL" Voice__ListenUrl="${Voice__ListenUrl:-http://127.0.0.1:$EARS_PORT}" \
         dotnet run --no-build --no-launch-profile
       ;;
     web)
@@ -114,12 +145,12 @@ start_one() {
       ;;
   esac
 
-  for _ in $(seq 90); do
+  for _ in $(seq "$wait"); do
     if ready "$name"; then say "$name: ready on port $port"; return; fi
     group_of "$name" >/dev/null || fail "$name stopped while starting: see $STATE/logs/$name.log"
     sleep 1
   done
-  fail "$name is not answering after 90 seconds: see $STATE/logs/$name.log"
+  fail "$name is not answering after $wait seconds: see $STATE/logs/$name.log"
 }
 
 stop_one() {
@@ -151,7 +182,7 @@ status_one() {
 pick() {
   if [ $# -eq 0 ] || [ "$1" = all ]; then printf '%s\n' "${SERVICES[@]}"; return; fi
   for s in "$@"; do
-    case "$s" in api|web|opencode) echo "$s" ;; *) fail "unknown service '$s': use api, web or opencode" ;; esac
+    case "$s" in api|web|opencode|ears) echo "$s" ;; *) fail "unknown service '$s': use api, web, opencode or ears" ;; esac
   done
 }
 

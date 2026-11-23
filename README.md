@@ -143,12 +143,16 @@ everything:
 
 ```bash
 scripts/openspace status           # what is running
-scripts/openspace logs api         # follow a log (api, web or opencode)
+scripts/openspace logs api         # follow a log (api, web, opencode or ears)
 scripts/openspace restart api      # after changing the code: rebuild and restart the API
 scripts/openspace stop
 scripts/openspace restore FILE     # put a database backup back
 scripts/openspace kanji-data       # once, only for the morning paper's kanji of the day
 ```
+
+To talk to Shiori by voice, install faster-whisper once (`tools/voice/README.md`):
+`scripts/openspace start` then starts her ears too, and skips them when it is missing.
+Variables can be kept in `~/.config/openspace/openspace.env`, one `KEY=value` a line.
 
 Logs and process ids live in `~/.local/state/openspace`. Ports change with
 `OPENSPACE_API_PORT` (5145), `OPENSPACE_WEB_PORT` (5173) and

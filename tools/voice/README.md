@@ -10,11 +10,28 @@ are detected on their own. Nothing you say leaves the computer.
 python3 -m venv ~/.local/share/openspace/voice-venv
 ~/.local/share/openspace/voice-venv/bin/pip install faster-whisper
 # ffmpeg must be on the PATH (sudo apt install ffmpeg)
-~/.local/share/openspace/voice-venv/bin/python tools/voice/listen-server.py --model medium
 ```
 
-- `--model`: `small` is quick on a processor; `medium` (default) understands better;
-  `large-v3` is best and wants a graphics card.
+`scripts/openspace start` starts it with the rest when its Python has faster-whisper, and skips
+it otherwise. Tell it which Python and models in `~/.config/openspace/openspace.env`:
+
+```bash
+OPENSPACE_EARS_PYTHON=~/.local/share/openspace/voice-venv/bin/python
+OPENSPACE_EARS_MODEL=small          # the model that hears requests (default medium)
+OPENSPACE_EARS_WAKE_MODEL=base      # the light one that listens for her name (default base)
+OPENSPACE_EARS_DEVICE=auto          # auto, cuda or cpu
+OPENSPACE_EARS_MODELS=~/.local/share/openspace/whisper   # where models are downloaded
+```
+
+Or by hand: `python tools/voice/listen-server.py --model medium --wake-model base`.
+
+- `--model`: `small` is quick; `medium` (default) understands better; `large-v3` is best and
+  wants a graphics card.
+- `--wake-model`: always listening runs every sentence said near the mic through this one, so it
+  stays light; only a sentence that starts with "Shiori" goes on to `--model`.
+- Graphics memory, int8 weights: `base` + `small` together take about 0.6 GB; `medium` about
+  1.5 GB more. On a processor `small` takes a few seconds a sentence and `medium` several times
+  that.
 - `--download-root DIR`: where the model is kept (downloaded once, about 1.5 GB for medium).
 - `--device auto|cuda|cpu`: `auto` tries the graphics card and falls back to the processor when
   it is busy or missing.
@@ -23,6 +40,11 @@ python3 -m venv ~/.local/share/openspace/voice-venv
 In the Shiori view, **hold the microphone button** (or the **space bar** when no field is
 focused) and talk; let go and what you said is sent as your message. If something is already
 typed, the spoken words are added to it instead, for you to send. **Esc** while holding drops it.
+
+Or turn on the **ear** beside the mic and call her: "Shiori, cosa c'è oggi?" sends "cosa c'è
+oggi?"; "Shiori" alone makes her listen, and the next sentence within 8 seconds is sent. Her name
+is matched by `wake.py` (also "hey Shiori", "ねえ、しおり"); only Italian, English and Japanese
+are considered, so a short sentence is not taken for another language.
 
 ## Speaking (text to speech)
 

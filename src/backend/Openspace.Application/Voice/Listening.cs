@@ -12,14 +12,20 @@ public sealed class VoiceOptions
     public long MaxBytes { get; set; } = 25 * 1024 * 1024;
 }
 
-/// <summary>What was heard: the words and the language they were said in.</summary>
-public sealed record Heard(string Text, string Language, double Seconds);
+/// <summary>
+/// What was heard: the words and the language they were said in. When listening for her name,
+/// <paramref name="Called"/> says whether Shiori was called, and the text is what followed it.
+/// </summary>
+public sealed record Heard(string Text, string Language, double Seconds, bool Called = false);
 
 /// <summary>Turns what the person said into text, on this machine.</summary>
 public interface IListener
 {
-    /// <summary>Transcribes the audio; null language lets the listener detect it.</summary>
-    Task<Heard> HearAsync(Stream audio, string? language, CancellationToken cancellationToken);
+    /// <summary>
+    /// Transcribes the audio; null language lets the listener detect it. With
+    /// <paramref name="wake"/> only speech that calls Shiori by name is kept.
+    /// </summary>
+    Task<Heard> HearAsync(Stream audio, string? language, bool wake, CancellationToken cancellationToken);
 
     /// <summary>Whether the listener answers, and what it runs on.</summary>
     Task<ListenerStatus> StatusAsync(CancellationToken cancellationToken);

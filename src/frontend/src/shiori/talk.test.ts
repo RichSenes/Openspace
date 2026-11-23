@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ShioriSessionSummary, TranscriptEntry } from '../api/types'
-import { adviceFor, stageLayout, apiMode, boardItems, faceFor, liveSubtitles, modeOf, noteName, orderSessions, pickSession, titleFrom, type FaceInput } from './talk'
+import { adviceFor, answerText, stageLayout, apiMode, boardItems, faceFor, liveSubtitles, modeOf, noteName, orderSessions, pickSession, titleFrom, type FaceInput } from './talk'
 
 const entry = (role: TranscriptEntry['role'], text: string): TranscriptEntry => ({ role, text, mode: 'Brainstorm', at: '2026-01-01T10:00:00Z' })
 
@@ -45,6 +45,15 @@ describe('liveSubtitles', () => {
 
   it('turns a long answer into a card', () => {
     expect(liveSubtitles([entry('Person', 'a'), entry('Shiori', 'word '.repeat(80))], '', false).long).toBe(true)
+  })
+
+  it('shows only what has been revealed, still writing, and is long by the whole answer', () => {
+    const t = [entry('Person', 'a'), entry('Shiori', 'word '.repeat(80))]
+    const s = liveSubtitles(t, '', false, null, 9)
+    expect(s.answer?.tokens).toEqual(liveSubtitles([entry('Person', 'a'), entry('Shiori', 'word word')], '', false).answer?.tokens)
+    expect(s.answer?.streaming).toBe(true)
+    expect(s.long).toBe(true)
+    expect(answerText(t, '', false)).toEqual({ text: 'word '.repeat(80), turn: '2026-01-01T10:00:00Z' })
     expect(liveSubtitles([entry('Person', 'a'), entry('Shiori', 'short')], '', false).long).toBe(false)
   })
 })

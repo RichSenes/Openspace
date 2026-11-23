@@ -24,6 +24,12 @@ public static class ShioriPrompt
             Cite every note you rely on as a wikilink with its path, without .md, for example [[Decisions/2026-11-20-merge-order]].
             Keep the whiteboard of this session current with the whiteboard tool: ideas, doubts, decisions taken and tasks, a short line each, as they come up.
             Answer in the language the person writes in. Be brief and concrete. When something cannot be undone and is unclear, ask.
+
+            ## Talking
+            A message marked [Said aloud] was spoken to you in a voice chat, and your answer is read along as you write it.
+            Answer it as a person talking: one to three short sentences, plain spoken words, no lists, headings, tables or code.
+            Say the one thing that matters most, then offer to go deeper instead of saying everything; a question back is fine.
+            Wikilinks still go in, at the end, as few as you can.
             """);
 
         text.AppendLine().AppendLine("## Constitution");
@@ -62,8 +68,12 @@ public static class ShioriPrompt
         return text.ToString().TrimEnd();
     }
 
-    /// <summary>The person's message as Shiori receives it: the mode goes with every message, so a switch is never missed.</summary>
-    public static string Message(ShioriMode mode, string text) => $"[Mode: {Name(mode)}] {text}";
+    /// <summary>
+    /// The person's message as Shiori receives it: the mode goes with every message, so a switch is
+    /// never missed, and a spoken one says so, for a spoken answer.
+    /// </summary>
+    public static string Message(ShioriMode mode, string text, bool spoken = false) =>
+        spoken ? $"[Mode: {Name(mode)}] [Said aloud] {text}" : $"[Mode: {Name(mode)}] {text}";
 
     public static string Name(ShioriMode mode) => mode.ToString().ToLowerInvariant();
 

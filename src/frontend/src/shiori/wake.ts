@@ -11,6 +11,11 @@ export type Wake = 'off' | 'starting' | 'waiting' | 'talking' | 'hearing' | 'den
 export const RATE = 16_000
 /** A conversation nobody speaks in for this long goes back to waiting for her name. */
 export const QUIET_MS = 60_000
+/**
+ * After the last sentence, this much more quiet before what was said goes to her as one
+ * message: a pause to think does not cut you off, and starting again waits again.
+ */
+export const TURN_MS = 1_800
 
 const FRAME = 320 // 20 ms
 const PRE_ROLL = 15 // 300 ms kept from before the voice started, so the first sound is not cut
@@ -26,7 +31,7 @@ export function wakeLabel(wake: Wake): string {
     case 'waiting':
       return 'Say “Shiori…” to talk to her, or hold the mic'
     case 'talking':
-      return 'Talking with Shiori · say “basta così” or “grazie Shiori” to stop'
+      return 'Talking with Shiori · say “basta così, grazie” or “以上” to stop'
     case 'hearing':
       return 'Shiori is hearing you…'
     case 'denied':
@@ -108,6 +113,11 @@ export class Utterances {
     return done
   }
 
+  /** Someone is talking right now: a sentence has started and not ended. */
+  get speaking(): boolean {
+    return this.sentence.length > 0
+  }
+
   /** Forgets anything half heard (while holding the mic, or after a pause). */
   reset() {
     this.before = []
@@ -148,23 +158,64 @@ export class Utterances {
   }
 }
 
-// How a conversation is closed, said alone (her name around it is fine).
-const GOODBYES = new Set([
-  'basta', 'basta così', 'basta cosi', 'ok basta', 'stop', 'fine', 'ho finito', 'è tutto', 'e tutto', 'per ora è tutto',
-  'grazie', 'grazie è tutto', 'grazie basta', 'grazie mille', 'ciao', 'a dopo', 'chiudi', 'smetti di ascoltare',
-  "that's all", 'thats all', 'thank you', 'thanks', 'bye', 'goodbye', 'stop listening', "that's it", 'done',
-  'もういい', 'ありがとう', 'おわり', '終わり', 'ストップ', 'またね', 'じゃあね',
+// What closes a conversation. A turn closes it only when it is one of these plus, at most,
+// polite words around it: "basta così, grazie" closes, "basta con le riunioni" does not.
+const CLOSINGS = [
+  'basta cosi', 'per ora basta', 'a posto cosi', 'apposto cosi', 'va bene cosi', 'per ora e tutto', 'e tutto',
+  'ho finito', 'abbiamo finito', 'chiudiamo qui', 'chiudiamo', 'chiudi pure', 'smetti di ascoltare',
+  'puoi smettere di ascoltare', 'a dopo', 'ci sentiamo dopo', 'ci sentiamo', 'alla prossima', 'ciao ciao',
+  'a piu tardi', 'buonanotte', 'thats all', 'thats all for now', 'thats it', 'that will be all', 'stop listening',
+  'were done', 'im done', 'goodbye', 'bye bye', 'talk later', 'good night',
+  // Japanese as the listener writes it in either script.
+  'ijo', 'ijou', 'oshimai', 'otsukare', 'otsukaresama', 'jaane', 'matane',
+].map((c) => c.split(' '))
+const POLITE = new Set([
+  'grazie', 'mille', 'tante', 'ok', 'okay', 'va', 'bene', 'no', 'si', 'per', 'ora', 'adesso', 'allora', 'dai', 'perfetto',
+  'ottimo', 'benissimo', 'grande', 'cosi', 'tutto', 'e', 'ed', 'thanks', 'thank', 'you', 'yes', 'alright', 'all', 'right',
+  'for', 'now', 'great', 'perfect', 'deshita', 'desu',
 ])
-const NAME = /^(shiori|shiory|shori|siori|sciori|sheori|chiori|しおり|シオリ|栞)$/
+const JA_CLOSINGS = ['お疲れさまでした', 'お疲れ様でした', 'おつかれさま', 'お疲れさま', 'お疲れ様', 'おつかれ', 'お疲れ', '以上', 'おしまい', 'おわり', '終わり', 'じゃあね', 'またね']
+const JA_POLITE = ['ありがとうございます', 'ありがとう', 'でした', 'です', 'うん', 'はい', 'ね', 'よ']
+const NAME = /^(shiori|shiory|shori|siori|sciori|sheori|chiori)$/
+const JA_NAME = /しおり|シオリ|栞/g
 
-/** Whether a sentence only says goodbye: "Basta così.", "Grazie Shiori!", "ありがとう、しおり". */
-export function isGoodbye(text: string): boolean {
-  const words = text
+function words(text: string): string[] {
+  return text
     .toLowerCase()
-    .replace(/[.,!?;:、。！？…"“”「」]/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w && !NAME.test(w))
-  return words.length > 0 && words.length <= 4 && GOODBYES.has(words.join(' '))
+}
+
+function japaneseGoodbye(text: string): boolean {
+  let rest = text.replace(JA_NAME, '').replace(/[\s、。！？!?,.…「」]/g, '')
+  const closing = JA_CLOSINGS.find((c) => rest.includes(c))
+  if (!closing) return false
+  rest = rest.replace(closing, '')
+  for (const p of JA_POLITE) rest = rest.split(p).join('')
+  return rest.replace(/[a-zA-Z]/g, '').length === 0 && words(text).every((w) => POLITE.has(w))
+}
+
+/**
+ * Whether a turn only says goodbye: "Basta così, grazie", "No grazie, per ora va bene così",
+ * "Shiori, 以上です". A request that merely contains the words ("è tutto pronto?") does not.
+ */
+export function isGoodbye(text: string): boolean {
+  if (/[\u3040-\u30ff\u4e00-\u9fff]/.test(text)) return japaneseGoodbye(text)
+  const said = words(text)
+  if (!said.length || said.length > 10) return false
+  for (const closing of CLOSINGS) {
+    for (let at = 0; at + closing.length <= said.length; at++) {
+      if (closing.every((w, k) => said[at + k] === w)) {
+        const rest = [...said.slice(0, at), ...said.slice(at + closing.length)]
+        if (rest.every((w) => POLITE.has(w))) return true
+      }
+    }
+  }
+  return false
 }
 
 const BY_NAME_KEY = 'openspace.shiori.byName'

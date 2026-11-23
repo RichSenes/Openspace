@@ -43,7 +43,27 @@ export interface LiveSubtitles {
   notes: string[]
 }
 
-export function liveSubtitles(transcript: TranscriptEntry[], draft: string, answering: boolean, error: string | null = null): LiveSubtitles {
+/** The full text of her answer to the person's last message, and that message's moment. */
+export function answerText(transcript: TranscriptEntry[], draft: string, answering: boolean): { text: string; turn: string | null } {
+  let last = -1
+  for (let i = transcript.length - 1; i >= 0; i--) {
+    if (transcript[i].role === 'Person') {
+      last = i
+      break
+    }
+  }
+  const saved = transcript.slice(last + 1).find((e) => e.role === 'Shiori')
+  return { text: answering && draft ? draft : (saved?.text ?? ''), turn: last >= 0 ? `${transcript[last].at}` : null }
+}
+
+/** `shown` cuts the answer to what has been revealed so far (all of it by default). */
+export function liveSubtitles(
+  transcript: TranscriptEntry[],
+  draft: string,
+  answering: boolean,
+  error: string | null = null,
+  shown = Number.POSITIVE_INFINITY,
+): LiveSubtitles {
   let last = -1
   for (let i = transcript.length - 1; i >= 0; i--) {
     if (transcript[i].role === 'Person') {
@@ -54,16 +74,17 @@ export function liveSubtitles(transcript: TranscriptEntry[], draft: string, answ
   const after = transcript.slice(last + 1)
   const saved = after.find((e) => e.role === 'Shiori')
   const failedEntry = after.find((e) => e.role === 'Failed')
-  const text = answering && draft ? draft : (saved?.text ?? '')
+  const whole = answering && draft ? draft : (saved?.text ?? '')
+  const text = whole.slice(0, shown)
   const tokens = text ? tokenize(text) : []
   const failed = failedEntry?.text ?? (!answering && !saved && last >= 0 ? error : null)
   const notes = [...new Set(tokens.flatMap((t) => (t.type === 'cite' ? [t.path] : [])))].slice(-3)
   return {
     you: last >= 0 ? transcript[last].text : null,
     thinking: answering && !draft,
-    answer: tokens.length > 0 ? { tokens, streaming: answering && !!draft } : null,
+    answer: tokens.length > 0 ? { tokens, streaming: (answering && !!draft) || text.length < whole.length } : null,
     failed,
-    long: text.length > LONG_ANSWER,
+    long: whole.length > LONG_ANSWER,
     notes,
   }
 }

@@ -30,5 +30,27 @@ internal static class VoiceEndpoints
                 return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         }).DisableAntiforgery();
+
+        voice.MapGet("/speak/status", (ISpeaker speaker, CancellationToken ct) => speaker.StatusAsync(ct));
+
+        voice.MapPost("/speak", async (SpeakRequest request, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        {
+            var text = request.Text?.Trim();
+            if (string.IsNullOrEmpty(text))
+                return Results.Problem("Give her something to say.", statusCode: StatusCodes.Status400BadRequest);
+            if (text.Length > options.Value.MaxSpokenChars)
+                return Results.Problem($"She says at most {options.Value.MaxSpokenChars} characters at once.", statusCode: StatusCodes.Status413PayloadTooLarge);
+            try
+            {
+                return Results.File(await speaker.SpeakAsync(text, Languages.Choose(request.Language) ?? "it", ct), "audio/wav");
+            }
+            catch (SpeakerException e)
+            {
+                return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
     }
+
+    /// <summary>What Shiori says, and in which of her three languages.</summary>
+    public sealed record SpeakRequest(string? Text, string? Language);
 }

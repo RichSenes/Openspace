@@ -30,6 +30,8 @@ import { adviceFor, answerText, apiMode, faceFor, liveSubtitles, modeOf, pickSes
 import { useReveal } from './reveal'
 import { useEars } from './useEars'
 import { useWake } from './useWake'
+import { useVoice } from './useVoice'
+import { languageOf, nextSentences } from './speech'
 import { loadByName, saveByName, wakeLabel } from './wake'
 import { afterHearing, earsLabel, isTalkKey, type Heard } from './voice'
 import { Words } from './Words'
@@ -118,7 +120,9 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   // Said while she is still answering: kept, and sent together once she is done.
   const busyRef = useRef(false)
   const heardMeanwhile = useRef<string[]>([])
+  const heardIn = useRef('it')
   const onHeard = (heard: Heard) => {
+    if (heard.language) heardIn.current = heard.language
     if (busyRef.current && !textRef.current.trim()) {
       if (heard.text.trim()) heardMeanwhile.current.push(heard.text.trim())
       return
@@ -128,10 +132,17 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     if (next.send) void submitRef.current(next.send)
   }
   const voice = useEars(onHeard, (message) => setProblem(message))
+  // Her voice: answers to spoken messages are said aloud; she does not listen meanwhile.
+  const mouth = useVoice((message) => setProblem(message))
+  // Holding the mic to talk interrupts her.
+  const talk = () => {
+    mouth.stop()
+    void voice.start()
+  }
   const ended = !!view?.endedAt
   // Or call her by name: the microphone stays open and only "Shiori…" is listened to.
   const [byName, setByName] = useState(loadByName)
-  const { wake, end: endTalk } = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking', onHeard, (message) => setProblem(message))
+  const { wake, end: endTalk } = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking' || mouth.speaking, onHeard, (message) => setProblem(message))
   // Holding the mic says what the mic does; otherwise always listening tells its state.
   const byNameShown = wake !== 'off' && voice.ears === 'idle'
   const toggleByName = () => {
@@ -145,6 +156,16 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const info = MODES[modeOf(mode)]
   const latest = answerText(view?.transcript ?? [], live.draft, answering)
   const reveal = useReveal(latest.turn, latest.text.length)
+  // Spoken back a sentence at a time as she writes, when the turn was spoken.
+  const spokenTurn = useRef(false)
+  const spoken = useRef({ turn: latest.turn, from: 0 })
+  useEffect(() => {
+    if (spoken.current.turn !== latest.turn) spoken.current = { turn: latest.turn, from: 0 }
+    if (!spokenTurn.current || !latest.text) return
+    const { sentences, next } = nextSentences(latest.text, spoken.current.from, !answering)
+    spoken.current.from = next
+    void mouth.say(sentences, languageOf(latest.text, heardIn.current))
+  }, [latest.text, latest.turn, answering, mouth])
   const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error, reveal.shown)
   const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'talking', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: (answering && live.draft.length > 0) || reveal.behind, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
@@ -183,6 +204,8 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         setWanted(created.id)
       }
       if (said === undefined) setText('')
+      spokenTurn.current = said !== undefined
+      mouth.stop()
       await send.mutateAsync({ sessionId: target, text: message, spoken: said !== undefined })
       void session.refetch()
     } catch (e) {
@@ -206,11 +229,15 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     const down = (e: KeyboardEvent) => {
       if (!isTalkKey(e, e.isComposing)) return
       e.preventDefault()
+      mouth.stop()
       void voice.start()
     }
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') voice.stop()
-      if (e.code === 'Escape') voice.cancel()
+      if (e.code === 'Escape') {
+        voice.cancel()
+        mouth.stop()
+      }
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -218,7 +245,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [ended, voice])
+  }, [ended, voice, mouth])
 
   const switchMode = (m: ShioriMode) => {
     if (m === mode) return
@@ -357,6 +384,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
                 <Words tokens={subs.answer.tokens} streaming={subs.answer.streaming} />
               </p>
             )}
+            {mouth.speaking && (
+              <button type="button" className="sp-skip" onClick={mouth.stop}>
+                Quiet
+              </button>
+            )}
             {subs.answer && reveal.behind && (
               <button type="button" className="sp-skip" onClick={reveal.skip}>
                 Show it all
@@ -445,14 +477,14 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
               style={{ '--level': voice.level } as React.CSSProperties}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId)
-                void voice.start()
+                talk()
               }}
               onPointerUp={() => voice.stop()}
               onPointerCancel={() => voice.cancel()}
               onKeyDown={(e) => {
                 if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
                   e.preventDefault()
-                  void voice.start()
+                  talk()
                 }
               }}
               onKeyUp={(e) => {

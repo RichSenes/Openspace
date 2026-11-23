@@ -10,6 +10,12 @@ public sealed class VoiceOptions
 
     /// <summary>The longest recording accepted, in bytes.</summary>
     public long MaxBytes { get; set; } = 25 * 1024 * 1024;
+
+    /// <summary>Her voice: the local speech server; her words never leave the machine either.</summary>
+    public Uri SpeakUrl { get; set; } = new("http://127.0.0.1:8177");
+
+    /// <summary>The longest text spoken at once; the page sends her answers a sentence or two at a time.</summary>
+    public int MaxSpokenChars { get; set; } = 1200;
 }
 
 /// <summary>

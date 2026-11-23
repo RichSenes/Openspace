@@ -18,7 +18,11 @@ export function useDismiss(
       trigger?.current?.focus()
     }
     const onPress = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) close()
+      const at = e.target as Node
+      // A press on the button that opened it is left to that button, which toggles it shut;
+      // closing here too would make its click open it again.
+      if (box.current?.contains(at) || trigger?.current?.contains(at)) return
+      close()
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('pointerdown', onPress)

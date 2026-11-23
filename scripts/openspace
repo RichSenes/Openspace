@@ -102,7 +102,6 @@ start_one() {
     return
   fi
 
-  local wait=90
   case "$name" in
     ears)
       # Optional: without faster-whisper Openspace runs as before, only without voice.
@@ -111,10 +110,12 @@ start_one() {
         return
       fi
       mkdir -p "$EARS_MODELS"
-      # The first start downloads the models: give it time.
-      wait=600
       launch ears "$ROOT/tools/voice" "$EARS_PYTHON" listen-server.py --port "$EARS_PORT" --model "$EARS_MODEL" \
         --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS"
+      # Loading the models takes from seconds to minutes (the first time they are downloaded):
+      # the rest does not wait for them, and the page says when they are not ready yet.
+      say "ears: starting in the background on port $port (scripts/openspace status, logs ears)"
+      return
       ;;
     opencode)
       command -v opencode >/dev/null 2>&1 || fail "opencode is not installed (npm install -g opencode-ai)"
@@ -145,12 +146,12 @@ start_one() {
       ;;
   esac
 
-  for _ in $(seq "$wait"); do
+  for _ in $(seq 90); do
     if ready "$name"; then say "$name: ready on port $port"; return; fi
     group_of "$name" >/dev/null || fail "$name stopped while starting: see $STATE/logs/$name.log"
     sleep 1
   done
-  fail "$name is not answering after $wait seconds: see $STATE/logs/$name.log"
+  fail "$name is not answering after 90 seconds: see $STATE/logs/$name.log"
 }
 
 stop_one() {

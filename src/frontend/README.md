@@ -69,10 +69,12 @@ recording to the local listening server (`tools/voice/listen-server.py`, faster-
 the text back. Nothing said leaves the machine. Pure logic in `shiori/voice.ts`, the recorder in
 `shiori/useEars.ts`.
 
-Or turn on the ear beside the mic and call her by name: "Shiori, che tempo fa domani?", or just
-"Shiori" and then the request. The microphone stays open, the page cuts what it hears into
-sentences on its own (`shiori/wake.ts`, an AudioWorklet in `shiori/useWake.ts`) and the listening
-server keeps only those that start with her name. The choice is remembered in this browser.
+Or turn on the ear beside the mic and call her by name: "Shiori" opens a conversation (a rising
+chime), and every sentence after it is a message until a goodbye ("basta così", "grazie Shiori"),
+a minute of quiet or Stop talking (a falling chime). The microphone stays open, the page cuts what
+it hears into sentences on its own (`shiori/wake.ts`, an AudioWorklet in `shiori/useWake.ts`) and,
+before her name, the listening server keeps only a sentence that starts with it. Words said while
+she is answering are sent together once she is done. The choice is remembered in this browser.
 
 ## Views
 

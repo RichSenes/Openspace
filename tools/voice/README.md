@@ -44,8 +44,10 @@ In the Shiori view, **hold the microphone button** (or the **space bar** when no
 focused) and talk; let go and what you said is sent as your message. If something is already
 typed, the spoken words are added to it instead, for you to send. **Esc** while holding drops it.
 
-Or turn on the **ear** beside the mic and call her: "Shiori, cosa c'è oggi?" sends "cosa c'è
-oggi?"; "Shiori" alone makes her listen, and the next sentence within 8 seconds is sent. Her name
+Or turn on the **ear** beside the mic and call her: "Shiori" (or "Shiori, cosa c'è oggi?")
+opens a conversation, with a soft rising chime. From then on every sentence is a message, without
+her name, until a goodbye said alone ("basta così", "grazie Shiori", "that's all", "ありがとう"),
+a minute of quiet, or **Stop talking**; a falling chime says she stopped listening. Her name
 is matched by `wake.py` (also "hey Shiori", "ねえ、しおり"); only Italian, English and Japanese
 are considered, so a short sentence is not taken for another language.
 

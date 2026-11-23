@@ -114,7 +114,14 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   useEffect(() => {
     textRef.current = text
   })
+  // Said while she is still answering: kept, and sent together once she is done.
+  const busyRef = useRef(false)
+  const heardMeanwhile = useRef<string[]>([])
   const onHeard = (heard: Heard) => {
+    if (busyRef.current && !textRef.current.trim()) {
+      if (heard.text.trim()) heardMeanwhile.current.push(heard.text.trim())
+      return
+    }
     const next = afterHearing(heard, textRef.current)
     setText(next.compose)
     if (next.send) void submitRef.current(next.send)
@@ -123,7 +130,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const ended = !!view?.endedAt
   // Or call her by name: the microphone stays open and only "Shiori…" is listened to.
   const [byName, setByName] = useState(loadByName)
-  const wake = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking', onHeard, (message) => setProblem(message))
+  const { wake, end: endTalk } = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking', onHeard, (message) => setProblem(message))
   // Holding the mic says what the mic does; otherwise always listening tells its state.
   const byNameShown = wake !== 'off' && voice.ears === 'idle'
   const toggleByName = () => {
@@ -136,7 +143,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const mode = view?.mode ?? nextMode
   const info = MODES[modeOf(mode)]
   const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error)
-  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'called', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
+  const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'talking', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: answering && live.draft.length > 0, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
   // A failure with its advice needs the room of a long answer, not its card.
   const { focus, subsTop } = stageLayout(size.w, size.h, size.top, size.dock, subs.long || !!subs.failed)
@@ -181,7 +188,14 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   }
   useEffect(() => {
     submitRef.current = submit
+    busyRef.current = busy
   })
+  useEffect(() => {
+    if (busy || !heardMeanwhile.current.length) return
+    const said = heardMeanwhile.current.join(' ')
+    heardMeanwhile.current = []
+    void submitRef.current(said)
+  }, [busy])
 
   useEffect(() => {
     if (ended) return
@@ -473,6 +487,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         {!ended && (
           <p className={`sp-ears is-${byNameShown ? wake : voice.ears}`} aria-live="polite">
             {byNameShown ? wakeLabel(wake) : earsLabel(voice.ears, voice.ms)}
+            {byNameShown && wake === 'talking' && (
+              <button type="button" className="sp-ears-end" onClick={endTalk}>
+                Stop talking
+              </button>
+            )}
           </p>
         )}
       </footer>

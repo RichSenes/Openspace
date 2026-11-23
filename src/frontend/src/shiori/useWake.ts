@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Heard } from './voice'
-import { CALLED_MS, Utterances, resample, toWav, type Wake } from './wake'
+import { QUIET_MS, Utterances, isGoodbye, resample, toWav, type Wake } from './wake'
 
 // Hands the raw microphone to the page in pieces; nothing is played back.
 const TAP = `class Tap extends AudioWorkletProcessor {
@@ -32,15 +32,36 @@ async function ask(wav: ArrayBuffer, wake: boolean): Promise<Heard & { called: b
   return (await response.json()) as Heard & { called: boolean }
 }
 
+/** Two soft notes: rising when she starts listening, falling when the conversation closes. */
+function chime(ctx: AudioContext, up: boolean) {
+  const now = ctx.currentTime
+  const notes = up ? [660, 990] : [880, 587]
+  notes.forEach((hz, i) => {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = hz
+    const at = now + i * 0.11
+    gain.gain.setValueAtTime(0, at)
+    gain.gain.linearRampToValueAtTime(0.12, at + 0.015)
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.22)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(at)
+    osc.stop(at + 0.25)
+  })
+}
+
 /**
  * Always listening for her name. While `on`, the microphone stays open and each sentence is
- * checked for "Shiori…"; `onRequest` gets what was asked after it (or the next sentence, when
- * only her name was said). `paused` (holding the mic to talk) sets it aside meanwhile.
+ * checked for "Shiori…"; her name opens a conversation in which every sentence goes to
+ * `onRequest`, until a goodbye, a minute of quiet, or `end()`. `paused` (holding the mic to
+ * talk) sets it aside meanwhile.
  */
 export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) => void, onProblem: (message: string) => void) {
   const canListen = typeof AudioWorkletNode !== 'undefined' && !!navigator.mediaDevices
   const [wake, setWake] = useState<Wake>('off')
   const live = useRef({ onRequest, onProblem, paused })
+  const closer = useRef<() => void>(() => {})
   useEffect(() => {
     live.current = { onRequest, onProblem, paused }
   })
@@ -52,51 +73,69 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
     let ctx: AudioContext | null = null
     // Held here on purpose: Firefox lets go of audio nodes nobody holds, and the sound stops.
     let nodes: AudioNode[] = []
-    let calledUntil = 0
-    let calledTimer = 0
+    let talking = false
+    let quietTimer = 0
     let busy = false
-    let waiting: Float32Array | null = null
+    const queue: Float32Array[] = []
     const cut = new Utterances()
-    const settle = () => setWake(performance.now() < calledUntil ? 'called' : 'waiting')
+
+    const settle = () => setWake(talking ? 'talking' : 'waiting')
+    const keepOpen = () => {
+      clearTimeout(quietTimer)
+      quietTimer = window.setTimeout(() => close(), QUIET_MS)
+    }
+    const open = () => {
+      if (!talking && ctx) chime(ctx, true)
+      talking = true
+      keepOpen()
+      settle()
+    }
+    const close = () => {
+      if (talking && ctx) chime(ctx, false)
+      talking = false
+      clearTimeout(quietTimer)
+      if (!stopped) settle()
+    }
+    closer.current = close
 
     const hear = async (sentence: Float32Array) => {
-      if (busy) {
-        waiting = sentence // only the latest one waits; the room may talk faster than she hears
+      const inConversation = talking
+      if (inConversation) {
+        keepOpen()
+        setWake('hearing')
+      }
+      const heard = await ask(toWav(sentence), !inConversation)
+      if (stopped) return
+      if (!inConversation) {
+        if (!heard.called) return
+        open()
+        if (heard.text.trim()) live.current.onRequest(heard)
         return
       }
+      if (isGoodbye(heard.text)) close()
+      else if (heard.text.trim()) live.current.onRequest(heard)
+    }
+
+    // One sentence at a time, in the order they were said.
+    const next = async () => {
+      if (busy) return
       busy = true
-      const afterName = performance.now() < calledUntil
-      if (afterName) setWake('hearing')
-      try {
-        const heard = await ask(toWav(sentence), !afterName)
-        if (stopped) return
-        if (afterName) {
-          calledUntil = 0
-          if (heard.text.trim()) live.current.onRequest(heard)
-        } else if (heard.called) {
-          if (heard.text.trim()) live.current.onRequest(heard)
-          else {
-            // Only her name: she turns to listen for a moment.
-            calledUntil = performance.now() + CALLED_MS
-            clearTimeout(calledTimer)
-            calledTimer = window.setTimeout(settle, CALLED_MS + 50)
-          }
+      while (queue.length && !stopped) {
+        try {
+          await hear(queue.shift()!)
+        } catch (e) {
+          if (!stopped) live.current.onProblem(e instanceof Error ? e.message : String(e))
         }
-      } catch (e) {
-        if (!stopped) live.current.onProblem(e instanceof Error ? e.message : String(e))
-      } finally {
-        busy = false
         if (!stopped) settle()
-        const next = waiting
-        waiting = null
-        if (next && !stopped) void hear(next)
       }
+      busy = false
     }
 
     const begin = async () => {
       setWake('starting')
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+        // No automatic gain: raising the room's hum between words keeps sentences from ending.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } })
       } catch {
         if (!stopped) setWake('denied')
         return
@@ -127,7 +166,12 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
           cut.reset()
           return
         }
-        for (const sentence of cut.push(resample(e.data, rate))) void hear(sentence)
+        const said = cut.push(resample(e.data, rate))
+        if (!said.length) return
+        // Before her name only the latest sentence matters; in a conversation every one does.
+        if (talking) queue.push(...said)
+        else queue.splice(0, queue.length, said[said.length - 1])
+        void next()
       }
       setWake('waiting')
     }
@@ -137,7 +181,8 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
 
     return () => {
       stopped = true
-      clearTimeout(calledTimer)
+      closer.current = () => {}
+      clearTimeout(quietTimer)
       stream?.getTracks().forEach((t) => t.stop())
       nodes.forEach((n) => n.disconnect())
       nodes = []
@@ -146,5 +191,6 @@ export function useWake(on: boolean, paused: boolean, onRequest: (heard: Heard) 
     }
   }, [on, canListen])
 
-  return canListen ? wake : on ? 'unavailable' : 'off'
+  const end = useCallback(() => closer.current(), [])
+  return { wake: canListen ? wake : on ? ('unavailable' as const) : ('off' as const), end }
 }

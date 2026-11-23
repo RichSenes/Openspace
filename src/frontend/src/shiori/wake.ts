@@ -1,22 +1,23 @@
 /**
  * Calling Shiori by name: while always listening is on, the page keeps the microphone open,
  * cuts what is said into sentences on its own, and asks the listening server on this machine
- * whether a sentence starts with her name. Only then is it sent as a message; everything
- * else is dropped where it was heard.
+ * whether a sentence starts with her name. That opens a conversation: from then on every
+ * sentence is a message, until a goodbye ("basta così", "grazie Shiori") or a long quiet.
+ * Before her name everything is dropped where it was heard.
  */
-export type Wake = 'off' | 'starting' | 'waiting' | 'called' | 'hearing' | 'denied' | 'unavailable'
+export type Wake = 'off' | 'starting' | 'waiting' | 'talking' | 'hearing' | 'denied' | 'unavailable'
 
 /** The rate the listening server works at; sentences are sent as 16 kHz mono WAV. */
 export const RATE = 16_000
-/** After only her name ("Shiori?"), this long to say what you need. */
-export const CALLED_MS = 8_000
+/** A conversation nobody speaks in for this long goes back to waiting for her name. */
+export const QUIET_MS = 60_000
 
 const FRAME = 320 // 20 ms
 const PRE_ROLL = 15 // 300 ms kept from before the voice started, so the first sound is not cut
 const START = 3 // 60 ms of voice to begin a sentence
-const END = 35 // 700 ms of quiet to end it
+const END = 28 // 560 ms of quiet to end it
 const SHORTEST = 15 // 300 ms of voice: less is a cough or a click
-const LONGEST = 600 // 12 s: a long talk in the room is not a request
+const LONGEST = 1500 // 30 s: a sentence is cut here, so the room's noise cannot hold one open
 
 export function wakeLabel(wake: Wake): string {
   switch (wake) {
@@ -24,8 +25,8 @@ export function wakeLabel(wake: Wake): string {
       return 'Allow the microphone in the browser'
     case 'waiting':
       return 'Say “Shiori…” to talk to her, or hold the mic'
-    case 'called':
-      return 'Shiori is listening: say what you need'
+    case 'talking':
+      return 'Talking with Shiori · say “basta così” or “grazie Shiori” to stop'
     case 'hearing':
       return 'Shiori is hearing you…'
     case 'denied':
@@ -118,9 +119,11 @@ export class Utterances {
 
   private frame(frame: Float32Array): Float32Array | null {
     const level = rms(frame)
-    const voiced = level > Math.max(0.012, this.floor * 3)
+    const voiced = level > Math.max(0.01, this.floor * 3)
+    // The room's noise is followed all the time: down at once, up slowly (doubling in about
+    // seven seconds), so a fan or a raised mic gain cannot keep a sentence open forever.
+    this.floor = level < this.floor ? level * 0.5 + this.floor * 0.5 : this.floor * 1.002
     if (!this.sentence.length) {
-      this.floor = voiced ? this.floor : this.floor * 0.95 + level * 0.05
       this.before.push(frame)
       this.loud = voiced ? this.loud + 1 : 0
       if (this.loud >= START) {
@@ -143,6 +146,25 @@ export class Utterances {
     frames.forEach((f, i) => out.set(f, i * FRAME))
     return out
   }
+}
+
+// How a conversation is closed, said alone (her name around it is fine).
+const GOODBYES = new Set([
+  'basta', 'basta così', 'basta cosi', 'ok basta', 'stop', 'fine', 'ho finito', 'è tutto', 'e tutto', 'per ora è tutto',
+  'grazie', 'grazie è tutto', 'grazie basta', 'grazie mille', 'ciao', 'a dopo', 'chiudi', 'smetti di ascoltare',
+  "that's all", 'thats all', 'thank you', 'thanks', 'bye', 'goodbye', 'stop listening', "that's it", 'done',
+  'もういい', 'ありがとう', 'おわり', '終わり', 'ストップ', 'またね', 'じゃあね',
+])
+const NAME = /^(shiori|shiory|shori|siori|sciori|sheori|chiori|しおり|シオリ|栞)$/
+
+/** Whether a sentence only says goodbye: "Basta così.", "Grazie Shiori!", "ありがとう、しおり". */
+export function isGoodbye(text: string): boolean {
+  const words = text
+    .toLowerCase()
+    .replace(/[.,!?;:、。！？…"“”「」]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !NAME.test(w))
+  return words.length > 0 && words.length <= 4 && GOODBYES.has(words.join(' '))
 }
 
 const BY_NAME_KEY = 'openspace.shiori.byName'

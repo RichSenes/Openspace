@@ -28,7 +28,10 @@ Or by hand: `python tools/voice/listen-server.py --model medium --wake-model bas
 - `--model`: `small` is quick; `medium` (default) understands better; `large-v3` is best and
   wants a graphics card.
 - `--wake-model`: always listening runs every sentence said near the mic through this one, so it
-  stays light; only a sentence that starts with "Shiori" goes on to `--model`.
+  stays light; only a sentence that starts with "Shiori" goes on to `--model`. On a graphics card
+  give it the same name as `--model` (`small`): one model, one pass, and her name is heard far
+  more often than by `base`.
+- `--log-heard`: prints how each sentence was heard, to see how your voice gets her name written.
 - Graphics memory, int8 weights: `base` + `small` together take about 0.6 GB; `medium` about
   1.5 GB more. On a processor `small` takes a few seconds a sentence and `medium` several times
   that.

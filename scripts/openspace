@@ -111,7 +111,7 @@ start_one() {
       fi
       mkdir -p "$EARS_MODELS"
       launch ears "$ROOT/tools/voice" "$EARS_PYTHON" listen-server.py --port "$EARS_PORT" --model "$EARS_MODEL" \
-        --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS"
+        --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS" ${OPENSPACE_EARS_LOG_HEARD:+--log-heard}
       # Loading the models takes from seconds to minutes (the first time they are downloaded):
       # the rest does not wait for them, and the page says when they are not ready yet.
       say "ears: starting in the background on port $port (scripts/openspace status, logs ears)"

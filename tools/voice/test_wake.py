@@ -20,6 +20,13 @@ class CalledTests(unittest.TestCase):
         self.assertEqual(called("Siori apri le note"), (True, "apri le note"))
         self.assertEqual(called("Shori."), (True, ""))
 
+    def test_a_name_heard_a_little_wrong_is_still_her(self):
+        self.assertEqual(called("Sheori, accendi la musica"), (True, "accendi la musica"))
+        self.assertEqual(called("Shuri che ore sono"), (True, "che ore sono"))
+        self.assertEqual(called("Siri, che ore sono"), (False, ""))
+        self.assertEqual(called("Signori, si parte"), (False, ""))
+        self.assertEqual(called("Sicuri di no"), (False, ""))
+
     def test_japanese(self):
         self.assertEqual(called("しおり、今日の予定は？"), (True, "今日の予定は？"))
         self.assertEqual(called("ねえ、シオリちゃん、おはよう"), (True, "おはよう"))

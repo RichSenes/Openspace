@@ -133,7 +133,9 @@ internal sealed class Harness
         new(Routines, [OffersKind], Outbox, UnitOfWork, Clock, NullLogger<Routines.ProposalCommands>.Instance);
 
     public GpuShift Shift() => new(
-        Gpu, GpuProbe, ModelServer, Tasks, Offices, Runtime, Activity, UnitOfWork, new LiveOptions<LocalModelOptions>(() => LocalModels), Clock);
+        Gpu, GpuProbe, ModelServer, Tasks, Offices, Runtime, Activity, UnitOfWork, new LiveOptions<LocalModelOptions>(() => LocalModels), Clock, [Voice]);
+
+    public FakeVoiceGuest Voice { get; } = new();
 
     public AgentSignals Signals() => new(
         Offices, new AgentSetups(Roles), Tasks, UnitOfWork, Runtime, Activity, Context, Interns, Audit, Publisher, Reviews, Permissions,

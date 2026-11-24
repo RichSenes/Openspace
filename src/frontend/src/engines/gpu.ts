@@ -8,6 +8,15 @@ export interface GpuBadge {
   tone: GpuTone
   /** The longer story, for the tooltip. */
   title: string
+  /** Openspace's own programs hold memory a waiting model needs: a button can free it. */
+  canMakeRoom: boolean
+}
+
+/** "Shiori's voice 5.9 GB, ComfyUI 8.3 GB": who has the card's memory. */
+export function gpuUsing(view: GpuView): string | undefined {
+  const using = view.using ?? []
+  if (!using.length) return undefined
+  return using.map((u) => `${u.name} ${(u.miB / 1024).toFixed(1)} GB`).join(', ')
 }
 
 /**
@@ -33,7 +42,12 @@ export function gpuBadge(view: GpuView | undefined): GpuBadge | undefined {
     state: view.state,
     text,
     tone,
-    title: [view.detail ?? text, ...(users ? [`Used by: ${users.full.join('; ')}`] : [])].join('\n'),
+    title: [
+      view.detail ?? text,
+      ...(users ? [`Used by: ${users.full.join('; ')}`] : []),
+      ...(gpuUsing(view) ? [`On the card: ${gpuUsing(view)}`] : []),
+    ].join('\n'),
+    canMakeRoom: view.state === 'WaitingForMemory' && (view.using ?? []).some((u) => u.openspace && u.name !== "Shiori's ears"),
   })
   switch (view.state) {
     case 'Loading':
@@ -41,7 +55,8 @@ export function gpuBadge(view: GpuView | undefined): GpuBadge | undefined {
     case 'Serving':
       return badge(users ? `${model} · ${users.short}` : `${model} · idle`, 'calm')
     case 'WaitingForMemory':
-      return badge(`${model} waits for graphics memory`, 'waiting')
+      // Named after the biggest holder, so it is clear what to close or free.
+      return badge(view.using?.length ? `${model} waits for graphics memory held by ${view.using[0].name}` : `${model} waits for graphics memory`, 'waiting')
     case 'Yielding':
       return badge(`Freeing the graphics card for ${holders}`, 'waiting')
     case 'Lent':

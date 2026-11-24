@@ -1,9 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { join, Pcm } from './pcm'
+import { byScript, languageOf, type Spoken } from './speech'
 
-interface Line {
-  text: string
+interface Line extends Spoken {
   language: string
+}
+
+/** A line being heard: when it started on the audio clock, and how long it is so far. */
+interface Heard {
+  line: Line
+  start: number
+  seconds: number
+  arrived: boolean
+}
+
+/** Her speaking pace, to guess how long a line lasts while it is still arriving. */
+const CHARS_PER_SECOND = 14
+
+/** Where in the written text she is, given the lines heard so far and the audio clock. */
+export function placeOf(heard: Heard[], now: number): number | null {
+  if (!heard.length) return null
+  let at = heard[0].line.from
+  for (const h of heard) {
+    if (now < h.start) break
+    const lasts = h.arrived ? h.seconds : Math.max(h.seconds, h.line.text.length / CHARS_PER_SECOND)
+    const share = lasts > 0 ? Math.min(1, (now - h.start) / lasts) : 1
+    at = h.line.from + (h.line.to - h.line.from) * share
+  }
+  return at
 }
 
 /** Her voice could not start because the graphics card is full: she writes instead, for now. */
@@ -37,6 +61,11 @@ async function problemOf(response: Response): Promise<Error> {
 export function useVoice(onProblem: (message: string) => void) {
   const [speaking, setSpeaking] = useState(false)
   const [resting, setResting] = useState<string | null>(null)
+  // Whether her voice answers, as far as the page knows: null until asked.
+  const [answers, setAnswers] = useState<boolean | null>(null)
+  // Where in the written text her voice is, while it speaks: the page shows the words with it.
+  const [at, setAt] = useState<number | null>(null)
+  const heard = useRef<Heard[]>([])
   const queue = useRef<Line[]>([])
   const running = useRef(false)
   const round = useRef(0)
@@ -57,7 +86,10 @@ export function useVoice(onProblem: (message: string) => void) {
     const audio = (ctx.current ??= new AudioContext())
     await audio.resume().catch(() => {})
     let cursor = 0 // when the last scheduled piece ends, on the audio clock
-    const play = (samples: Float32Array, rate: number) => {
+    const clock = setInterval(() => {
+      if (round.current === mine) setAt(placeOf(heard.current, audio.currentTime))
+    }, 80)
+    const play = (samples: Float32Array, rate: number, line: Heard) => {
       if (!samples.length || round.current !== mine) return
       const buffer = audio.createBuffer(1, samples.length, rate)
       buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0)
@@ -66,6 +98,8 @@ export function useVoice(onProblem: (message: string) => void) {
       source.connect(audio.destination)
       const at = Math.max(cursor, audio.currentTime + 0.05)
       source.start(at)
+      if (!line.seconds) line.start = at
+      line.seconds = at + buffer.duration - line.start
       cursor = at + buffer.duration
       playing.current.add(source)
       source.onended = () => playing.current.delete(source)
@@ -73,6 +107,8 @@ export function useVoice(onProblem: (message: string) => void) {
     try {
       while (queue.current.length && round.current === mine) {
         const line = queue.current.shift()!
+        const mark: Heard = { line, start: Number.POSITIVE_INFINITY, seconds: 0, arrived: false }
+        heard.current.push(mark)
         const abort = new AbortController()
         aborts.current = abort
         const response = await fetch('/api/voice/speak/stream', {
@@ -99,13 +135,14 @@ export function useVoice(onProblem: (message: string) => void) {
             length += samples.length
           }
           if (length >= want || (done && length)) {
-            play(join(gathered), rate)
+            play(join(gathered), rate, mark)
             gathered = []
             length = 0
             want = PIECE * rate
           }
           if (done) break
         }
+        mark.arrived = true
       }
       // Wait for the last words to be heard.
       while (round.current === mine && audio.currentTime < cursor) await new Promise((r) => setTimeout(r, 100))
@@ -115,8 +152,15 @@ export function useVoice(onProblem: (message: string) => void) {
         else if (!(e instanceof DOMException && e.name === 'AbortError')) live.current(e instanceof Error ? e.message : String(e))
       }
       queue.current = []
+      // Her voice gave up: the words go on at reading pace from where they are.
+      heard.current = []
+      if (round.current === mine) setAt(null)
     } finally {
+      clearInterval(clock)
       if (round.current === mine) {
+        // All said: the text is shown whole up to the last line; a stop shows it all at once.
+        const last = heard.current.at(-1)
+        if (last) setAt(last.line.to)
         running.current = false
         aborts.current = null
         setSpeaking(false)
@@ -132,20 +176,32 @@ export function useVoice(onProblem: (message: string) => void) {
       } catch {
         ready.current = false
       }
+      setAnswers(ready.current)
       // Asked again later: her voice may be started after the page.
       setTimeout(() => (ready.current = null), 30_000)
     }
     return ready.current
   }, [])
 
+
+  /**
+   * Queues the parts of an answer: each is split where it changes between Japanese and other
+   * scripts, and said in that piece's language (`language` is the one she was spoken to in).
+   */
   const say = useCallback(
-    async (sentences: string[], language: string) => {
-      if (!sentences.length || !(await available())) return
-      queue.current.push(...sentences.map((text) => ({ text, language })))
+    async (parts: Spoken[], language: string) => {
+      if (!parts.length || !(await available())) return
+      queue.current.push(...parts.flatMap(byScript).map((p) => ({ ...p, language: languageOf(p.text, language) })))
       void run()
     },
     [run, available],
   )
+
+  /** A new answer starts: where her voice is starts over from the answer's first words. */
+  const begin = useCallback((from = 0) => {
+    heard.current = []
+    setAt(from)
+  }, [])
 
   const warm = useCallback(async () => {
     if (!(await available())) return
@@ -175,6 +231,8 @@ export function useVoice(onProblem: (message: string) => void) {
     }
     playing.current.clear()
     running.current = false
+    heard.current = []
+    setAt(null)
     setSpeaking(false)
   }, [])
 
@@ -187,5 +245,13 @@ export function useVoice(onProblem: (message: string) => void) {
     [stop],
   )
 
-  return { speaking, resting, say, stop, warm }
+  // Asked once on arrival, so the page knows whether answers will be spoken.
+  useEffect(() => {
+    void available()
+  }, [available])
+
+  /** Answers follow her voice when it will speak them: it answers and has room on the card. */
+  const voiced = answers === true && !resting
+
+  return { speaking, resting, voiced, at, say, stop, warm, begin }
 }

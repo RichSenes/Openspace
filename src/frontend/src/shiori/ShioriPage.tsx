@@ -31,7 +31,7 @@ import { useReveal } from './reveal'
 import { useEars } from './useEars'
 import { useWake } from './useWake'
 import { useVoice } from './useVoice'
-import { languageOf, nextSentences } from './speech'
+import { nextSentences } from './speech'
 import { loadByName, saveByName, wakeLabel } from './wake'
 import { afterHearing, earsLabel, isTalkKey, type Heard } from './voice'
 import { Words } from './Words'
@@ -160,17 +160,19 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const mode = view?.mode ?? nextMode
   const info = MODES[modeOf(mode)]
   const latest = answerText(view?.transcript ?? [], live.draft, answering)
-  const reveal = useReveal(latest.turn, latest.text.length)
+  // A spoken answer appears as her voice says it; otherwise (and if her voice stops) at reading pace.
+  const [spokenTurn, setSpokenTurn] = useState(false)
+  const reveal = useReveal(latest.turn, latest.text.length, spokenTurn && mouth.voiced ? mouth.at : null)
   // Spoken back a sentence at a time as she writes, when the turn was spoken.
-  const spokenTurn = useRef(false)
   const spoken = useRef({ turn: latest.turn, from: 0 })
+  const { say } = mouth
   useEffect(() => {
     if (spoken.current.turn !== latest.turn) spoken.current = { turn: latest.turn, from: 0 }
-    if (!spokenTurn.current || !latest.text) return
-    const { sentences, next } = nextSentences(latest.text, spoken.current.from, !answering)
+    if (!spokenTurn || !latest.text) return
+    const { parts, next } = nextSentences(latest.text, spoken.current.from, !answering)
     spoken.current.from = next
-    void mouth.say(sentences, languageOf(latest.text, heardIn.current))
-  }, [latest.text, latest.turn, answering, mouth])
+    void say(parts, heardIn.current)
+  }, [latest.text, latest.turn, answering, say, spokenTurn])
   const subs = liveSubtitles(view?.transcript ?? [], live.draft, answering, live.error, reveal.shown)
   const face = faceFor({ typing: (focused && text.trim().length > 0) || voice.ears === 'recording' || wake === 'talking', sending: sending || voice.ears === 'hearing' || wake === 'hearing', answering, streaming: (answering && live.draft.length > 0) || reveal.behind, failed: !!subs.failed, ended })
   const faceLook = FACE_LOOKS[face]
@@ -209,8 +211,9 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         setWanted(created.id)
       }
       if (said === undefined) setText('')
-      spokenTurn.current = said !== undefined
+      setSpokenTurn(said !== undefined)
       mouth.stop()
+      mouth.begin()
       await send.mutateAsync({ sessionId: target, text: message, spoken: said !== undefined })
       void session.refetch()
     } catch (e) {

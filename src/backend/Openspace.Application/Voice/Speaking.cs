@@ -12,6 +12,12 @@ public interface ISpeaker
     /// <summary>Loads her voice now, so the first sentence of a conversation does not wait for it.</summary>
     Task<SpeakerStatus> WakeAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Frees the graphics card when her voice has been quiet for <paramref name="quietFor"/>
+    /// (zero: now). True when it is not on the card afterwards, or not running at all.
+    /// </summary>
+    Task<bool> SleepAsync(TimeSpan quietFor, CancellationToken cancellationToken);
+
     /// <summary>Whether the voice answers, and with which engine and voice.</summary>
     Task<SpeakerStatus> StatusAsync(CancellationToken cancellationToken);
 }

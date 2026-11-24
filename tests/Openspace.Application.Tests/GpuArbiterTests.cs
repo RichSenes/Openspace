@@ -103,6 +103,77 @@ public class GpuArbiterTests
     }
 
     [Fact]
+    public async Task Her_voice_makes_room_for_a_model_once_it_has_been_quiet_a_minute()
+    {
+        _h.GpuProbe.Memory = new GpuMemory(7000, 12288);
+        _h.GpuProbe.Users.AddRange([new GpuUser("Shiori's voice", 6050, true), new GpuUser("Shiori's ears", 1082, true)]);
+        await LocalTaskAsync();
+
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal([GpuShift.GuestQuiet], _h.Voice.Asked);
+        var view = _h.Gpu.View();
+        Assert.Equal(GpuState.WaitingForMemory, view.State);
+        Assert.Contains("Shiori's voice made room", view.Detail, StringComparison.Ordinal);
+        Assert.Equal(["Shiori's voice", "Shiori's ears"], view.Using!.Select(u => u.Name));
+    }
+
+    [Fact]
+    public async Task While_she_talks_her_voice_keeps_the_card_and_says_how_to_free_it()
+    {
+        _h.GpuProbe.Memory = new GpuMemory(7000, 12288);
+        _h.GpuProbe.Users.Add(new GpuUser("Shiori's voice", 6050, true));
+        _h.Voice.Talking = true;
+        await LocalTaskAsync();
+
+        await _h.Shift().TickAsync(default);
+
+        Assert.Contains("Make room", _h.Gpu.View().Detail, StringComparison.Ordinal);
+        Assert.Empty(_h.ModelServer.Started);
+    }
+
+    [Fact]
+    public async Task Programs_that_are_not_Openspaces_are_only_named()
+    {
+        _h.GpuProbe.Memory = new GpuMemory(9000, 12288);
+        _h.GpuProbe.Users.Add(new GpuUser("ComfyUI", 8500, false));
+        await LocalTaskAsync();
+
+        await _h.Shift().TickAsync(default);
+
+        Assert.Empty(_h.Voice.Asked);
+        Assert.Equal("ComfyUI", _h.Gpu.View().Using!.Single().Name);
+    }
+
+    [Fact]
+    public async Task An_idle_model_gives_way_when_her_voice_finds_the_card_full()
+    {
+        var task = await RunningLocalTaskAsync();
+        task.SubmitForReview(_h.Clock.GetUtcNow());
+        await _h.Shift().TickAsync(default);
+        Assert.Equal(GpuState.Serving, _h.Gpu.View().State);
+
+        _h.Gpu.WantRoom("Shiori's voice");
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal(GpuState.Free, _h.Gpu.View().State);
+        Assert.Contains("make room for Shiori's voice", _h.Gpu.View().Detail, StringComparison.Ordinal);
+        Assert.Equal(1, _h.ModelServer.Stops);
+    }
+
+    [Fact]
+    public async Task A_model_at_work_keeps_the_card_when_her_voice_asks()
+    {
+        await RunningLocalTaskAsync();
+        _h.Gpu.WantRoom("Shiori's voice");
+
+        await _h.Shift().TickAsync(default);
+
+        Assert.Equal(GpuState.Serving, _h.Gpu.View().State);
+        Assert.Equal(0, _h.ModelServer.Stops);
+    }
+
+    [Fact]
     public async Task While_a_holder_runs_the_model_is_not_loaded()
     {
         _h.GpuProbe.Programs.Add("dotnet /apps/image-studio/ImageStudio.dll");

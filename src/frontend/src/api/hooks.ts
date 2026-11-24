@@ -602,6 +602,11 @@ export function useRetryGpu() {
   return useWrite(() => request<void>('POST', '/api/gpu/retry'), keys.gpu)
 }
 
+/** A model waits for memory Openspace's own programs hold (Shiori's voice): they let it go now. */
+export function useMakeRoom() {
+  return useWrite(() => request<void>('POST', '/api/gpu/make-room'), keys.gpu)
+}
+
 /** Changes what runs a desk's agent: engine, agent and model. */
 export function useChangeDeskAgent(officeId: string) {
   return useWrite(

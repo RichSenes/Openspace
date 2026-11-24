@@ -69,6 +69,14 @@ public sealed class VoiceApiTests : IDisposable
 
         public bool Busy { get; init; }
 
+        public List<TimeSpan> Slept { get; } = [];
+
+        public Task<bool> SleepAsync(TimeSpan quietFor, CancellationToken cancellationToken)
+        {
+            Slept.Add(quietFor);
+            return Task.FromResult(true);
+        }
+
         public Task<SpokenAudio> StreamAsync(string text, string language, CancellationToken cancellationToken)
         {
             Language = language;
@@ -96,6 +104,18 @@ public sealed class VoiceApiTests : IDisposable
         Assert.Equal("48000", response.Headers.GetValues("X-Sample-Rate").Single());
         Assert.Equal([1, 0, 2, 0], await response.Content.ReadAsByteArrayAsync());
         Assert.Equal("ja", voice.Language);
+    }
+
+    [Fact]
+    public async Task Make_room_frees_the_card_from_her_voice_at_once()
+    {
+        var voice = new Voice();
+        var client = _app.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<ISpeaker>(voice))).CreateClient();
+
+        var response = await client.PostAsync("/api/gpu/make-room", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([TimeSpan.Zero], voice.Slept);
     }
 
     [Fact]

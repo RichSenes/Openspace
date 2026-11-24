@@ -22,6 +22,23 @@ describe('gpuBadge', () => {
     expect(badge?.title).toBe('Local desks wait until the graphics card is free again.')
   })
 
+  it('says who holds the memory a model waits for, and offers to free what is Openspace\'s', () => {
+    const waiting = view({
+      state: 'WaitingForMemory',
+      modelName: 'Gemma',
+      detail: '3900 MiB free on the graphics card, 10300 needed.',
+      using: [
+        { name: "Shiori's voice", miB: 6050, openspace: true },
+        { name: "Shiori's ears", miB: 1082, openspace: true },
+      ],
+    })
+    const badge = gpuBadge(waiting)
+    expect(badge?.text).toBe("Gemma waits for graphics memory held by Shiori's voice")
+    expect(badge?.title).toContain("On the card: Shiori's voice 5.9 GB, Shiori's ears 1.1 GB")
+    expect(badge?.canMakeRoom).toBe(true)
+    expect(gpuBadge({ ...waiting, using: [{ name: 'ComfyUI', miB: 9000, openspace: false }] })?.canMakeRoom).toBe(false)
+  })
+
   it('says in the bar when a model did not load for lack of graphics memory', () => {
     expect(gpuBadge(view({ state: 'Failed', modelName: 'Gemma', detail: 'The model server stopped while loading (not enough graphics memory): trying again at 17:04.' }))?.text).toBe(
       'Gemma: not enough graphics memory',

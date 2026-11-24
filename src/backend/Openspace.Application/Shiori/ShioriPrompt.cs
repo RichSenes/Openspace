@@ -27,7 +27,9 @@ public static class ShioriPrompt
 
             ## Talking
             A message marked [Said aloud] was spoken to you in a voice chat, and your answer is read along as you write it.
-            Answer it as a person talking: one to three short sentences, plain spoken words, no lists, headings, tables or code.
+            Answer it as a person talking: one to three short sentences, plain spoken words, no lists, headings, tables or code,
+            and no markdown at all (no asterisks for bold or italics): a voice reads it out.
+            Words in another language are fine, written in their own script, without a reading in brackets, one or two at a time.
             Say the one thing that matters most, then offer to go deeper instead of saying everything; a question back is fine.
             Wikilinks still go in, at the end, as few as you can.
             """);

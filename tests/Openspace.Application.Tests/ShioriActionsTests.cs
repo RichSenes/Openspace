@@ -138,6 +138,45 @@ public class ShioriActionsTests
     }
 
     [Fact]
+    public async Task Organise_gives_a_single_task_straight_to_the_desk_named_approved_and_queued()
+    {
+        var (id, token) = await OpenAsync(ShioriMode.Organise);
+
+        var said = await _actions.AssignAsync(token, "e corp", "frontend", "Read the app's version", "Say which version package.json has.", default);
+
+        var task = Assert.Single(_s.H.Tasks.Items);
+        Assert.Equal((WorkTaskStatus.Queued, _s.H.Desk.Id, "Shiori", "Read the app's version"), (task.Status, task.DeskId!.Value, task.RequestedBy, task.Title));
+        Assert.Contains("No approval needed", said, StringComparison.Ordinal);
+        Assert.Contains("Read the app's version → E Corp, Frontend", (await _sessions.GetAsync(id, default)).Board.Select(i => i.Text));
+        Assert.Empty(_s.H.Runtime.PlanRequests);
+    }
+
+    [Fact]
+    public async Task Without_a_desk_the_task_goes_to_the_least_busy_one_and_a_wrong_desk_is_named()
+    {
+        var spare = _s.H.Office.AddDesk(_s.H.Room.Id, "Backend", AgentProfile.Create("build"), Harness.Start);
+        _s.H.Enqueue("Already busy");
+        var (_, token) = await OpenAsync(ShioriMode.Organise);
+
+        await _actions.AssignAsync(token, "E Corp", null, "Read the version", null, default);
+        var wrong = await Assert.ThrowsAsync<RejectedException>(() => _actions.AssignAsync(token, "E Corp", "Design", "Anything", null, default));
+
+        Assert.Equal(spare.Id, _s.H.Tasks.Items.Single(t => t.Title == "Read the version").DeskId);
+        Assert.Contains("Its desks are: Frontend, Backend", wrong.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Only_organise_gives_tasks()
+    {
+        var (_, token) = await OpenAsync(ShioriMode.Brainstorm);
+
+        var refused = await Assert.ThrowsAsync<RejectedException>(() => _actions.AssignAsync(token, "E Corp", null, "Read the version", null, default));
+
+        Assert.Equal(ShioriActions.ModeCode, refused.Code);
+        Assert.Empty(_s.H.Tasks.Items);
+    }
+
+    [Fact]
     public async Task Organise_names_the_offices_when_asked_for_one_that_does_not_exist_and_cannot_propose()
     {
         var (_, token) = await OpenAsync(ShioriMode.Organise);

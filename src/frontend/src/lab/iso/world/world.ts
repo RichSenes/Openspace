@@ -61,7 +61,7 @@ export interface Lab {
   /** The real world changed: characters take their new places, interns come and go. */
   update(view: WorldView): void
   /** Paints the view: a window of `viewW` × `viewH` world pixels, the lab in its middle. */
-  draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions, viewW: number, viewH: number): void
+  draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions, viewW: number, viewH: number, centre?: [number, number]): void
 }
 
 /**
@@ -381,11 +381,13 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   return {
     world,
     update,
-    draw(ctx, t, dt, when, viewW, viewH) {
+    draw(ctx, t, dt, when, viewW, viewH, centre) {
       fit(viewW, viewH)
-      // Where the view sits on the world: its middle on the lab's.
-      const ox = Math.round((width - vw) / 2)
-      const oy = Math.round((height - vh) / 2)
+      // Where the view sits on the world: its middle on the lab's, or where it was moved to,
+      // never past the world's edges.
+      const [cx0, cy0] = centre ?? [width / 2, height / 2]
+      const ox = vw >= width ? Math.round((width - vw) / 2) : Math.round(Math.min(width - vw, Math.max(0, cx0 - vw / 2)))
+      const oy = vh >= height ? Math.round((height - vh) / 2) : Math.round(Math.min(height - vh, Math.max(0, cy0 - vh / 2)))
       const inWorld = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, -ox, -oy)
       const plain = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, 0, 0)
       for (const ag of agents) step(ag, t, dt)

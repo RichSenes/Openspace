@@ -6,6 +6,7 @@ using Openspace.Application.Attention;
 using Openspace.Application.Brain;
 using Openspace.Application.Work;
 using Openspace.Domain.Offices;
+using Openspace.Domain.Work;
 
 namespace Openspace.Application.Shiori;
 
@@ -22,7 +23,9 @@ public sealed class ShioriActions(
     IOfficeRepository offices,
     SupervisorJobs jobs,
     Supervisor supervisor,
-    TimeProvider clock)
+    TimeProvider clock,
+    IWorkTaskRepository? tasks = null,
+    IUnitOfWork? unitOfWork = null)
 {
     public const string ModeCode = "shiori-mode";
 
@@ -166,6 +169,66 @@ public sealed class ShioriActions(
         await sessions.ChangeBoardAsync(session.Id, new WhiteboardChange(WhiteboardAction.Add, Kind: WhiteboardKind.Task, Text: $"Plan asked of {target.Name}: {what}", Office: target.Name), cancellationToken)
             .ConfigureAwait(false);
         return $"The supervisor of {target.Name} is planning it (job {job.Id}). The tasks arrive as proposals under an epic, for the person to approve.";
+    }
+
+    /// <summary>
+    /// Gives one task straight to a desk, as the office's supervisor would: the person asked for it
+    /// in the session, so it is approved and goes in the queue at once, with no proposal to accept.
+    /// Without a desk named, the desk of the office with the least work in hand takes it.
+    /// </summary>
+    public async Task<string> AssignAsync(string token, string office, string? desk, string title, string? description, CancellationToken cancellationToken)
+    {
+        var session = await CallerAsync(token, ShioriTools.AssignTask, cancellationToken).ConfigureAwait(false);
+        if (tasks is null || unitOfWork is null)
+        {
+            throw new RejectedException("shiori-assign", "Tasks cannot be given from here.");
+        }
+
+        var what = title?.Trim();
+        if (string.IsNullOrEmpty(what))
+        {
+            throw new RejectedException("empty-text", "Say what the task is, in a short title.");
+        }
+
+        var all = await offices.ListAsync(cancellationToken).ConfigureAwait(false);
+        var target = all.FirstOrDefault(o => string.Equals(o.Name, office?.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new RejectedException("shiori-office", $"There is no office \"{office}\". The offices are: {string.Join(", ", all.Select(o => o.Name))}.");
+        var desks = target.Rooms.Where(r => r.Kind == RoomKind.Work).SelectMany(r => r.Desks).ToList();
+        if (desks.Count == 0)
+        {
+            throw new RejectedException("shiori-desk", $"{target.Name} has no desk to give work to.");
+        }
+
+        Desk chosen;
+        if (!string.IsNullOrWhiteSpace(desk))
+        {
+            chosen = desks.FirstOrDefault(d => string.Equals(d.Name, desk.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new RejectedException("shiori-desk", $"{target.Name} has no desk \"{desk}\". Its desks are: {string.Join(", ", desks.Select(d => d.Name))}.");
+        }
+        else
+        {
+            // The desk with the least in hand: running, queued or waiting for a review.
+            var busy = new Dictionary<DeskId, int>();
+            foreach (var status in new[] { WorkTaskStatus.Running, WorkTaskStatus.Queued, WorkTaskStatus.Review })
+            {
+                foreach (var t in await tasks.ListAsync(target.Id, status, cancellationToken).ConfigureAwait(false))
+                {
+                    if (t.DeskId is { } d)
+                    {
+                        busy[d] = busy.GetValueOrDefault(d) + 1;
+                    }
+                }
+            }
+
+            chosen = desks.OrderBy(d => busy.GetValueOrDefault(d.Id)).First();
+        }
+
+        var task = WorkTask.Assign(target, chosen.Id, what, description?.Trim(), "Shiori", clock.GetUtcNow());
+        tasks.Add(task);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await sessions.ChangeBoardAsync(session.Id, new WhiteboardChange(WhiteboardAction.Add, Kind: WhiteboardKind.Task, Text: $"{what} → {target.Name}, {chosen.Name}", Office: target.Name), cancellationToken)
+            .ConfigureAwait(false);
+        return $"Given to {chosen.Name} in {target.Name}: \"{what}\" is in the queue and starts as soon as a seat is free. No approval needed: the person asked for it.";
     }
 
     /// <summary>The calling session, when its mode allows the tool now.</summary>

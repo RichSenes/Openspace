@@ -59,31 +59,49 @@ are considered, so a short sentence is not taken for another language.
 ## Speaking (text to speech)
 
 `speak-server.py` gives Shiori her voice, on this machine. Her answers to what you said aloud are
-spoken back a sentence at a time while she writes them; meanwhile she does not listen, so she
-never hears herself. Holding the mic, **Esc** or **Quiet** under her words stops her.
+spoken back a sentence at a time while she writes them, and each sentence streams: it starts
+playing about 0.2 s after it is asked for, while the rest is still being made. Meanwhile she does
+not listen, so she never hears herself. Holding the mic, **Esc** or **Quiet** under her words
+stops her.
 
-Two engines, both Apache-2.0:
+Engines:
 
-- `qwen`, [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) Base 1.7B: clones one voice and makes
-  it speak Italian, English and Japanese, so she sounds the same in all three. Wants a graphics
-  card (about 4–5 GB).
+- `voxcpm` (the default), [VoxCPM2](https://github.com/OpenBMB/VoxCPM) (Apache-2.0): clones one
+  voice and makes it speak Italian, English and Japanese, with the most natural intonation of the
+  ones tried (Qwen's Italian sounds English-accented). On an RTX 3060 it makes speech a little
+  faster than it is spoken, in about 6 GB.
+- `qwen`, [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) Base 1.7B (Apache-2.0): the same kind of
+  cloning, 1.7 times slower than speech, 4–5 GB.
 - `qwen-fast`: the same voice through [faster-qwen3-tts](https://github.com/andimarafioti/faster-qwen3-tts)
-  (MIT), which replays CUDA graphs. On an RTX 3060 the 1.7B model makes speech about 1.8 times
-  faster than it is spoken (the first sound after half a second) in 4.6 GB, the 0.6B twice as
-  fast in 2.7 GB; plain `qwen` is 1.7 times slower than speech. It wants its own environment:
-  `pip install faster-qwen3-tts transformers==5.15.1` (newer transformers break it).
-- `kokoro`, [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M): tiny and quick, also on a
-  processor, but each language has its own preset voice.
+  (MIT), which replays CUDA graphs: about 1.8 times faster than speech in 4.6 GB (the 0.6B model
+  in 2.7 GB). It wants its own environment: `pip install faster-qwen3-tts transformers==5.15.1`.
+- `kokoro`, [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0): tiny and quick,
+  also on a processor, but flat, and each language has its own preset voice.
+
+### Sharing the graphics card
+
+The model is not kept loaded. It is loaded when you call her by name (the first words are
+answered while it loads, about 15 s) or when she first has something to say, and it is unloaded
+after `OPENSPACE_VOICE_IDLE` seconds of quiet (300 by default). It runs in its own process, so
+unloading frees all of its memory for image generation, training or a large language model.
+
+- When the card has less free memory than the engine needs (6.5 GB for voxcpm; `--need-gb`), she
+  does not load: the page says her voice is resting and she answers in writing, and tries again
+  at the next answer.
+- When she is quiet and someone else fills the card (under `--leave-gb`, 1 GB free), she unloads
+  without waiting.
+
+### Setting it up
 
 Her voice is designed once from a description with `design-voice.py` (Qwen3-TTS VoiceDesign),
 which writes a folder with a clip of it; the server clones that clip for every sentence:
 
 ```bash
 python3 -m venv ~/.local/share/openspace/tts-venv
-~/.local/share/openspace/tts-venv/bin/pip install qwen-tts soundfile   # or: kokoro misaki[ja]
+~/.local/share/openspace/tts-venv/bin/pip install voxcpm qwen-tts soundfile   # or: kokoro misaki[ja]
 ~/.local/share/openspace/tts-venv/bin/python tools/voice/design-voice.py \
   --model DIR/Qwen3-TTS-12Hz-1.7B-VoiceDesign --out ~/.local/share/openspace/voices/shiori \
-  --describe "A young woman in her late twenties, warm and calm, soft mid-low pitch, gentle"
+  --describe "A young woman with a low, soft, intimate voice: calm, slightly breathy, warm, slow"
 ```
 
 Then in `~/.config/openspace/openspace.env`, and `scripts/openspace start` starts it with the rest
@@ -91,10 +109,13 @@ Then in `~/.config/openspace/openspace.env`, and `scripts/openspace start` start
 
 ```bash
 OPENSPACE_VOICE_PYTHON=~/.local/share/openspace/tts-venv/bin/python
-OPENSPACE_VOICE_ENGINE=qwen                       # or kokoro
-OPENSPACE_VOICE_MODEL=DIR/Qwen3-TTS-12Hz-1.7B-Base # kokoro: the Kokoro-82M folder
-OPENSPACE_VOICE_DIR=~/.local/share/openspace/voices/shiori   # qwen only
+OPENSPACE_VOICE_ENGINE=voxcpm                     # or qwen, qwen-fast, kokoro
+OPENSPACE_VOICE_MODEL=DIR/VoxCPM2                 # the engine's model folder
+OPENSPACE_VOICE_DIR=~/.local/share/openspace/voices/shiori   # all but kokoro
+OPENSPACE_VOICE_IDLE=300                          # seconds of quiet before it frees the card
 ```
 
-`POST /speak {"text": "...", "language": "it"}` returns WAV; Openspace reaches it through
-`/api/voice/speak` (`Voice:SpeakUrl`, port 8177).
+`POST /speak {"text": "...", "language": "it"}` returns WAV, and with `"stream": true` raw 16-bit
+mono PCM as it is made (`X-Sample-Rate`); `POST /wake` loads it, `POST /sleep` frees the card,
+`GET /health` says whether it is asleep, waking or awake. Openspace reaches it through
+`/api/voice/speak`, `/api/voice/speak/stream` and `/api/voice/speak/wake` (`Voice:SpeakUrl`, port 8177).

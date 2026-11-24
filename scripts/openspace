@@ -38,13 +38,15 @@ EARS_MODEL="${OPENSPACE_EARS_MODEL:-medium}"
 EARS_WAKE_MODEL="${OPENSPACE_EARS_WAKE_MODEL:-base}"
 EARS_DEVICE="${OPENSPACE_EARS_DEVICE:-auto}"
 EARS_MODELS="${OPENSPACE_EARS_MODELS:-$HOME/.local/share/openspace/whisper}"
-# Her voice: the Python with the engine, the engine, its model folder and, for qwen, her voice.
+# Her voice: the Python with the engine, the engine, its model folder and (all but kokoro) her
+# voice; it loads when she is about to speak and frees the graphics card after IDLE quiet seconds.
 VOICE_PORT="${OPENSPACE_VOICE_PORT:-8177}"
 VOICE_PYTHON="${OPENSPACE_VOICE_PYTHON:-python3}"
-VOICE_ENGINE="${OPENSPACE_VOICE_ENGINE:-qwen}"
+VOICE_ENGINE="${OPENSPACE_VOICE_ENGINE:-voxcpm}"
 VOICE_MODEL="${OPENSPACE_VOICE_MODEL:-}"
 VOICE_DIR="${OPENSPACE_VOICE_DIR:-}"
 VOICE_DEVICE="${OPENSPACE_VOICE_DEVICE:-auto}"
+VOICE_IDLE="${OPENSPACE_VOICE_IDLE:-300}"
 STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
 SERVICES=(opencode ears voice api web)
 # The API writes the OpenCode provider of the local models here; OpenCode merges it with
@@ -130,6 +132,7 @@ start_one() {
     voice)
       # Optional too: without a voice model she answers in writing only.
       local package=qwen_tts
+      [ "$VOICE_ENGINE" = voxcpm ] && package=voxcpm
       [ "$VOICE_ENGINE" = kokoro ] && package=kokoro
       [ "$VOICE_ENGINE" = qwen-fast ] && package=faster_qwen3_tts
       if [ -z "$VOICE_MODEL" ] || ! "$VOICE_PYTHON" -c "import $package" >/dev/null 2>&1; then
@@ -137,7 +140,7 @@ start_one() {
         return
       fi
       launch voice "$ROOT/tools/voice" "$VOICE_PYTHON" speak-server.py --port "$VOICE_PORT" --engine "$VOICE_ENGINE" \
-        --model "$VOICE_MODEL" ${VOICE_DIR:+--voice "$VOICE_DIR"} --device "$VOICE_DEVICE"
+        --model "$VOICE_MODEL" ${VOICE_DIR:+--voice "$VOICE_DIR"} --device "$VOICE_DEVICE" --idle "$VOICE_IDLE"
       say "voice: starting in the background on port $port (scripts/openspace status, logs voice)"
       return
       ;;

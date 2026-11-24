@@ -6,7 +6,6 @@ import { FOOT_X, FOOT_Y, facingOf, scientistFrames, type Facing, type Frames, ty
 import { buildWorld, T, tint, type World } from './build'
 import { findPath, type Spot } from './furnish'
 import { hashOf, type OfficeSpec } from './layout'
-import { car } from './outdoor'
 import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from './sky'
 
 /**
@@ -51,8 +50,8 @@ export interface Lab {
   draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions): void
 }
 
-export function makeLab(offices: OfficeSpec[]): Lab {
-  const world = buildWorld(offices)
+export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): Lab {
+  const world = buildWorld(offices, viewW, viewH)
   const { plan, furnished, screen, width, height } = world
   const brain: Brain = makeBrain(REFERENCE)
   const r = rand(Math.floor(hashOf(offices.map((o) => o.name).join(), 8) * 1e6))
@@ -200,8 +199,6 @@ export function makeLab(offices: OfficeSpec[]): Lab {
     ctx.fill()
     ctx.restore()
   }
-  // Now and then a car goes by on the road.
-  const passing = [car('#3a5f9a'), car('#e8e4dc')]
   const drops = Array.from({ length: 420 }, () => ({ x: r() * width, y: r() * height, s: 0.6 + r() * 0.6 }))
 
   return {
@@ -256,8 +253,8 @@ export function makeLab(offices: OfficeSpec[]): Lab {
           light: w.window && s.glow ? (c) => c.drawImage(tint(s.glow!, windowSky, `${s.canvas.width}x${s.canvas.height}${w.a1 - w.a0}`), sx, sy) : undefined,
         })
       }
-      const span = plan.w * T + 360
-      const cars = passing.map((c, k) => ({ prop: c, a: ((t * 34 + k * span * 0.55) % span) - 180, b: world.roadB + 3 }))
+      // The city's traffic: cars and people, moved on.
+      const cars = world.city.move(t, dt)
       for (const c of cars) {
         const [x, y] = screen(c.a, c.b)
         const s = c.prop.sprite
@@ -307,7 +304,8 @@ export function makeLab(offices: OfficeSpec[]): Lab {
           },
         })
       }
-      const sorted = order(items)
+      // Only what is on screen.
+      const sorted = order(items.filter((it) => it.box[2] > 0 && it.box[0] < width && it.box[3] > 0 && it.box[1] < height))
 
       // Under white light.
       ctx.imageSmoothingEnabled = false
@@ -340,7 +338,7 @@ export function makeLab(offices: OfficeSpec[]): Lab {
         const [x, y] = screen(pl.a, pl.b)
         pool(lctx, x, y, pl.r * 2, pl.color, pl.strength)
       }
-      for (const p of [...world.props, ...cars.map((c) => ({ ...c, flip: 1, outdoor: true }))]) {
+      for (const p of [...world.props, ...cars.map((c) => ({ ...c, outdoor: true }))]) {
         if (!p.prop.lights) continue
         if (p.outdoor && !dark) continue
         const [x, y] = screen(p.a, p.b)
@@ -380,6 +378,13 @@ export function makeLab(offices: OfficeSpec[]): Lab {
         rctx.drawImage(world.indoor, 0, 0)
         ctx.drawImage(rain, 0, 0)
       }
+
+      // The city fades a little towards the edges of the screen: the lab is what you look at.
+      const vg = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.35, width / 2, height / 2, Math.hypot(width, height) * 0.55)
+      vg.addColorStop(0, 'rgba(8,12,22,0)')
+      vg.addColorStop(1, 'rgba(8,12,22,0.42)')
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, width, height)
 
       // Speech bubbles are not of the world: drawn last, never in the dark.
       for (const ag of agents) {

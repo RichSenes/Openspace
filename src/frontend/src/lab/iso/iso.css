@@ -1,0 +1,62 @@
+.iso-lab section {
+  display: grid;
+  gap: 10px;
+}
+
+.iso-canvas {
+  display: block;
+  image-rendering: pixelated;
+  max-width: none;
+}
+
+.iso-frame {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.iso-note,
+.iso-legend {
+  max-width: 70ch;
+  color: var(--mute);
+  line-height: 1.5;
+}
+
+.iso-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.iso-tools button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.iso-tools button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.iso-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.iso-pieces figure {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.iso-pieces figcaption {
+  color: var(--mute);
+  font-size: 13px;
+}

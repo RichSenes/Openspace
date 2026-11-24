@@ -438,16 +438,38 @@
 /* Shiori's compact chat, in the panel that slides in over the lab. */
 .world-shiori {
   z-index: 3;
+  bottom: auto;
+  height: 100%;
   width: min(400px, 100vw);
   grid-template-rows: 1fr;
+  overflow: hidden;
+  transition:
+    transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Folded: only her card, her last words and the box; the lab shows underneath. */
+.world-shiori.is-folded {
+  height: var(--sc-folded, 260px);
+  border-bottom: 1px solid var(--line);
 }
 
 .sc {
+  /* The colours her page's pieces (sessions, chips, listening) expect. */
+  --muted: #a7a3c8;
+  --edge: #352a4d;
+  --edge-hi: #5b4a80;
+  --text: var(--ink);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   height: 100%;
   color: var(--ink);
+}
+
+.sc.is-folded {
+  grid-template-rows: auto auto auto;
+  align-content: start;
 }
 
 .sc-head {
@@ -455,37 +477,67 @@
 }
 
 .sc-tabs {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   padding: calc(6px + env(safe-area-inset-top, 0px)) 6px 0;
 }
 
 .sc-tabs [role='tab'] {
   min-height: 34px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 0;
-  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--mute);
   font: inherit;
   cursor: pointer;
+  transition: color 0.2s;
 }
 
+.sc-tabs [role='tab']:hover,
 .sc-tabs [aria-selected='true'] {
-  border-bottom-color: var(--mode, var(--accent));
   color: var(--ink);
 }
 
-.sc-close {
-  margin-left: auto;
-  width: 34px;
-  height: 34px;
+/* The line under the active tab, sliding from one to the next. */
+.sc-ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--mode, var(--accent));
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.2s;
+}
+
+.sc.is-folded .sc-ink {
+  opacity: 0;
+}
+
+.sc-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--mute);
   font-size: 20px;
   cursor: pointer;
+}
+
+.sc-icon:hover {
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.sc-fold {
+  margin-left: auto;
 }
 
 .sc-who {
@@ -545,6 +597,47 @@
 .sc-face .pr-hud,
 .sc-face .pr-hud-lines {
   display: none;
+}
+
+/* A tab's content comes in from the side of the tab that was picked. */
+.sc-body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  animation: sc-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sc-body.from-left {
+  --from: -18px;
+}
+
+.sc-body.from-right {
+  --from: 18px;
+}
+
+@keyframes sc-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--from, 18px));
+  }
+}
+
+.sc-last {
+  display: -webkit-box;
+  margin: 0;
+  padding: 10px 14px;
+  overflow: hidden;
+  color: var(--ink);
+  line-height: 1.45;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  animation: sc-fade 0.24s ease-out;
+}
+
+@keyframes sc-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 .sc-log {
@@ -624,6 +717,9 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .sc-modes button[aria-pressed='true'] {
@@ -663,8 +759,9 @@
 }
 
 .sc-mic.is-on {
-  border-color: #ff8a80;
-  color: #ff8a80;
+  border-color: var(--mode, var(--accent));
+  color: var(--mode, var(--accent));
+  background: color-mix(in srgb, var(--mode, var(--accent)) 14%, transparent);
 }
 
 .sc-mic:disabled,
@@ -674,16 +771,33 @@
 }
 
 .sc-pane {
+  display: grid;
+  align-content: start;
+  gap: 12px;
   min-height: 0;
   overflow: auto;
   padding: 12px 14px;
-  grid-row: 2 / 4;
 }
 
-.sc-new {
-  display: inline-flex;
-  align-items: center;
+.sc-look fieldset {
+  display: grid;
   gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sc-look legend {
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-link {
+  justify-self: start;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -694,36 +808,12 @@
   cursor: pointer;
 }
 
-.sc-sessions {
-  display: grid;
-  gap: 4px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sc-sessions button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.sc-sessions button[aria-current='true'] {
-  border-color: var(--mode, var(--accent));
-}
-
-.sc-ended {
-  color: var(--mute);
-  font-size: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .world-shiori,
+  .sc-ink,
+  .sc-body,
+  .sc-last {
+    transition: none;
+    animation: none;
+  }
 }

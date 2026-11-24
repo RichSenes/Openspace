@@ -32,11 +32,16 @@ export interface Spoken {
   to: number
 }
 
+/** Japanese this long (kana and kanji) is said on its own; shorter stays inside the sentence. */
+const LONG_JAPANESE = 10
+
+const japaneseIn = (text: string) => [...text].filter((ch) => JA.test(ch)).length
+
 /**
- * Splits a sentence where it changes between Japanese and other scripts, so each piece is said
- * in one language: a voice reading "Si dice おはようございます, buongiorno" in one go stumbles
- * at the switch. Spaces and punctuation stay with the piece before them. The written stretch is
- * shared out by length.
+ * Splits a sentence where a long stretch of Japanese starts or ends, so that stretch is said in
+ * Japanese with her Japanese voice. A word or two ("si dice 痛い, fa male") stays inside the
+ * sentence, said in one breath: split off, it came out after a pause, unnatural. Spaces and
+ * punctuation stay with the piece before them; the written stretch is shared out by length.
  */
 export function byScript(part: Spoken): Spoken[] {
   const runs: string[] = []
@@ -53,7 +58,15 @@ export function byScript(part: Spoken): Spoken[] {
     current += ch
   }
   if (current) runs.push(current)
-  const said = runs.map((r) => r.trim()).filter((r) => /[\p{L}\p{N}]/u.test(r))
+  // Short Japanese joins the text around it; long Japanese stands alone.
+  const pieces: { text: string; long: boolean }[] = []
+  for (const run of runs) {
+    const long = japaneseIn(run) >= LONG_JAPANESE
+    const last = pieces.at(-1)
+    if (last && !long && !last.long) last.text += run
+    else pieces.push({ text: run, long })
+  }
+  const said = pieces.map((p) => p.text.trim()).filter((r) => /[\p{L}\p{N}]/u.test(r))
   if (said.length <= 1) return said.length ? [{ ...part, text: said[0] }] : []
   const total = said.reduce((n, r) => n + r.length, 0)
   let at = part.from
@@ -93,8 +106,9 @@ export function nextSentences(text: string, from: number, final: boolean): { sen
   return { sentences: said.map((p) => p.text), parts: said, next: start }
 }
 
-/** Her language for this answer: Japanese by its script, else the one she was spoken to in. */
+/** The language of a piece: Japanese when most of its letters are, else the one she was spoken to in. */
 export function languageOf(text: string, spokenIn: string): 'it' | 'en' | 'ja' {
-  if (JA.test(text)) return 'ja'
+  const letters = [...text].filter((ch) => /[\p{L}\p{N}]/u.test(ch)).length
+  if (letters && japaneseIn(text) * 2 > letters) return 'ja'
   return spokenIn === 'en' ? 'en' : spokenIn === 'ja' ? 'ja' : 'it'
 }

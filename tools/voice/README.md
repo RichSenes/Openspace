@@ -93,9 +93,9 @@ What VoxCPM2 clones, any of:
 
 A clip in one language gives the others its accent: a voice designed in English speaks Italian
 like an English speaker. A timbre reference with an Italian clip and a Japanese one keeps one
-voice that sounds native in both. Answers that mix scripts ("si dice 痛い, fa male") are said a
-piece at a time, each in its language, and a reading in Latin letters after Japanese words is
-left to the eyes.
+voice that sounds native in both. A Japanese word or two inside an Italian sentence ("si dice
+痛い, fa male") is said in one breath with it; a long stretch of Japanese is said on its own with
+the Japanese clip. A reading in Latin letters after Japanese words is left to the eyes.
 
 ### Sharing the graphics card
 
@@ -137,7 +137,8 @@ OPENSPACE_VOICE_ENGINE=voxcpm                     # or qwen, qwen-fast, kokoro
 OPENSPACE_VOICE_MODEL=DIR/VoxCPM2                 # the engine's model folder
 OPENSPACE_VOICE_DIR=~/.local/share/openspace/voices/shiori   # all but kokoro
 OPENSPACE_VOICE_IDLE=300                          # seconds of quiet before it frees the card
-OPENSPACE_VOICE_PACE=1.1                          # faster speech, same pitch (pip install audiotsm)
+OPENSPACE_VOICE_PACE=1.0                          # stretches streamed speech: it can click, so a faster
+                                                  # voice clip (her pace follows it) is better
 ```
 
 `POST /speak {"text": "...", "language": "it"}` returns WAV, and with `"stream": true` raw 16-bit

@@ -341,6 +341,16 @@
   color: var(--mode);
 }
 
+/* Her voice could not start (the graphics card is full): said quietly, under the status. */
+.sp-resting {
+  margin: 4px auto 0;
+  max-width: 60ch;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+}
+
 .sp-ears-end {
   margin-left: 10px;
   padding: 2px 8px;

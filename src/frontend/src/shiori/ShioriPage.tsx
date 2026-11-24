@@ -145,6 +145,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const { wake, end: endTalk } = useWake(byName && !ended, voice.ears === 'recording' || voice.ears === 'asking' || mouth.speaking, onHeard, (message) => setProblem(message))
   // Holding the mic says what the mic does; otherwise always listening tells its state.
   const byNameShown = wake !== 'off' && voice.ears === 'idle'
+  // Called by name: her voice starts loading while the first words are said and answered.
+  const { warm } = mouth
+  useEffect(() => {
+    if (wake === 'talking') void warm()
+  }, [wake, warm])
   const toggleByName = () => {
     setByName(!byName)
     saveByName(!byName)
@@ -535,6 +540,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
             )}
           </p>
         )}
+        {!ended && mouth.resting && <p className="sp-resting">{mouth.resting}</p>}
       </footer>
 
       {drawer === 'sessions' && (

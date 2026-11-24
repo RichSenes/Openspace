@@ -67,7 +67,51 @@ public sealed class VoiceApiTests : IDisposable
             return Task.FromResult<byte[]>([82, 73, 70, 70]);
         }
 
-        public Task<SpeakerStatus> StatusAsync(CancellationToken cancellationToken) => Task.FromResult(new SpeakerStatus(true, "qwen", "shiori", null));
+        public bool Busy { get; init; }
+
+        public Task<SpokenAudio> StreamAsync(string text, string language, CancellationToken cancellationToken)
+        {
+            Language = language;
+            if (Busy)
+                throw new SpeakerException("the graphics card is busy", busy: true);
+            return Task.FromResult(new SpokenAudio(48000, new MemoryStream([1, 0, 2, 0])));
+        }
+
+        public Task<SpeakerStatus> WakeAsync(CancellationToken cancellationToken) =>
+            Busy ? throw new SpeakerException("the graphics card is busy", busy: true) : Task.FromResult(new SpeakerStatus(true, null, null, null, "waking"));
+
+        public Task<SpeakerStatus> StatusAsync(CancellationToken cancellationToken) => Task.FromResult(new SpeakerStatus(true, "voxcpm", "shiori", null, "asleep"));
+    }
+
+    [Fact]
+    public async Task Her_voice_can_arrive_while_it_is_made()
+    {
+        var voice = new Voice();
+        var client = _app.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<ISpeaker>(voice))).CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/voice/speak/stream", new { text = "Ciao!", language = "ja" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("audio/pcm", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("48000", response.Headers.GetValues("X-Sample-Rate").Single());
+        Assert.Equal([1, 0, 2, 0], await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal("ja", voice.Language);
+    }
+
+    [Fact]
+    public async Task With_the_graphics_card_full_she_says_her_voice_is_resting()
+    {
+        var voice = new Voice { Busy = true };
+        var client = _app.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<ISpeaker>(voice))).CreateClient();
+
+        var spoken = await client.PostAsJsonAsync("/api/voice/speak/stream", new { text = "Ciao!", language = "it" });
+        var woken = await client.PostAsync("/api/voice/speak/wake", null);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, spoken.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, woken.StatusCode);
+        var problem = await spoken.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.True(problem.GetProperty("busy").GetBoolean());
+        Assert.Equal("Her voice is resting", problem.GetProperty("title").GetString());
     }
 
     [Fact]

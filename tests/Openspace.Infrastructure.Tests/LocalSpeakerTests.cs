@@ -7,18 +7,24 @@ namespace Openspace.Infrastructure.Tests;
 
 public sealed class LocalSpeakerTests
 {
-    private sealed class Server(HttpStatusCode status, byte[] body, string type) : HttpMessageHandler
+    private sealed class Server(HttpStatusCode status, byte[] body, string type, string? rate = null) : HttpMessageHandler
     {
         public string? Sent { get; private set; }
         public Uri? Asked { get; private set; }
 
+        public long? Length { get; private set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Asked = request.RequestUri;
+            Length = request.Content?.Headers.ContentLength;
             Sent = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
             var content = new ByteArrayContent(body);
             content.Headers.ContentType = new(type);
-            return new HttpResponseMessage(status) { Content = content };
+            var response = new HttpResponseMessage(status) { Content = content };
+            if (rate is not null)
+                response.Headers.Add("X-Sample-Rate", rate);
+            return response;
         }
     }
 
@@ -41,6 +47,7 @@ public sealed class LocalSpeakerTests
         Assert.Equal("/speak", server.Asked!.AbsolutePath);
         Assert.Contains("\"text\":\"Ciao, sono Shiori.\"", server.Sent, StringComparison.Ordinal);
         Assert.Contains("\"language\":\"it\"", server.Sent, StringComparison.Ordinal);
+        Assert.NotNull(server.Length); // the Python server reads Content-Length, not a chunked body
     }
 
     [Fact]
@@ -57,5 +64,28 @@ public sealed class LocalSpeakerTests
         var e = await Assert.ThrowsAsync<SpeakerException>(() => Speaker(new Down()).SpeakAsync("Ciao", "it", CancellationToken.None));
         Assert.Contains("speak-server.py", e.Message);
         Assert.False((await Speaker(new Down()).StatusAsync(CancellationToken.None)).Ready);
+    }
+
+    [Fact]
+    public async Task Streaming_asks_for_pieces_and_says_their_sample_rate()
+    {
+        var server = new Server(HttpStatusCode.OK, [1, 0, 2, 0], "audio/pcm", "48000");
+        await using var spoken = await Speaker(server).StreamAsync("Ciao.", "en", CancellationToken.None);
+        using var copy = new MemoryStream();
+        await spoken.Audio.CopyToAsync(copy);
+
+        Assert.Equal(48000, spoken.SampleRate);
+        Assert.Equal([1, 0, 2, 0], copy.ToArray());
+        Assert.Contains("\"stream\":true", server.Sent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_full_graphics_card_is_told_apart_from_a_failure()
+    {
+        var server = new Server(HttpStatusCode.ServiceUnavailable, Encoding.UTF8.GetBytes("""{"error":"the graphics card is busy","busy":true}"""), "application/json");
+        var e = await Assert.ThrowsAsync<SpeakerException>(() => Speaker(server).StreamAsync("Ciao", "it", CancellationToken.None));
+        Assert.True(e.Busy);
+        var woken = await Assert.ThrowsAsync<SpeakerException>(() => Speaker(server).WakeAsync(CancellationToken.None));
+        Assert.True(woken.Busy);
     }
 }

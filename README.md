@@ -152,7 +152,9 @@ scripts/openspace kanji-data       # once, only for the morning paper's kanji of
 
 To talk to Shiori by voice, install faster-whisper once (`tools/voice/README.md`):
 `scripts/openspace start` then starts her ears too, and skips them when it is missing. Her own
-voice (Qwen3-TTS or Kokoro) is started the same way once a voice model is configured.
+voice (VoxCPM2, cloning one designed voice in Italian, English and Japanese) is started the same
+way once a voice model is configured; it loads only while she talks and frees the graphics card
+when she is quiet.
 Variables can be kept in `~/.config/openspace/openspace.env`, one `KEY=value` a line.
 
 Logs and process ids live in `~/.local/state/openspace`. Ports change with

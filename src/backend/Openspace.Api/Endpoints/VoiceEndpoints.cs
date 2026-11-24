@@ -33,23 +33,88 @@ internal static class VoiceEndpoints
 
         voice.MapGet("/speak/status", (ISpeaker speaker, CancellationToken ct) => speaker.StatusAsync(ct));
 
-        voice.MapPost("/speak", async (SpeakRequest request, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        voice.MapPost("/speak/wake", async (ISpeaker speaker, CancellationToken ct) =>
         {
-            var text = request.Text?.Trim();
-            if (string.IsNullOrEmpty(text))
-                return Results.Problem("Give her something to say.", statusCode: StatusCodes.Status400BadRequest);
-            if (text.Length > options.Value.MaxSpokenChars)
-                return Results.Problem($"She says at most {options.Value.MaxSpokenChars} characters at once.", statusCode: StatusCodes.Status413PayloadTooLarge);
             try
             {
-                return Results.File(await speaker.SpeakAsync(text, Languages.Choose(request.Language) ?? "it", ct), "audio/wav");
+                return Results.Ok(await speaker.WakeAsync(ct));
             }
             catch (SpeakerException e)
             {
-                return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+                return Unavailable(e);
             }
         });
+
+        voice.MapPost("/speak", async (SpeakRequest request, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        {
+            if (Refused(request, options.Value) is { } refused)
+                return refused;
+            try
+            {
+                return Results.File(await speaker.SpeakAsync(request.Text!.Trim(), Languages.Choose(request.Language) ?? "it", ct), "audio/wav");
+            }
+            catch (SpeakerException e)
+            {
+                return Unavailable(e);
+            }
+        });
+
+        // Her voice as it is made (16-bit mono PCM, rate in X-Sample-Rate): the page starts playing
+        // the first words while the rest of the sentence is still being generated.
+        voice.MapPost("/speak/stream", async (SpeakRequest request, HttpContext context, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        {
+            if (Refused(request, options.Value) is { } refused)
+                return refused;
+            SpokenAudio spoken;
+            try
+            {
+                spoken = await speaker.StreamAsync(request.Text!.Trim(), Languages.Choose(request.Language) ?? "it", ct);
+            }
+            catch (SpeakerException e)
+            {
+                return Unavailable(e);
+            }
+
+            await using (spoken)
+            {
+                context.Response.ContentType = "audio/pcm";
+                context.Response.Headers["X-Sample-Rate"] = spoken.SampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                context.Response.Headers.CacheControl = "no-store";
+                var buffer = new byte[16384];
+                try
+                {
+                    int read;
+                    while ((read = await spoken.Audio.ReadAsync(buffer, ct)) > 0)
+                    {
+                        await context.Response.Body.WriteAsync(buffer.AsMemory(0, read), ct);
+                        await context.Response.Body.FlushAsync(ct);
+                    }
+                }
+                catch (Exception e) when (e is OperationCanceledException or IOException or HttpRequestException)
+                {
+                    // The page stopped her, or the voice stopped mid-sentence: what was sent is what she said.
+                }
+            }
+
+            return Results.Empty;
+        });
     }
+
+    private static IResult? Refused(SpeakRequest request, VoiceOptions options)
+    {
+        var text = request.Text?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return Results.Problem("Give her something to say.", statusCode: StatusCodes.Status400BadRequest);
+        if (text.Length > options.MaxSpokenChars)
+            return Results.Problem($"She says at most {options.MaxSpokenChars} characters at once.", statusCode: StatusCodes.Status413PayloadTooLarge);
+        return null;
+    }
+
+    // Busy: the graphics card is full (image generation, training...), so she writes instead of speaking.
+    private static IResult Unavailable(SpeakerException e) =>
+        Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: e.Busy ? "Her voice is resting" : "Her voice is unavailable",
+            extensions: new Dictionary<string, object?> { ["busy"] = e.Busy });
 
     /// <summary>What Shiori says, and in which of her three languages.</summary>
     public sealed record SpeakRequest(string? Text, string? Language);

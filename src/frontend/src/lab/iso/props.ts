@@ -21,6 +21,8 @@ export interface Light {
   dy: number
   r: number
   color: string
+  /** A beam instead of a pool: its direction on screen, as headlights throw it along the road. */
+  beam?: [number, number]
 }
 
 /** The light a prop throws on the floor: a pool centred at (a, b) of its own floor units. */

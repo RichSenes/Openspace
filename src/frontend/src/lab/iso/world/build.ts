@@ -3,6 +3,7 @@ import { benchDesk, capsule, chair, coffeeCounter, cornerDesk, holoTable, micros
 import { mix, noise, Painter, toCanvas } from '../px'
 import { makeCity, type City } from './city'
 import { decor, type DecorKind } from './decor'
+import { arcade, beanbag, foosball, pingPong, vending } from './recreation'
 import { planLab, type Furnished, type Item } from './furnish'
 import { edgeKind, hashOf, spaceAt, type OfficeSpec, type Plan, type Space } from './layout'
 
@@ -56,6 +57,8 @@ export interface World {
   ground: HTMLCanvasElement
   /** White where the building is (floors and its tall walls): indoor light goes there. */
   indoor: HTMLCanvasElement
+  /** White where the lab and the city's buildings stand: light from outside does not go through them. */
+  solid: HTMLCanvasElement
   props: Placed[]
   walls: WallPiece[]
   pools: Pool[]
@@ -71,6 +74,21 @@ function propFor(item: Item): Prop {
     const s = item.seed % 3
     const liquids = ['#37d6a0', '#4cc3ff', '#b98cff']
     switch (item.kind) {
+      case 'pingpong':
+        prop = pingPong()
+        break
+      case 'foosball':
+        prop = foosball()
+        break
+      case 'arcade':
+        prop = arcade(item.seed)
+        break
+      case 'vending':
+        prop = vending()
+        break
+      case 'beanbag':
+        prop = beanbag(item.seed)
+        break
       case 'decor':
         prop = decor((item.variant ?? 'bin') as DecorKind, item.accent, item.seed)
         break
@@ -221,6 +239,12 @@ function floorOf(space: Space, a: number, b: number, centre: [number, number]): 
       c = (ta + tb) % 2 ? '#c3cbd5' : '#bec6d0'
       break
     }
+    case 'games': {
+      const n = noise(a / 2, b / 2, 8)
+      c = (ta + tb) % 2 ? mix('#d8cfc4', space.accent, 0.12) : mix('#d2c9be', space.accent, 0.1)
+      if (n > 0.8) c = mix(c, '#ffffff', 0.1)
+      break
+    }
     case 'lounge': {
       const d = Math.hypot(a - (space.a0 + space.a1) * 4, b - (space.b0 + space.b1) * 4)
       c = d < 22 ? (d > 20.5 ? mix(space.accent, '#ffffff', 0.3) : mix('#8a97a8', space.accent, 0.18 + 0.05 * noise(a / 3, b / 3))) : (ta + tb) % 2 ? '#d9d4e2' : '#d4cfdd'
@@ -322,19 +346,37 @@ export function buildWorld(offices: OfficeSpec[], viewW: number, viewH: number):
 
   const props: Placed[] = furnished.items.map((item) => ({ prop: propFor(item), a: item.a, b: item.b, flip: item.flip ? -1 : 1, outdoor: false, room: item.room }))
   for (const t of city.things) props.push({ prop: t.prop, a: t.a, b: t.b, flip: t.flip, outdoor: true, room: -1 })
+  // What stops the street's light: the lab and the buildings, their whole shapes.
+  const solid = document.createElement('canvas')
+  solid.width = width
+  solid.height = height
+  const sctx = solid.getContext('2d')!
+  sctx.drawImage(indoor, 0, 0)
+  for (const w of walls) {
+    const [x, y] = screen(w.a0, w.b0)
+    sctx.drawImage(w.sprite.canvas, x - w.sprite.ax, y - w.sprite.ay)
+  }
+  for (const t of city.things) {
+    if (!t.solid) continue
+    const [x, y] = screen(t.a, t.b)
+    sctx.drawImage(t.prop.sprite.canvas, x - t.prop.sprite.ax, y - t.prop.sprite.ay)
+  }
+  sctx.globalCompositeOperation = 'source-in'
+  sctx.fillStyle = '#ffffff'
+  sctx.fillRect(0, 0, width, height)
 
   // Lamps on the ceiling of every area (each office a little different, the lounge warm and
   // soft, the walkway and her area dimmer), and the light of her well.
   const pools: Pool[] = []
   for (const s of plan.spaces) {
-    const strength = s.kind === 'office' ? 0.3 + hashOf(s.name, 5) * 0.18 : s.kind === 'lounge' ? 0.26 : s.kind === 'floor' ? 0.16 : 0.08
-    const colour = s.kind === 'lounge' ? '#fff0dc' : s.kind === 'office' ? mix('#eef3ff', s.accent, 0.08) : '#e8f0ff'
+    const strength = s.kind === 'office' ? 0.3 + hashOf(s.name, 5) * 0.18 : s.kind === 'lounge' || s.kind === 'games' ? 0.26 : s.kind === 'floor' ? 0.16 : 0.08
+    const colour = s.kind === 'lounge' || s.kind === 'games' ? '#fff0dc' : s.kind === 'office' ? mix('#eef3ff', s.accent, 0.08) : '#e8f0ff'
     for (let b = s.b0 + 1; b < s.b1; b += 3)
       for (let a = s.a0 + 1; a < s.a1; a += 3) if (spaceAt(plan, a, b)?.id === s.id) pools.push({ a: a * T + 4, b: b * T + 4, r: 34, color: colour, strength, kind: 'ceiling' })
   }
   pools.push({ a: centre[0], b: centre[1], r: 150, color: '#46ffb0', strength: 0.75, kind: 'shiori' })
 
-  return { plan, furnished, city, width, height, screen, ground: p.canvas(), indoor, props, walls, pools, centre }
+  return { plan, furnished, city, width, height, screen, ground: p.canvas(), indoor, solid, props, walls, pools, centre }
 }
 
 /** Where the lab goes on a screen of this size: the middle of its building at the middle. */

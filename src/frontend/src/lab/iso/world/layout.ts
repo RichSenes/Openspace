@@ -17,7 +17,7 @@ export interface OfficeSpec {
   flavor: Flavor
 }
 
-export type SpaceKind = 'floor' | 'hall' | 'office' | 'lounge'
+export type SpaceKind = 'floor' | 'hall' | 'office' | 'lounge' | 'games'
 
 export interface Space {
   id: number
@@ -55,6 +55,8 @@ export const HALL = 17
 /** The walkway between her area and the offices. */
 const AISLE = 2
 const LOUNGE: OfficeSpec = { name: 'Lounge', accent: '#c48bff', agents: 2, flavor: 'data' }
+/** The break room: games for several at once. Both common rooms grow with the number of agents. */
+const GAMES: OfficeSpec = { name: 'Break room', accent: '#ffb347', agents: 2, flavor: 'creative' }
 
 /** A repeatable number in [0, 1) from a name. */
 export function hashOf(text: string, salt = 0): number {
@@ -99,7 +101,11 @@ function place(side: Side, u0: number, u1: number, v0: number, v1: number): [num
 
 /** `margin` is the ground left round the building, in tiles: the city around it. */
 export function makePlan(offices: OfficeSpec[], more: Record<string, number> = {}, margin = 8): Plan {
-  const specs = [...offices, LOUNGE]
+  const everyone = offices.reduce((n, o) => n + o.agents, 0)
+  const common = Math.max(2, Math.round(everyone / 5))
+  const lounge = { ...LOUNGE, agents: common }
+  const games = { ...GAMES, agents: common + 1 }
+  const specs = [...offices, lounge, games]
   const sized = specs.map((spec) => ({ spec, size: roomSize(spec, more[spec.name] ?? 0) })).sort((x, y) => y.size[0] * y.size[1] - x.size[0] * x.size[1])
   // The biggest areas first, each on the side that is shortest so far: the lab stays round,
   // and the back sides fill first, so big areas never hide small ones.
@@ -130,7 +136,7 @@ export function makePlan(offices: OfficeSpec[], more: Record<string, number> = {
       while (hits(place(side, u - 1, u + along + 1, v, v + out))) v++
       if (v > 0) floors.push(place(side, u, u + along, 0, v))
       const [a0, b0, a1, b1] = place(side, u, u + along, v, v + out)
-      raw.push({ kind: spec === LOUNGE ? 'lounge' : 'office', name: spec.name, accent: spec.accent, flavor: spec.flavor, agents: spec.agents, a0, b0, a1, b1, side })
+      raw.push({ kind: spec === lounge ? 'lounge' : spec === games ? 'games' : 'office', name: spec.name, accent: spec.accent, flavor: spec.flavor, agents: spec.agents, a0, b0, a1, b1, side })
       // A walkway between two areas on the same side, as deep as the shallower of the two.
       if (i < rooms.length - 1) floors.push(place(side, u + along, u + along + AISLE, 0, Math.min(out, rooms[i + 1].size[1])))
       u += along + AISLE
@@ -154,7 +160,7 @@ export function makePlan(offices: OfficeSpec[], more: Record<string, number> = {
   // Every area opens towards Shiori: three tiles in the middle of the side that faces her.
   const doors = new Set<string>()
   for (const s of spaces) {
-    if (s.kind !== 'office' && s.kind !== 'lounge') continue
+    if (s.kind !== 'office' && s.kind !== 'lounge' && s.kind !== 'games') continue
     const mid = (x0: number, x1: number) => Math.floor((x0 + x1) / 2) - 1
     for (let k = 0; k < 3; k++) {
       if (s.side === '-b') doors.add(edgeKey(mid(s.a0, s.a1) + k, s.b1 - 1, 'b'))

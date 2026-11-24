@@ -9,7 +9,8 @@ import { hashOf, makePlan, wallBetween, type OfficeSpec, type Plan, type Space }
  * Positions are in floor units (eight to a tile).
  */
 
-export type ItemKind = 'decor' | 'bench' | 'corner' | 'holo' | 'microscope' | 'capsule' | 'rack' | 'board' | 'coffee' | 'sofa' | 'plant' | 'chair' | 'totem'
+export type ItemKind =
+  'pingpong' | 'foosball' | 'arcade' | 'vending' | 'beanbag' | 'decor' | 'bench' | 'corner' | 'holo' | 'microscope' | 'capsule' | 'rack' | 'board' | 'coffee' | 'sofa' | 'plant' | 'chair' | 'totem'
 
 export interface Item {
   kind: ItemKind
@@ -30,12 +31,19 @@ export interface Spot {
   b: number
   face: 'NE' | 'NW' | 'SE' | 'SW'
   room: number
-  use: 'seat' | 'board' | 'coffee' | 'sofa' | 'shiori'
+  use: 'seat' | 'board' | 'coffee' | 'sofa' | 'shiori' | 'queue' | 'pingpong' | 'foosball' | 'arcade' | 'vending' | 'beanbag' | 'chat'
+  /** Places that go together: the ends of a table, the circle of a chat. */
+  group?: number
 }
 
 /** Footprints in tiles (along a, along b) when not mirrored, and in floor units. */
 export const FOOT: Record<ItemKind, { tiles: [number, number]; units: [number, number] }> = {
   decor: { tiles: [1, 1], units: [6, 6] },
+  pingpong: { tiles: [3, 2], units: [22, 12] },
+  foosball: { tiles: [2, 1], units: [14, 8] },
+  arcade: { tiles: [1, 1], units: [6, 6] },
+  vending: { tiles: [1, 1], units: [6, 7] },
+  beanbag: { tiles: [1, 1], units: [7, 7] },
   bench: { tiles: [5, 2], units: [40, 12] },
   corner: { tiles: [4, 4], units: [30, 26] },
   holo: { tiles: [3, 3], units: [18, 18] },
@@ -88,6 +96,7 @@ export function furnish(plan: Plan): Furnished {
 
   for (const room of plan.spaces) {
     if (room.kind === 'office' || room.kind === 'lounge') furnishRoom(plan, room, items, spots, used, blocked)
+    if (room.kind === 'games') furnishGames(plan, room, items, spots, used, blocked)
   }
   // Around Shiori: places to stand and ask her something, a few steps from the dome.
   const hall = plan.hall
@@ -115,7 +124,116 @@ export function furnish(plan: Plan): Furnished {
     const face = Math.abs(Math.cos(th)) > Math.abs(Math.sin(th)) ? (Math.cos(th) > 0 ? 'NW' : 'SE') : Math.sin(th) > 0 ? 'NE' : 'SW'
     spots.push({ a: ta * T + 4, b: tb * T + 4, face, room: hall.id, use: 'shiori' })
   }
+  // The queue for her: a short line in front of the dome, the first one closest to her.
+  const front = Math.floor(cb + 6.2)
+  for (let k = 0; k < 5; k++) {
+    const a = Math.floor(ca) + (k % 2 ? -Math.ceil(k / 2) : Math.ceil(k / 2))
+    if (front < hall.b1 && !blocked[front * plan.w + a]) spots.push({ a: a * T + 4, b: front * T + 4, face: 'NE', room: hall.id, use: 'queue' })
+  }
+  // Places to stand and talk, in her area's corners and along the walkway: small circles.
+  let group = 1000
+  for (const [a, b] of [
+    [hall.a0 + 2.5, hall.b0 + 3.5],
+    [hall.a1 - 3.5, hall.b0 + 2.5],
+    [hall.a0 + 2.5, hall.b1 - 3.5],
+  ]) {
+    const g = group++
+    for (const [da, db, face] of [
+      [0, 0, 'SE'],
+      [1, 0, 'SW'],
+      [0, 1, 'NE'],
+    ] as const) {
+      const ta = Math.floor(a + da)
+      const tb = Math.floor(b + db)
+      if (!blocked[tb * plan.w + ta]) spots.push({ a: ta * T + 4, b: tb * T + 4, face, room: hall.id, use: 'chat', group: g })
+    }
+  }
   return { items, spots, blocked }
+}
+
+/**
+ * The break room: a ping-pong table, a table football and arcade cabinets, a vending machine,
+ * beanbags; each game with its players' places.
+ */
+function furnishGames(plan: Plan, room: Space, items: Item[], spots: Spot[], used: Uint8Array, blocked: Uint8Array) {
+  const seed = Math.floor(hashOf(room.name, 19) * 1e6)
+  const W = plan.w
+  const free = (a: number, b: number, w: number, h: number) => {
+    for (let y = b; y < b + h; y++) for (let x = a; x < a + w; x++) if (x < room.a0 || y < room.b0 || x >= room.a1 || y >= room.b1 || used[y * W + x]) return false
+    return true
+  }
+  const mark = (a: number, b: number, w: number, h: number) => {
+    for (let y = b; y < b + h; y++) for (let x = a; x < a + w; x++) if (x >= 0 && y >= 0 && x < W && y < plan.h) used[y * W + x] = 1
+  }
+  const blockRect = (a: number, b: number, da: number, db: number) => {
+    for (let tb = Math.floor(b / T); tb <= Math.floor((b + db - 0.01) / T); tb++)
+      for (let ta = Math.floor(a / T); ta <= Math.floor((a + da - 0.01) / T); ta++) {
+        const oa = Math.min(a + da, (ta + 1) * T) - Math.max(a, ta * T)
+        const ob = Math.min(b + db, (tb + 1) * T) - Math.max(b, tb * T)
+        if (oa >= 2 && ob >= 2) blocked[tb * W + ta] = 1
+      }
+  }
+  const put = (kind: ItemKind, ta: number, tb: number) => {
+    const a = ta * T + 1
+    const b = tb * T + 1
+    items.push({ kind, a, b, flip: false, room: room.id, accent: room.accent, seed: seed + items.length })
+    blockRect(a, b, FOOT[kind].units[0], FOOT[kind].units[1])
+    return [a, b] as const
+  }
+  // Doors stay clear.
+  for (let b = room.b0; b < room.b1; b++)
+    for (let a = room.a0; a < room.a1; a++)
+      for (const [na, nb, dir, ea, eb] of [
+        [a + 1, b, 'a', a, b],
+        [a - 1, b, 'a', a - 1, b],
+        [a, b + 1, 'b', a, b],
+        [a, b - 1, 'b', a, b - 1],
+      ] as const) {
+        const outside = na < room.a0 || nb < room.b0 || na >= room.a1 || nb >= room.b1
+        if (outside && !wallBetween(plan, ea, eb, dir)) mark(a - 1, b - 1, 3, 3)
+      }
+  let group = 2000 + room.id * 10
+  // Against the back wall first: arcade cabinets and the vending machine.
+  const wallThings: ItemKind[] = ['arcade', 'arcade', 'vending', 'arcade']
+  let k = 0
+  for (let a = room.a0 + 1; a < room.a1 - 1 && k < wallThings.length; a += 2) {
+    if (room.side === '+b' || !free(a, room.b0, 1, 2)) continue
+    const kind = wallThings[k++]
+    const [pa, pb] = put(kind, a, room.b0)
+    // Its place in front stays free for whoever plays.
+    mark(a, room.b0, 1, 2)
+    spots.push({ a: pa + 3, b: pb + 13, face: 'NE', room: room.id, use: kind === 'vending' ? 'vending' : 'arcade', group: group++ })
+  }
+  // The ping-pong table, with room at both ends; the table football, with room at both sides.
+  const games: [ItemKind, number, number, number, number][] = [
+    ['pingpong', 3, 2, 2, 0],
+    ['foosball', 2, 1, 0, 2],
+    ['foosball', 2, 1, 0, 2],
+  ]
+  for (const [kind, w, h, ea, eb] of games) {
+    let placed = false
+    for (let b = room.b0 + 1 + eb; b + h + eb <= room.b1 - 1 && !placed; b++)
+      for (let a = room.a0 + 1 + ea; a + w + ea <= room.a1 - 1 && !placed; a++) {
+        if (!free(a - ea, b - eb, w + 2 * ea, h + 2 * eb)) continue
+        const [pa, pb] = put(kind, a, b)
+        mark(a - ea, b - eb, w + 2 * ea, h + 2 * eb)
+        const g = group++
+        if (kind === 'pingpong') {
+          spots.push({ a: pa - 5, b: pb + 6, face: 'SE', room: room.id, use: 'pingpong', group: g }, { a: pa + 22 + 5, b: pb + 6, face: 'NW', room: room.id, use: 'pingpong', group: g })
+        } else {
+          for (const da of [3, 11])
+            spots.push({ a: pa + da, b: pb - 5, face: 'SW', room: room.id, use: 'foosball', group: g }, { a: pa + da, b: pb + 8 + 5, face: 'NE', room: room.id, use: 'foosball', group: g })
+        }
+        placed = true
+      }
+  }
+  for (let b = room.b1 - 2; b > room.b0 + 1; b -= 2)
+    for (const a of [room.a1 - 2, room.a0 + 1]) {
+      if (!free(a, b, 1, 1)) continue
+      const [pa, pb] = put('beanbag', a, b)
+      mark(a, b, 1, 1)
+      spots.push({ a: pa + 3, b: pb + 11, face: 'NE', room: room.id, use: 'beanbag' })
+    }
 }
 
 function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used: Uint8Array, blocked: Uint8Array) {

@@ -68,6 +68,16 @@ export function placeOf(heard: Heard[], now: number, cps: number): number | null
   return at
 }
 
+/** Fades the start and/or the end of some samples in place, over 5 ms. */
+export function fade(samples: Float32Array, rate: number, start: boolean, end: boolean) {
+  const n = Math.min(Math.round(rate * 0.005), Math.floor(samples.length / 2))
+  for (let i = 0; i < n; i++) {
+    const k = i / n
+    if (start) samples[i] *= k
+    if (end) samples[samples.length - 1 - i] *= k
+  }
+}
+
 /** Her voice could not start because the graphics card is full: she writes instead, for now. */
 class Resting extends Error {}
 
@@ -174,7 +184,10 @@ export function useVoice(onProblem: (message: string) => void) {
             length += samples.length
           }
           if (length >= want || (done && length)) {
-            play(join(gathered), rate, mark)
+            const samples = join(gathered)
+            // A line starting or ending on a non-zero sample clicks: fade its edges over 5 ms.
+            fade(samples, rate, !mark.pieces.length, done)
+            play(samples, rate, mark)
             gathered = []
             length = 0
             want = PIECE * rate

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Heard, placeOf, voicedFrames, voiceIn } from './useVoice'
+import { fade, type Heard, placeOf, voicedFrames, voiceIn } from './useVoice'
 
 const line = (from: number, to: number, text = 'x'.repeat(30)) => ({ text, from, to, language: 'it' })
 /** A piece of `pattern` frames of 0.1 s: 1 voice, 0 silence. */
@@ -48,5 +48,16 @@ describe('voice and silence in her audio', () => {
     const h: Heard = { line: line(0, 10), pieces: [piece(0, '101'), piece(0.3, '1')], arrived: true }
     expect(voiceIn(h)).toBeCloseTo(0.3)
     expect(voiceIn(h, 0.25)).toBeCloseTo(0.15)
+  })
+})
+
+describe('the edges of each line', () => {
+  it('fade in and out, so a line does not start or stop with a click', () => {
+    const samples = new Float32Array(1000).fill(1)
+    fade(samples, 16000, true, true) // 5 ms at 16 kHz: 80 samples
+    expect(samples[0]).toBe(0)
+    expect(samples[40]).toBeCloseTo(0.5)
+    expect(samples[500]).toBe(1)
+    expect(samples[999]).toBe(0)
   })
 })

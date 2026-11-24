@@ -45,11 +45,18 @@ describe('words in two languages', () => {
     expect(spokenText('Il piano (quello nuovo) va bene.')).toBe('Il piano (quello nuovo) va bene.')
   })
 
-  it('splits a sentence where the script changes, sharing out its written stretch', () => {
-    const parts = byScript({ text: 'Per oggi te ne consiglio una: 痛い, che vuol dire "fa male!"', from: 100, to: 160 })
-    expect(parts.map((p) => p.text)).toEqual(['Per oggi te ne consiglio una:', '痛い,', 'che vuol dire "fa male!"'])
-    expect(parts[0].from).toBe(100)
-    expect(parts.at(-1)!.to).toBe(160)
+  it('keeps a Japanese word or two inside the sentence, said in one breath', () => {
+    const part = { text: 'Per oggi te ne consiglio una: 痛い, che vuol dire "fa male!"', from: 100, to: 160 }
+    expect(byScript(part)).toEqual([part])
+    expect(languageOf(part.text, 'it')).toBe('it')
+  })
+
+  it('says a long stretch of Japanese on its own, sharing out the written stretch', () => {
+    const parts = byScript({ text: 'Si dice così: 明日の十時にチームの会議があります。 Bello, no?', from: 0, to: 60 })
+    expect(parts.map((p) => p.text)).toEqual(['Si dice così:', '明日の十時にチームの会議があります。', 'Bello, no?'])
+    expect(parts.map((p) => languageOf(p.text, 'it'))).toEqual(['it', 'ja', 'it'])
+    expect(parts[0].from).toBe(0)
+    expect(parts.at(-1)!.to).toBe(60)
     expect(parts.every((p, i) => i === 0 || p.from === parts[i - 1].to)).toBe(true)
   })
 

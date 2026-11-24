@@ -12,6 +12,11 @@ const SETUPS: OfficeSpec[][] = [
   ],
   [{ name: 'Solo', accent: '#5b9bff', agents: 1, flavor: 'data' }],
   [
+    { name: 'Karuta', accent: '#5b9bff', agents: 17, flavor: 'code' },
+    { name: 'Openspace', accent: '#f2a948', agents: 3, flavor: 'code' },
+  ],
+  [{ name: 'Crowd', accent: '#3fd29a', agents: 40, flavor: 'research' }],
+  [
     { name: 'Alpha', accent: '#5b9bff', agents: 8, flavor: 'code' },
     { name: 'Beta', accent: '#f2a948', agents: 2, flavor: 'creative' },
     { name: 'Gamma', accent: '#3fd29a', agents: 4, flavor: 'research' },

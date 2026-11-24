@@ -14,7 +14,7 @@ import { makeLab } from './world'
  */
 
 const DEMO: OfficeSpec[] = [
-  { name: 'Karuta', accent: '#5b9bff', agents: 5, flavor: 'code' },
+  { name: 'Karuta', accent: '#5b9bff', agents: 17, flavor: 'code' },
   { name: 'Openspace', accent: '#f2a948', agents: 3, flavor: 'code' },
   { name: 'Riku', accent: '#3fd29a', agents: 2, flavor: 'research' },
   { name: 'Atelier', accent: '#ff7aa8', agents: 3, flavor: 'creative' },
@@ -163,7 +163,7 @@ export function WorldLab() {
                   </label>
                   <label>
                     Agents
-                    <input type="number" min={1} max={12} value={o.agents} onChange={(e) => setOffice(i, { agents: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })} />
+                    <input type="number" min={1} max={40} value={o.agents} onChange={(e) => setOffice(i, { agents: Math.max(1, Math.min(40, Number(e.target.value) || 1)) })} />
                   </label>
                   <label>
                     Work

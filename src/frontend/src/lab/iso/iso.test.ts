@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { box, iso, shades, YF } from './iso'
 import { Painter } from './px'
-import { advance, behind, order, type Person } from './scene'
+import { advance, behind, KEEP_AWAY, makePeople, order, type Person } from './scene'
+import { CENTER } from './room'
 import { FOOT_Y, facingOf, H, paintScientist, W } from './scientist'
 
 describe('iso', () => {
@@ -134,5 +135,17 @@ describe('scene', () => {
     expect(names.indexOf('back')).toBeLessThan(names.indexOf('desk'))
     expect(names.indexOf('desk')).toBeLessThan(names.indexOf('front'))
     expect(names).toHaveLength(4)
+  })
+
+  it('keeps everyone a few steps from the dome on every route', () => {
+    const near = makePeople().map((p) => {
+      let closest = Infinity
+      for (let k = 0; k < 4000; k++) {
+        advance(p, 0.05)
+        closest = Math.min(closest, Math.hypot(p.a - CENTER[0], p.b - CENTER[1]))
+      }
+      return closest
+    })
+    for (const d of near) expect(d).toBeGreaterThanOrEqual(KEEP_AWAY - 0.5)
   })
 })

@@ -131,6 +131,7 @@ start_one() {
       # Optional too: without a voice model she answers in writing only.
       local package=qwen_tts
       [ "$VOICE_ENGINE" = kokoro ] && package=kokoro
+      [ "$VOICE_ENGINE" = qwen-fast ] && package=faster_qwen3_tts
       if [ -z "$VOICE_MODEL" ] || ! "$VOICE_PYTHON" -c "import $package" >/dev/null 2>&1; then
         say "voice: skipped, no OPENSPACE_VOICE_MODEL or no $package in $VOICE_PYTHON (see tools/voice/README.md)"
         return

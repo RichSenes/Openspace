@@ -67,6 +67,11 @@ Two engines, both Apache-2.0:
 - `qwen`, [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) Base 1.7B: clones one voice and makes
   it speak Italian, English and Japanese, so she sounds the same in all three. Wants a graphics
   card (about 4–5 GB).
+- `qwen-fast`: the same voice through [faster-qwen3-tts](https://github.com/andimarafioti/faster-qwen3-tts)
+  (MIT), which replays CUDA graphs. On an RTX 3060 the 1.7B model makes speech about 1.8 times
+  faster than it is spoken (the first sound after half a second) in 4.6 GB, the 0.6B twice as
+  fast in 2.7 GB; plain `qwen` is 1.7 times slower than speech. It wants its own environment:
+  `pip install faster-qwen3-tts transformers==5.15.1` (newer transformers break it).
 - `kokoro`, [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M): tiny and quick, also on a
   processor, but each language has its own preset voice.
 

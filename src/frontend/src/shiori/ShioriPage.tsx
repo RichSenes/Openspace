@@ -161,7 +161,11 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   const info = MODES[modeOf(mode)]
   const latest = answerText(view?.transcript ?? [], live.draft, answering)
   // A spoken answer appears as her voice says it; otherwise (and if her voice stops) at reading pace.
-  const [spokenTurn, setSpokenTurn] = useState(false)
+  // The turn showing when the person last spoke (null: none yet); undefined when they typed.
+  // Only the answer after it is spoken: until their words arrive, the turn showing is the old one,
+  // whose answer was already heard.
+  const [spokenAfter, setSpokenAfter] = useState<string | null | undefined>(undefined)
+  const spokenTurn = spokenAfter !== undefined && latest.turn !== spokenAfter
   const reveal = useReveal(latest.turn, latest.text.length, spokenTurn && mouth.voiced ? mouth.at : null)
   // Spoken back a sentence at a time as she writes, when the turn was spoken.
   const spoken = useRef({ turn: latest.turn, from: 0 })
@@ -186,7 +190,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
   useEffect(() => {
     const el = subsRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [reveal.shown, view?.transcript.length])
+  }, [reveal.shown, view?.transcript.length, subsTop])
 
   // Another session, another ending to tell.
   const [shownId, setShownId] = useState(id)
@@ -211,7 +215,7 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
         setWanted(created.id)
       }
       if (said === undefined) setText('')
-      setSpokenTurn(said !== undefined)
+      setSpokenAfter(said !== undefined ? latest.turn : undefined)
       mouth.stop()
       mouth.begin()
       await send.mutateAsync({ sessionId: target, text: message, spoken: said !== undefined })

@@ -32,6 +32,12 @@ internal sealed class InMemoryShioriStore : IShioriSessionStore
         return Task.CompletedTask;
     }
 
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        _sessions.Remove(id);
+        return Task.CompletedTask;
+    }
+
     public Task SaveAsync(ShioriSession session, CancellationToken cancellationToken)
     {
         _sessions[session.Id] = Copy(session);

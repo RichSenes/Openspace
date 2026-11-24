@@ -16,6 +16,8 @@ internal static class ShioriEndpoints
 
     public sealed record ModeRequest(ShioriMode Mode);
 
+    public sealed record TitleRequest(string? Title);
+
     public static void MapShioriEndpoints(this IEndpointRouteBuilder app)
     {
         var sessions = app.MapGroup("/api/shiori/sessions").WithTags("Shiori");
@@ -35,6 +37,19 @@ internal static class ShioriEndpoints
 
         sessions.MapPut("/{id:guid}/mode", (Guid id, ModeRequest request, ShioriSessions shiori, CancellationToken ct) =>
             shiori.SetModeAsync(id, request.Mode, ct));
+
+        sessions.MapPut("/{id:guid}/title", async (Guid id, TitleRequest request, ShioriSessions shiori, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return Results.Problem("Give the session a name.", statusCode: StatusCodes.Status400BadRequest);
+            return Results.Ok(await shiori.RenameAsync(id, request.Title, ct));
+        });
+
+        sessions.MapDelete("/{id:guid}", async (Guid id, ShioriSessions shiori, CancellationToken ct) =>
+        {
+            await shiori.DeleteAsync(id, ct);
+            return Results.NoContent();
+        });
 
         sessions.MapPost("/{id:guid}/end", (Guid id, ShioriSessions shiori, CancellationToken ct) => shiori.EndAsync(id, ct));
     }

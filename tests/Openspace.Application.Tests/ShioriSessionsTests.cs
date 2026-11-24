@@ -157,6 +157,32 @@ public class ShioriSessionsTests
     }
 
     [Fact]
+    public async Task A_session_can_be_renamed_and_its_note_keeps_its_file()
+    {
+        var (sessions, session) = await OpenAsync();
+
+        var renamed = await sessions.RenameAsync(session.Id, "  Release order\nfor Friday ", default);
+
+        Assert.Equal("Release order for Friday", renamed.Title);
+        Assert.Equal(session.Note, renamed.Note);
+        Assert.Equal("Release order for Friday", _s.H.Vault.Notes[session.Note].Title);
+        Assert.Equal("Release order for Friday", (await sessions.ListAsync(default)).Single().Title);
+        await Assert.ThrowsAsync<ArgumentException>(() => sessions.RenameAsync(session.Id, "  ", default));
+    }
+
+    [Fact]
+    public async Task A_deleted_session_is_gone_but_its_note_stays_in_the_brain()
+    {
+        var (sessions, session) = await OpenAsync();
+
+        await sessions.DeleteAsync(session.Id, default);
+
+        Assert.Empty(await sessions.ListAsync(default));
+        await Assert.ThrowsAsync<NotFoundException>(() => sessions.GetAsync(session.Id, default));
+        Assert.True(_s.H.Vault.Notes.ContainsKey(session.Note));
+    }
+
+    [Fact]
     public async Task A_message_said_aloud_asks_for_a_short_spoken_answer()
     {
         var (sessions, session) = await OpenAsync();

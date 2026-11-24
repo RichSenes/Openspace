@@ -183,3 +183,165 @@
   opacity: 0.4;
   cursor: default;
 }
+
+.world-card {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgb(7 6 13 / 0.9);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+}
+
+.world-card h2 {
+  margin: 0;
+  padding-right: 28px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.world-card h3 {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.world-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mute);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.card-sub {
+  color: var(--mute);
+}
+
+.card-state.is-working {
+  color: #7fd6ff;
+}
+
+.card-state.is-waiting {
+  color: #ffd27a;
+}
+
+.card-state.is-failed {
+  color: #ff8a80;
+}
+
+.card-log,
+.card-needs,
+.card-traits {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-log li {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.card-traits {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.card-traits li {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mute);
+  font-size: 12px;
+}
+
+.card-need {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.card-need-kind {
+  font-size: 12px;
+  color: #ffd27a;
+}
+
+.card-need-kind span {
+  color: var(--mute);
+}
+
+.card-need-detail {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.card-actions input {
+  flex: 1 1 140px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.card-actions button,
+.card-link {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.card-link {
+  justify-self: start;
+}
+
+.card-link.is-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.card-done {
+  color: #7be3a8;
+  font-size: 13px;
+}

@@ -52,7 +52,7 @@ public sealed record WorldCharacter(
 public sealed record WorldOffice(Guid Id, string Name, IReadOnlyList<WorldCharacter> Characters);
 
 /// <summary>Something waiting for the person, and who brings it to Shiori (null when it is hers).</summary>
-/// <param name="Kind">The kind of need, as the needs-you list names it, or "Question" for an agent's live question.</param>
+/// <param name="Kind">The kind of need, as the needs-you list names it; for an agent's live wait, "Permission" (allow or deny) or "Question" (something to do or decide).</param>
 public sealed record WorldWaiting(string Kind, Guid OfficeId, Guid? CharacterId, Guid Id, string Title, string Detail, DateTimeOffset Since);
 
 public sealed record WorldView(IReadOnlyList<WorldOffice> Offices, IReadOnlyList<WorldWaiting> Waiting);
@@ -154,7 +154,7 @@ public sealed class WorldQueries(
 
         foreach (var question in live.Values.Where(a => a.Kind == ActivityKind.Waiting))
         {
-            waiting.Add(new WorldWaiting("Question", question.OfficeId, question.DeskId, question.TaskId, question.Detail ?? question.Doing ?? "A question", question.Step ?? string.Empty, question.At));
+            waiting.Add(new WorldWaiting(question.PermissionId is not null && !question.Question ? "Permission" : "Question", question.OfficeId, question.DeskId, question.TaskId, question.Detail ?? question.Doing ?? "A question", question.Step ?? string.Empty, question.At));
         }
 
         return new WorldView(result, [.. waiting.OrderBy(w => w.Since)]);

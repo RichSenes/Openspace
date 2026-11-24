@@ -71,7 +71,7 @@ public sealed class WorldTests
 
         Assert.Equal(CharacterState.Waiting, world.Offices[0].Characters[0].State);
         var question = Assert.Single(world.Waiting);
-        Assert.Equal(("Question", _h.Desk.Id.Value, "npm run deploy"), (question.Kind, question.CharacterId, question.Title));
+        Assert.Equal(("Permission", _h.Desk.Id.Value, "npm run deploy"), (question.Kind, question.CharacterId, question.Title));
     }
 
     [Fact]

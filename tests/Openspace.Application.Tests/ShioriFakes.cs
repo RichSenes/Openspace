@@ -198,7 +198,7 @@ internal sealed class ShioriHarness
         new(Store, Runtime, H.Vault, Publisher, new LiveOptions<FunctionModelOptions>(() => Models), _services, H.Clock, NullLogger<ShioriSessions>.Instance);
 
     public ShioriActions Actions(ShioriSessions sessions) =>
-        new(sessions, H.Vault, new Brain.BrainSearch(new InMemoryBrainIndex(H.Vault)), H.Offices, Jobs, H.Supervisor(), H.Clock);
+        new(sessions, H.Vault, new Brain.BrainSearch(new InMemoryBrainIndex(H.Vault)), H.Offices, Jobs, H.Supervisor(), H.Clock, H.Tasks, H.UnitOfWork);
 
     /// <summary>The secret a session's tools carry, as the engine would get it.</summary>
     public async Task<string> TokenAsync(Guid session) => (await Store.FindAsync(session, default))!.Token;

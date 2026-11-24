@@ -69,6 +69,16 @@ internal sealed class ShioriMcpTools(ShioriActions actions, IHttpContextAccessor
         CancellationToken cancellationToken) =>
         RunAsync(token => actions.AcceptAsync(token, note, cancellationToken));
 
+    [McpServerTool(Name = ShioriTools.AssignTask)]
+    [Description("Organise mode only. Give one clear task straight to a desk of an office, as its supervisor: it goes in the queue at once, approved, because the person asked for it. For bigger work use plan_work.")]
+    public Task<string> AssignAsync(
+        [Description("The office's exact name, as list_offices gives it.")] string office,
+        [Description("A short title for the task, e.g. \"Read the app's version\".")] string title,
+        [Description("What to do, standing on its own: the agent does not see this conversation.")] string? description = null,
+        [Description("The desk's name, as list_offices gives it; leave it out to give it to the least busy desk.")] string? desk = null,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(token => actions.AssignAsync(token, office, desk, title, description, cancellationToken));
+
     [McpServerTool(Name = ShioriTools.PlanWork)]
     [Description("Organise mode only. Ask one office's supervisor to plan a piece of work: it reads the project and proposes tasks for its desks, under an epic the person approves. Call it once per office concerned.")]
     public Task<string> PlanAsync(

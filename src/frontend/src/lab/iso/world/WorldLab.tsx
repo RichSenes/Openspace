@@ -6,7 +6,7 @@ import { ACCENTS, specsOf } from './fromWorld'
 import { planLab } from './furnish'
 import type { Flavor, OfficeSpec } from './layout'
 import { hourNow, type Weather } from './sky'
-import { makeLab } from './world'
+import { makeLab, WORLD_H, WORLD_W } from './world'
 
 /**
  * `?lab=world`: the lab made from a setup, filling the screen, always in its middle. Change the
@@ -67,7 +67,9 @@ export function WorldLab() {
     const labH = span * (4 / 3) * 0.5 + 120
     return Math.max(1, Math.min(4, Math.floor(Math.min((vw * 0.92) / labW, (vh * 0.92) / labH))))
   }, [offices, vw, vh])
-  const scale = zoom || auto
+  // Never zoomed out past the world's edges: the view always fits in what is painted.
+  const least = Math.max(1, Math.ceil(Math.max(vw / WORLD_W, vh / WORLD_H)))
+  const scale = Math.min(6, Math.max(least, zoom || auto))
   // Painted once per setup; the page's size only moves the window onto it.
   // With real offices the characters are the real ones: built once per setup, then moved by every change.
   const lab = useMemo(() => makeLab(offices, real ? { offices: [], waiting: [] } : undefined), [offices, real])
@@ -77,6 +79,62 @@ export function WorldLab() {
   const cw = Math.ceil(vw / scale)
   const ch = Math.ceil(vh / scale)
   const ref = useRef<HTMLCanvasElement>(null)
+  // Where the view looks, in world pixels: the lab until it is moved.
+  const centre = useRef<[number, number] | null>(null)
+  const view = useRef({ scale, cw, ch, vw, vh })
+  useEffect(() => {
+    view.current = { scale, cw, ch, vw, vh }
+  }, [scale, cw, ch, vw, vh])
+  const clampCentre = (c: [number, number], w = view.current.cw, h = view.current.ch): [number, number] => [
+    Math.min(WORLD_W - w / 2, Math.max(w / 2, c[0])),
+    Math.min(WORLD_H - h / 2, Math.max(h / 2, c[1])),
+  ]
+
+  // The wheel (or a trackpad's pinch) zooms on the point under the pointer; dragging moves the view.
+  useEffect(() => {
+    const canvas = ref.current!
+    let lastWheel = 0
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const now = performance.now()
+      if (now - lastWheel < 110 || Math.abs(e.deltaY) < 1) return
+      lastWheel = now
+      const { scale: s, vw: w, vh: h } = view.current
+      const next = Math.min(6, Math.max(Math.max(1, Math.ceil(Math.max(w / WORLD_W, h / WORLD_H))), s + (e.deltaY < 0 ? 1 : -1)))
+      if (next === s) return
+      const c = centre.current ?? [WORLD_W / 2, WORLD_H / 2]
+      const px = e.clientX - w / 2
+      const py = e.clientY - h / 2
+      const at: [number, number] = [c[0] + px / s, c[1] + py / s]
+      centre.current = clampCentre([at[0] - px / next, at[1] - py / next], Math.ceil(w / next), Math.ceil(h / next))
+      setZoom(next)
+    }
+    let drag: { x: number; y: number } | null = null
+    const onDown = (e: PointerEvent) => {
+      drag = { x: e.clientX, y: e.clientY }
+      canvas.setPointerCapture(e.pointerId)
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!drag) return
+      const { scale: s } = view.current
+      const c = centre.current ?? [WORLD_W / 2, WORLD_H / 2]
+      centre.current = clampCentre([c[0] - (e.clientX - drag.x) / s, c[1] - (e.clientY - drag.y) / s])
+      drag = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = () => (drag = null)
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    canvas.addEventListener('pointerdown', onDown)
+    canvas.addEventListener('pointermove', onMove)
+    canvas.addEventListener('pointerup', onUp)
+    canvas.addEventListener('pointercancel', onUp)
+    return () => {
+      canvas.removeEventListener('wheel', onWheel)
+      canvas.removeEventListener('pointerdown', onDown)
+      canvas.removeEventListener('pointermove', onMove)
+      canvas.removeEventListener('pointerup', onUp)
+      canvas.removeEventListener('pointercancel', onUp)
+    }
+  }, [])
   const when = useRef({ hour, weather, lamps })
   useEffect(() => {
     when.current = { hour, weather, lamps }
@@ -96,7 +154,7 @@ export function WorldLab() {
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      lab.draw(ctx, (now - start) / 1000, dt, when.current, ctx.canvas.width, ctx.canvas.height)
+      lab.draw(ctx, (now - start) / 1000, dt, when.current, ctx.canvas.width, ctx.canvas.height, centre.current ?? undefined)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -128,9 +186,19 @@ export function WorldLab() {
         {open && (
           <>
             <div className="iso-tools" role="group" aria-label="Zoom">
-              {[0, 1, 2, 3].map((z) => (
-                <button key={z} type="button" aria-pressed={zoom === z} onClick={() => setZoom(z)}>
-                  {z === 0 ? `Auto (×${auto})` : `×${z}`}
+              <button
+                type="button"
+                aria-pressed={zoom === 0}
+                onClick={() => {
+                  centre.current = null
+                  setZoom(0)
+                }}
+              >
+                Lab in view (×{Math.max(least, auto)})
+              </button>
+              {[1, 2, 3, 4].map((z) => (
+                <button key={z} type="button" aria-pressed={zoom === z} disabled={z < least} onClick={() => setZoom(z)}>
+                  ×{z}
                 </button>
               ))}
               {world.data && (

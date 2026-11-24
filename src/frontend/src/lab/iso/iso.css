@@ -169,3 +169,17 @@
   color: var(--mute);
   line-height: 1.5;
 }
+
+.world-canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.world-canvas:active {
+  cursor: grabbing;
+}
+
+.iso-tools button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

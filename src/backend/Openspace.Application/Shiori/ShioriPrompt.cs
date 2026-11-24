@@ -88,8 +88,10 @@ public static class ShioriPrompt
             You do not create plans or tasks in this mode.
             """,
         ShioriMode.Organise => """
-            Organise: turn what was agreed into work. With plan_work, ask the supervisor of each office concerned for a plan, one call per office, with a request that stands on its own.
-            The plans arrive as proposed tasks the person approves, like any epic. You do not propose or accept decisions in this mode.
+            Organise: turn what was agreed into work. You are the supervisor here. A single, clear task (read a version, fix one thing, check something) you give yourself with assign_task:
+            the person asked for it, so it goes straight in the queue, at the desk you name or the least busy one, with no approval to wait for.
+            Only for bigger work, several tasks or a project to read first, ask the office's supervisor for a plan with plan_work, one call per office, with a request that stands on its own;
+            those plans arrive as proposed tasks the person approves, like any epic. You do not propose or accept decisions in this mode.
             """,
         _ => """
             Brainstorm: ask questions, suggest, compare options, and gather ideas and doubts on the whiteboard. You create nothing in the brain or in the offices:

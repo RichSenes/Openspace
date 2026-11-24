@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import '../lab.css'
 import './iso.css'
-import { makeBrain } from './brain'
+import { makeBrain, REFERENCE } from './brain'
 import { benchDesk, capsule, coffeeCounter, cornerDesk, glassWall, holoTable, microscopeBench, plant, rack, sofa, totem, whiteboard, type Prop } from './props'
 import { makeScene } from './scene'
 import { SCENE_H, SCENE_W } from './room'
@@ -83,7 +83,10 @@ export function IsoLab() {
   const [zoom, setZoom] = useState(0)
   const [paused, setPaused] = useState(false)
   const [night, setNight] = useState(() => new URLSearchParams(location.search).has('night'))
-  const scene = useMemo(() => makeScene(), [])
+  // The reference picture, when this machine has one, can stand in for her drawn brain.
+  const [reference, setReference] = useState(REFERENCE !== null)
+  const picture = reference ? REFERENCE : null
+  const scene = useMemo(() => makeScene(picture), [picture])
   const sceneScale = useScale(zoom, SCENE_W)
   const clock = useRef({ t: 0 })
 
@@ -137,7 +140,7 @@ export function IsoLab() {
     ]
     return list
   }, [])
-  const brain = useMemo(() => makeBrain(), [])
+  const brain = useMemo(() => makeBrain(picture), [picture])
 
   return (
     <main className="lab iso-lab">
@@ -149,6 +152,11 @@ export function IsoLab() {
               {z === 0 ? 'Fit' : `×${z}`}
             </button>
           ))}
+          {REFERENCE && (
+            <button type="button" aria-pressed={reference} onClick={() => setReference((r) => !r)}>
+              Reference brain
+            </button>
+          )}
           <button type="button" aria-pressed={night} onClick={() => setNight((n) => !n)}>
             Night
           </button>

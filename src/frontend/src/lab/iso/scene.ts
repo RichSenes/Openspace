@@ -1,4 +1,4 @@
-import { makeBrain, type Brain } from './brain'
+import { makeBrain, type Brain, type PixelPicture } from './brain'
 import { glow, benchDesk, capsule, chair, coffeeCounter, cornerDesk, glassWall, holoTable, microscopeBench, mirrored, plant, rack, sofa, totem, whiteboard, type Prop } from './props'
 import { CENTER, makeRoom, screenOf, SCENE_H, SCENE_W, type Room } from './room'
 import { FOOT_X, FOOT_Y, facingOf, scientistFrames, type Facing, type Frames, type Look, type Pose } from './scientist'
@@ -367,9 +367,9 @@ export interface Scene {
   draw(ctx: CanvasRenderingContext2D, t: number, dt: number, night?: boolean): void
 }
 
-export function makeScene(): Scene {
+export function makeScene(picture: PixelPicture | null = null): Scene {
   const room = makeRoom()
-  const brain = makeBrain()
+  const brain = makeBrain(picture)
   const props = layout()
   const people = makePeople()
   const DOME = 34

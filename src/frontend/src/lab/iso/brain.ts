@@ -128,6 +128,60 @@ export interface BrainArt {
   canvas: HTMLCanvasElement
   /** The furrow pixels above the liquid, for the signals to run along. */
   furrows: Set<number>
+  /** Its width, and how far its top stands above the floor point. */
+  w: number
+  above: number
+}
+
+/** A pixel picture: a palette and rows of indexes into it (null is empty). */
+export interface PixelPicture {
+  palette: string[]
+  rows: (number | null)[][]
+}
+
+/**
+ * A picture kept only on this machine (git ignores the folder): a reference to try her look
+ * against, never published with the repository.
+ */
+const LOCAL = import.meta.glob<{ default: PixelPicture }>('./local/brain-reference.json', { eager: true })
+export const REFERENCE: PixelPicture | null = Object.values(LOCAL)[0]?.default ?? null
+
+/**
+ * The reference picture, each of its pixels drawn as 2×2, sunk in the liquid as the drawn one
+ * is; its darkest reds are the furrows the signals run along.
+ */
+export function paintPicture(pic: PixelPicture): BrainArt {
+  const SC = 2
+  const w = pic.rows[0].length * SC
+  const h = pic.rows.length * SC
+  const above = Math.round(h * 0.4)
+  const rx = w / 2 - 2
+  const line = (x: number) => above + FRONT * Math.sqrt(Math.max(0, 1 - ((x + 0.5 - w / 2) / rx) ** 2))
+  const dark = pic.palette.map((c) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16))
+    return r > 90 && r < 190 && g < 70 && b < 70
+  })
+  const p = new Painter(w, h)
+  const furrows = new Set<number>()
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = pic.rows[Math.floor(y / SC)][Math.floor(x / SC)]
+      if (v === null) continue
+      let c = pic.palette[v]
+      const under = line(x) - (y + 0.5)
+      if (under < 0) {
+        const k = Math.min(1, -under / 16)
+        if (k < 1) p.set(x, y, mix(mix(c, GREEN, 0.6), DEEP, 0.3 + k * 0.4), 0.55 * (1 - k))
+        continue
+      }
+      if (under < 1.5) c = mix(c, '#d9fff0', 0.55)
+      else if (under < 8) c = mix(c, GREEN, 0.35)
+      else if (under < 15) c = mix(c, GREEN, 0.15)
+      p.set(x, y, c)
+      if (dark[v] && under > 2) furrows.add(y * w + x)
+    }
+  }
+  return { canvas: p.canvas(), furrows, w, above }
 }
 
 /** Where the liquid meets her, in her own pixels: a curve, lower in the middle. */
@@ -349,7 +403,7 @@ export function paintBrain(): BrainArt {
       const i = (y * BW + x) * 4
       if (p.data[i + 3] === 0 && solid.data[i + 3] > 0) p.set(x, y, CORAL[0])
     }
-  return { canvas: p.canvas(), furrows }
+  return { canvas: p.canvas(), furrows, w: BW, above: ABOVE }
 }
 
 /** The glass: faint where it faces you, bright at its edges, a highlight where the light hits. */
@@ -406,10 +460,12 @@ interface Signal {
   carry: number
 }
 
-export function makeBrain(): Brain {
+export function makeBrain(picture: PixelPicture | null = null): Brain {
   const well = paintWell()
   const glass = paintGlass()
-  const { canvas: brain, furrows } = paintBrain()
+  const art = picture ? paintPicture(picture) : paintBrain()
+  const { canvas: brain, furrows } = art
+  const AW = art.w
   const list = [...furrows]
   const r = rand(17)
   const particles: Particle[] = Array.from({ length: 26 }, (_, k) => ({
@@ -425,8 +481,8 @@ export function makeBrain(): Brain {
   const signals: Signal[] = Array.from({ length: 5 }, () => ({ at: pick(), from: -1, trail: [], steps: 0, carry: 0 }))
   // Neighbours along a furrow, never straight back.
   const next = (s: Signal) => {
-    const x = s.at % BW
-    const y = Math.floor(s.at / BW)
+    const x = s.at % AW
+    const y = Math.floor(s.at / AW)
     const options: number[] = []
     for (const [dx, dy] of [
       [1, 0],
@@ -438,7 +494,7 @@ export function makeBrain(): Brain {
       [1, -1],
       [-1, 1],
     ]) {
-      const k = (y + dy) * BW + x + dx
+      const k = (y + dy) * AW + x + dx
       if (furrows.has(k) && k !== s.from && !s.trail.includes(k)) options.push(k)
     }
     return options.length ? options[Math.floor(r() * options.length)] : -1
@@ -451,8 +507,8 @@ export function makeBrain(): Brain {
       last = t
       const ox = Math.round(x - W / 2)
       const oy = Math.round(y - TOP)
-      const bx = Math.round(x - BW / 2)
-      const by = Math.round(y - ABOVE)
+      const bx = Math.round(x - AW / 2)
+      const by = Math.round(y - art.above)
       const placed = particles.map((p) => place(p, t))
       for (const p of placed) if (p.far) trail(ctx, x, y, p)
       ctx.drawImage(well, ox, oy)
@@ -488,9 +544,9 @@ export function makeBrain(): Brain {
             s.at = n
           }
         }
-        if (s.steps < 4) glow(ctx, bx + (s.at % BW), by + Math.floor(s.at / BW), 7, '#bff8ff', 0.5)
-        s.trail.forEach((k, i) => dot(ctx, bx + (k % BW), by + Math.floor(k / BW), '#9ff3ff', 0.7 - i * 0.13))
-        dot(ctx, bx + (s.at % BW), by + Math.floor(s.at / BW), '#ffffff')
+        if (s.steps < 4) glow(ctx, bx + (s.at % AW), by + Math.floor(s.at / AW), 7, '#bff8ff', 0.5)
+        s.trail.forEach((k, i) => dot(ctx, bx + (k % AW), by + Math.floor(k / AW), '#9ff3ff', 0.7 - i * 0.13))
+        dot(ctx, bx + (s.at % AW), by + Math.floor(s.at / AW), '#ffffff')
       }
       for (const p of placed) if (!p.far) trail(ctx, x, y, p)
       ctx.drawImage(glass, ox, oy)

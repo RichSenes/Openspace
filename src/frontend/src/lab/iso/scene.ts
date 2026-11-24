@@ -16,7 +16,7 @@ interface Placed {
 }
 
 export type Step = { go: [number, number]; first?: 'a' | 'b' } | { act: Pose; face: Facing; secs: number; bubble?: Bubble }
-export type Bubble = 'question' | 'idea' | 'chat' | 'dots'
+export type Bubble = 'question' | 'idea' | 'chat' | 'dots' | 'review' | 'failed'
 
 export interface Person {
   look: Look
@@ -285,6 +285,16 @@ export function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, 
     px(-1, -7, '#5d6878')
     px(0, -7, '#5d6878')
     px(1, -7, '#5d6878')
+  } else if (kind === 'review') {
+    // A parcel: work handed in, to look at.
+    for (let dy = -10; dy <= -6; dy++) for (let dx = -2; dx <= 2; dx++) px(dx, dy, dy === -10 ? '#e8c890' : '#c49a6c')
+    for (let dy = -10; dy <= -6; dy++) px(0, dy, '#8a6a4a')
+  } else if (kind === 'failed') {
+    // A red mark: something went wrong.
+    for (const dy of [-11, -10, -9, -8]) px(0, dy, '#d23a3a')
+    px(0, -6, '#d23a3a')
+    px(1, -11, '#d23a3a')
+    px(1, -10, '#d23a3a')
   } else if (kind === 'chat') {
     // Squiggles: talk, not words.
     for (let k = 0; k < 9; k++) px(-4 + k, -9 + Math.round(Math.sin(k * 1.4 + t * 6 + seed) * 1), '#5b6fa8')

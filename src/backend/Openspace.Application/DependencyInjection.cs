@@ -70,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<RoutineQueries>();
         services.AddScoped<ProposalCommands>();
         services.AddScoped<Attention.NeedsYouQueries>();
+        services.AddScoped<World.WorldQueries>();
         services.AddSingleton<Attention.DecisionAcceptor>();
         services.AddScoped<Attention.DecisionCommands>();
         services.AddScoped<IChatAnswers, ChatAnswers>();

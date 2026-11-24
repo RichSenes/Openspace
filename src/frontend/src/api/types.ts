@@ -995,3 +995,44 @@ export interface ShioriEnding {
   session: ShioriSessionView
   proposed: string[]
 }
+
+/** Who a character of the world is: a desk's agent, a routine, an intern helping a desk. */
+export type CharacterKind = 'Desk' | 'Routine' | 'Intern'
+
+/** What a character is doing now: free, at work, waiting for the person, failed, or off. */
+export type CharacterState = 'Free' | 'Working' | 'Waiting' | 'Failed' | 'Off'
+
+export interface WorldCharacter {
+  id: string
+  kind: CharacterKind
+  name: string
+  state: CharacterState
+  doing: string | null
+  taskId: string | null
+  taskTitle: string | null
+  forDesk: string | null
+  traits: string[]
+}
+
+export interface WorldOffice {
+  id: string
+  name: string
+  characters: WorldCharacter[]
+}
+
+/** Something waiting for the person, and who brings it to Shiori (null when it is hers). */
+export interface WorldWaiting {
+  kind: string
+  officeId: string
+  characterId: string | null
+  id: string
+  title: string
+  detail: string
+  since: string
+}
+
+/** The world in one look: every office's characters and the queue at Shiori. */
+export interface WorldView {
+  offices: WorldOffice[]
+  waiting: WorldWaiting[]
+}

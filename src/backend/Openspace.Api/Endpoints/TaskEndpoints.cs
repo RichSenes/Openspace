@@ -94,6 +94,9 @@ internal static class TaskEndpoints
 
         // Everything that waits for the person, from every office: tasks, proposals, failed routines.
         app.MapGet("/api/needs-you", (Application.Attention.NeedsYouQueries needs, CancellationToken ct) => needs.ListAsync(ct)).WithTags("Activity");
+
+        // The world in one look: every office's characters and what each does, and the queue at Shiori.
+        app.MapGet("/api/world", (Application.World.WorldQueries world, CancellationToken ct) => world.GetAsync(ct)).WithTags("Activity");
         app.MapGet("/api/context", (Guid? officeId, ContextBoard board) => board.Snapshot(officeId)).WithTags("Activity");
         app.MapGet("/api/interns", (Guid? officeId, InternBoard board) => board.Snapshot(officeId)).WithTags("Activity");
         app.MapGet("/api/guests", (Guid? officeId, Application.Guests.GuestBoard board) => board.Snapshot(officeId)).WithTags("Activity");

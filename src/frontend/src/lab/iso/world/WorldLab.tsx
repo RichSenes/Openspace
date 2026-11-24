@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import '../../lab.css'
 import '../iso.css'
+import { useWorld } from '../../../api/hooks'
+import { ACCENTS, specsOf } from './fromWorld'
 import { planLab } from './furnish'
 import type { Flavor, OfficeSpec } from './layout'
 import { hourNow, type Weather } from './sky'
@@ -22,7 +24,6 @@ const DEMO: OfficeSpec[] = [
 
 const FLAVORS: Flavor[] = ['code', 'research', 'creative', 'data']
 const WEATHERS: Weather[] = ['clear', 'cloudy', 'rain', 'storm']
-const ACCENTS = ['#5b9bff', '#f2a948', '#3fd29a', '#ff7aa8', '#c48bff', '#e6d25a', '#5fd7e6', '#ff8a5c']
 const NAMES = ['Kumo', 'Hoshi', 'Mizu', 'Kaze', 'Tsuki', 'Yama']
 
 /** The page can open on a given hour, weather, lamps and zoom: ?lab=world&hour=22&weather=storm&lamps=off&zoom=2. */
@@ -43,7 +44,14 @@ function useViewport() {
 }
 
 export function WorldLab() {
-  const [offices, setOffices] = useState(DEMO)
+  const [demo, setDemo] = useState(DEMO)
+  // The real offices, when Openspace's API answers and the page is asked for them (?lab=world&real).
+  const [real, setReal] = useState(ASKED.has('real'))
+  const world = useWorld()
+  // The lab follows the setup, not every change of state: rebuilt when offices or their seats change.
+  const realKey = world.data ? JSON.stringify(specsOf(world.data)) : ''
+  const offices = useMemo(() => (real && realKey ? (JSON.parse(realKey) as OfficeSpec[]) : demo), [real, realKey, demo])
+  const setOffices = setDemo
   const [live, setLive] = useState(!ASKED.has('hour'))
   const [hour, setHour] = useState(() => (ASKED.has('hour') ? Number(ASKED.get('hour')) : hourNow()))
   const [weather, setWeather] = useState<Weather>(() => (WEATHERS.includes(ASKED.get('weather') as Weather) ? (ASKED.get('weather') as Weather) : 'clear'))
@@ -121,6 +129,11 @@ export function WorldLab() {
                   {z === 0 ? `Auto (×${auto})` : `×${z}`}
                 </button>
               ))}
+              {world.data && (
+                <button type="button" aria-pressed={real} onClick={() => setReal((r) => !r)}>
+                  Real offices
+                </button>
+              )}
               <button type="button" aria-pressed={!lamps} onClick={() => setLamps((l) => !l)}>
                 Lamps off
               </button>
@@ -153,52 +166,56 @@ export function WorldLab() {
                 </select>
               </label>
             </div>
-            <div className="world-offices">
-              {offices.map((o, i) => (
-                <fieldset key={i}>
-                  <legend style={{ color: o.accent }}>{o.name}</legend>
-                  <label>
-                    Name
-                    <input value={o.name} maxLength={16} size={8} onChange={(e) => setOffice(i, { name: e.target.value || '?' })} />
-                  </label>
-                  <label>
-                    Agents
-                    <input type="number" min={1} max={40} value={o.agents} onChange={(e) => setOffice(i, { agents: Math.max(1, Math.min(40, Number(e.target.value) || 1)) })} />
-                  </label>
-                  <label>
-                    Work
-                    <select value={o.flavor} onChange={(e) => setOffice(i, { flavor: e.target.value as Flavor })}>
-                      {FLAVORS.map((f) => (
-                        <option key={f}>{f}</option>
-                      ))}
-                    </select>
-                  </label>
-                  {offices.length > 1 && (
-                    <button type="button" onClick={() => setOffices((list) => list.filter((_, k) => k !== i))}>
-                      Remove
-                    </button>
-                  )}
-                </fieldset>
-              ))}
-              {offices.length < 8 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOffices((list) => [
-                      ...list,
-                      {
-                        name: NAMES[list.length % NAMES.length] + (list.length >= NAMES.length ? list.length : ''),
-                        accent: ACCENTS[list.length % ACCENTS.length],
-                        agents: 2,
-                        flavor: FLAVORS[list.length % 4],
-                      },
-                    ])
-                  }
-                >
-                  Add an office
-                </button>
-              )}
-            </div>
+            {real ? (
+              <p className="world-note">The offices set up in Openspace: an area per office, a seat for each desk and each routine.</p>
+            ) : (
+              <div className="world-offices">
+                {offices.map((o, i) => (
+                  <fieldset key={i}>
+                    <legend style={{ color: o.accent }}>{o.name}</legend>
+                    <label>
+                      Name
+                      <input value={o.name} maxLength={16} size={8} onChange={(e) => setOffice(i, { name: e.target.value || '?' })} />
+                    </label>
+                    <label>
+                      Agents
+                      <input type="number" min={1} max={40} value={o.agents} onChange={(e) => setOffice(i, { agents: Math.max(1, Math.min(40, Number(e.target.value) || 1)) })} />
+                    </label>
+                    <label>
+                      Work
+                      <select value={o.flavor} onChange={(e) => setOffice(i, { flavor: e.target.value as Flavor })}>
+                        {FLAVORS.map((f) => (
+                          <option key={f}>{f}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {offices.length > 1 && (
+                      <button type="button" onClick={() => setOffices((list) => list.filter((_, k) => k !== i))}>
+                        Remove
+                      </button>
+                    )}
+                  </fieldset>
+                ))}
+                {offices.length < 8 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOffices((list) => [
+                        ...list,
+                        {
+                          name: NAMES[list.length % NAMES.length] + (list.length >= NAMES.length ? list.length : ''),
+                          accent: ACCENTS[list.length % ACCENTS.length],
+                          agents: 2,
+                          flavor: FLAVORS[list.length % 4],
+                        },
+                      ])
+                    }
+                  >
+                    Add an office
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </aside>

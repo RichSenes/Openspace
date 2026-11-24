@@ -55,7 +55,7 @@ this page records what was decided for turning it into the real thing.
 
 ## Steps
 
-1. A live snapshot of the world from the backend: offices and desks (with traits), routines and
+1. *(Done: `GET /api/world`, `useWorld`, "Real offices" in the study.)* A live snapshot of the world from the backend: offices and desks (with traits), routines and
    the office each serves, interns, and for each character what they are doing now and whether
    they wait for the person.
 2. The lab built from that snapshot instead of the demo setup, characters moved by it: desk work,

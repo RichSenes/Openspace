@@ -1,9 +1,10 @@
 import { box, YF, type Sprite } from '../iso'
-import { benchDesk, capsule, chair, coffeeCounter, cornerDesk, holoTable, microscopeBench, mirrored, plant, rack, sofa, totem, whiteboard, type BoardKind, type Prop } from '../props'
+import { capsule, chair, coffeeCounter, holoTable, mirrored, plant, rack, sofa, totem, whiteboard, type BoardKind, type Prop } from '../props'
 import { mix, noise, Painter, toCanvas } from '../px'
 import { makeCity, type City } from './city'
 import { decor, type DecorKind } from './decor'
 import { arcade, beanbag, foosball, pingPong, vending } from './recreation'
+import { benchFacing, cornerFacing, microscopeFacing } from './desks'
 import { planLab, type Furnished, type Item } from './furnish'
 import { edgeKind, hashOf, spaceAt, type OfficeSpec, type Plan, type Space } from './layout'
 
@@ -93,16 +94,16 @@ function propFor(item: Item): Prop {
         prop = decor((item.variant ?? 'bin') as DecorKind, item.accent, item.seed)
         break
       case 'bench':
-        prop = benchDesk(item.accent, s + 1)
+        prop = benchFacing(item.accent, s + 1)
         break
       case 'corner':
-        prop = cornerDesk(item.accent, s + 2)
+        prop = cornerFacing(item.accent, s + 2)
         break
       case 'holo':
         prop = holoTable(item.accent)
         break
       case 'microscope':
-        prop = microscopeBench(item.accent)
+        prop = microscopeFacing(item.accent)
         break
       case 'capsule':
         prop = capsule(liquids[s], s * 5 + 3)

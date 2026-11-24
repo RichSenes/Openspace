@@ -222,7 +222,8 @@ void main(){
   size = mix(size, uPoint * 0.95, m);
   if (uPixel > 0.5) size = max(1.0, floor(size + 0.5));
   gl_PointSize = size;
-  vColor = col * bright * alpha * uDim;
+  // The portrait is drawn from its own pixels, already sized: only the points dim when small.
+  vColor = col * bright * alpha * (uSkin > 1.5 ? 1.0 : uDim);
 }
 `
 

@@ -9,6 +9,7 @@ import { hourNow, type Weather } from './sky'
 import { Card } from './Cards'
 import { ShioriPanel, WakeListener } from './ShioriPanel'
 import type { Heard } from '../../../shiori/voice'
+import { loadByName } from '../../../shiori/wake'
 import { makeLab, WORLD_H, WORLD_W, type Picked } from './world'
 
 /**
@@ -66,6 +67,8 @@ export function WorldLab() {
   // Shiori's panel, and what was said to her by name before it opened.
   const [shiori, setShiori] = useState(false)
   const [said, setSaid] = useState<Heard | null>(null)
+  // Listening for her name, shared by the lab (panel closed) and her panel (open).
+  const [byName, setByName] = useState(loadByName)
   const [vw, vh] = useViewport()
   // The zoom that makes the lab fill most of the screen, unless one is chosen.
   const auto = useMemo(() => {
@@ -217,9 +220,10 @@ export function WorldLab() {
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />
       {picked && <Card picked={picked} world={world.data} onClose={() => setPicked(null)} />}
-      <ShioriPanel open={shiori} onClose={() => setShiori(false)} world={world.data} pending={said} onPendingTaken={() => setSaid(null)} />
+      <ShioriPanel open={shiori} onClose={() => setShiori(false)} world={world.data} pending={said} onPendingTaken={() => setSaid(null)} byName={byName} onByName={setByName} />
       {!shiori && (
         <WakeListener
+          on={byName}
           onCalled={(heard) => {
             setSaid(heard)
             setPicked(null)

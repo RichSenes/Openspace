@@ -102,11 +102,20 @@ function DeleteSession({ session, onDone }: { session: ShioriSessionSummary; onD
   )
 }
 
-export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onClose }: SessionsProps) {
+export function SessionsDrawer({ onClose, ...list }: SessionsProps) {
+  return (
+    <Drawer side="left" title="Sessions" onClose={onClose}>
+      <SessionList {...list} />
+    </Drawer>
+  )
+}
+
+/** The sessions, newest first, each with its mode, size and age, to rename or delete in place. */
+export function SessionList({ sessions, loading, current, onPick, onNew }: Omit<SessionsProps, 'onClose'>) {
   const list = orderSessions(sessions ?? [])
   const [editing, setEditing] = useState<{ id: string; what: 'rename' | 'delete' } | null>(null)
   return (
-    <Drawer side="left" title="Sessions" onClose={onClose}>
+    <>
       <button type="button" className="pr-btn sp-new" onClick={onNew}>
         <Plus size={16} aria-hidden="true" />
         <span>New session</span>
@@ -158,7 +167,7 @@ export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onCl
           })}
         </ul>
       )}
-    </Drawer>
+    </>
   )
 }
 

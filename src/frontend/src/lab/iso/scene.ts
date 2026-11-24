@@ -87,7 +87,12 @@ const AMBER = '#f2a948'
 const VIOLET = '#c48bff'
 
 function layout(): Placed[] {
-  const at = (prop: Prop, a: number, b: number, flip = false): Placed => ({ prop: flip ? mirrored(prop) : prop, a, b, flip: flip ? -1 : 1 })
+  const at = (prop: Prop, a: number, b: number, flip = false): Placed => ({
+    prop: flip ? mirrored(prop) : prop,
+    a,
+    b,
+    flip: flip ? -1 : 1,
+  })
   return [
     // Research: capsules against the wall, a bench, a board.
     at(capsule('#37d6a0', 3), 4, 24),
@@ -122,7 +127,13 @@ function layout(): Placed[] {
 const PEOPLE: { look: Look; route: Step[]; start: [number, number] }[] = [
   {
     // Engineering: types, then goes to ask Shiori something and takes notes.
-    look: { skin: '#f1c9a5', hair: '#1d1a22', style: 'short', shirt: BLUE, glasses: true },
+    look: {
+      skin: '#f1c9a5',
+      hair: '#1d1a22',
+      style: 'short',
+      shirt: BLUE,
+      glasses: true,
+    },
     start: [66, 33],
     route: [
       { act: 'type', face: 'NE', secs: 6 },
@@ -285,14 +296,59 @@ export function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, 
   }
 }
 
-interface Drawable {
-  /** Footprint on the floor, for sorting. */
+export interface Footprint {
   a0: number
   b0: number
   a1: number
   b1: number
-  person: boolean
+}
+
+interface Drawable extends Footprint {
+  /** What it covers on screen: only things that overlap there need an order. */
+  box: [number, number, number, number]
   draw: (ctx: CanvasRenderingContext2D, t: number) => void
+}
+
+/**
+ * Back to front: two things that overlap on screen are ordered by their footprints (one is
+ * wholly behind the other along a floor axis), then everything is drawn in an order that keeps
+ * all those pairs, as iso engines do. A plain sort cannot: the relation is not transitive.
+ */
+export function order<T extends Footprint & { box: [number, number, number, number] }>(items: T[]): T[] {
+  const n = items.length
+  const after: number[][] = items.map(() => [])
+  const waiting = new Array<number>(n).fill(0)
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const x = items[i].box
+      const y = items[j].box
+      if (x[2] <= y[0] || y[2] <= x[0] || x[3] <= y[1] || y[3] <= x[1]) continue
+      const k = behind(items[i], items[j])
+      const [first, second] = k <= 0 ? [i, j] : [j, i]
+      after[first].push(second)
+      waiting[second]++
+    }
+  }
+  const depth = (k: number) => items[k].a0 + items[k].a1 + items[k].b0 + items[k].b1
+  const ready = items.map((_, k) => k).filter((k) => waiting[k] === 0)
+  const out: T[] = []
+  const done = new Array<boolean>(n).fill(false)
+  while (out.length < n) {
+    if (!ready.length) {
+      // A loop: break it at the farthest thing left.
+      let pick = -1
+      for (let k = 0; k < n; k++) if (!done[k] && (pick < 0 || depth(k) < depth(pick))) pick = k
+      ready.push(pick)
+      waiting[pick] = 0
+    }
+    ready.sort((p, q) => depth(q) - depth(p))
+    const k = ready.pop()!
+    if (done[k]) continue
+    done[k] = true
+    out.push(items[k])
+    for (const m of after[k]) if (--waiting[m] === 0 && !done[m]) ready.push(m)
+  }
+  return out
 }
 
 /** Whether x stands behind y: compared by footprints, as iso games do. */
@@ -317,7 +373,7 @@ export function makeScene(): Scene {
   const brain = makeBrain()
   const props = layout()
   const people = makePeople()
-  const DOME = 29
+  const DOME = 33
   return {
     room,
     brain,
@@ -330,38 +386,41 @@ export function makeScene(): Scene {
       ctx.fillRect(0, 0, SCENE_W, SCENE_H)
       ctx.drawImage(room.canvas, 0, 0)
       room.live(ctx, t)
-      const items: Drawable[] = props.map((p) => ({
-        a0: p.a,
-        b0: p.b,
-        a1: p.a + p.prop.da,
-        b1: p.b + p.prop.db,
-        person: false,
-        draw: (c, tt) => {
-          const [x, y] = screenOf(p.a, p.b)
-          c.drawImage(p.prop.sprite.canvas, x - p.prop.sprite.ax, y - p.prop.sprite.ay)
-          p.prop.anim?.(c, x, y, tt, p.flip)
-        },
-      }))
+      const items: Drawable[] = props.map((p) => {
+        const [x, y] = screenOf(p.a, p.b)
+        const sx = x - p.prop.sprite.ax
+        const sy = y - p.prop.sprite.ay
+        return {
+          a0: p.a,
+          b0: p.b,
+          a1: p.a + p.prop.da,
+          b1: p.b + p.prop.db,
+          box: [sx, sy, sx + p.prop.sprite.canvas.width, sy + p.prop.sprite.canvas.height] as [number, number, number, number],
+          draw: (c: CanvasRenderingContext2D, tt: number) => {
+            c.drawImage(p.prop.sprite.canvas, x - p.prop.sprite.ax, y - p.prop.sprite.ay)
+            p.prop.anim?.(c, x, y, tt, p.flip)
+          },
+        }
+      })
+      const [bx, by] = screenOf(CENTER[0], CENTER[1])
       items.push({
         a0: CENTER[0] - DOME,
         b0: CENTER[1] - DOME,
         a1: CENTER[0] + DOME,
         b1: CENTER[1] + DOME,
-        person: false,
-        draw: (c, tt) => {
-          const [x, y] = screenOf(CENTER[0], CENTER[1])
-          brain.draw(c, x, y, tt)
-        },
+        box: [bx - 110, by - 110, bx + 110, by + 80],
+        draw: (c, tt) => brain.draw(c, bx, by, tt),
       })
       for (const p of people) {
+        const [px, py] = screenOf(p.a, p.b)
         items.push({
-          a0: p.a - 1,
-          b0: p.b - 1,
-          a1: p.a + 1,
-          b1: p.b + 1,
-          person: true,
+          a0: p.a - 2,
+          b0: p.b - 2,
+          a1: p.a + 2,
+          b1: p.b + 2,
+          box: [px - 20, py - 70, px + 20, py + 4],
           draw: (c, tt) => {
-            const [x, y] = screenOf(p.a, p.b)
+            const [x, y] = [px, py]
             const frame = p.pose === 'walk' ? Math.floor(p.into * 8) : p.pose === 'stand' || p.pose === 'think' ? 0 : Math.floor(tt * (p.pose === 'coffee' ? 0.5 : 3) + p.seed)
             const sprite = p.frames.get(p.facing, p.pose, frame)
             c.globalAlpha = 0.22
@@ -374,8 +433,7 @@ export function makeScene(): Scene {
           },
         })
       }
-      items.sort(behind)
-      for (const item of items) item.draw(ctx, t)
+      for (const item of order(items)) item.draw(ctx, t)
       if (night) {
         // The lights go down: what glows is what lights the room.
         ctx.save()
@@ -388,8 +446,8 @@ export function makeScene(): Scene {
           for (const l of p.prop.lights ?? []) glow(ctx, x + p.flip * l.dx, y + l.dy, l.r, l.color, 0.55)
         }
         const [cx, cy] = screenOf(CENTER[0], CENTER[1])
-        glow(ctx, cx, cy - 90, 190, '#b25cff', 0.55 + 0.1 * Math.sin(t * 1.7))
-        glow(ctx, cx, cy - 10, 130, '#5fd7ff', 0.3)
+        glow(ctx, cx, cy - 30, 150, '#b25cff', 0.45 + 0.1 * Math.sin(t * 1.7))
+        glow(ctx, cx, cy, 120, '#46ffb0', 0.7)
         room.glows(ctx, t)
       }
     },

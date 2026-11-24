@@ -1,4 +1,4 @@
-import { box, cylinder, iso, onLeftFace, shades, type Sprite } from './iso'
+import { box, cylinder, iso, onLeftFace, shades, SQUASH, YF, type Sprite } from './iso'
 import { mix, noise, Painter, rand, type Point } from './px'
 
 /**
@@ -38,7 +38,7 @@ type At = (a: number, b: number, z?: number) => Point
 /** Paints a prop of footprint da × db reaching `top` pixels up, its origin placed with room around it. */
 function paint(da: number, db: number, top: number, draw: (p: Painter, at: At, ax: number, ay: number) => void, extra = 8): { sprite: Sprite; ax: number; ay: number } {
   const w = 2 * (da + db) + 2 * extra
-  const h = da + db + top + 2 * extra
+  const h = Math.ceil((da + db) * YF) + top + 2 * extra
   const ax = 2 * db + extra
   const ay = top + extra
   const p = new Painter(w, h)
@@ -167,7 +167,12 @@ export function cornerDesk(accent: string, seed = 2): Prop {
       p.ellipse(x - 4 + r() * 8, y - 3 - r() * 9, 2, 1.5, ['#3d8f5a', '#57b06f', '#2f7048'][k % 3])
     }
   })
-  return { sprite, da, db, lights: [lamp(20, 8, 30, 30, '#7fc8ff'), lamp(9, 19, 36, 26, '#ffd9a0')] }
+  return {
+    sprite,
+    da,
+    db,
+    lights: [lamp(20, 8, 30, 30, '#7fc8ff'), lamp(9, 19, 36, 26, '#ffd9a0')],
+  }
 }
 
 /** A round table with a hologram turning above it. */
@@ -176,13 +181,13 @@ export function holoTable(accent: string): Prop {
   const db = 18
   const { sprite } = paint(da, db, 60, (p, at) => {
     const [cx, cy] = at(9, 9)
-    p.ellipse(cx + 2, cy + 1, 26, 13, '#0b1220', 0.16)
+    p.ellipse(cx + 2, cy + 1, 26, 26 * SQUASH, '#0b1220', 0.16)
     cylinder(p, cx, cy, 6, 14, '#5b6677')
     cylinder(p, cx, cy - 14, 24, 3, '#2b3443', '#1b2533')
-    p.ellipse(cx, cy - 17, 20, 10, '#13202c')
+    p.ellipse(cx, cy - 17, 20, 20 * SQUASH, '#13202c')
     for (let k = 0; k < 40; k++) {
       const th = (k / 40) * Math.PI * 2
-      p.set(cx + Math.cos(th) * 22, cy - 17 + Math.sin(th) * 11, k % 4 === 0 ? '#9ff3ff' : accent)
+      p.set(cx + Math.cos(th) * 22, cy - 17 + Math.sin(th) * 22 * SQUASH, k % 4 === 0 ? '#9ff3ff' : accent)
     }
     cylinder(p, cx, cy - 17, 4, 2, '#7a8696', '#bfe9ff')
   })
@@ -266,11 +271,11 @@ export function capsule(liquid: string, seed = 3): Prop {
   const db = 12
   const { sprite } = paint(da, db, BASE + TUBE + 34, (p, at) => {
     const [cx, cy] = at(6, 6)
-    p.ellipse(cx + 3, cy + 2, R + 6, (R + 6) / 2, '#0b1220', 0.18)
+    p.ellipse(cx + 3, cy + 2, R + 6, (R + 6) * SQUASH, '#0b1220', 0.18)
     cylinder(p, cx, cy, R + 2, BASE, '#465062', '#5d687a')
     for (let k = 0; k < 9; k++) {
       const th = Math.PI * (0.1 + (k / 8) * 0.8)
-      p.set(cx + Math.cos(th) * (R + 1), cy - 4 + Math.sin(th) * ((R + 1) / 2), k % 2 ? '#7ff0ff' : '#3cc7e0')
+      p.set(cx + Math.cos(th) * (R + 1), cy - 4 + Math.sin(th) * (R + 1) * SQUASH, k % 2 ? '#7ff0ff' : '#3cc7e0')
     }
     // The liquid, darker at the edges.
     cylinder(p, cx, cy - BASE, R - 1, TUBE - 12, liquid, mix(liquid, '#ffffff', 0.35))
@@ -309,7 +314,12 @@ export function capsule(liquid: string, seed = 3): Prop {
   const [cx, cy] = iso(6, 6)
   const r = rand(seed * 13)
   const capsuleLight = lamp(6, 6, BASE + 30, 60, liquid)
-  const bubbles = Array.from({ length: 16 }, () => ({ x: (r() * 2 - 1) * (R - 4), speed: 0.15 + r() * 0.3, ph: r(), big: r() > 0.75 }))
+  const bubbles = Array.from({ length: 16 }, () => ({
+    x: (r() * 2 - 1) * (R - 4),
+    speed: 0.15 + r() * 0.3,
+    ph: r(),
+    big: r() > 0.75,
+  }))
   return {
     sprite,
     da,
@@ -327,7 +337,7 @@ export function capsule(liquid: string, seed = 3): Prop {
         dot(ctx, xx, yy, '#eafffb', 0.85 * (1 - ph * 0.5), b.big ? 2 : 1)
       }
       // The surface ripples.
-      for (let k = -R + 2; k < R - 2; k++) dot(ctx, bx + k, surface + Math.round(((R - 1) / 2) * Math.sqrt(1 - (k / (R - 1)) ** 2) + Math.sin(t * 4 + k * 0.6)), mix(liquid, '#ffffff', 0.6), 0.6)
+      for (let k = -R + 2; k < R - 2; k++) dot(ctx, bx + k, surface + Math.round((R - 1) * SQUASH * Math.sqrt(1 - (k / (R - 1)) ** 2) + Math.sin(t * 4 + k * 0.6)), mix(liquid, '#ffffff', 0.6), 0.6)
       // The cap's light blinks.
       if (Math.floor(t * 1.5 + seed) % 3 !== 0) dot(ctx, bx - 2, by - TUBE - 6, '#ff8a98', 1, 2)
     },
@@ -349,13 +359,19 @@ export function rack(seed = 4): Prop {
       const [x, y] = at(0, db, 0)
       leds.push([x + 3, y + 1 - v - 2], [x + 5, y + 2 - v - 2], [x + 15, y + 7 - v - 2])
     }
-    for (let v = 3; v < H - 3; v += 2) for (let u = 3; u < da * 2 - 3; u += 2) {
-      const [x, y] = at(da, 0, 0)
-      p.set(x - u, y + Math.floor(u / 2) - v, '#1a202b')
-    }
+    for (let v = 3; v < H - 3; v += 2)
+      for (let u = 3; u < da * 2 - 3; u += 2) {
+        const [x, y] = at(da, 0, 0)
+        p.set(x - u, y + Math.floor((u * YF) / 2) - v, '#1a202b')
+      }
   })
   const r = rand(seed)
-  const live = leds.map(([x, y]) => ({ x: x - ax, y: y - ay, ph: r() * 10, color: ['#5dff9a', '#5dff9a', '#ffcf5a', '#67e3ff'][Math.floor(r() * 4)] }))
+  const live = leds.map(([x, y]) => ({
+    x: x - ax,
+    y: y - ay,
+    ph: r() * 10,
+    color: ['#5dff9a', '#5dff9a', '#ffcf5a', '#67e3ff'][Math.floor(r() * 4)],
+  }))
   return {
     sprite,
     da,
@@ -490,12 +506,13 @@ export function sofa(color: string): Prop {
   const db = 10
   const { sprite } = paint(da, db, 24, (p, at) => {
     shadow(p, at, 0, 0, da, db)
+    // The seat, the backrest between the two arms, two cushions.
     box(p, at, 0, 0, 0, da, db, 8, shades(color))
-    box(p, at, 0, 0, 8, da, 3, 10, shades(color))
-    box(p, at, 0, 0, 8, 3, db, 5, shades(color))
-    box(p, at, da - 3, 0, 8, 3, db, 5, shades(color))
-    box(p, at, 3, 3, 8, 10, db - 3, 2, shades(mix(color, '#ffffff', 0.12)))
-    box(p, at, 13, 3, 8, 10, db - 3, 2, shades(mix(color, '#ffffff', 0.12)))
+    box(p, at, 3, 0, 8, da - 6, 3, 11, shades(color))
+    box(p, at, 3, 3, 8, (da - 6) / 2, db - 3, 2, shades(mix(color, '#ffffff', 0.12)))
+    box(p, at, 3 + (da - 6) / 2, 3, 8, (da - 6) / 2, db - 3, 2, shades(mix(color, '#ffffff', 0.12)))
+    box(p, at, 0, 0, 8, 3, db, 7, shades(color))
+    box(p, at, da - 3, 0, 8, 3, db, 7, shades(color))
   })
   return { sprite, da, db }
 }
@@ -504,7 +521,7 @@ export function sofa(color: string): Prop {
 export function plant(seed = 6): Prop {
   const { sprite } = paint(6, 6, 44, (p, at) => {
     const [cx, cy] = at(3, 3)
-    p.ellipse(cx + 2, cy + 1, 9, 4.5, '#0b1220', 0.16)
+    p.ellipse(cx + 2, cy + 1, 9, 9 * SQUASH, '#0b1220', 0.16)
     cylinder(p, cx, cy, 6, 12, '#e8edf2')
     const r = rand(seed)
     for (let k = 0; k < 26; k++) {
@@ -523,13 +540,14 @@ export function plant(seed = 6): Prop {
 export function chair(color: string): Prop {
   const { sprite } = paint(6, 6, 24, (p, at) => {
     const [cx, cy] = at(3, 3)
-    p.ellipse(cx + 1, cy + 1, 7, 3.5, '#0b1220', 0.16)
+    p.ellipse(cx + 1, cy + 1, 7, 7 * SQUASH, '#0b1220', 0.16)
     for (const [a, b] of [
       [0, 3],
       [6, 3],
       [3, 0],
       [3, 6],
-    ]) p.line(cx, cy, ...at(a, b), '#3a4352')
+    ])
+      p.line(cx, cy, ...at(a, b), '#3a4352')
     p.rect(cx, cy - 10, 1, 10, '#5d6878')
     box(p, at, 0, 0, 10, 6, 6, 2, shades(color))
     box(p, at, 0, 5, 12, 6, 1, 10, shades(color))
@@ -571,7 +589,7 @@ export function totem(accent: string): Prop {
         const h = 6 + Math.round((Math.sin(t * 2 + u * 0.7) * 0.5 + 0.5) * 10 + noise(u * 0.4, t, 3) * 6)
         for (let v = 2; v < 31; v++) {
           const X = x + flip * (x0 - u)
-          const Y = y + y0 + Math.floor(u / 2) - v
+          const Y = y + y0 + Math.floor((u * YF) / 2) - v
           dot(ctx, X, Y, v < h ? (v > h - 2 ? '#e8fbff' : accent) : '#0d2433', v < h ? 0.95 : 1)
         }
       }
@@ -589,5 +607,10 @@ export function mirrored(prop: Prop): Prop {
   ctx.translate(c.width, 0)
   ctx.scale(-1, 1)
   ctx.drawImage(c, 0, 0)
-  return { ...prop, da: prop.db, db: prop.da, sprite: { canvas: m, ax: c.width - 1 - prop.sprite.ax, ay: prop.sprite.ay } }
+  return {
+    ...prop,
+    da: prop.db,
+    db: prop.da,
+    sprite: { canvas: m, ax: c.width - 1 - prop.sprite.ax, ay: prop.sprite.ay },
+  }
 }

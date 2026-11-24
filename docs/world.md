@@ -58,7 +58,7 @@ this page records what was decided for turning it into the real thing.
 1. *(Done: `GET /api/world`, `useWorld`, "Real offices" in the study.)* A live snapshot of the world from the backend: offices and desks (with traits), routines and
    the office each serves, interns, and for each character what they are doing now and whether
    they wait for the person.
-2. The lab built from that snapshot instead of the demo setup, characters moved by it: desk work,
+2. *(Done: real characters at their seats, queuing at Shiori with an icon, free ones in the lounge; interns come and go.)* The lab built from that snapshot instead of the demo setup, characters moved by it: desk work,
    the queue at Shiori, failures.
 3. The character card and the queue at Shiori, with their actions.
 4. Talking to Shiori inside the world (her voice and subtitles reused).

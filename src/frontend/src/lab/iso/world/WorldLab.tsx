@@ -69,7 +69,11 @@ export function WorldLab() {
   }, [offices, vw, vh])
   const scale = zoom || auto
   // Painted once per setup; the page's size only moves the window onto it.
-  const lab = useMemo(() => makeLab(offices), [offices])
+  // With real offices the characters are the real ones: built once per setup, then moved by every change.
+  const lab = useMemo(() => makeLab(offices, real ? { offices: [], waiting: [] } : undefined), [offices, real])
+  useEffect(() => {
+    if (real && world.data) lab.update(world.data)
+  }, [lab, real, world.data])
   const cw = Math.ceil(vw / scale)
   const ch = Math.ceil(vh / scale)
   const ref = useRef<HTMLCanvasElement>(null)

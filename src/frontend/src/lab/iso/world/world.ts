@@ -7,6 +7,8 @@ import { buildWorld, T, tint, type World } from './build'
 import { findPath, type Spot } from './furnish'
 import { hashOf, type OfficeSpec } from './layout'
 import { label } from './decor'
+import type { CharacterKind, CharacterState, WorldView } from '../../../api/types'
+import { intentOf, lookOf, queueOf } from './intent'
 import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from './sky'
 
 /**
@@ -39,6 +41,14 @@ interface Agent {
   seed: number
   bubble?: Bubble
   walked: number
+  /** A real character (desk, routine, intern) or one of the demo's. */
+  kind: CharacterKind | 'Demo'
+  id?: string
+  state?: CharacterState
+  /** What it brings to Shiori, when it queues. */
+  need?: string
+  /** Not in the lab: a routine switched off. */
+  away?: boolean
 }
 
 const SPEED = 15
@@ -48,6 +58,8 @@ const STYLES: HairStyle[] = ['short', 'long', 'curly', 'bun', 'pony']
 
 export interface Lab {
   world: World
+  /** The real world changed: characters take their new places, interns come and go. */
+  update(view: WorldView): void
   /** Paints the view: a window of `viewW` × `viewH` world pixels, the lab in its middle. */
   draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions, viewW: number, viewH: number): void
 }
@@ -59,36 +71,77 @@ export interface Lab {
 export const WORLD_W = 2880
 export const WORLD_H = 1800
 
-export function makeLab(offices: OfficeSpec[]): Lab {
+export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   const world = buildWorld(offices, WORLD_W, WORLD_H)
   const { plan, furnished, screen, width, height } = world
   const brain: Brain = makeBrain(REFERENCE)
   const r = rand(Math.floor(hashOf(offices.map((o) => o.name).join(), 8) * 1e6))
   const seats = furnished.spots.filter((s) => s.use === 'seat')
-  const agents: Agent[] = seats.map((seat, i) => {
-    const room = plan.spaces[seat.room]
-    const look: Look = {
-      skin: SKINS[Math.floor(r() * SKINS.length)],
-      hair: HAIRS[Math.floor(r() * HAIRS.length)],
-      style: STYLES[Math.floor(r() * STYLES.length)],
-      shirt: room.accent,
-      glasses: r() > 0.65,
+  const agents: Agent[] = live
+    ? realAgents(live)
+    : seats.map((seat, i) => {
+        const room = plan.spaces[seat.room]
+        const look: Look = {
+          skin: SKINS[Math.floor(r() * SKINS.length)],
+          hair: HAIRS[Math.floor(r() * HAIRS.length)],
+          style: STYLES[Math.floor(r() * STYLES.length)],
+          shirt: room.accent,
+          glasses: r() > 0.65,
+        }
+        return {
+          look,
+          frames: scientistFrames(look),
+          a: seat.a,
+          b: seat.b,
+          facing: seat.face,
+          pose: 'type',
+          path: [],
+          act: { pose: 'type', face: seat.face, secs: 2 + r() * 12, since: 0 },
+          seat,
+          room: seat.room,
+          seed: i,
+          walked: 0,
+          kind: 'Demo' as const,
+        }
+      })
+
+  /** The real characters, each at a seat of its office's area: desks first, then routines. */
+  function realAgents(view: WorldView): Agent[] {
+    const out: Agent[] = []
+    for (const space of plan.spaces.filter((s) => s.kind === 'office')) {
+      const office = view.offices.find((o) => o.name === space.name)
+      if (!office) continue
+      const mine = seats.filter((s) => s.room === space.id)
+      const people = [...office.characters.filter((c) => c.kind === 'Desk'), ...office.characters.filter((c) => c.kind === 'Routine')]
+      people.forEach((c, i) => {
+        const seat = mine[i]
+        if (!seat) return
+        const look = lookOf(c.id, c.kind, space.accent)
+        out.push({
+          look,
+          frames: scientistFrames(look),
+          a: seat.a,
+          b: seat.b,
+          facing: seat.face,
+          pose: 'stand',
+          path: [],
+          act: null,
+          seat,
+          room: space.id,
+          seed: out.length,
+          walked: 0,
+          kind: c.kind,
+          id: c.id,
+          state: c.state,
+        })
+      })
     }
-    return {
-      look,
-      frames: scientistFrames(look),
-      a: seat.a,
-      b: seat.b,
-      facing: seat.face,
-      pose: 'type',
-      path: [],
-      act: { pose: 'type', face: seat.face, secs: 2 + r() * 12, since: 0 },
-      seat,
-      room: seat.room,
-      seed: i,
-      walked: 0,
-    }
-  })
+    return out
+  }
+
+  // Where they queue at Shiori: round her dome, the front first.
+  const queueSpots = furnished.spots.filter((s) => s.use === 'shiori').sort((x, y) => y.a + y.b - (x.a + x.b))
+  const queued = new Map<string, number>()
 
   // Each office's name, floating over its far corner: easier than telling colours apart.
   const names = plan.spaces.filter((s) => s.kind === 'office' || s.kind === 'lounge').map((s) => ({ canvas: label(s.name, s.accent), at: screen((s.a0 + 1.5) * T, (s.b0 + 1.5) * T, 46) }))
@@ -110,6 +163,10 @@ export function makeLab(offices: OfficeSpec[]): Lab {
   }
 
   const decide = (ag: Agent, t: number) => {
+    if (ag.kind !== 'Demo') {
+      decideReal(ag, t)
+      return
+    }
     const atSeat = Math.hypot(ag.a - ag.seat.a, ag.b - ag.seat.b) < 1
     if (!atSeat) {
       goTo(ag, ag.seat, { pose: 'type', face: ag.seat.face, secs: 10 + r() * 18, since: t })
@@ -122,6 +179,121 @@ export function makeLab(offices: OfficeSpec[]): Lab {
     if (spot && spot.use === 'board' && goTo(ag, spot, { pose: 'think', face: spot.face, secs: 4 + r() * 4, since: t, bubble: r() > 0.5 ? 'idea' : 'dots' })) return
     ag.act = { pose: 'type', face: ag.seat.face, secs: 8 + r() * 14, since: t }
   }
+
+  /** A real character: where its state puts it, and there it stays until the state changes. */
+  const decideReal = (ag: Agent, t: number) => {
+    const intent = intentOf(ag.state ?? 'Free', ag.need)
+    ag.away = intent.where === 'away'
+    const FOREVER = 1e9
+    if (intent.where === 'away') {
+      ag.act = { pose: 'stand', face: ag.seat.face, secs: FOREVER, since: t }
+      return
+    }
+    if (intent.where === 'seat') {
+      const atSeat = Math.hypot(ag.a - ag.seat.a, ag.b - ag.seat.b) < 1
+      const act = { pose: intent.pose, face: ag.seat.face, secs: FOREVER, since: t }
+      if (atSeat || !goTo(ag, ag.seat, act)) ag.act = act
+      return
+    }
+    if (intent.where === 'queue') {
+      const spot = queueSpots[(queued.get(ag.id ?? '') ?? 0) % Math.max(1, queueSpots.length)]
+      const act = { pose: intent.pose, face: spot?.face ?? ag.facing, secs: FOREVER, since: t, bubble: intent.bubble }
+      if (!spot || !goTo(ag, spot, act)) {
+        ag.act = act
+        ag.bubble = intent.bubble
+      }
+      return
+    }
+    // Free: the lounge, the coffee, the boards, or a moment at the desk doing nothing much.
+    const roll = r()
+    const spot = roll < 0.35 ? pick('coffee') : roll < 0.55 ? pick('board', ag.room) : roll < 0.7 ? pick('sofa') : null
+    if (spot && spot.use === 'coffee' && goTo(ag, spot, { pose: 'coffee', face: spot.face, secs: 8 + r() * 8, since: t, bubble: 'chat' })) return
+    if (spot && spot.use === 'board' && goTo(ag, spot, { pose: 'think', face: spot.face, secs: 5 + r() * 5, since: t, bubble: r() > 0.5 ? 'idea' : 'dots' })) return
+    if (spot && spot.use === 'sofa' && goTo(ag, spot, { pose: 'stand', face: spot.face, secs: 8 + r() * 10, since: t, bubble: 'chat' })) return
+    const atSeat = Math.hypot(ag.a - ag.seat.a, ag.b - ag.seat.b) < 1
+    if (!atSeat && goTo(ag, ag.seat, { pose: 'stand', face: ag.seat.face, secs: 6 + r() * 10, since: t })) return
+    ag.act = { pose: r() > 0.5 ? 'think' : 'stand', face: ag.seat.face, secs: 6 + r() * 10, since: t }
+  }
+
+  /** Starts again from where they are: their state changed. */
+  const rethink = (ag: Agent) => {
+    // Finish the step to the next tile centre, so they never stop between two tiles.
+    ag.path = ag.path.slice(0, 1)
+    ag.act = null
+    ag.bubble = undefined
+  }
+
+  const update = (view: WorldView) => {
+    // Characters met for the first time take their seats.
+    for (const a of realAgents(view)) if (!agents.some((x) => x.id === a.id)) agents.push({ ...a, seed: agents.length })
+    const byId = new Map(view.offices.flatMap((o) => o.characters.map((c) => [c.id, c] as const)))
+    const present = new Set(agents.filter((a) => a.id).map((a) => a.id!))
+    const line = queueOf(view, present)
+    const needs = new Map(line.map((q) => [q.id, q.need]))
+    const before = new Map(queued)
+    queued.clear()
+    line.forEach((q, i) => queued.set(q.id, i))
+    for (const ag of agents) {
+      if (!ag.id) continue
+      const c = byId.get(ag.id)
+      if (!c) continue
+      const changed = c.state !== ag.state || needs.get(ag.id) !== ag.need || before.get(ag.id) !== queued.get(ag.id)
+      ag.state = c.state
+      ag.need = needs.get(ag.id)
+      if (changed) rethink(ag)
+    }
+    // Interns: they come in beside the desk they help, and leave when it is done.
+    const interns = view.offices.flatMap((o) => o.characters.filter((c) => c.kind === 'Intern'))
+    const wanted = new Set(interns.map((c) => c.id))
+    for (let i = agents.length - 1; i >= 0; i--) if (agents[i].kind === 'Intern' && !wanted.has(agents[i].id!)) agents.splice(i, 1)
+    for (const c of interns) {
+      if (agents.some((a) => a.id === c.id)) continue
+      const desk = agents.find((a) => a.id === c.forDesk)
+      if (!desk) continue
+      const beside = besideOf(desk.seat)
+      if (!beside) continue
+      const look = lookOf(c.id, 'Intern', plan.spaces[desk.room].accent)
+      // In from the walkway by Shiori, then to the desk.
+      const start = queueSpots[agents.length % Math.max(1, queueSpots.length)] ?? beside
+      agents.push({
+        look,
+        frames: scientistFrames(look),
+        a: start.a,
+        b: start.b,
+        facing: 'SE',
+        pose: 'walk',
+        path: [],
+        act: null,
+        seat: beside,
+        room: desk.room,
+        seed: agents.length,
+        walked: 0,
+        kind: 'Intern',
+        id: c.id,
+        state: 'Working',
+      })
+    }
+  }
+
+  /** A free tile next to a seat, where an intern stands to help. */
+  const besideOf = (seat: Spot): Spot | null => {
+    const [ta, tb] = tileOf(seat.a, seat.b)
+    for (const [da, db] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [1, 1],
+      [-1, 1],
+    ]) {
+      const a = ta + da
+      const b = tb + db
+      if (a < 0 || b < 0 || a >= plan.w || b >= plan.h || plan.cells[b * plan.w + a] < 0 || furnished.blocked[b * plan.w + a]) continue
+      if (agents.some((x) => tileOf(x.seat.a, x.seat.b).join() === `${a},${b}`)) continue
+      return { ...seat, a: a * T + 4, b: b * T + 4 }
+    }
+    return null
+  }
+  if (live) update(live)
 
   const step = (ag: Agent, t: number, dt: number) => {
     if (ag.path.length) {
@@ -156,8 +328,8 @@ export function makeLab(offices: OfficeSpec[]): Lab {
     if (ag.act && t < ag.act.since + ag.act.secs) {
       ag.pose = ag.act.pose
       ag.facing = ag.act.face
-      // A question shows as they arrive, then they listen and write.
-      if (ag.act.bubble === 'question') ag.bubble = t - ag.act.since < 1.8 ? 'question' : undefined
+      // In the demo a question shows as they arrive, then they listen and write; a real one stays.
+      if (ag.act.bubble === 'question' && ag.kind === 'Demo') ag.bubble = t - ag.act.since < 1.8 ? 'question' : undefined
       return
     }
     ag.bubble = undefined
@@ -208,6 +380,7 @@ export function makeLab(offices: OfficeSpec[]): Lab {
 
   return {
     world,
+    update,
     draw(ctx, t, dt, when, viewW, viewH) {
       fit(viewW, viewH)
       // Where the view sits on the world: its middle on the lab's.
@@ -295,6 +468,7 @@ export function makeLab(offices: OfficeSpec[]): Lab {
         light: (c) => brain.draw(c, cx, cy, t),
       })
       for (const ag of agents) {
+        if (ag.away) continue
         const [x, y] = screen(ag.a, ag.b)
         const frame = ag.pose === 'walk' ? Math.floor(ag.walked * 8) : ag.pose === 'type' || ag.pose === 'notes' ? Math.floor(t * 3 + ag.seed) : Math.floor(t * 0.5 + ag.seed)
         const sprite = ag.frames.get(ag.facing, ag.pose, frame)
@@ -417,7 +591,7 @@ export function makeLab(offices: OfficeSpec[]): Lab {
       inWorld(ctx)
       for (const n of names) ctx.drawImage(n.canvas, Math.round(n.at[0] - n.canvas.width / 2), Math.round(n.at[1]))
       for (const ag of agents) {
-        if (!ag.bubble || ag.path.length) continue
+        if (!ag.bubble || ag.path.length || ag.away) continue
         const [x, y] = screen(ag.a, ag.b)
         drawBubble(ctx, x + 6, y - 50, ag.bubble, t, ag.seed)
       }

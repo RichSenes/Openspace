@@ -48,6 +48,7 @@ VOICE_MODEL="${OPENSPACE_VOICE_MODEL:-}"
 VOICE_DIR="${OPENSPACE_VOICE_DIR:-}"
 VOICE_DEVICE="${OPENSPACE_VOICE_DEVICE:-auto}"
 VOICE_IDLE="${OPENSPACE_VOICE_IDLE:-300}"
+VOICE_PACE="${OPENSPACE_VOICE_PACE:-1.0}"  # 1.1: ten per cent faster, same pitch
 STATE="${OPENSPACE_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/openspace}"
 SERVICES=(opencode ears voice api web)
 # The API writes the OpenCode provider of the local models here; OpenCode merges it with
@@ -141,7 +142,7 @@ start_one() {
         return
       fi
       launch voice "$ROOT/tools/voice" "$VOICE_PYTHON" speak-server.py --port "$VOICE_PORT" --engine "$VOICE_ENGINE" \
-        --model "$VOICE_MODEL" ${VOICE_DIR:+--voice "$VOICE_DIR"} --device "$VOICE_DEVICE" --idle "$VOICE_IDLE"
+        --model "$VOICE_MODEL" ${VOICE_DIR:+--voice "$VOICE_DIR"} --device "$VOICE_DEVICE" --idle "$VOICE_IDLE" --pace "$VOICE_PACE"
       say "voice: starting in the background on port $port (scripts/openspace status, logs voice)"
       return
       ;;

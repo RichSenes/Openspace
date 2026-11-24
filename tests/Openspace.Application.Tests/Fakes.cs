@@ -488,8 +488,29 @@ internal sealed class FakeGpuProbe : LocalModels.IGpuProbe
 
     public Task<LocalModels.GpuMemory?> MemoryAsync(CancellationToken cancellationToken) => Task.FromResult(Memory);
 
+    public List<LocalModels.GpuUser> Users { get; } = [];
+
+    public Task<IReadOnlyList<LocalModels.GpuUser>> UsersAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<LocalModels.GpuUser>>(Users);
+
     public IReadOnlyList<string> RunningHolders(IReadOnlyList<LocalModels.GpuHolder> holders) =>
         [.. holders.Where(h => Programs.Exists(p => p.Contains(h.Match, StringComparison.OrdinalIgnoreCase))).Select(h => h.Name)];
+}
+
+/// <summary>Shiori's voice on the card: makes room when it has been quiet long enough, unless it is talking.</summary>
+internal sealed class FakeVoiceGuest : LocalModels.IGpuGuest
+{
+    public string Name => "Shiori's voice";
+
+    public bool Talking { get; set; }
+
+    public List<TimeSpan> Asked { get; } = [];
+
+    public Task<bool> MakeRoomAsync(TimeSpan quietFor, CancellationToken cancellationToken)
+    {
+        Asked.Add(quietFor);
+        return Task.FromResult(!Talking || quietFor == TimeSpan.Zero);
+    }
 }
 
 internal sealed class FakeModelServer : LocalModels.ILocalModelServer

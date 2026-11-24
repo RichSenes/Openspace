@@ -76,6 +76,15 @@ export interface GpuView {
   routinesWaiting: string[] | null
   /** The tasks working on the loaded model right now, as "office · desk: title". */
   users?: string[] | null
+  /** While a model waits for memory: the programs holding it, largest first. */
+  using?: GpuUser[] | null
+}
+
+/** A program with graphics memory; `openspace` when it is one of Openspace's own (Shiori's voice, her ears). */
+export interface GpuUser {
+  name: string
+  miB: number
+  openspace: boolean
 }
 
 /** Why a queued task has not started yet, as the queue saw it on its last round. */

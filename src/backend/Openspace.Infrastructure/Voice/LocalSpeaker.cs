@@ -66,6 +66,23 @@ public sealed class LocalSpeaker(HttpClient http, IOptionsMonitor<VoiceOptions> 
         }
     }
 
+    private sealed record Slept([property: JsonPropertyName("state")] string? State);
+
+    public async Task<bool> SleepAsync(TimeSpan quietFor, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var content = new StringContent($"{{\"quietFor\":{(int)quietFor.TotalSeconds}}}", System.Text.Encoding.UTF8, "application/json");
+            using var response = await http.PostAsync(new Uri(options.CurrentValue.SpeakUrl, "sleep"), content, cancellationToken).ConfigureAwait(false);
+            var slept = await response.Content.ReadFromJsonAsync<Slept>(cancellationToken).ConfigureAwait(false);
+            return slept?.State is not ("awake" or "waking");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            return true; // not running: nothing of hers on the card
+        }
+    }
+
     public async Task<SpeakerStatus> StatusAsync(CancellationToken cancellationToken)
     {
         try

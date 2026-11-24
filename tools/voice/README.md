@@ -78,6 +78,20 @@ Engines:
 - `kokoro`, [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0): tiny and quick,
   also on a processor, but flat, and each language has its own preset voice.
 
+### Her voice folder
+
+What VoxCPM2 clones, any of:
+
+- `reference.wav`: the timbre only, who she is, without copying an accent or a pace;
+- `voice.wav` + `voice.txt`: a clip she continues, with its accent and pace;
+- `voice-ja.wav` + `voice-ja.txt` (or `-en`): a clip for that language.
+
+A clip in one language gives the others its accent: a voice designed in English speaks Italian
+like an English speaker. A timbre reference with an Italian clip and a Japanese one keeps one
+voice that sounds native in both. Answers that mix scripts ("si dice 痛い, fa male") are said a
+piece at a time, each in its language, and a reading in Latin letters after Japanese words is
+left to the eyes.
+
 ### Sharing the graphics card
 
 The model is not kept loaded. It is loaded when you call her by name (the first words are
@@ -90,6 +104,11 @@ unloading frees all of its memory for image generation, training or a large lang
   at the next answer.
 - When she is quiet and someone else fills the card (under `--leave-gb`, 1 GB free), she unloads
   without waiting.
+- When a local model (Gemma) waits for memory her voice holds, Openspace asks her to unload once
+  she has been quiet for a minute; the top bar says who holds the card, and **Make room** frees
+  it at once, even mid-conversation.
+- When her voice finds the card full and a local model is loaded but unused, Openspace unloads
+  the model for her; a model at work keeps the card.
 
 ### Setting it up
 

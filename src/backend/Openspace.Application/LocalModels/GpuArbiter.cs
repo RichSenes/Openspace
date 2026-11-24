@@ -38,9 +38,10 @@ public enum GpuState
 /// </param>
 /// <param name="RoutinesWaiting">The routines whose turn it is, by name.</param>
 /// <param name="Users">The tasks working on the loaded model right now, as "office · desk: title"; routines are in <paramref name="RoutinesWaiting"/>.</param>
+/// <param name="Using">While a model waits for memory: the programs holding it, so people know what to close or free.</param>
 public sealed record GpuView(
     GpuState State, string? Model, string? ModelName, IReadOnlyList<string> Holders, string? Detail, bool RoutineTurn = false,
-    IReadOnlyList<string>? RoutinesWaiting = null, IReadOnlyList<string>? Users = null);
+    IReadOnlyList<string>? RoutinesWaiting = null, IReadOnlyList<string>? Users = null, IReadOnlyList<GpuUser>? Using = null);
 
 /// <summary>
 /// Who has the graphics card. Programs listed as holders, and those that claim it through
@@ -76,6 +77,29 @@ public sealed class GpuArbiter(IOptionsMonitor<LocalModelOptions> options, TimeP
 
     /// <summary>Why the model last failed to load, for the message shown until the next try.</summary>
     internal string? LastFailure { get; set; }
+
+    /// <summary>One of Openspace's own programs (Shiori's voice) needs the card now, and since when.</summary>
+    internal (string Who, DateTimeOffset Since)? RoomWanted { get; private set; }
+
+    /// <summary>
+    /// Shiori's voice found the card full: a loaded model nobody is using is unloaded for it at
+    /// the next look. A model at work, or one a desk waits for, keeps the card.
+    /// </summary>
+    public void WantRoom(string who)
+    {
+        lock (_gate)
+        {
+            RoomWanted = (who, clock.GetUtcNow());
+        }
+    }
+
+    internal void RoomGiven()
+    {
+        lock (_gate)
+        {
+            RoomWanted = null;
+        }
+    }
 
     /// <summary>A person asks to try loading again now instead of waiting.</summary>
     public void RetryNow()

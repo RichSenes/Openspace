@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Openspace.Application.LocalModels;
 using Openspace.Application.Voice;
 
 namespace Openspace.Api.Endpoints;
@@ -33,7 +34,7 @@ internal static class VoiceEndpoints
 
         voice.MapGet("/speak/status", (ISpeaker speaker, CancellationToken ct) => speaker.StatusAsync(ct));
 
-        voice.MapPost("/speak/wake", async (ISpeaker speaker, CancellationToken ct) =>
+        voice.MapPost("/speak/wake", async (ISpeaker speaker, GpuArbiter gpu, CancellationToken ct) =>
         {
             try
             {
@@ -41,11 +42,11 @@ internal static class VoiceEndpoints
             }
             catch (SpeakerException e)
             {
-                return Unavailable(e);
+                return Unavailable(e, gpu);
             }
         });
 
-        voice.MapPost("/speak", async (SpeakRequest request, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        voice.MapPost("/speak", async (SpeakRequest request, ISpeaker speaker, GpuArbiter gpu, IOptions<VoiceOptions> options, CancellationToken ct) =>
         {
             if (Refused(request, options.Value) is { } refused)
                 return refused;
@@ -55,13 +56,13 @@ internal static class VoiceEndpoints
             }
             catch (SpeakerException e)
             {
-                return Unavailable(e);
+                return Unavailable(e, gpu);
             }
         });
 
         // Her voice as it is made (16-bit mono PCM, rate in X-Sample-Rate): the page starts playing
         // the first words while the rest of the sentence is still being generated.
-        voice.MapPost("/speak/stream", async (SpeakRequest request, HttpContext context, ISpeaker speaker, IOptions<VoiceOptions> options, CancellationToken ct) =>
+        voice.MapPost("/speak/stream", async (SpeakRequest request, HttpContext context, ISpeaker speaker, GpuArbiter gpu, IOptions<VoiceOptions> options, CancellationToken ct) =>
         {
             if (Refused(request, options.Value) is { } refused)
                 return refused;
@@ -72,7 +73,7 @@ internal static class VoiceEndpoints
             }
             catch (SpeakerException e)
             {
-                return Unavailable(e);
+                return Unavailable(e, gpu);
             }
 
             await using (spoken)
@@ -110,11 +111,16 @@ internal static class VoiceEndpoints
         return null;
     }
 
-    // Busy: the graphics card is full (image generation, training...), so she writes instead of speaking.
-    private static IResult Unavailable(SpeakerException e) =>
-        Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable,
+    // Busy: the graphics card is full (image generation, training...), so she writes instead of
+    // speaking; a local model loaded but unused is unloaded for her at the next look.
+    private static IResult Unavailable(SpeakerException e, GpuArbiter gpu)
+    {
+        if (e.Busy)
+            gpu.WantRoom("Shiori's voice");
+        return Results.Problem(e.Message, statusCode: StatusCodes.Status503ServiceUnavailable,
             title: e.Busy ? "Her voice is resting" : "Her voice is unavailable",
             extensions: new Dictionary<string, object?> { ["busy"] = e.Busy });
+    }
 
     /// <summary>What Shiori says, and in which of her three languages.</summary>
     public sealed record SpeakRequest(string? Text, string? Language);

@@ -27,6 +27,19 @@ internal static class GpuEndpoints
             return Results.NoContent();
         });
 
+        // A model waits for memory that Openspace's own programs hold (Shiori's voice): they let
+        // it go now, even mid-conversation, and the model loads at the next look.
+        group.MapPost("/make-room", async (IEnumerable<IGpuGuest> guests, GpuArbiter gpu, CancellationToken ct) =>
+        {
+            foreach (var guest in guests)
+            {
+                await guest.MakeRoomAsync(TimeSpan.Zero, ct);
+            }
+
+            gpu.RetryNow();
+            return Results.Ok(gpu.View());
+        });
+
         group.MapDelete("/claim/{holder}", (string holder, GpuArbiter gpu) => gpu.Release(holder));
     }
 }

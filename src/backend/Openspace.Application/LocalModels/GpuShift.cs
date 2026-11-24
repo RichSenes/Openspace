@@ -21,8 +21,15 @@ public sealed class GpuShift(
     ActivityBoard activity,
     IUnitOfWork unitOfWork,
     IOptionsMonitor<LocalModelOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    IEnumerable<IGpuGuest> guests)
 {
+    /// <summary>Openspace's own programs make room for a model after this long unused (her voice between two answers is not unused).</summary>
+    public static readonly TimeSpan GuestQuiet = TimeSpan.FromMinutes(1);
+
+    /// <summary>A request for room from her voice counts for this long.</summary>
+    private static readonly TimeSpan RoomFor = TimeSpan.FromMinutes(2);
+
     /// <summary>The tasks on the local model at the last look, for the top bar.</summary>
     private List<string> _users = [];
 
@@ -84,6 +91,15 @@ public sealed class GpuShift(
             // Another desk waits for a different model: make room for it.
             await StopAsync(cancellationToken).ConfigureAwait(false);
             Report(GpuState.Free, null, false, $"Unloaded {NameOf(running)} to make room for {NameOf(wanted)}.");
+            return;
+        }
+
+        if (!working && wanted != running && arbiter.RoomWanted is { } room && now - room.Since < RoomFor)
+        {
+            // Shiori's voice is talking and found the card full: an idle model gives way.
+            arbiter.RoomGiven();
+            await StopAsync(cancellationToken).ConfigureAwait(false);
+            Report(GpuState.Free, null, false, $"Unloaded {NameOf(running)}, unused, to make room for {room.Who}.");
             return;
         }
 
@@ -181,7 +197,17 @@ public sealed class GpuShift(
 
         if (await probe.MemoryAsync(cancellationToken).ConfigureAwait(false) is { } memory && memory.FreeMiB < model.MemoryMiB)
         {
-            Report(GpuState.WaitingForMemory, wanted, false, $"{memory.FreeMiB} MiB free on the graphics card, {model.MemoryMiB} needed.");
+            var users = await probe.UsersAsync(cancellationToken).ConfigureAwait(false);
+            var detail = $"{memory.FreeMiB} MiB free on the graphics card, {model.MemoryMiB} needed.";
+            // Openspace's own programs on the card give it back once unused for a minute.
+            foreach (var guest in guests.Where(g => users.Any(u => u.Openspace && u.Name == g.Name)))
+            {
+                detail += await guest.MakeRoomAsync(GuestQuiet, cancellationToken).ConfigureAwait(false)
+                    ? $" {guest.Name} made room: loading at the next look."
+                    : $" {guest.Name} is in use: it makes room after a minute of quiet, or now with Make room.";
+            }
+
+            Report(GpuState.WaitingForMemory, wanted, false, detail, users: users);
             return;
         }
 
@@ -232,10 +258,10 @@ public sealed class GpuShift(
         return local;
     }
 
-    private void Report(GpuState state, string? id, bool busy, string? detail = null, IReadOnlyList<string>? holders = null)
+    private void Report(GpuState state, string? id, bool busy, string? detail = null, IReadOnlyList<string>? holders = null, IReadOnlyList<GpuUser>? users = null)
     {
         var provider = options.CurrentValue.Provider;
-        arbiter.Report(new GpuView(state, id is null ? null : $"{provider}/{id}", id is null ? null : NameOf(id), holders ?? [], detail, Users: id is null ? [] : _users), busy);
+        arbiter.Report(new GpuView(state, id is null ? null : $"{provider}/{id}", id is null ? null : NameOf(id), holders ?? [], detail, Users: id is null ? [] : _users, Using: users), busy);
     }
 
     private string NameOf(string id) => options.CurrentValue.Find(id) is { Name.Length: > 0 } model ? model.Name : id;

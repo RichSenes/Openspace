@@ -29,6 +29,17 @@ public class LocalModelsTests
     }
 
     [Fact]
+    public void Programs_on_the_card_are_named_without_their_paths()
+    {
+        Assert.Equal(("Shiori's voice", true), GpuProbe.NameOf("/opt/tts/venv/bin/python speak-server.py --engine voxcpm --voice /home/x/voices/v "));
+        Assert.Equal(("Shiori's ears", true), GpuProbe.NameOf("/opt/w/venv/bin/python listen-server.py --port 8178 "));
+        Assert.Equal(("ComfyUI", false), GpuProbe.NameOf("/srv/ComfyUI/venv/bin/python main.py --listen "));
+        Assert.Equal(("A language model (llama-server)", false), GpuProbe.NameOf("/opt/llama/bin/llama-server -m /models/secret.gguf "));
+        Assert.Equal(("blender", false), GpuProbe.NameOf("/usr/bin/blender --background "));
+        Assert.Equal(("Another program", false), GpuProbe.NameOf(""));
+    }
+
+    [Fact]
     public void Holders_are_found_in_command_lines_whatever_the_case()
     {
         GpuHolder[] holders =

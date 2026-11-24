@@ -29,7 +29,7 @@ memory falls under --leave-gb), she makes room without waiting for --idle.
 POST /speak    {"text": "Ciao!", "language": "it"}                 ->  audio/wav
 POST /speak    {"text": "Ciao!", "language": "it", "stream": true} ->  audio/pcm (16-bit, mono), X-Sample-Rate
 POST /wake     loads the model now, so the first sentence does not wait for it
-POST /sleep    frees the graphics card now
+POST /sleep    frees the graphics card now; {"quietFor": 60} only after a minute of quiet
 GET  /health   ->  {"ok": true, "engine": "voxcpm", "voice": "morbida", "state": "asleep", ...}
 """
 import argparse
@@ -65,7 +65,15 @@ class Engine:
 
 
 class VoxCPM(Engine):
-    """VoxCPM2, cloning one designed voice for every language."""
+    """VoxCPM2, cloning one voice for every language.
+
+    The voice folder holds what to clone, any of:
+      reference.wav             the timbre only: who she is, without copying an accent or pace
+      voice.wav + voice.txt     a clip she continues: timbre, accent and pace (Italian, say)
+      voice-ja.wav + voice-ja.txt  a clip for her Japanese, so each language sounds native
+    A clip in one language makes the others sound foreign-accented: an English clip gives her
+    Italian an English accent. A timbre reference with a clip per language avoids it.
+    """
 
     def __init__(self, args):
         import torch
@@ -79,20 +87,34 @@ class VoxCPM(Engine):
         model = Model.from_pretrained(args.model, load_denoiser=False, optimize=False)
         self.tts = model.tts_model
         self.rate = self.tts.sample_rate
-        # Built once: every sentence reuses the same voice, so it never drifts (and is quicker).
-        self.cache = self.tts.build_prompt_cache(
-            prompt_text=(voice / "voice.txt").read_text(encoding="utf-8").strip(), prompt_wav_path=str(voice / "voice.wav")
-        )
+        reference = voice / "reference.wav"
+        reference = str(reference) if reference.exists() else None
 
-    def _make(self, text, streaming):
+        def cache(clip):
+            wav, txt = voice / f"{clip}.wav", voice / f"{clip}.txt"
+            if not wav.exists():
+                return None
+            return self.tts.build_prompt_cache(prompt_text=txt.read_text(encoding="utf-8").strip(), prompt_wav_path=str(wav),
+                                               reference_wav_path=reference)
+
+        # Built once: every sentence reuses the same voice, so it never drifts (and is quicker).
+        default = cache("voice") or (self.tts.build_prompt_cache(reference_wav_path=reference) if reference else None)
+        if default is None:
+            raise SystemExit(f"speak-server: {voice} has neither voice.wav nor reference.wav")
+        self.caches = {"default": default}
+        for language in NAMES:
+            if (found := cache(f"voice-{language}")) is not None:
+                self.caches[language] = found
+
+    def _make(self, text, language, streaming):
         return self.tts._generate_with_prompt_cache(  # noqa: SLF001 - the public call rebuilds the voice every time
-            target_text=" ".join(text.split()), prompt_cache=self.cache, min_len=2, max_len=4096,
+            target_text=" ".join(text.split()), prompt_cache=self.caches.get(language, self.caches["default"]), min_len=2, max_len=4096,
             inference_timesteps=10, cfg_value=2.0, retry_badcase=not streaming, retry_badcase_max_times=3,
             retry_badcase_ratio_threshold=6.0, streaming=streaming,
         )
 
     def speak(self, text, language):
-        made = self._make(text, False)
+        made = self._make(text, language, False)
         try:
             wav, _, _ = next(made)
         finally:
@@ -100,7 +122,7 @@ class VoxCPM(Engine):
         return wav.squeeze(0).cpu().numpy(), self.rate
 
     def stream(self, text, language):
-        made = self._make(text, True)
+        made = self._make(text, language, True)
         try:
             for wav, _, _ in made:
                 yield wav.squeeze(0).cpu().numpy(), self.rate
@@ -187,6 +209,8 @@ def pcm16(wav):
 def worker(args, conn, cancel):
     """The child process: loads the engine, then says what it is sent until told to stop."""
     os.environ.setdefault("TQDM_DISABLE", "1")  # no progress bar per sentence in the log
+    if args.device == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""  # some engines (VoxCPM) pick the card by themselves
     try:
         engine = ENGINES[args.engine](args)
         for _ in engine.stream("Ciao.", "it"):  # warms up, so the first real sentence is not the slow one
@@ -423,7 +447,11 @@ def main():
                 except Busy as e:
                     return self.reply(503, {"error": str(e), "busy": True})
             if path == "/sleep":
-                voice.sleep()
+                # {"quietFor": 60}: only when she has said nothing for a minute (a model wants the card).
+                quiet = float(body.get("quietFor") or 0)
+                if voice.turn.locked() or time.monotonic() - voice.used < quiet:
+                    return self.reply(200, {"state": voice.state})
+                voice.sleep("a model needs the graphics card" if quiet else "asked")
                 return self.reply(200, {"state": voice.state})
             if path != "/speak":
                 return self.reply(404, {"error": "not found"})

@@ -88,4 +88,16 @@ public sealed class LocalSpeakerTests
         var woken = await Assert.ThrowsAsync<SpeakerException>(() => Speaker(server).WakeAsync(CancellationToken.None));
         Assert.True(woken.Busy);
     }
+
+    [Fact]
+    public async Task Sleeping_says_whether_she_left_the_card()
+    {
+        var awake = new Server(HttpStatusCode.OK, Encoding.UTF8.GetBytes("""{"state":"awake"}"""), "application/json");
+        Assert.False(await Speaker(awake).SleepAsync(TimeSpan.FromMinutes(1), CancellationToken.None));
+        Assert.Contains("\"quietFor\":60", awake.Sent, StringComparison.Ordinal);
+
+        var asleep = new Server(HttpStatusCode.OK, Encoding.UTF8.GetBytes("""{"state":"asleep"}"""), "application/json");
+        Assert.True(await Speaker(asleep).SleepAsync(TimeSpan.Zero, CancellationToken.None));
+        Assert.True(await Speaker(new Down()).SleepAsync(TimeSpan.Zero, CancellationToken.None));
+    }
 }

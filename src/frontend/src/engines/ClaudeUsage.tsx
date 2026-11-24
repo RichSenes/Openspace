@@ -1,5 +1,5 @@
 import { Cpu, Hand, LoaderCircle, MemoryStick, RefreshCw, TriangleAlert } from 'lucide-react'
-import { useCheckClaudeUsage, useEngines, useGpu, useRetryGpu } from '../api/hooks'
+import { useCheckClaudeUsage, useEngines, useGpu, useMakeRoom, useRetryGpu } from '../api/hooks'
 import { gpuBadge } from './gpu'
 import type { ClaudeUsage, UsageWindow } from '../api/types'
 import './engines.css'
@@ -94,6 +94,7 @@ const GPU_ICON = { Loading: LoaderCircle, Serving: Cpu, WaitingForMemory: Memory
 export function GpuStatus({ onOpen }: { onOpen: () => void }) {
   const badge = gpuBadge(useGpu().data)
   const retry = useRetryGpu()
+  const makeRoom = useMakeRoom()
   if (!badge) return null
   const Icon = GPU_ICON[badge.state as keyof typeof GPU_ICON] ?? Cpu
   return (
@@ -102,6 +103,18 @@ export function GpuStatus({ onOpen }: { onOpen: () => void }) {
         <Icon size={14} aria-hidden />
         <span>{badge.text}</span>
       </button>
+      {badge.canMakeRoom && (
+        <button
+          type="button"
+          className="claude-meter"
+          onClick={() => makeRoom.mutate()}
+          disabled={makeRoom.isPending}
+          title="Unload Shiori's voice now, even mid-conversation: it loads again when she next speaks"
+        >
+          <MemoryStick size={14} aria-hidden />
+          <span>Make room</span>
+        </button>
+      )}
       {badge.state === 'Failed' && (
         <button type="button" className="claude-meter" onClick={() => retry.mutate()} disabled={retry.isPending} title="Load the model again now">
           <RefreshCw size={14} aria-hidden />

@@ -16,6 +16,25 @@ public interface IGpuProbe
 
     /// <summary>The names of the holders running now.</summary>
     IReadOnlyList<string> RunningHolders(IReadOnlyList<GpuHolder> holders);
+
+    /// <summary>The programs with memory on the card now, by name, largest first; empty when it cannot be read.</summary>
+    Task<IReadOnlyList<GpuUser>> UsersAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>A program using graphics memory: <paramref name="Openspace"/> when it is one of Openspace's own (her voice, her ears).</summary>
+public sealed record GpuUser(string Name, int MiB, bool Openspace);
+
+/// <summary>
+/// One of Openspace's own programs on the card that can give its memory back when a model needs
+/// it, such as Shiori's voice (it loads again by itself when she next speaks).
+/// </summary>
+public interface IGpuGuest
+{
+    /// <summary>The name <see cref="IGpuProbe.UsersAsync"/> gives it.</summary>
+    string Name { get; }
+
+    /// <summary>Frees its memory when it has been unused for <paramref name="quietFor"/>; true when it is not on the card any more.</summary>
+    Task<bool> MakeRoomAsync(TimeSpan quietFor, CancellationToken cancellationToken);
 }
 
 /// <summary>The one model server Openspace starts on this machine.</summary>

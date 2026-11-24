@@ -4,8 +4,8 @@ import type { Mode } from './modes'
 
 /** A word of an answer, or a note it cites: [[Folder/name]] in the text. */
 export type Token =
-  | { type: 'word'; text: string; glued: boolean }
-  | { type: 'cite'; path: string; glued: boolean }
+  | { type: 'word'; text: string; glued: boolean; line?: boolean }
+  | { type: 'cite'; path: string; glued: boolean; line?: boolean }
 
 /** Splits an answer into the pieces that stream in one by one; a citation is one piece. */
 export function tokenize(text: string): Token[] {
@@ -14,8 +14,11 @@ export function tokenize(text: string): Token[] {
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     const glued = m.index > 0 && !/\s/.test(text[m.index - 1])
-    if (m[1] !== undefined) out.push({ type: 'cite', path: m[1], glued })
-    else out.push({ type: 'word', text: m[0], glued })
+    // Starts a new line: a list item or a paragraph, kept when the answer is shown.
+    const before = text.slice(0, m.index).match(/\s*$/)![0]
+    const line = out.length > 0 && before.includes('\n')
+    if (m[1] !== undefined) out.push({ type: 'cite', path: m[1], glued, ...(line ? { line } : {}) })
+    else out.push({ type: 'word', text: m[0], glued, ...(line ? { line } : {}) })
   }
   return out
 }

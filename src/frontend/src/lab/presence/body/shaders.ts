@@ -57,7 +57,7 @@ in vec3 aPos;
 in vec4 aData;
 in vec2 aExtra;
 uniform float uSkin, uPhase, uTime, uEnergy, uVoice, uEyes, uOpen, uPleased, uUnsure, uLean, uHeat, uLid, uLidTilt, uWide;
-uniform float uAspect, uScale, uPoint, uPixel, uWorm, uLift, uBodyScale;
+uniform float uAspect, uScale, uPoint, uPixel, uWorm, uLift, uBodyScale, uDim;
 uniform vec2 uGaze, uOffset;
 uniform mat3 uRot, uEyeRot;
 uniform vec3 uEyeC, uCool, uHot, uEye;
@@ -222,7 +222,7 @@ void main(){
   size = mix(size, uPoint * 0.95, m);
   if (uPixel > 0.5) size = max(1.0, floor(size + 0.5));
   gl_PointSize = size;
-  vColor = col * bright * alpha;
+  vColor = col * bright * alpha * uDim;
 }
 `
 

@@ -1,3 +1,4 @@
+import { pointSize } from './rig'
 import { BLIT_FS, POINT_FS, POINT_VS, POST_FS, QUAD_VS } from './shaders'
 import { buildSkin, KIND, PORTRAIT_UNITS, SKIN_INDEX, type PointSet, type SkinId } from './shapes'
 
@@ -274,8 +275,9 @@ export class BodyRenderer {
     u1('uLift', f.lift)
     u1('uBodyScale', f.bodyScale)
     u1('uPixel', pixel ? 1 : 0)
-    // Point size follows the body's size on screen, so density holds at every width.
-    u1('uPoint', Math.max(1, (minSide * f.scale) / (pixel ? 150 : 95)))
+    const points = pointSize(minSide, f.scale, pixel)
+    u1('uPoint', points.size)
+    u1('uDim', points.dim)
     u2('uGaze', f.gaze)
     u2('uOffset', f.offset)
     gl.uniformMatrix3fv(P.u.uRot, false, f.rot)

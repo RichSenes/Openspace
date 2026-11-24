@@ -49,7 +49,7 @@ this page records what was decided for turning it into the real thing.
 - A character: a card opens over the world, without leaving it: who they are, what they are
   doing, the task and its last log lines, mood and relationships, and the actions (answer,
   approve, open the full page).
-- Shiori: she wakes and you talk to her right there, with her voice and subtitles over the lab.
+- Shiori: she wakes and you talk to her right there, in a compact chat beside the lab, her voice answering what you said aloud.
   Her card lists who is queuing and why; you answer them one by one, and each walks back to
   their desk.
 
@@ -61,7 +61,7 @@ this page records what was decided for turning it into the real thing.
 2. *(Done: real characters at their seats, queuing at Shiori with an icon, free ones in the lounge; interns come and go.)* The lab built from that snapshot instead of the demo setup, characters moved by it: desk work,
    the queue at Shiori, failures.
 3. *(Done: click a character or Shiori; answers in the card.)* The character card and the queue at Shiori, with their actions.
-4. *(Done: her page slides in from the side, with a Waiting tab; calling her by name in the lab opens it.)* Talking to Shiori inside the world (her voice and subtitles reused).
+4. *(Done: a compact chat slides in from the side: her, small, in a card in the corner, the chat under it, tabs for her sessions and for who waits; calling her by name in the lab opens it.)* Talking to Shiori inside the world (her voice and subtitles reused).
 5. Social life with real small talk, rate-limited, on the local model.
 6. Meeting notes when work touches.
 7. The world as the home page, with a thin bar on top and a way to every other page; then the

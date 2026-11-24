@@ -134,3 +134,13 @@ export const MODE_HEAT: Record<string, V3> = {
 export function mix3(a: V3, b: V3, t: number): V3 {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
+
+/**
+ * Point size follows the body's size on screen, so density holds at every width. Below one pixel
+ * the points cannot shrink further, so they dim instead: small, in a card, she stays a figure, not
+ * a white disc of points piled on each other.
+ */
+export function pointSize(minSide: number, scale: number, pixel: boolean): { size: number; dim: number } {
+  const point = (minSide * scale) / (pixel ? 150 : 95)
+  return { size: Math.max(1, point), dim: Math.min(1, point ** 1.6) }
+}

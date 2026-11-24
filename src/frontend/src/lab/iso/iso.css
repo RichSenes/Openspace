@@ -434,3 +434,296 @@
   background: rgb(7 6 13 / 0.85);
   color: var(--ink);
 }
+
+/* Shiori's compact chat, in the panel that slides in over the lab. */
+.world-shiori {
+  z-index: 3;
+  width: min(400px, 100vw);
+  grid-template-rows: 1fr;
+}
+
+.sc {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  height: 100%;
+  color: var(--ink);
+}
+
+.sc-head {
+  border-bottom: 1px solid var(--line);
+}
+
+.sc-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 6px 0;
+}
+
+.sc-tabs [role='tab'] {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sc-tabs [aria-selected='true'] {
+  border-bottom-color: var(--mode, var(--accent));
+  color: var(--ink);
+}
+
+.sc-close {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sc-who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 12px 14px;
+}
+
+.sc-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sc-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--mode, var(--accent));
+  color: var(--mode, var(--accent));
+}
+
+.sc-title {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sc-session {
+  margin: 2px 0 0;
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--mute);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Her, small, in a card in the corner. */
+.sc-face {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 45%, #1a1030, #07060d 70%);
+}
+
+.sc-face .pr-hud,
+.sc-face .pr-hud-lines {
+  display: none;
+}
+
+.sc-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  list-style: none;
+}
+
+.sc-log li {
+  max-width: 88%;
+  padding: 8px 11px;
+  border-radius: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sc-you {
+  align-self: flex-end;
+  background: #2a2148;
+  border-bottom-right-radius: 4px;
+}
+
+.sc-her {
+  align-self: flex-start;
+  background: #151223;
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+}
+
+.sc-failed {
+  align-self: flex-start;
+  color: #ff8a80;
+}
+
+.sc-mark-line,
+.sc-empty {
+  align-self: center;
+  max-width: none;
+  color: var(--mute);
+  font-size: 12px;
+}
+
+.sc-thinking {
+  color: var(--mute);
+}
+
+.sc-dock {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+}
+
+.sc-problem {
+  margin: 0;
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+.sc-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.sc-modes button {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sc-modes button[aria-pressed='true'] {
+  border-color: var(--mode, var(--accent));
+  color: var(--ink);
+}
+
+.sc-compose {
+  display: flex;
+  gap: 6px;
+}
+
+.sc-compose input {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0d0b18;
+  color: var(--ink);
+  font: inherit;
+}
+
+.sc-mic,
+.sc-send {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sc-mic.is-on {
+  border-color: #ff8a80;
+  color: #ff8a80;
+}
+
+.sc-mic:disabled,
+.sc-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sc-pane {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  grid-row: 2 / 4;
+}
+
+.sc-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sc-sessions {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sc-sessions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-sessions button[aria-current='true'] {
+  border-color: var(--mode, var(--accent));
+}
+
+.sc-ended {
+  color: var(--mute);
+  font-size: 12px;
+}

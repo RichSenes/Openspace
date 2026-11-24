@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apply, bodyRotation, project, RIGS, rotation } from './rig'
+import { apply, bodyRotation, pointSize, project, RIGS, rotation } from './rig'
 
 describe('rotation', () => {
   it('keeps lengths and turns +z toward +x with yaw', () => {
@@ -28,5 +28,22 @@ describe('projection', () => {
 
   it('names three parts on every body', () => {
     for (const rig of Object.values(RIGS)) expect(rig.parts).toHaveLength(3)
+  })
+})
+
+describe('pointSize', () => {
+  it('grows with her size on screen and stays fully lit when large', () => {
+    const big = pointSize(900, 0.6, true)
+    expect(big.size).toBeCloseTo(3.6, 6)
+    expect(big.dim).toBe(1)
+    expect(pointSize(1800, 0.6, true).size).toBeCloseTo(7.2, 6)
+  })
+
+  it('never goes under one pixel, and dims instead when she is small', () => {
+    const small = pointSize(96, 0.7, true)
+    expect(small.size).toBe(1)
+    expect(small.dim).toBeGreaterThan(0.1)
+    expect(small.dim).toBeLessThan(0.6)
+    expect(pointSize(48, 0.7, true).dim).toBeLessThan(small.dim)
   })
 })

@@ -139,6 +139,51 @@ public sealed partial class ShioriSessions(
         return entry;
     }
 
+    /// <summary>
+    /// Gives a session a new name: in the list, and as the title of its note (which keeps its
+    /// file, so links to it still work). Ended sessions can be renamed too.
+    /// </summary>
+    public async Task<ShioriSessionView> RenameAsync(Guid id, string title, CancellationToken cancellationToken)
+    {
+        var name = title.ReplaceLineEndings(" ").Trim();
+        if (name.Length == 0)
+        {
+            throw new ArgumentException("Give the session a name.", nameof(title));
+        }
+
+        name = name.Length <= MaxTitle ? name : name[..MaxTitle];
+        var session = await ChangeAsync(id, s => s.Title = name, cancellationToken).ConfigureAwait(false);
+        await WriteNoteAsync(session, "renamed", cancellationToken).ConfigureAwait(false);
+        await PublishAsync(p => p.StateAsync(State(session), CancellationToken.None)).ConfigureAwait(false);
+        return View(session);
+    }
+
+    /// <summary>
+    /// Removes a session from Openspace: an answer still being written stops first. Its note stays
+    /// in the brain, with whatever it led to (proposals, decisions): only the session goes.
+    /// </summary>
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var session = await FindAsync(id, cancellationToken).ConfigureAwait(false);
+        if (IsAnswering(id))
+        {
+            await runtime.StopAsync(session.RuntimeSessionId).ConfigureAwait(false);
+        }
+
+        var gate = _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await store.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        _spoken.TryRemove(id, out _);
+    }
+
     /// <summary>The answer being written in a session, for tests and a clean stop; done when there is none.</summary>
     public Task Completion(Guid id) => _answering.TryGetValue(id, out var running) ? running : Task.CompletedTask;
 

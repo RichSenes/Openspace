@@ -1199,6 +1199,26 @@ export function useSetShioriMode() {
   )
 }
 
+export function useRenameShioriSession() {
+  return useShioriWrite(
+    (input: { sessionId: string; title: string }) =>
+      request<ShioriSessionView>('PUT', `/api/shiori/sessions/${input.sessionId}/title`, { title: input.title }),
+    (v) => v,
+  )
+}
+
+/** Removes a session from Openspace; its note stays in the brain. */
+export function useDeleteShioriSession() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => request<void>('DELETE', `/api/shiori/sessions/${sessionId}`),
+    onSuccess: (_, sessionId) => {
+      client.removeQueries({ queryKey: keys.shioriSession(sessionId) })
+      return client.invalidateQueries({ queryKey: keys.shioriSessions, exact: true })
+    },
+  })
+}
+
 export function useEndShioriSession() {
   return useShioriWrite((sessionId: string) => request<ShioriEnding>('POST', `/api/shiori/sessions/${sessionId}/end`), (e) => e.session)
 }

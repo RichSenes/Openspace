@@ -109,7 +109,8 @@ real: write and press Enter, her answer streams in as subtitles under her (a lon
 one becomes a card and she steps back), cited notes show as chips. Her face
 listens while you type, thinks until the first words arrive and speaks while they
 stream. The mode switch, the Conversation and Board drawers and the Sessions
-drawer (resume one, start a new one, read the ended ones) work on the saved
+drawer (resume one, start a new one, read the ended ones, rename or delete one; a
+deleted session's note stays in the brain) work on the saved
 sessions; End writes the session's note and turns the board's decisions into
 proposals. A failed answer says why and where to fix it. Body, drawing, world,
 hour and weather are chosen under the palette button and kept in this browser.

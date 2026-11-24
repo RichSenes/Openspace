@@ -109,6 +109,12 @@ internal sealed class ShioriSessionStore(IServiceScopeFactory scopes) : IShioriS
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        await Rows(scope).Where(s => s.Id == id).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static DbSet<ShioriSessionRow> Rows(AsyncServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<OpenspaceDbContext>().Set<ShioriSessionRow>();
 

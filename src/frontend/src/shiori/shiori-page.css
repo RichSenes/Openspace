@@ -245,6 +245,73 @@
   overflow-wrap: anywhere;
 }
 
+/* A session with its rename and delete buttons beside it. */
+.sp-session-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.sp-session-row > .sp-session {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-session-tools {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* Renaming or deleting, in place of the session. */
+.sp-session-edit {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--c);
+  border-left-width: 3px;
+}
+
+.sp-session-name {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--edge-hi);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.sp-session-name:focus-visible {
+  outline: 2px solid var(--mode);
+  outline-offset: 1px;
+}
+
+.sp-session-ask {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.sp-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sp-danger {
+  border-color: #f7a072;
+  color: #f7a072;
+}
+
+.sp-session-error {
+  margin: 0;
+  font-size: 12px;
+  color: #f7a072;
+}
+
 .sp-session-meta {
   display: flex;
   flex-wrap: wrap;
@@ -291,9 +358,15 @@
   max-height: calc(100% - var(--sp-top, 70px) - 16px);
 }
 
-/* Nothing said is ever cut off: a subtitle taller than its room scrolls. */
+/* Nothing said is ever cut off: a subtitle taller than its room scrolls. Its room is what the
+   state line above it leaves (max-height: 100% alone counted that line twice, and the box ran
+   over the composer). */
 .sp .pr-subs-inner {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 760px) {
@@ -387,4 +460,9 @@
 .sp-skip:hover,
 .sp-skip:focus-visible {
   background: color-mix(in srgb, var(--mode) 18%, transparent);
+}
+
+/* The state line keeps its height; the words below it give way. */
+.sp .pr-subs > .pr-state {
+  flex-shrink: 0;
 }

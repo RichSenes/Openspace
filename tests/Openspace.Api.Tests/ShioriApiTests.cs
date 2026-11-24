@@ -167,6 +167,21 @@ public sealed class ShioriApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_session_is_renamed_and_deleted()
+    {
+        using var http = _app.CreateClient();
+        var created = await (await http.PostAsJsonAsync("/api/shiori/sessions", new { title = "Prova" })).Content.ReadFromJsonAsync<JsonElement>();
+        var id = created.GetProperty("id").GetString();
+
+        var renamed = await http.PutAsJsonAsync($"/api/shiori/sessions/{id}/title", new { title = "Piano del venerdì" });
+        Assert.Equal("Piano del venerdì", (await renamed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.PutAsJsonAsync($"/api/shiori/sessions/{id}/title", new { title = " " })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await http.DeleteAsync($"/api/shiori/sessions/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"/api/shiori/sessions/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task An_unknown_session_is_not_found()
     {
         using var http = _app.CreateClient();

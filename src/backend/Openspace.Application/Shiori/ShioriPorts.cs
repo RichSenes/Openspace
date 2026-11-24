@@ -16,6 +16,9 @@ public interface IShioriSessionStore
 
     /// <summary>Writes the session as it is now, whole.</summary>
     Task SaveAsync(ShioriSession session, CancellationToken cancellationToken);
+
+    /// <summary>Removes the session; nothing happens when there is none.</summary>
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>One answer to ask of Shiori's engine.</summary>

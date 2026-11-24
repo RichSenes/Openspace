@@ -1,5 +1,6 @@
-import { Check, Plus, X } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useDeleteShioriSession, useRenameShioriSession } from '../api/hooks'
 import type { ShioriSessionSummary, ShioriSessionView } from '../api/types'
 import { boardSections } from '../lab/shiori/board'
 import { MODES } from '../lab/shiori/modes'
@@ -31,8 +32,79 @@ interface SessionsProps {
   onClose: () => void
 }
 
+/** Renaming a session in place: a field with its name, saved with Enter or Save. */
+function RenameSession({ session, onDone }: { session: ShioriSessionSummary; onDone: () => void }) {
+  const [title, setTitle] = useState(session.title)
+  const rename = useRenameShioriSession()
+  const save = () => {
+    const name = title.trim()
+    if (!name || name === session.title) return onDone()
+    rename.mutate({ sessionId: session.id, title: name }, { onSuccess: onDone })
+  }
+  return (
+    <form
+      className="sp-session-edit"
+      onSubmit={(e) => {
+        e.preventDefault()
+        save()
+      }}
+    >
+      <label className="sr-only" htmlFor={`rename-${session.id}`}>
+        Name of the session
+      </label>
+      <input
+        id={`rename-${session.id}`}
+        className="sp-session-name"
+        value={title}
+        maxLength={120}
+        autoFocus
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation()
+            onDone()
+          }
+        }}
+      />
+      <div className="sp-session-actions">
+        <button type="submit" className="pr-btn" disabled={!title.trim() || rename.isPending}>
+          <Check size={14} aria-hidden="true" />
+          <span>Save</span>
+        </button>
+        <button type="button" className="pr-btn" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      {rename.isError && <p className="sp-session-error">{rename.error instanceof Error ? rename.error.message : 'It could not be renamed.'}</p>}
+    </form>
+  )
+}
+
+/** Deleting asks first, in place: the session goes, its note stays in the brain. */
+function DeleteSession({ session, onDone }: { session: ShioriSessionSummary; onDone: () => void }) {
+  const remove = useDeleteShioriSession()
+  return (
+    <div className="sp-session-edit" role="group" aria-label={`Delete ${session.title}`}>
+      <p className="sp-session-ask">
+        Delete <strong>{session.title}</strong>? Its note stays in the brain.
+      </p>
+      <div className="sp-session-actions">
+        <button type="button" className="pr-btn sp-danger" disabled={remove.isPending} onClick={() => remove.mutate(session.id, { onSuccess: onDone })}>
+          <Trash2 size={14} aria-hidden="true" />
+          <span>Delete</span>
+        </button>
+        <button type="button" className="pr-btn" autoFocus onClick={onDone}>
+          Keep it
+        </button>
+      </div>
+      {remove.isError && <p className="sp-session-error">{remove.error instanceof Error ? remove.error.message : 'It could not be deleted.'}</p>}
+    </div>
+  )
+}
+
 export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onClose }: SessionsProps) {
   const list = orderSessions(sessions ?? [])
+  const [editing, setEditing] = useState<{ id: string; what: 'rename' | 'delete' } | null>(null)
   return (
     <Drawer side="left" title="Sessions" onClose={onClose}>
       <button type="button" className="pr-btn sp-new" onClick={onNew}>
@@ -47,8 +119,16 @@ export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onCl
         <ul className="sp-sessions">
           {list.map((s) => {
             const mode = MODES[modeOf(s.mode)]
+            if (editing?.id === s.id) {
+              const Edit = editing.what === 'rename' ? RenameSession : DeleteSession
+              return (
+                <li key={s.id} style={{ '--c': mode.hex } as React.CSSProperties}>
+                  <Edit session={s} onDone={() => setEditing(null)} />
+                </li>
+              )
+            }
             return (
-              <li key={s.id}>
+              <li key={s.id} className="sp-session-row">
                 <button
                   type="button"
                   className={`sp-session${s.id === current ? ' is-on' : ''}${s.endedAt ? ' is-ended' : ''}`}
@@ -65,6 +145,14 @@ export function SessionsDrawer({ sessions, loading, current, onPick, onNew, onCl
                     </span>
                   </span>
                 </button>
+                <div className="sp-session-tools">
+                  <button type="button" className="pr-icon" onClick={() => setEditing({ id: s.id, what: 'rename' })} aria-label={`Rename ${s.title}`} title="Rename">
+                    <Pencil size={15} />
+                  </button>
+                  <button type="button" className="pr-icon" onClick={() => setEditing({ id: s.id, what: 'delete' })} aria-label={`Delete ${s.title}`} title="Delete">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </li>
             )
           })}

@@ -60,7 +60,10 @@ export function WorldLab() {
     return Math.max(1, Math.min(4, Math.floor(Math.min((vw * 0.92) / labW, (vh * 0.92) / labH))))
   }, [offices, vw, vh])
   const scale = zoom || auto
-  const lab = useMemo(() => makeLab(offices, Math.ceil(vw / scale), Math.ceil(vh / scale)), [offices, vw, vh, scale])
+  // Painted once per setup; the page's size only moves the window onto it.
+  const lab = useMemo(() => makeLab(offices), [offices])
+  const cw = Math.ceil(vw / scale)
+  const ch = Math.ceil(vh / scale)
   const ref = useRef<HTMLCanvasElement>(null)
   const when = useRef({ hour, weather, lamps })
   useEffect(() => {
@@ -81,7 +84,7 @@ export function WorldLab() {
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      lab.draw(ctx, (now - start) / 1000, dt, when.current)
+      lab.draw(ctx, (now - start) / 1000, dt, when.current, ctx.canvas.width, ctx.canvas.height)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -96,10 +99,10 @@ export function WorldLab() {
     <main className="world-page">
       <canvas
         ref={ref}
-        width={lab.world.width}
-        height={lab.world.height}
+        width={cw}
+        height={ch}
         className="iso-canvas world-canvas"
-        style={{ width: lab.world.width * scale, height: lab.world.height * scale }}
+        style={{ width: cw * scale, height: ch * scale }}
         role="img"
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />

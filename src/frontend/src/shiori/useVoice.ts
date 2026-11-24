@@ -6,25 +6,63 @@ interface Line extends Spoken {
   language: string
 }
 
-/** A line being heard: when it started on the audio clock, and how long it is so far. */
-interface Heard {
-  line: Line
+/** A piece of a line's audio on the audio clock, as frames that are voice (true) or silence. */
+export interface Piece {
   start: number
-  seconds: number
+  frame: number
+  voiced: boolean[]
+}
+
+/** A line being heard: its audio so far, and whether all of it has arrived. */
+export interface Heard {
+  line: Line
+  pieces: Piece[]
   arrived: boolean
 }
 
-/** Her speaking pace, to guess how long a line lasts while it is still arriving. */
-const CHARS_PER_SECOND = 14
+/** Frames of this length are voice when louder than VOICED (a pause at a comma is not). */
+const FRAME = 0.02
+const VOICED = 0.01
 
-/** Where in the written text she is, given the lines heard so far and the audio clock. */
-export function placeOf(heard: Heard[], now: number): number | null {
+/** Which frames of some samples are voice. */
+export function voicedFrames(samples: Float32Array, rate: number): boolean[] {
+  const size = Math.max(1, Math.round(rate * FRAME))
+  const out: boolean[] = []
+  for (let i = 0; i < samples.length; i += size) {
+    let sum = 0
+    const end = Math.min(samples.length, i + size)
+    for (let j = i; j < end; j++) sum += samples[j] * samples[j]
+    out.push(Math.sqrt(sum / (end - i)) > VOICED)
+  }
+  return out
+}
+
+/** Seconds of voice in a line, all of it or heard by `now`. */
+export function voiceIn(h: Heard, now = Number.POSITIVE_INFINITY): number {
+  let seconds = 0
+  for (const p of h.pieces) {
+    for (let k = 0; k < p.voiced.length; k++) {
+      const at = p.start + k * p.frame
+      if (at >= now) return seconds
+      if (p.voiced[k]) seconds += Math.min(p.frame, now - at)
+    }
+  }
+  return seconds
+}
+
+/**
+ * Where in the written text she is, given the lines heard so far and the audio clock: the words
+ * move only while she is actually speaking, so they wait at her pauses (commas, full stops) as
+ * she does. A line still arriving is guessed at `cps` characters per second of voice.
+ */
+export function placeOf(heard: Heard[], now: number, cps: number): number | null {
   if (!heard.length) return null
   let at = heard[0].line.from
   for (const h of heard) {
-    if (now < h.start) break
-    const lasts = h.arrived ? h.seconds : Math.max(h.seconds, h.line.text.length / CHARS_PER_SECOND)
-    const share = lasts > 0 ? Math.min(1, (now - h.start) / lasts) : 1
+    if (!h.pieces.length || now < h.pieces[0].start) break
+    const all = voiceIn(h)
+    const lasts = h.arrived ? all : Math.max(all, h.line.text.length / cps)
+    const share = lasts > 0 ? Math.min(h.arrived ? 1 : 0.95, voiceIn(h, now) / lasts) : 1
     at = h.line.from + (h.line.to - h.line.from) * share
   }
   return at
@@ -66,6 +104,8 @@ export function useVoice(onProblem: (message: string) => void) {
   // Where in the written text her voice is, while it speaks: the page shows the words with it.
   const [at, setAt] = useState<number | null>(null)
   const heard = useRef<Heard[]>([])
+  // Characters per second of voice, learnt from each line said: guesses lines still arriving.
+  const pace = useRef(15)
   const queue = useRef<Line[]>([])
   const running = useRef(false)
   const round = useRef(0)
@@ -87,7 +127,7 @@ export function useVoice(onProblem: (message: string) => void) {
     await audio.resume().catch(() => {})
     let cursor = 0 // when the last scheduled piece ends, on the audio clock
     const clock = setInterval(() => {
-      if (round.current === mine) setAt(placeOf(heard.current, audio.currentTime))
+      if (round.current === mine) setAt(placeOf(heard.current, audio.currentTime, pace.current))
     }, 80)
     const play = (samples: Float32Array, rate: number, line: Heard) => {
       if (!samples.length || round.current !== mine) return
@@ -98,8 +138,7 @@ export function useVoice(onProblem: (message: string) => void) {
       source.connect(audio.destination)
       const at = Math.max(cursor, audio.currentTime + 0.05)
       source.start(at)
-      if (!line.seconds) line.start = at
-      line.seconds = at + buffer.duration - line.start
+      line.pieces.push({ start: at, frame: FRAME, voiced: voicedFrames(samples, rate) })
       cursor = at + buffer.duration
       playing.current.add(source)
       source.onended = () => playing.current.delete(source)
@@ -107,7 +146,7 @@ export function useVoice(onProblem: (message: string) => void) {
     try {
       while (queue.current.length && round.current === mine) {
         const line = queue.current.shift()!
-        const mark: Heard = { line, start: Number.POSITIVE_INFINITY, seconds: 0, arrived: false }
+        const mark: Heard = { line, pieces: [], arrived: false }
         heard.current.push(mark)
         const abort = new AbortController()
         aborts.current = abort
@@ -143,6 +182,8 @@ export function useVoice(onProblem: (message: string) => void) {
           if (done) break
         }
         mark.arrived = true
+        const voice = voiceIn(mark)
+        if (voice > 0.5) pace.current = (pace.current + line.text.length / voice) / 2
       }
       // Wait for the last words to be heard.
       while (round.current === mine && audio.currentTime < cursor) await new Promise((r) => setTimeout(r, 100))

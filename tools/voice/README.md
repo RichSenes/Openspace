@@ -63,7 +63,9 @@ are considered, so a short sentence is not taken for another language.
 
 `speak-server.py` gives Shiori her voice, on this machine. Her answers to what you said aloud are
 spoken back a sentence at a time while she writes them, and each sentence streams: it starts
-playing about 0.2 s after it is asked for, while the rest is still being made. Meanwhile she does
+playing about 0.2 s after it is asked for, while the rest is still being made. The words appear
+with her voice: they move only while she is speaking (the page tells voice from silence every
+20 ms), so they wait at her pauses as she does. Meanwhile she does
 not listen, so she never hears herself. Holding the mic, **Esc** or **Quiet** under her words
 stops her.
 
@@ -135,6 +137,7 @@ OPENSPACE_VOICE_ENGINE=voxcpm                     # or qwen, qwen-fast, kokoro
 OPENSPACE_VOICE_MODEL=DIR/VoxCPM2                 # the engine's model folder
 OPENSPACE_VOICE_DIR=~/.local/share/openspace/voices/shiori   # all but kokoro
 OPENSPACE_VOICE_IDLE=300                          # seconds of quiet before it frees the card
+OPENSPACE_VOICE_PACE=1.1                          # faster speech, same pitch (pip install audiotsm)
 ```
 
 `POST /speak {"text": "...", "language": "it"}` returns WAV, and with `"stream": true` raw 16-bit

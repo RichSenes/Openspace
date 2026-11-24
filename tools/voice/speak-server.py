@@ -202,6 +202,36 @@ class Kokoro(Engine):
 ENGINES = {"voxcpm": VoxCPM, "qwen": Qwen, "qwen-fast": QwenFast, "kokoro": Kokoro}
 
 
+class Pace:
+    """Speeds her voice up without changing its pitch (WSOLA, audiotsm, MIT), a piece at a time."""
+
+    def __init__(self, speed, rate):
+        from audiotsm import wsola
+        from audiotsm.io.array import ArrayWriter
+
+        self.writer = ArrayWriter
+        self.tsm = wsola(1, speed=speed, frame_length=int(rate * 0.04), synthesis_hop=int(rate * 0.02))
+        self.out = ArrayWriter(1)
+
+    def push(self, samples):
+        from audiotsm.io.array import ArrayReader
+
+        reader = ArrayReader(np.asarray(samples, dtype=np.float32)[None, :])
+        while not reader.empty:
+            self.tsm.read_from(reader)
+            self.tsm.write_to(self.out)
+        return self._take()
+
+    def end(self):
+        self.tsm.flush_to(self.out)
+        return self._take()
+
+    def _take(self):
+        data = self.out.data[0]
+        self.out = self.writer(1)
+        return data
+
+
 def pcm16(wav):
     return (np.clip(np.asarray(wav, dtype=np.float32), -1, 1) * 32767).astype("<i2").tobytes()
 
@@ -225,13 +255,22 @@ def worker(args, conn, cancel):
             return
         text, language, streaming = asked
         try:
+            pace = None
             if streaming:
                 for wav, sr in engine.stream(text, language):
                     if cancel.is_set():
                         break
+                    if args.pace != 1:
+                        pace = pace or Pace(args.pace, sr)
+                        wav = pace.push(wav)
                     conn.send(("audio", pcm16(wav), sr))
+                if pace is not None and not cancel.is_set():
+                    conn.send(("audio", pcm16(pace.end()), sr))
             else:
                 wav, sr = engine.speak(text, language)
+                if args.pace != 1:
+                    pace = Pace(args.pace, sr)
+                    wav = np.concatenate([pace.push(wav), pace.end()])
                 conn.send(("audio", pcm16(wav), sr))
             conn.send(("end",))
         except Exception as e:  # noqa: BLE001 - one failed sentence does not stop her
@@ -399,6 +438,7 @@ def main():
     p.add_argument("--voice", help="voxcpm, qwen: the folder with voice.wav and voice.txt (design-voice.py)")
     p.add_argument("--voices", default="it=if_sara,en=af_heart,ja=jf_alpha", help="kokoro: a preset voice per language")
     p.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
+    p.add_argument("--pace", type=float, default=1.0, help="speech speed, pitch kept: 1.1 is ten per cent faster (needs audiotsm)")
     p.add_argument("--idle", type=int, default=300, help="seconds of quiet before she frees the graphics card")
     p.add_argument("--need-gb", type=float, help="free graphics memory needed to start (the engine's own by default)")
     p.add_argument("--leave-gb", type=float, default=1.0, help="free memory under which a quiet voice makes room")

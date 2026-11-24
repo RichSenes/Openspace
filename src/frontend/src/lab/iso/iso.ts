@@ -1,14 +1,20 @@
 import { mix, Painter, type Point } from './px'
 
 /**
- * The isometric grid, Habbo's way: a floor tile is a 32×16 diamond, lines run two pixels across
- * for one down. Positions are in units of an eighth of a tile along the two floor axes, so every
- * corner lands on a whole pixel: +a goes down-right on screen, +b down-left, z is pixels up.
+ * The isometric grid, seen from a little higher than Habbo: a floor tile is a 32×21 diamond,
+ * lines run three pixels across for two down. Positions are in units of an eighth of a tile
+ * along the two floor axes: +a goes down-right on screen, +b down-left, z is pixels up.
  */
 export const TILE = 8
 
+/** Pixels down per floor unit (across it is always 2): 1 would be Habbo's angle. */
+export const YF = 4 / 3
+
+/** How the camera looks down: the sine of its elevation, as a circle on the floor is squashed. */
+export const SQUASH = YF / 2
+
 export function iso(a: number, b: number, z = 0): Point {
-  return [(a - b) * 2, a + b - z]
+  return [(a - b) * 2, (a + b) * YF - z]
 }
 
 /** A sprite painted once: its canvas and the pixel that sits on its floor origin. */
@@ -40,7 +46,11 @@ export interface Shades {
 
 /** Three shades of a colour for a box lit from the top left. */
 export function shades(color: string, depth = 1): Shades {
-  return { top: mix(color, '#ffffff', 0.12 * depth), left: color, right: mix(color, '#0b1020', 0.28 * depth) }
+  return {
+    top: mix(color, '#ffffff', 0.12 * depth),
+    left: color,
+    right: mix(color, '#0b1020', 0.28 * depth),
+  }
 }
 
 export interface BoxFaces {
@@ -79,13 +89,13 @@ export function box(p: Painter, at: (a: number, b: number, z?: number) => Point,
  */
 export function onLeftFace(p: Painter, at: (a: number, b: number, z?: number) => Point, a: number, b: number, z: number, u: number, v: number, color: string, alpha = 1) {
   const [x, y] = at(a, b, z)
-  p.set(x + u, y + Math.floor(u / 2) - v, color, alpha)
+  p.set(x + u, y + Math.floor((u * YF) / 2) - v, color, alpha)
 }
 
 /** The same on the front-right face (looking +a): `u` runs leftwards from its back (right) end. */
 export function onRightFace(p: Painter, at: (a: number, b: number, z?: number) => Point, a: number, b: number, z: number, u: number, v: number, color: string, alpha = 1) {
   const [x, y] = at(a, b, z)
-  p.set(x - u, y + Math.floor(u / 2) - v, color, alpha)
+  p.set(x - u, y + Math.floor((u * YF) / 2) - v, color, alpha)
 }
 
 /**
@@ -93,7 +103,7 @@ export function onRightFace(p: Painter, at: (a: number, b: number, z?: number) =
  * as wide as tall, banded from light on the left to dark on the right.
  */
 export function cylinder(p: Painter, cx: number, cy: number, rx: number, h: number, color: string, top?: string, alpha = 1) {
-  const ry = rx / 2
+  const ry = rx * SQUASH
   const band = (x: number) => {
     const k = (x + 0.5 - (cx - rx)) / (2 * rx)
     const step = Math.min(4, Math.max(0, Math.floor(k * 5)))

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { box, iso, shades } from './iso'
+import { box, iso, shades, YF } from './iso'
 import { Painter } from './px'
-import { advance, behind, type Person } from './scene'
+import { advance, behind, order, type Person } from './scene'
 import { FOOT_Y, facingOf, H, paintScientist, W } from './scientist'
 
 describe('iso', () => {
-  it('runs two pixels across for one down, tiles are 32 by 16', () => {
-    expect(iso(8, 0)).toEqual([16, 8])
-    expect(iso(0, 8)).toEqual([-16, 8])
-    expect(iso(8, 8)).toEqual([0, 16])
+  it('runs three pixels across for two down: tiles are 32 by 21', () => {
+    expect(iso(8, 0)).toEqual([16, 8 * YF])
+    expect(iso(0, 8)).toEqual([-16, 8 * YF])
     expect(iso(0, 0, 10)).toEqual([0, -10])
+    expect(YF).toBeGreaterThan(1)
   })
 
   it('paints a box whose faces neither overlap nor leave gaps', () => {
@@ -37,13 +37,26 @@ describe('scientist', () => {
   it('stands on its foot pixel and fits its frame in every pose', () => {
     for (const back of [false, true]) {
       for (const pose of ['stand', 'walk', 'notes', 'think', 'coffee', 'type'] as const) {
-        const p = paintScientist({ skin: '#f1c9a5', hair: '#1d1a22', style: 'long', shirt: '#5b9bff', glasses: true }, back, pose, 1)
+        const p = paintScientist(
+          {
+            skin: '#f1c9a5',
+            hair: '#1d1a22',
+            style: 'long',
+            shirt: '#5b9bff',
+            glasses: true,
+          },
+          back,
+          pose,
+          1,
+        )
         let top = H
         let bottom = 0
-        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (p.alpha(x, y) > 0) {
-          top = Math.min(top, y)
-          bottom = Math.max(bottom, y)
-        }
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++)
+            if (p.alpha(x, y) > 0) {
+              top = Math.min(top, y)
+              bottom = Math.max(bottom, y)
+            }
         expect(top).toBeGreaterThan(0)
         expect(bottom).toBeLessThanOrEqual(FOOT_Y + 1)
         expect(bottom - top).toBeGreaterThan(40)
@@ -61,7 +74,12 @@ describe('scientist', () => {
 
 describe('scene', () => {
   const person = (route: Person['route']): Person => ({
-    look: { skin: '#000000', hair: '#000000', style: 'short', shirt: '#000000' },
+    look: {
+      skin: '#000000',
+      hair: '#000000',
+      style: 'short',
+      shirt: '#000000',
+    },
     frames: { get: () => document.createElement('canvas') },
     a: 0,
     b: 0,
@@ -90,7 +108,10 @@ describe('scene', () => {
   })
 
   it('goes back to the start of the route when done', () => {
-    const p = person([{ act: 'think', face: 'SE', secs: 1 }, { act: 'type', face: 'NE', secs: 1 }])
+    const p = person([
+      { act: 'think', face: 'SE', secs: 1 },
+      { act: 'type', face: 'NE', secs: 1 },
+    ])
     advance(p, 1.5)
     expect(p.pose).toBe('type')
     advance(p, 1)
@@ -102,5 +123,16 @@ describe('scene', () => {
     expect(behind({ a0: 20, b0: 24, a1: 22, b1: 26 }, desk)).toBeGreaterThan(0)
     expect(behind({ a0: 20, b0: 4, a1: 22, b1: 6 }, desk)).toBeLessThan(0)
     expect(behind({ a0: 2, b0: 14, a1: 4, b1: 16 }, desk)).toBeLessThan(0)
+  })
+
+  it('orders by footprints only what overlaps on screen, and keeps every pair', () => {
+    const desk = { name: 'desk', a0: 10, b0: 10, a1: 50, b1: 20, box: [0, 0, 100, 40] as [number, number, number, number] }
+    const front = { name: 'front', a0: 30, b0: 22, a1: 32, b1: 24, box: [40, 10, 50, 50] as [number, number, number, number] }
+    const back = { name: 'back', a0: 30, b0: 4, a1: 32, b1: 6, box: [40, -20, 50, 20] as [number, number, number, number] }
+    const far = { name: 'far', a0: 100, b0: 100, a1: 102, b1: 102, box: [400, 400, 410, 420] as [number, number, number, number] }
+    const names = order([front, desk, far, back]).map((x) => x.name)
+    expect(names.indexOf('back')).toBeLessThan(names.indexOf('desk'))
+    expect(names.indexOf('desk')).toBeLessThan(names.indexOf('front'))
+    expect(names).toHaveLength(4)
   })
 })

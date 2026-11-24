@@ -35,7 +35,14 @@ const OUTLINE = '#1a2230'
 const EYE = '#251d2c'
 
 /** How many frames each pose has. */
-export const FRAMES: Record<Pose, number> = { stand: 1, walk: 4, notes: 2, think: 1, coffee: 2, type: 2 }
+export const FRAMES: Record<Pose, number> = {
+  stand: 1,
+  walk: 4,
+  notes: 2,
+  think: 1,
+  coffee: 2,
+  type: 2,
+}
 
 export function paintScientist(look: Look, back: boolean, pose: Pose, frame: number): Painter {
   const p = new Painter(W, H)

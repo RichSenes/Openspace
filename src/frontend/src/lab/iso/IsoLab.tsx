@@ -13,7 +13,13 @@ import { FOOT_X, FOOT_Y, scientistFrames, type Facing, type Look, type Pose } fr
  */
 
 const LOOKS: Look[] = [
-  { skin: '#f1c9a5', hair: '#1d1a22', style: 'short', shirt: '#5b9bff', glasses: true },
+  {
+    skin: '#f1c9a5',
+    hair: '#1d1a22',
+    style: 'short',
+    shirt: '#5b9bff',
+    glasses: true,
+  },
   { skin: '#e8b48f', hair: '#5a3424', style: 'long', shirt: '#3fd29a' },
   { skin: '#8d5a3b', hair: '#141018', style: 'curly', shirt: '#f2a948' },
   { skin: '#f6d7c3', hair: '#c9a06a', style: 'bun', shirt: '#5b9bff' },
@@ -154,7 +160,9 @@ export function IsoLab() {
 
       <section>
         <h2>The lab</h2>
-        <p className="iso-note">Clean sci-fi, cold light, the city burning outside. Each former office is an area of the open space with its own floor and colour; Shiori is the brain under the dome.</p>
+        <p className="iso-note">
+          Clean sci-fi, cold light, the city burning outside. Each former office is an area of the open space with its own floor and colour; Shiori is the brain under the dome.
+        </p>
         <div className="iso-frame">
           <PixelCanvas width={SCENE_W} height={SCENE_H} scale={sceneScale} draw={drawScene} label="An isometric lab: scientists at work around a huge brain under a glass dome" />
         </div>
@@ -164,14 +172,14 @@ export function IsoLab() {
         <h2>Shiori</h2>
         <div className="iso-frame">
           <PixelCanvas
-            width={220}
-            height={250}
+            width={230}
+            height={200}
             scale={2}
             label="The brain under its dome, particles orbiting it"
             draw={(ctx, t) => {
               ctx.fillStyle = '#d2d9e1'
-              ctx.fillRect(0, 0, 220, 250)
-              brain.draw(ctx, 110, 205, t)
+              ctx.fillRect(0, 0, 230, 200)
+              brain.draw(ctx, 115, 108, t)
             }}
           />
         </div>
@@ -179,7 +187,9 @@ export function IsoLab() {
 
       <section>
         <h2>Scientists</h2>
-        <p className="iso-note">Two drawings per pose, front and back; flipped, they make the other two directions. Hair, skin and the shirt under the coat (the colour of their area) make each one somebody.</p>
+        <p className="iso-note">
+          Two drawings per pose, front and back; flipped, they make the other two directions. Hair, skin and the shirt under the coat (the colour of their area) make each one somebody.
+        </p>
         <div className="iso-frame">
           <PixelCanvas width={sheetW} height={sheetH} scale={3} draw={drawPeople} label="Five scientists walking in four directions and in their poses" />
         </div>

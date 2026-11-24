@@ -1,4 +1,4 @@
-import { iso } from './iso'
+import { iso, YF } from './iso'
 import { dot, glow } from './props'
 import { mix, noise, Painter, rand } from './px'
 
@@ -13,7 +13,7 @@ export const WALL = 96
 export const OX = 300
 export const OY = WALL + 12
 export const SCENE_W = 600
-export const SCENE_H = OY + 2 * N + 16
+export const SCENE_H = Math.ceil(OY + 2 * N * YF + 16)
 export const CENTER: [number, number] = [72, 72]
 export const PLATFORM = 36
 
@@ -32,10 +32,43 @@ export interface Area {
 }
 
 export const AREAS: Area[] = [
-  { name: 'Research', accent: '#3fd29a', rects: [[0, 16, 46, 82], [0, 82, 30, 98]], floor: '#d3e2dd', pattern: 'grate' },
-  { name: 'Engineering', accent: '#5b9bff', rects: [[12, 0, 128, 40], [100, 0, 144, 52]], floor: '#d2dbe8', pattern: 'raised' },
-  { name: 'Data', accent: '#f2a948', rects: [[6, 98, 92, 144], [30, 88, 46, 98]], floor: '#e3ddd2', pattern: 'plain' },
-  { name: 'Lounge', accent: '#c48bff', rects: [[100, 80, 144, 144]], floor: '#ddd7e6', pattern: 'carpet' },
+  {
+    name: 'Research',
+    accent: '#3fd29a',
+    rects: [
+      [0, 16, 46, 82],
+      [0, 82, 30, 98],
+    ],
+    floor: '#d3e2dd',
+    pattern: 'grate',
+  },
+  {
+    name: 'Engineering',
+    accent: '#5b9bff',
+    rects: [
+      [12, 0, 128, 40],
+      [100, 0, 144, 52],
+    ],
+    floor: '#d2dbe8',
+    pattern: 'raised',
+  },
+  {
+    name: 'Data',
+    accent: '#f2a948',
+    rects: [
+      [6, 98, 92, 144],
+      [30, 88, 46, 98],
+    ],
+    floor: '#e3ddd2',
+    pattern: 'plain',
+  },
+  {
+    name: 'Lounge',
+    accent: '#c48bff',
+    rects: [[100, 80, 144, 144]],
+    floor: '#ddd7e6',
+    pattern: 'carpet',
+  },
 ]
 
 /** Cables on the floor, as runs along the axes: thick, three side by side, from Shiori outwards. */
@@ -131,9 +164,9 @@ function floorColor(a: number, b: number): string {
   // The platform under Shiori: rings and spokes, a lit edge.
   const d = Math.hypot(a - CENTER[0], b - CENTER[1])
   if (d < PLATFORM) {
-    c = d > PLATFORM - 1.5 ? '#79e3f2' : d > PLATFORM - 3 ? '#aab6c3' : (Math.floor(d / 6) % 2 ? '#c6cfd9' : '#cdd5de')
+    c = d > PLATFORM - 1.5 ? '#79e3f2' : d > PLATFORM - 3 ? '#aab6c3' : Math.floor(d / 6) % 2 ? '#c6cfd9' : '#cdd5de'
     const ang = Math.atan2(b - CENTER[1], a - CENTER[0])
-    if (d < PLATFORM - 3 && Math.abs(((ang / (Math.PI / 6)) % 1 + 1) % 1 - 0.5) > 0.47) c = '#b3bdc9'
+    if (d < PLATFORM - 3 && Math.abs(((((ang / (Math.PI / 6)) % 1) + 1) % 1) - 0.5) > 0.47) c = '#b3bdc9'
   }
   const cable = cableAt(a, b)
   if (cable) {
@@ -211,12 +244,12 @@ export function makeRoom(): Room {
     }
   }
   // The floor, pixel by pixel, from what is at each point.
-  for (let y = OY; y < OY + 2 * N; y++) {
+  for (let y = OY; y < OY + 2 * N * YF; y++) {
     for (let x = 0; x < SCENE_W; x++) {
       const dx = x + 0.5 - OX
       const dy = y + 0.5 - OY
-      const a = (dx / 2 + dy) / 2
-      const b = (dy - dx / 2) / 2
+      const a = (dx / 2 + dy / YF) / 2
+      const b = (dy / YF - dx / 2) / 2
       if (a < 0 || b < 0 || a >= N || b >= N) continue
       p.set(x, y, floorColor(a, b))
     }
@@ -235,7 +268,7 @@ export function makeRoom(): Room {
     screens.data.fill(0)
     const put = (a0: number, u: number, v: number, c: string) => {
       const [x, y] = screenOf(a0, 0, 0)
-      screens.set(x + u, y + Math.floor(u / 2) - v, c)
+      screens.set(x + u, y + Math.floor((u * YF) / 2) - v, c)
     }
     const panel = (a0: number, wide: number, z0: number, high: number, fill: (u: number, v: number) => string) => {
       for (let u = 0; u < wide; u++) for (let v = 0; v < high; v++) put(a0, u, z0 + v, fill(u, v))
@@ -260,7 +293,7 @@ export function makeRoom(): Room {
       // A ring that fills: how busy she is.
       const d = Math.hypot(u - 11, (v - 13) * 1)
       const ang = (Math.atan2(v - 13, u - 11) + Math.PI) / (Math.PI * 2)
-      if (d > 7 && d < 10) return ang < (Math.sin(t * 0.4) * 0.5 + 0.5) ? '#c48bff' : '#2a2140'
+      if (d > 7 && d < 10) return ang < Math.sin(t * 0.4) * 0.5 + 0.5 ? '#c48bff' : '#2a2140'
       if (d < 3) return '#e9d6ff'
       return '#0b1d29'
     })
@@ -277,7 +310,11 @@ export function makeRoom(): Room {
     ctx.putImageData(image, 0, 0)
   }
 
-  const embers = Array.from({ length: 24 }, (_, k) => ({ u: (k * 37) % 72, ph: (k * 0.137) % 1, speed: 0.08 + ((k * 7) % 10) / 80 }))
+  const embers = Array.from({ length: 24 }, (_, k) => ({
+    u: (k * 37) % 72,
+    ph: (k * 0.137) % 1,
+    speed: 0.08 + ((k * 7) % 10) / 80,
+  }))
 
   return {
     canvas,

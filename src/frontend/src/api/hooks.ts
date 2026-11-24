@@ -63,6 +63,7 @@ import type {
   ShioriSessionSummary,
   ShioriSessionView,
   TranscriptEntry,
+  WorldView,
 } from './types'
 
 export const keys = {
@@ -86,6 +87,7 @@ export const keys = {
   reports: ['reports'] as const,
   routines: ['routines'] as const,
   needsYou: ['needs-you'] as const,
+  world: ['world'] as const,
   officeReports: (officeId: string) => ['reports', officeId] as const,
   branches: (officeId: string) => ['offices', officeId, 'branches'] as const,
   engines: ['engines'] as const,
@@ -900,6 +902,15 @@ export function useRunRoutine() {
 }
 
 /** Everything that waits for the person, from every office; the hub refreshes it as tasks and routines change. */
+/** The world in one look: the lab draws itself from it. Refreshed by the hub when something changes. */
+export function useWorld() {
+  return useQuery({
+    queryKey: keys.world,
+    queryFn: () => request<WorldView>('GET', '/api/world'),
+    refetchInterval: 20_000,
+  })
+}
+
 export function useNeedsYou() {
   return useQuery({
     queryKey: keys.needsYou,

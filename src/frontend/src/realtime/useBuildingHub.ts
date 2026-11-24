@@ -26,17 +26,24 @@ export function useBuildingHub(): LinkState {
       .configureLogging(LogLevel.Warning)
       .build()
 
-    hub.on('OfficeChanged', () => void client.invalidateQueries({ queryKey: keys.offices }))
+    // The world changes with offices, tasks, routines, the agents' activity and their interns.
+    const world = () => void client.invalidateQueries({ queryKey: keys.world })
+    hub.on('OfficeChanged', () => {
+      void client.invalidateQueries({ queryKey: keys.offices })
+      world()
+    })
     hub.on('TaskChanged', () => {
       void client.invalidateQueries({ queryKey: keys.feed })
       void client.invalidateQueries({ queryKey: keys.tasks })
       void client.invalidateQueries({ queryKey: keys.deskUsage })
       void client.invalidateQueries({ queryKey: keys.needsYou })
+      world()
     })
     hub.on('ReportsChanged', () => void client.invalidateQueries({ queryKey: keys.reports }))
     hub.on('RoutinesChanged', () => {
       void client.invalidateQueries({ queryKey: keys.routines })
       void client.invalidateQueries({ queryKey: keys.needsYou })
+      world()
     })
     hub.on('RoutineProgress', (progress: { routineId: string; line: string }) => reportRoutineProgress(progress.routineId, progress.line))
     hub.on('EpicsChanged', () => void client.invalidateQueries({ queryKey: keys.epics }))
@@ -49,8 +56,12 @@ export function useBuildingHub(): LinkState {
       client.setQueryData<DeskActivity[]>(keys.activity, (list) => mergeActivity(list, activity))
       const cue = cueOfActivity(activity)
       if (cue) emitCue(cue)
+      world()
     })
-    hub.on('DeskInterns', (interns: DeskInterns) => client.setQueryData<DeskInterns[]>(keys.interns, (list) => mergeInterns(list, interns)))
+    hub.on('DeskInterns', (interns: DeskInterns) => {
+      client.setQueryData<DeskInterns[]>(keys.interns, (list) => mergeInterns(list, interns))
+      world()
+    })
     hub.on('QueueWaits', (waits: QueueWait[]) => client.setQueryData<QueueWait[]>(keys.queueWaits, waits))
     hub.on('SupervisorJobs', (jobs: SupervisorJob[]) => client.setQueryData<SupervisorJob[]>(keys.supervisorJobs, jobs))
     hub.on('OfficeGuests', (office: OfficeGuests) => client.setQueryData<Guest[]>(keys.guests, (list) => mergeGuests(list, office)))

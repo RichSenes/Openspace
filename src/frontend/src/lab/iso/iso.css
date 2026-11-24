@@ -163,3 +163,9 @@
   font: inherit;
   cursor: pointer;
 }
+
+.world-note {
+  max-width: 46ch;
+  color: var(--mute);
+  line-height: 1.5;
+}

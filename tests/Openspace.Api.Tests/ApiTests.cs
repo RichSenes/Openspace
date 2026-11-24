@@ -93,6 +93,18 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_world_shows_each_office_with_its_characters_and_the_queue_at_Shiori()
+    {
+        using var created = await _http.PostAsJsonAsync("/api/offices", new { name = "World Corp" });
+        created.EnsureSuccessStatusCode();
+
+        var world = await _http.GetFromJsonAsync<JsonElement>("/api/world");
+
+        Assert.Contains(world.GetProperty("offices").EnumerateArray(), o => o.GetProperty("name").GetString() == "World Corp");
+        Assert.Equal(JsonValueKind.Array, world.GetProperty("waiting").ValueKind);
+    }
+
+    [Fact]
     public async Task A_board_test_names_the_boards_it_reads_when_it_has_no_reader_for_one()
     {
         using var response = await _http.PostAsJsonAsync("/api/job-boards/test", new { board = "monster:everything" });

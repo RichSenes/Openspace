@@ -43,8 +43,12 @@ const NEW = 'new'
 
 type Drawer = 'sessions' | 'log' | 'board' | null
 
-/** Shiori at the centre of her world: the real conversation, saved as sessions in the brain. */
-export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: SettingsSection) => void }) {
+/**
+ * Shiori at the centre of her world: the real conversation, saved as sessions in the brain.
+ * `pending` is something already said to her by name elsewhere (the lab): sent as soon as she
+ * can take it, then `onPendingTaken` is told.
+ */
+export function ShioriPage({ onOpenSettings, pending, onPendingTaken }: { onOpenSettings: (section: SettingsSection) => void; pending?: Heard | null; onPendingTaken?: () => void }) {
   const toast = useToast()
   const sessions = useShioriSessions()
   const [wanted, setWanted] = usePersistentState<string>('openspace.shiori.session', '')
@@ -229,6 +233,14 @@ export function ShioriPage({ onOpenSettings }: { onOpenSettings: (section: Setti
     submitRef.current = submit
     busyRef.current = busy
   })
+  // Said to her by name before this page was open: answered like anything she hears.
+  useEffect(() => {
+    if (!pending || busy || sessions.isPending) return
+    onPendingTaken?.()
+    onHeard(pending)
+    // onHeard reads the latest state through refs; only a new request matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, busy, sessions.isPending])
   useEffect(() => {
     if (busy || !heardMeanwhile.current.length) return
     const said = heardMeanwhile.current.join(' ')

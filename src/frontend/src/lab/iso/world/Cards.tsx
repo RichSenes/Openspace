@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAnswerPermission, useApproveTask, useDecideProposal, useSendBack, useTaskCommand, useTaskLog } from '../../../api/hooks'
 import type { WorldCharacter, WorldView, WorldWaiting } from '../../../api/types'
-import type { View } from '../../../layout/TopBar'
+import { openPage } from './pages'
 import type { Picked } from './world'
 
 /**
@@ -32,16 +32,6 @@ const NEED: Record<string, string> = {
   DecisionToAccept: 'A decision for you',
   DecisionDue: 'A decision to look at again',
   Agreement: 'Two desks need you to choose',
-}
-
-/** Opens one of Openspace's own pages, where everything about it is. */
-function openPage(view: View) {
-  try {
-    localStorage.setItem('openspace.view', view)
-  } catch {
-    // Not remembered: the app opens on its own page.
-  }
-  location.href = '/'
 }
 
 function Answers({ need }: { need: WorldWaiting }) {
@@ -236,8 +226,6 @@ function CharacterCard({ picked, world }: { picked: Extract<Picked, { kind: 'age
 }
 
 function ShioriCard({ world }: { world: WorldView | undefined }) {
-  const names = new Map((world?.offices ?? []).flatMap((o) => o.characters.map((c) => [c.id, `${c.name}, ${o.name}`] as const)))
-  const queue = world?.waiting ?? []
   return (
     <>
       <h2>Shiori</h2>
@@ -245,14 +233,23 @@ function ShioriCard({ world }: { world: WorldView | undefined }) {
       <button type="button" className="card-link is-primary" onClick={() => openPage('shiori')}>
         Talk to her
       </button>
-      <section>
-        <h3>{queue.length ? `Waiting for you (${queue.length})` : 'Nobody is waiting for you'}</h3>
-        <ul className="card-needs">
-          {queue.map((n) => (
-            <Need key={`${n.kind}${n.id}`} need={n} who={n.characterId ? names.get(n.characterId) : 'hers'} />
-          ))}
-        </ul>
-      </section>
+      <Queue world={world} />
     </>
+  )
+}
+
+/** Everyone waiting for the person at Shiori, each with who brings it and the answers to give. */
+export function Queue({ world }: { world: WorldView | undefined }) {
+  const names = new Map((world?.offices ?? []).flatMap((o) => o.characters.map((c) => [c.id, `${c.name}, ${o.name}`] as const)))
+  const queue = world?.waiting ?? []
+  return (
+    <section>
+      <h3>{queue.length ? `Waiting for you (${queue.length})` : 'Nobody is waiting for you'}</h3>
+      <ul className="card-needs">
+        {queue.map((n) => (
+          <Need key={`${n.kind}${n.id}`} need={n} who={n.characterId ? names.get(n.characterId) : 'hers'} />
+        ))}
+      </ul>
+    </section>
   )
 }

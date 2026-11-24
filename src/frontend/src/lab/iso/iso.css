@@ -345,3 +345,92 @@
   color: #7be3a8;
   font-size: 13px;
 }
+
+.world-shiori {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-left: 1px solid var(--line);
+  background: #07060d;
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.45);
+  transform: translateX(105%);
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.world-shiori.is-open {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-shiori {
+    transition: none;
+  }
+}
+
+.world-shiori-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 8px 0;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  border-bottom: 1px solid var(--line);
+}
+
+.world-shiori-tabs [role='tab'] {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  cursor: pointer;
+}
+
+.world-shiori-tabs [aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.world-shiori-close {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.world-shiori-talk {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.world-shiori-talk .pr {
+  height: 100%;
+}
+
+.world-shiori-waiting {
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.world-wake {
+  position: absolute;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: rgb(7 6 13 / 0.85);
+  color: var(--ink);
+}

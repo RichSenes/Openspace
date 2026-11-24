@@ -7,6 +7,8 @@ import { planLab } from './furnish'
 import type { Flavor, OfficeSpec } from './layout'
 import { hourNow, type Weather } from './sky'
 import { Card } from './Cards'
+import { ShioriPanel, WakeListener } from './ShioriPanel'
+import type { Heard } from '../../../shiori/voice'
 import { makeLab, WORLD_H, WORLD_W, type Picked } from './world'
 
 /**
@@ -61,6 +63,9 @@ export function WorldLab() {
   const [open, setOpen] = useState(false)
   // The card open over the lab: a character's or Shiori's.
   const [picked, setPicked] = useState<Picked | null>(null)
+  // Shiori's panel, and what was said to her by name before it opened.
+  const [shiori, setShiori] = useState(false)
+  const [said, setSaid] = useState<Heard | null>(null)
   const [vw, vh] = useViewport()
   // The zoom that makes the lab fill most of the screen, unless one is chosen.
   const auto = useMemo(() => {
@@ -133,7 +138,10 @@ export function WorldLab() {
       // A click, not a drag: whoever is under the pointer opens their card.
       if (drag && moved < 5) {
         const found = labRef.current.hit(e.clientX / cam.current.scale, e.clientY / cam.current.scale)
-        setPicked(found)
+        if (found?.kind === 'shiori') {
+          setPicked(null)
+          setShiori(true)
+        } else setPicked(found)
       }
       drag = null
     }
@@ -209,6 +217,16 @@ export function WorldLab() {
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />
       {picked && <Card picked={picked} world={world.data} onClose={() => setPicked(null)} />}
+      <ShioriPanel open={shiori} onClose={() => setShiori(false)} world={world.data} pending={said} onPendingTaken={() => setSaid(null)} />
+      {!shiori && (
+        <WakeListener
+          onCalled={(heard) => {
+            setSaid(heard)
+            setPicked(null)
+            setShiori(true)
+          }}
+        />
+      )}
       <aside className="world-panel" aria-label="Lab settings">
         <div className="world-panel-head">
           <h1>Lab</h1>

@@ -1,10 +1,11 @@
 /**
- * The lab's floor plan, made from the offices someone sets up: nothing is drawn by hand. Shiori's
- * hall sits in the middle; every office becomes a room sized by how many agents work in it,
- * with a shape of its own (seeded by its name, so the same setup always gives the same lab),
- * reached from the hall by a corridor. Rooms go round the hall, the biggest first; a lounge is
- * added for everybody. The plan is a grid of tiles: each tile belongs to one space or to the
- * outside, and walls stand wherever two spaces meet, except at doors.
+ * The lab's floor plan, made from the offices someone sets up: nothing is drawn by hand. It is
+ * one big open space. Shiori's area is the wide open middle; every office is an area around it,
+ * sized by how many agents work there and shaped by its name (the same setup always gives the
+ * same lab), set off by low glass partitions with an opening towards her; a lounge is added for
+ * everybody. Areas sit round her on four sides, the biggest at the back; the free floor between
+ * them is the walkway. The building's outline is the union of it all, so its shape follows the
+ * setup. A grid of tiles: each tile is outside (-1), free floor, Shiori's area, or an area.
  */
 
 export type Flavor = 'code' | 'research' | 'creative' | 'data'
@@ -16,7 +17,7 @@ export interface OfficeSpec {
   flavor: Flavor
 }
 
-export type SpaceKind = 'hall' | 'office' | 'corridor' | 'lounge'
+export type SpaceKind = 'floor' | 'hall' | 'office' | 'lounge'
 
 export interface Space {
   id: number
@@ -30,28 +31,29 @@ export interface Space {
   b0: number
   a1: number
   b1: number
-  /** Which way it opens towards the hall: the side of the hall it stands on. */
   side: Side
 }
 
 export type Side = '-a' | '+a' | '-b' | '+b'
 
 export interface Plan {
-  /** Size of the grid in tiles, the ground around included. */
+  /** Size of the grid in tiles, everything around included. */
   w: number
   h: number
   spaces: Space[]
   /** For each tile, the id of its space, or -1 outside. */
   cells: Int16Array
-  /** Tile edges with a door: walls are not built there. Keyed by edgeKey. */
+  /** Edges where a partition opens. Keyed by edgeKey. */
   doors: Set<string>
   hall: Space
+  /** The building's extent in tiles: a0, b0, a1, b1. */
+  box: [number, number, number, number]
 }
 
-/** The ground left around the building, in tiles. */
-export const MARGIN = 7
-const HALL = 11
-const CORRIDOR = 2
+/** Shiori's area: wide, the heart of the lab. */
+export const HALL = 17
+/** The walkway between her area and the offices. */
+const AISLE = 2
 const LOUNGE: OfficeSpec = { name: 'Lounge', accent: '#c48bff', agents: 2, flavor: 'data' }
 
 /** A repeatable number in [0, 1) from a name. */
@@ -63,14 +65,14 @@ export function hashOf(text: string, salt = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-/** A room's size in tiles: more agents, more room; its proportions come from its name. */
+/** An area's size in tiles: more agents, more room; its proportions come from its name. */
 export function roomSize(spec: OfficeSpec, more = 0): [number, number] {
-  const area = more + 40 + (spec.flavor === 'research' ? 16 : 22) * Math.max(1, spec.agents)
-  const aspect = 0.7 + hashOf(spec.name, 1) * 0.75
+  const area = more + 36 + (spec.flavor === 'research' ? 16 : 20) * Math.max(1, spec.agents)
+  const aspect = 0.75 + hashOf(spec.name, 1) * 0.7
   let along = Math.round(Math.sqrt(area * aspect))
   let out = Math.round(area / along)
-  along = Math.max(6, along)
-  out = Math.max(5, out)
+  along = Math.max(7, along)
+  out = Math.max(6, out)
   return [along, out]
 }
 
@@ -79,109 +81,89 @@ export function edgeKey(a: number, b: number, dir: 'a' | 'b'): string {
   return `${a},${b},${dir}`
 }
 
-interface Local {
-  u0: number
-  u1: number
-  v0: number
-  v1: number
-}
-
-/** A rectangle given along a side of the hall (u along it, v outwards) as floor tiles around (0, 0). */
-function place(side: Side, r: Local): [number, number, number, number] {
-  const h = HALL / 2
-  const lo = Math.floor(-h)
-  const hi = lo + HALL
+/** A rectangle along a side of Shiori's area (u along it, v outwards), in tiles round (0, 0). */
+function place(side: Side, u0: number, u1: number, v0: number, v1: number): [number, number, number, number] {
+  const lo = -Math.floor(HALL / 2) - AISLE
+  const hi = lo + HALL + 2 * AISLE
   switch (side) {
     case '-b':
-      return [r.u0, lo - r.v1, r.u1, lo - r.v0]
+      return [u0, lo - v1, u1, lo - v0]
     case '+b':
-      return [r.u0, hi + r.v0, r.u1, hi + r.v1]
+      return [u0, hi + v0, u1, hi + v1]
     case '-a':
-      return [lo - r.v1, r.u0, lo - r.v0, r.u1]
+      return [lo - v1, u0, lo - v0, u1]
     case '+a':
-      return [hi + r.v0, r.u0, hi + r.v1, r.u1]
+      return [hi + v0, u0, hi + v1, u1]
   }
 }
 
-export function makePlan(offices: OfficeSpec[], more: Record<string, number> = {}): Plan {
+/** `margin` is the ground left round the building, in tiles: the city around it. */
+export function makePlan(offices: OfficeSpec[], more: Record<string, number> = {}, margin = 8): Plan {
   const specs = [...offices, LOUNGE]
   const sized = specs.map((spec) => ({ spec, size: roomSize(spec, more[spec.name] ?? 0) })).sort((x, y) => y.size[0] * y.size[1] - x.size[0] * x.size[1])
-  // The biggest rooms take the back sides, so they never hide the smaller ones.
+  // The biggest areas first, each on the side that is shortest so far: the lab stays round,
+  // and the back sides fill first, so big areas never hide small ones.
   const sides: Side[] = ['-b', '-a', '+a', '+b']
   const bySide = new Map<Side, typeof sized>(sides.map((s) => [s, []]))
-  sized.forEach((r, i) => bySide.get(sides[i % 4])!.push(r))
+  const length = (s: Side) => bySide.get(s)!.reduce((n, x) => n + x.size[0], 0)
+  for (const r of sized) bySide.get(sides.reduce((best, s) => (length(s) < length(best) ? s : best), sides[0]))!.push(r)
 
   type Raw = Omit<Space, 'id'>
   const raw: Raw[] = []
-  const lo = Math.floor(-HALL / 2)
+  const lo = -Math.floor(HALL / 2)
+  // Free floor first: the walkway round Shiori's area.
+  raw.push({ kind: 'floor', name: '', accent: '#9aa6b4', flavor: 'data', agents: 0, a0: lo - AISLE, b0: lo - AISLE, a1: lo + HALL + AISLE, b1: lo + HALL + AISLE, side: '-b' })
   raw.push({ kind: 'hall', name: 'Shiori', accent: '#46ffb0', flavor: 'data', agents: 0, a0: lo, b0: lo, a1: lo + HALL, b1: lo + HALL, side: '-b' })
+  const floors: [number, number, number, number][] = []
   for (const side of sides) {
     const rooms = bySide.get(side)!
     if (!rooms.length) continue
-    const total = rooms.reduce((s, r) => s + r.size[0], 0)
-    // Off centre a little, by the first room's name: no two labs look alike.
+    const total = rooms.reduce((s, r) => s + r.size[0], 0) + (rooms.length - 1) * AISLE
     const shift = Math.round((hashOf(rooms[0].spec.name, 2) - 0.5) * 4)
     let u = Math.round(-total / 2) + shift
-    const length = CORRIDOR + Math.round(hashOf(rooms[0].spec.name, 3) * 2)
-    // The corridor from the hall.
-    const [ca0, cb0, ca1, cb1] = place(side, { u0: -1, u1: 1, v0: 0, v1: length })
-    raw.push({ kind: 'corridor', name: '', accent: '#9aa6b4', flavor: 'data', agents: 0, a0: ca0, b0: cb0, a1: ca1, b1: cb1, side })
-    let v0 = length
-    if (rooms.length > 1 || u > -1 || u + total < 1) {
-      // A cross corridor along the side, so every room has its own door.
-      const [xa0, xb0, xa1, xb1] = place(side, { u0: Math.min(u, -1), u1: Math.max(u + total, 1), v0: length, v1: length + 2 })
-      raw.push({ kind: 'corridor', name: '', accent: '#9aa6b4', flavor: 'data', agents: 0, a0: xa0, b0: xb0, a1: xa1, b1: xb1, side })
-      v0 = length + 2
-    }
-    for (const { spec, size } of rooms) {
+    rooms.forEach(({ spec, size }, i) => {
       const [along, out] = size
-      const [a0, b0, a1, b1] = place(side, { u0: u, u1: u + along, v0, v1: v0 + out })
+      // Where two sides meet at a corner, an area that would overlap another steps outwards,
+      // with free floor leading to it.
+      let v = 0
+      const hits = (r: [number, number, number, number]) => raw.some((x) => x.kind !== 'floor' && x.kind !== 'hall' && r[0] < x.a1 && x.a0 < r[2] && r[1] < x.b1 && x.b0 < r[3])
+      while (hits(place(side, u - 1, u + along + 1, v, v + out))) v++
+      if (v > 0) floors.push(place(side, u, u + along, 0, v))
+      const [a0, b0, a1, b1] = place(side, u, u + along, v, v + out)
       raw.push({ kind: spec === LOUNGE ? 'lounge' : 'office', name: spec.name, accent: spec.accent, flavor: spec.flavor, agents: spec.agents, a0, b0, a1, b1, side })
-      u += along
-    }
+      // A walkway between two areas on the same side, as deep as the shallower of the two.
+      if (i < rooms.length - 1) floors.push(place(side, u + along, u + along + AISLE, 0, Math.min(out, rooms[i + 1].size[1])))
+      u += along + AISLE
+    })
   }
+  for (const [a0, b0, a1, b1] of floors) raw.push({ kind: 'floor', name: '', accent: '#9aa6b4', flavor: 'data', agents: 0, a0, b0, a1, b1, side: '-b' })
 
-  // Into a grid with the ground around it.
-  const minA = Math.min(...raw.map((s) => s.a0)) - MARGIN
-  const minB = Math.min(...raw.map((s) => s.b0)) - MARGIN
-  const maxA = Math.max(...raw.map((s) => s.a1)) + MARGIN
-  const maxB = Math.max(...raw.map((s) => s.b1)) + MARGIN
-  const w = maxA - minA
-  const h = maxB - minB
-  const spaces: Space[] = raw.map((s, id) => ({ ...s, id, a0: s.a0 - minA, a1: s.a1 - minA, b0: s.b0 - minB, b1: s.b1 - minB }))
+  const minA = Math.min(...raw.map((s) => s.a0))
+  const minB = Math.min(...raw.map((s) => s.b0))
+  const maxA = Math.max(...raw.map((s) => s.a1))
+  const maxB = Math.max(...raw.map((s) => s.b1))
+  const offA = margin - minA
+  const offB = margin - minB
+  const w = maxA - minA + 2 * margin
+  const h = maxB - minB + 2 * margin
+  const spaces: Space[] = raw.map((s, id) => ({ ...s, id, a0: s.a0 + offA, a1: s.a1 + offA, b0: s.b0 + offB, b1: s.b1 + offB }))
   const cells = new Int16Array(w * h).fill(-1)
-  for (const s of spaces) for (let b = s.b0; b < s.b1; b++) for (let a = s.a0; a < s.a1; a++) if (cells[b * w + a] < 0 || s.kind !== 'corridor') cells[b * w + a] = s.id
-
-  // Doors: corridors open fully onto the hall and onto each other; a room gets a two-tile door
-  // in the middle of what it shares with a corridor.
+  // Floor under everything, then the areas over it.
+  for (const s of [...spaces.filter((x) => x.kind === 'floor'), ...spaces.filter((x) => x.kind !== 'floor')])
+    for (let b = s.b0; b < s.b1; b++) for (let a = s.a0; a < s.a1; a++) cells[b * w + a] = s.id
+  // Every area opens towards Shiori: three tiles in the middle of the side that faces her.
   const doors = new Set<string>()
-  const kindOf = (id: number) => (id < 0 ? null : spaces[id].kind)
-  const shared = new Map<string, string[]>()
-  for (let b = 0; b < h; b++) {
-    for (let a = 0; a < w; a++) {
-      const here = cells[b * w + a]
-      if (here < 0) continue
-      for (const dir of ['a', 'b'] as const) {
-        const na = dir === 'a' ? a + 1 : a
-        const nb = dir === 'b' ? b + 1 : b
-        if (na >= w || nb >= h) continue
-        const there = cells[nb * w + na]
-        if (there < 0 || there === here) continue
-        const kinds = [kindOf(here), kindOf(there)]
-        const key = edgeKey(a, b, dir)
-        if (kinds.every((k) => k === 'corridor' || k === 'hall')) doors.add(key)
-        else if (kinds.includes('corridor')) {
-          const pair = `${Math.min(here, there)}-${Math.max(here, there)}`
-          shared.set(pair, [...(shared.get(pair) ?? []), key])
-        }
-      }
+  for (const s of spaces) {
+    if (s.kind !== 'office' && s.kind !== 'lounge') continue
+    const mid = (x0: number, x1: number) => Math.floor((x0 + x1) / 2) - 1
+    for (let k = 0; k < 3; k++) {
+      if (s.side === '-b') doors.add(edgeKey(mid(s.a0, s.a1) + k, s.b1 - 1, 'b'))
+      if (s.side === '+b') doors.add(edgeKey(mid(s.a0, s.a1) + k, s.b0 - 1, 'b'))
+      if (s.side === '-a') doors.add(edgeKey(s.a1 - 1, mid(s.b0, s.b1) + k, 'a'))
+      if (s.side === '+a') doors.add(edgeKey(s.a0 - 1, mid(s.b0, s.b1) + k, 'a'))
     }
   }
-  for (const keys of shared.values()) {
-    const mid = Math.floor(keys.length / 2)
-    for (const k of keys.slice(Math.max(0, mid - 1), mid + 1)) doors.add(k)
-  }
-  return { w, h, spaces, cells, doors, hall: spaces[0] }
+  return { w, h, spaces, cells, doors, hall: spaces[1], box: [minA + offA, minB + offB, maxA + offA, maxB + offB] }
 }
 
 /** The space at a tile, or null outside. */
@@ -191,11 +173,19 @@ export function spaceAt(plan: Plan, a: number, b: number): Space | null {
   return id < 0 ? null : plan.spaces[id]
 }
 
-/** Whether a wall stands between a tile and its neighbour along +a or +b. */
-export function wallBetween(plan: Plan, a: number, b: number, dir: 'a' | 'b'): boolean {
+/** What stands on the edge between a tile and its neighbour: nothing, the building's wall, or a glass partition. */
+export function edgeKind(plan: Plan, a: number, b: number, dir: 'a' | 'b'): 'none' | 'wall' | 'glass' {
   const here = spaceAt(plan, a, b)
   const there = spaceAt(plan, dir === 'a' ? a + 1 : a, dir === 'b' ? b + 1 : b)
-  if (!here && !there) return false
-  if (here && there && here.id === there.id) return false
-  return !plan.doors.has(edgeKey(a, b, dir))
+  if (!here && !there) return 'none'
+  if (!here || !there) return 'wall'
+  if (here.id === there.id) return 'none'
+  const open = (s: Space) => s.kind === 'floor' || s.kind === 'hall'
+  if (open(here) && open(there)) return 'none'
+  return plan.doors.has(edgeKey(a, b, dir)) ? 'none' : 'glass'
+}
+
+/** Whether something stands between a tile and its neighbour along +a or +b: nobody walks through. */
+export function wallBetween(plan: Plan, a: number, b: number, dir: 'a' | 'b'): boolean {
+  return edgeKind(plan, a, b, dir) !== 'none'
 }

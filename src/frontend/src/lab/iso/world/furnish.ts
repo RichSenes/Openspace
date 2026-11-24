@@ -61,14 +61,20 @@ const T = 8
  * Plans and furnishes the lab: a room whose desks do not seat everybody is made bigger and the
  * lab planned again, until all have a seat.
  */
-export function planLab(offices: OfficeSpec[]): { plan: Plan; furnished: Furnished } {
+export function planLab(offices: OfficeSpec[], margin = 8): { plan: Plan; furnished: Furnished } {
   const more: Record<string, number> = {}
   for (let round = 0; ; round++) {
-    const plan = makePlan(offices, more)
+    const plan = makePlan(offices, more, margin)
     const furnished = furnish(plan)
+    // Only places someone can walk to count: the rest are dropped, and their area grows.
+    const start = furnished.spots.find((p) => p.use === 'shiori')
+    if (start) {
+      const reach = reachable(plan, furnished.blocked, [Math.floor(start.a / T), Math.floor(start.b / T)])
+      furnished.spots = furnished.spots.filter((p) => reach.has(Math.floor(p.b / T) * plan.w + Math.floor(p.a / T)))
+    }
     const short = plan.spaces.filter((s) => s.kind === 'office' && furnished.spots.filter((p) => p.use === 'seat' && p.room === s.id).length < s.agents)
-    if (!short.length || round >= 6) return { plan, furnished }
-    for (const s of short) more[s.name] = (more[s.name] ?? 0) + 14
+    if (!short.length || round >= 10) return { plan, furnished }
+    for (const s of short) more[s.name] = (more[s.name] ?? 0) + 24
   }
 }
 
@@ -85,10 +91,22 @@ export function furnish(plan: Plan): Furnished {
   const hall = plan.hall
   const ca = (hall.a0 + hall.a1) / 2
   const cb = (hall.b0 + hall.b1) / 2
-  for (let k = 0; k < 12; k++) {
-    const th = (k / 12) * Math.PI * 2
-    const a = ca + Math.cos(th) * 5.4
-    const b = cb + Math.sin(th) * 5.4
+  // Plants at the corners of her area.
+  for (const [a, b] of [
+    [hall.a0 + 1, hall.b0 + 1],
+    [hall.a1 - 2, hall.b0 + 1],
+    [hall.a0 + 1, hall.b1 - 2],
+    [hall.a1 - 2, hall.b1 - 2],
+  ]) {
+    items.push({ kind: 'plant', a: a * T + 1, b: b * T + 1, flip: false, room: hall.id, accent: hall.accent, seed: a * 7 + b })
+    blocked[b * plan.w + a] = 1
+  }
+  // Nobody walks into her dome or onto the platform's edge.
+  for (let b = hall.b0; b < hall.b1; b++) for (let a = hall.a0; a < hall.a1; a++) if (Math.hypot(a + 0.5 - ca, b + 0.5 - cb) < 5.6) blocked[b * plan.w + a] = 1
+  for (let k = 0; k < 16; k++) {
+    const th = (k / 16) * Math.PI * 2
+    const a = ca + Math.cos(th) * 6.6
+    const b = cb + Math.sin(th) * 6.6
     const ta = Math.floor(a)
     const tb = Math.floor(b)
     if (ta < hall.a0 || tb < hall.b0 || ta >= hall.a1 || tb >= hall.b1) continue
@@ -121,10 +139,11 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
   const rect = (a: number, b: number, da: number, db: number) => {
     for (let tb = Math.floor(b / T); tb <= Math.floor((b + db - 0.01) / T); tb++)
       for (let ta = Math.floor(a / T); ta <= Math.floor((a + da - 0.01) / T); ta++) {
-        // A tile is taken only if the piece covers its middle.
-        const cx = ta * T + 4
-        const cy = tb * T + 4
-        if (cx >= a && cx < a + da && cy >= b && cy < b + db) blocked[tb * plan.w + ta] = 1
+        // A tile is taken as soon as the piece covers a real part of it: nobody walks through
+        // the corner of a desk.
+        const oa = Math.min(a + da, (ta + 1) * T) - Math.max(a, ta * T)
+        const ob = Math.min(b + db, (tb + 1) * T) - Math.max(b, tb * T)
+        if (oa >= 2 && ob >= 2) blocked[tb * plan.w + ta] = 1
       }
   }
   const put = (kind: ItemKind, ta: number, tb: number, flip = false, variant?: string) => {
@@ -151,7 +170,14 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
     }
   }
 
-  // Against the back walls: what the kind of work needs.
+  // A walkway kept free from the opening straight across the area: everyone can get in and out.
+  const midA = Math.floor((room.a0 + room.a1) / 2) - 1
+  const midB = Math.floor((room.b0 + room.b1) / 2) - 1
+  if (room.side === '-b' || room.side === '+b') mark(midA, room.b0, 3, room.b1 - room.b0)
+  else mark(room.a0, midB, room.a1 - room.a0, 3)
+
+  // Against the back walls: what the kind of work needs. Not against the side that opens
+  // towards Shiori.
   const n = Math.max(1, room.agents)
   const wallItems: ItemKind[] =
     room.kind === 'lounge'
@@ -166,7 +192,7 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
   const boards = ['math', 'diagram', 'graph']
   let wall = 0
   // Along the wall at the back (low b), facing +b; then along the other back wall, facing +a.
-  for (let a = room.a0 + 1; a < room.a1 - 1 && wall < wallItems.length;) {
+  for (let a = room.a0 + 1; room.side !== '+b' && a < room.a1 - 1 && wall < wallItems.length;) {
     const kind = wallItems[wall]
     const [w, h] = FOOT[kind].tiles
     if (a + w <= room.a1 - 1 && fits(a, room.b0, w, h + 1)) {
@@ -180,7 +206,7 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
       wall++
     } else a++
   }
-  for (let b = room.b0 + 2; b < room.b1 - 1 && wall < wallItems.length;) {
+  for (let b = room.b0 + (room.side === '+b' ? 1 : 2); room.side !== '+a' && b < room.b1 - 1 && wall < wallItems.length;) {
     const kind = wallItems[wall]
     const [w, h] = FOOT[kind].tiles
     if (b + w <= room.b1 - 1 && fits(room.a0, b, h + 1, w)) {
@@ -256,6 +282,29 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
       mark(a, b, 1, 1)
     }
   }
+}
+
+/** Every tile someone can walk to from a tile. */
+export function reachable(plan: Plan, blocked: Uint8Array, from: [number, number]): Set<number> {
+  const W = plan.w
+  const seen = new Set<number>([from[1] * W + from[0]])
+  const queue = [from]
+  while (queue.length) {
+    const [a, b] = queue.pop()!
+    const next: [number, number, boolean][] = [
+      [a + 1, b, !wallBetween(plan, a, b, 'a')],
+      [a - 1, b, a > 0 && !wallBetween(plan, a - 1, b, 'a')],
+      [a, b + 1, !wallBetween(plan, a, b, 'b')],
+      [a, b - 1, b > 0 && !wallBetween(plan, a, b - 1, 'b')],
+    ]
+    for (const [na, nb, open] of next) {
+      const k = nb * W + na
+      if (!open || na < 0 || nb < 0 || na >= W || nb >= plan.h || seen.has(k) || plan.cells[k] < 0 || blocked[k]) continue
+      seen.add(k)
+      queue.push([na, nb])
+    }
+  }
+  return seen
 }
 
 /** Tile walking: four directions, no walls crossed, no furniture stepped on. A plain A*. */

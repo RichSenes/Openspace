@@ -19,6 +19,8 @@ export interface Look {
   shirt: string
   glasses?: boolean
   trousers?: string
+  /** A coat other than the lab's white one: people in the street. */
+  coat?: string
 }
 
 export const W = 32
@@ -27,10 +29,6 @@ export const H = 58
 export const FOOT_X = 16
 export const FOOT_Y = 55
 
-const COAT = '#e6ecf2'
-const COAT_SHADE = '#b8c4d0'
-const COAT_DEEP = '#93a1b2'
-const COAT_LIGHT = '#f8fbfd'
 const OUTLINE = '#1a2230'
 const EYE = '#251d2c'
 
@@ -46,6 +44,10 @@ export const FRAMES: Record<Pose, number> = {
 
 export function paintScientist(look: Look, back: boolean, pose: Pose, frame: number): Painter {
   const p = new Painter(W, H)
+  const COAT = look.coat ?? '#e6ecf2'
+  const COAT_SHADE = look.coat ? mix(look.coat, '#0b1020', 0.22) : '#b8c4d0'
+  const COAT_DEEP = look.coat ? mix(look.coat, '#0b1020', 0.4) : '#93a1b2'
+  const COAT_LIGHT = look.coat ? mix(look.coat, '#ffffff', 0.25) : '#f8fbfd'
   const skinShade = mix(look.skin, '#5a2a30', 0.22)
   const hairShade = mix(look.hair, '#0a0a14', 0.35)
   const hairLight = mix(look.hair, '#ffffff', 0.25)

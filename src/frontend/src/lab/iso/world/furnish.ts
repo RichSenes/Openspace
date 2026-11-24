@@ -1,3 +1,4 @@
+import { DECOR_FOOT, type DecorKind } from './decor'
 import { hashOf, makePlan, wallBetween, type OfficeSpec, type Plan, type Space } from './layout'
 
 /**
@@ -8,7 +9,7 @@ import { hashOf, makePlan, wallBetween, type OfficeSpec, type Plan, type Space }
  * Positions are in floor units (eight to a tile).
  */
 
-export type ItemKind = 'bench' | 'corner' | 'holo' | 'microscope' | 'capsule' | 'rack' | 'board' | 'coffee' | 'sofa' | 'plant' | 'chair' | 'totem'
+export type ItemKind = 'decor' | 'bench' | 'corner' | 'holo' | 'microscope' | 'capsule' | 'rack' | 'board' | 'coffee' | 'sofa' | 'plant' | 'chair' | 'totem'
 
 export interface Item {
   kind: ItemKind
@@ -34,6 +35,7 @@ export interface Spot {
 
 /** Footprints in tiles (along a, along b) when not mirrored, and in floor units. */
 export const FOOT: Record<ItemKind, { tiles: [number, number]; units: [number, number] }> = {
+  decor: { tiles: [1, 1], units: [6, 6] },
   bench: { tiles: [5, 2], units: [40, 12] },
   corner: { tiles: [4, 4], units: [30, 26] },
   holo: { tiles: [3, 3], units: [18, 18] },
@@ -134,6 +136,10 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
       return
     }
     const [ua, ub] = FOOT[kind].units
+    rect(a, b, ...((flip ? [ub, ua] : [ua, ub]) as [number, number]))
+  }
+  const blockDecor = (d: DecorKind, a: number, b: number, flip: boolean) => {
+    const [ua, ub] = DECOR_FOOT[d]
     rect(a, b, ...((flip ? [ub, ua] : [ua, ub]) as [number, number]))
   }
   const rect = (a: number, b: number, da: number, db: number) => {
@@ -270,6 +276,39 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
         mark(a - 1, b - 1, 5, 5)
         break
       }
+    }
+  }
+  // The small things of a lived-in place, along the walls and partitions: shelves and
+  // cabinets against them, bins, boxes, lamps, a coat stand, an armchair here and there.
+  const along: DecorKind[] =
+    room.kind === 'lounge'
+      ? ['shelf', 'armchair', 'lamp', 'armchair', 'cooler']
+      : room.flavor === 'research'
+        ? ['shelf', 'cabinet', 'boxes', 'cooler', 'bin']
+        : room.flavor === 'creative'
+          ? ['shelf', 'lamp', 'armchair', 'boxes', 'coats']
+          : ['cabinet', 'printer', 'shelf', 'bin', 'coats', 'boxes']
+  const rd = (k: number) => hashOf(room.name, 100 + k)
+  let tries = 0
+  for (let b = room.b0; b < room.b1; b++) {
+    for (let a = room.a0; a < room.a1; a++) {
+      if (!free(a, b)) continue
+      const backB = b === room.b0 && room.side !== '+b'
+      const backA = a === room.a0 && room.side !== '+a'
+      const edge = backB || backA || a === room.a1 - 1 || b === room.b1 - 1
+      if (!edge || rd(tries++) > 0.42) continue
+      const kind = along[Math.floor(rd(tries++) * along.length)]
+      const flip = !backB && backA
+      const [ua, ub] = DECOR_FOOT[kind]
+      const [wa, wb] = flip ? [Math.ceil(ub / T), Math.ceil(ua / T)] : [Math.ceil(ua / T), Math.ceil(ub / T)]
+      // Shelves and cabinets only against a back wall, where their front can be seen.
+      if ((kind === 'shelf' || kind === 'cabinet' || kind === 'printer') && !backB && !backA) continue
+      if (!fits(a, b, wa, wb)) continue
+      const pa = a * T + 1
+      const pb = b * T + 1
+      items.push({ kind: 'decor', a: pa, b: pb, flip, room: room.id, accent: room.accent, seed: seed + tries, variant: kind })
+      blockDecor(kind, pa, pb, flip)
+      mark(a, b, wa, wb)
     }
   }
   for (const [a, b] of [

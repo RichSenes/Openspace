@@ -2,6 +2,7 @@ import { box, YF, type Sprite } from '../iso'
 import { benchDesk, capsule, chair, coffeeCounter, cornerDesk, holoTable, microscopeBench, mirrored, plant, rack, sofa, totem, whiteboard, type BoardKind, type Prop } from '../props'
 import { mix, noise, Painter, toCanvas } from '../px'
 import { makeCity, type City } from './city'
+import { decor, type DecorKind } from './decor'
 import { planLab, type Furnished, type Item } from './furnish'
 import { edgeKind, hashOf, spaceAt, type OfficeSpec, type Plan, type Space } from './layout'
 
@@ -64,12 +65,15 @@ export interface World {
 
 const cache = new Map<string, Prop>()
 function propFor(item: Item): Prop {
-  const key = `${item.kind}|${item.accent}|${item.variant ?? ''}|${item.seed % 3}|${item.flip}`
+  const key = `${item.kind}|${item.accent}|${item.variant ?? ''}|${item.seed % (item.kind === 'decor' ? 6 : 3)}|${item.flip}`
   let prop = cache.get(key)
   if (!prop) {
     const s = item.seed % 3
     const liquids = ['#37d6a0', '#4cc3ff', '#b98cff']
     switch (item.kind) {
+      case 'decor':
+        prop = decor((item.variant ?? 'bin') as DecorKind, item.accent, item.seed)
+        break
       case 'bench':
         prop = benchDesk(item.accent, s + 1)
         break
@@ -261,7 +265,13 @@ export function buildWorld(offices: OfficeSpec[], viewW: number, viewH: number):
   const height = viewH
   const hall = plan.hall
   const centre: [number, number] = [((hall.a0 + hall.a1) / 2) * T, ((hall.b0 + hall.b1) / 2) * T]
-  const city = makeCity(plan)
+  // Only what would show on the painted world is made.
+  const seen = (a0: number, b0: number, a1: number, b1: number) => {
+    const xs = [screen(a0, b0)[0], screen(a1, b0)[0], screen(a0, b1)[0], screen(a1, b1)[0]]
+    const ys = [screen(a0, b0)[1], screen(a1, b1)[1]]
+    return Math.max(...xs) > -40 && Math.min(...xs) < width + 40 && Math.max(...ys) > -40 && Math.min(...ys) - 240 < height + 40
+  }
+  const city = makeCity(plan, seen)
 
   const p = new Painter(width, height)
   const mask = new Painter(width, height)

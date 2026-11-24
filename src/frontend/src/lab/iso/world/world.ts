@@ -6,6 +6,7 @@ import { FOOT_X, FOOT_Y, facingOf, scientistFrames, type Facing, type Frames, ty
 import { buildWorld, T, tint, type World } from './build'
 import { findPath, type Spot } from './furnish'
 import { hashOf, type OfficeSpec } from './layout'
+import { label } from './decor'
 import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from './sky'
 
 /**
@@ -47,11 +48,19 @@ const STYLES: HairStyle[] = ['short', 'long', 'curly', 'bun', 'pony']
 
 export interface Lab {
   world: World
-  draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions): void
+  /** Paints the view: a window of `viewW` × `viewH` world pixels, the lab in its middle. */
+  draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions, viewW: number, viewH: number): void
 }
 
-export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): Lab {
-  const world = buildWorld(offices, viewW, viewH)
+/**
+ * The world is painted once, wide enough for a very large screen; changing the size of the page
+ * only changes the window onto it, always centred on the lab.
+ */
+export const WORLD_W = 2880
+export const WORLD_H = 1800
+
+export function makeLab(offices: OfficeSpec[]): Lab {
+  const world = buildWorld(offices, WORLD_W, WORLD_H)
   const { plan, furnished, screen, width, height } = world
   const brain: Brain = makeBrain(REFERENCE)
   const r = rand(Math.floor(hashOf(offices.map((o) => o.name).join(), 8) * 1e6))
@@ -81,6 +90,8 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
     }
   })
 
+  // Each office's name, floating over its far corner: easier than telling colours apart.
+  const names = plan.spaces.filter((s) => s.kind === 'office' || s.kind === 'lounge').map((s) => ({ canvas: label(s.name, s.accent), at: screen((s.a0 + 1.5) * T, (s.b0 + 1.5) * T, 46) }))
   const tileOf = (a: number, b: number): [number, number] => [Math.floor(a / T), Math.floor(b / T)]
   const goTo = (ag: Agent, spot: Spot, act: Agent['act']) => {
     const path = findPath(plan, furnished.blocked, tileOf(ag.a, ag.b), tileOf(spot.a, spot.b))
@@ -153,36 +164,30 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
     decide(ag, t)
   }
 
-  // Layers, all the size of the world.
-  const layer = () => {
-    const c = document.createElement('canvas')
-    c.width = width
-    c.height = height
-    return c
-  }
+  // Layers the size of the view, made again when it changes.
+  let vw = 0
+  let vh = 0
+  const layer = () => document.createElement('canvas')
   const light = layer()
   const glow = layer()
   const rain = layer()
-  const small = document.createElement('canvas')
-  small.width = Math.ceil(width / 4)
-  small.height = Math.ceil(height / 4)
+  const tinted = layer()
+  const small = layer()
   const lctx = light.getContext('2d')!
   const gctx = glow.getContext('2d')!
   const rctx = rain.getContext('2d')!
+  const tctx = tinted.getContext('2d')!
   const sctx = small.getContext('2d')!
-  const indoorTint = new Map<string, HTMLCanvasElement>()
-  const indoorAs = (colour: string) => {
-    let c = indoorTint.get(colour)
-    if (!c) {
-      c = layer()
-      const x = c.getContext('2d')!
-      x.drawImage(world.indoor, 0, 0)
-      x.globalCompositeOperation = 'source-in'
-      x.fillStyle = colour
-      x.fillRect(0, 0, width, height)
-      indoorTint.set(colour, c)
+  const fit = (w: number, h: number) => {
+    if (w === vw && h === vh) return
+    vw = w
+    vh = h
+    for (const c of [light, glow, rain, tinted]) {
+      c.width = w
+      c.height = h
     }
-    return c
+    small.width = Math.ceil(w / 4)
+    small.height = Math.ceil(h / 4)
   }
   const pool = (ctx: CanvasRenderingContext2D, x: number, y: number, rad: number, colour: string, strength: number) => {
     ctx.save()
@@ -199,11 +204,17 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
     ctx.fill()
     ctx.restore()
   }
-  const drops = Array.from({ length: 420 }, () => ({ x: r() * width, y: r() * height, s: 0.6 + r() * 0.6 }))
+  const drops = Array.from({ length: 520 }, () => ({ x: r(), y: r(), s: 0.6 + r() * 0.6 }))
 
   return {
     world,
-    draw(ctx, t, dt, when) {
+    draw(ctx, t, dt, when, viewW, viewH) {
+      fit(viewW, viewH)
+      // Where the view sits on the world: its middle on the lab's.
+      const ox = Math.round((width - vw) / 2)
+      const oy = Math.round((height - vh) / 2)
+      const inWorld = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, -ox, -oy)
+      const plain = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, 0, 0)
       for (const ag of agents) step(ag, t, dt)
       const storm = stormAt(t, when.weather)
       const sky = cityBurns(when.hour) ? mix(skyColour(when.hour, when.weather), '#ff5a2a', 0.45) : skyColour(when.hour, when.weather)
@@ -305,17 +316,23 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
         })
       }
       // Only what is on screen.
-      const sorted = order(items.filter((it) => it.box[2] > 0 && it.box[0] < width && it.box[3] > 0 && it.box[1] < height))
+      const sorted = order(items.filter((it) => it.box[2] > ox && it.box[0] < ox + vw && it.box[3] > oy && it.box[1] < oy + vh))
 
       // Under white light.
       ctx.imageSmoothingEnabled = false
       ctx.globalCompositeOperation = 'source-over'
-      ctx.drawImage(world.ground, 0, 0)
+      plain(ctx)
+      ctx.fillStyle = '#0d131c'
+      ctx.fillRect(0, 0, vw, vh)
+      ctx.drawImage(world.ground, ox, oy, vw, vh, 0, 0, vw, vh)
+      inWorld(ctx)
       for (const it of sorted) it.draw(ctx)
 
       // What gives light, each hidden by whatever stands in front of it.
       gctx.globalCompositeOperation = 'source-over'
-      gctx.clearRect(0, 0, width, height)
+      plain(gctx)
+      gctx.clearRect(0, 0, vw, vh)
+      inWorld(gctx)
       for (const it of sorted) {
         gctx.globalCompositeOperation = 'destination-out'
         it.draw(gctx)
@@ -328,10 +345,19 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
       const outdoor = storm.flash > 0 ? mix(groundLight(when.hour, when.weather), '#ffffff', storm.flash * 0.7) : groundLight(when.hour, when.weather)
       const lampsOn = when.lamps && !storm.lampsDown
       const inside = lampsOn ? '#737c8f' : storm.lampsDown && when.lamps ? '#2a3044' : '#161b2b'
+      plain(lctx)
       lctx.globalCompositeOperation = 'source-over'
       lctx.fillStyle = outdoor
-      lctx.fillRect(0, 0, width, height)
-      lctx.drawImage(indoorAs(inside), 0, 0)
+      lctx.fillRect(0, 0, vw, vh)
+      // Indoors, the lamps' colour: the building's mask, tinted.
+      tctx.globalCompositeOperation = 'source-over'
+      tctx.clearRect(0, 0, vw, vh)
+      tctx.drawImage(world.indoor, ox, oy, vw, vh, 0, 0, vw, vh)
+      tctx.globalCompositeOperation = 'source-in'
+      tctx.fillStyle = inside
+      tctx.fillRect(0, 0, vw, vh)
+      lctx.drawImage(tinted, 0, 0)
+      inWorld(lctx)
       lctx.globalCompositeOperation = 'lighter'
       for (const pl of world.pools) {
         if (pl.kind === 'ceiling' && !lampsOn) continue
@@ -345,6 +371,7 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
         for (const l of p.prop.lights) pool(lctx, x + p.flip * l.dx, y + l.dy, l.r * 1.6, l.color, p.outdoor ? 0.9 : lampsOn ? 0.35 : 0.75)
       }
 
+      plain(ctx)
       ctx.globalCompositeOperation = 'multiply'
       ctx.drawImage(light, 0, 0)
       ctx.globalCompositeOperation = 'source-over'
@@ -356,7 +383,7 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
       ctx.imageSmoothingEnabled = true
       ctx.globalCompositeOperation = 'lighter'
       ctx.globalAlpha = lampsOn ? 0.35 : 0.8
-      ctx.drawImage(small, 0, 0, width, height)
+      ctx.drawImage(small, 0, 0, vw, vh)
       ctx.globalAlpha = 1
       ctx.imageSmoothingEnabled = false
       ctx.globalCompositeOperation = 'source-over'
@@ -364,34 +391,37 @@ export function makeLab(offices: OfficeSpec[], viewW: number, viewH: number): La
       // Rain, only outside.
       if (when.weather === 'rain' || when.weather === 'storm') {
         rctx.globalCompositeOperation = 'source-over'
-        rctx.clearRect(0, 0, width, height)
+        rctx.clearRect(0, 0, vw, vh)
         rctx.fillStyle = dark ? '#8aa0c8' : '#d8e4f4'
         for (const d of drops) {
-          const y = (d.y + t * 260 * d.s) % height
-          const x = (d.x - t * 60 * d.s + width * 4) % width
+          const y = (d.y * vh + t * 260 * d.s) % vh
+          const x = (d.x * vw - t * 60 * d.s + vw * 40) % vw
           rctx.globalAlpha = 0.5
           rctx.fillRect(Math.round(x), Math.round(y), 1, 4)
           rctx.fillRect(Math.round(x) - 1, Math.round(y) + 4, 1, 2)
         }
         rctx.globalAlpha = 1
         rctx.globalCompositeOperation = 'destination-out'
-        rctx.drawImage(world.indoor, 0, 0)
+        rctx.drawImage(world.indoor, ox, oy, vw, vh, 0, 0, vw, vh)
         ctx.drawImage(rain, 0, 0)
       }
 
       // The city fades a little towards the edges of the screen: the lab is what you look at.
-      const vg = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.35, width / 2, height / 2, Math.hypot(width, height) * 0.55)
+      const vg = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.35, vw / 2, vh / 2, Math.hypot(vw, vh) * 0.55)
       vg.addColorStop(0, 'rgba(8,12,22,0)')
       vg.addColorStop(1, 'rgba(8,12,22,0.42)')
       ctx.fillStyle = vg
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(0, 0, vw, vh)
 
       // Speech bubbles are not of the world: drawn last, never in the dark.
+      inWorld(ctx)
+      for (const n of names) ctx.drawImage(n.canvas, Math.round(n.at[0] - n.canvas.width / 2), Math.round(n.at[1]))
       for (const ag of agents) {
         if (!ag.bubble || ag.path.length) continue
         const [x, y] = screen(ag.a, ag.b)
         drawBubble(ctx, x + 6, y - 50, ag.bubble, t, ag.seed)
       }
+      plain(ctx)
     },
   }
 }

@@ -15,7 +15,7 @@ export const OY = WALL + 12
 export const SCENE_W = 600
 export const SCENE_H = Math.ceil(OY + 2 * N * YF + 16)
 export const CENTER: [number, number] = [72, 72]
-export const PLATFORM = 36
+export const PLATFORM = 40
 
 export function screenOf(a: number, b: number, z = 0): [number, number] {
   const [x, y] = iso(a, b, z)

@@ -124,26 +124,25 @@ function layout(): Placed[] {
   ]
 }
 
+/**
+ * Everyone keeps a few steps from the dome: nobody comes closer to her than this, in floor units.
+ */
+export const KEEP_AWAY = 36
+
 const PEOPLE: { look: Look; route: Step[]; start: [number, number] }[] = [
   {
     // Engineering: types, then goes to ask Shiori something and takes notes.
-    look: {
-      skin: '#f1c9a5',
-      hair: '#1d1a22',
-      style: 'short',
-      shirt: BLUE,
-      glasses: true,
-    },
+    look: { skin: '#f1c9a5', hair: '#1d1a22', style: 'short', shirt: BLUE, glasses: true },
     start: [66, 33],
     route: [
       { act: 'type', face: 'NE', secs: 6 },
-      { go: [66, 38], first: 'b' },
-      { go: [104, 38] },
-      { go: [104, 70], first: 'b' },
+      { go: [66, 35], first: 'b' },
+      { go: [110, 35] },
+      { go: [110, 66], first: 'b' },
       { act: 'notes', face: 'NW', secs: 6, bubble: 'question' },
       { act: 'think', face: 'NW', secs: 2.5, bubble: 'dots' },
-      { go: [104, 38], first: 'b' },
-      { go: [66, 38] },
+      { go: [110, 35], first: 'b' },
+      { go: [66, 35] },
       { go: [66, 33], first: 'b' },
     ],
   },
@@ -153,13 +152,13 @@ const PEOPLE: { look: Look; route: Step[]; start: [number, number] }[] = [
     start: [42, 44],
     route: [
       { act: 'type', face: 'NW', secs: 5 },
-      { go: [42, 70], first: 'b' },
-      { go: [22, 70] },
-      { go: [22, 62], first: 'b' },
+      { go: [42, 26], first: 'b' },
+      { go: [20, 26] },
+      { go: [20, 30], first: 'b' },
       { act: 'notes', face: 'NW', secs: 5 },
       { act: 'think', face: 'NW', secs: 3, bubble: 'idea' },
-      { go: [22, 70], first: 'b' },
-      { go: [42, 70] },
+      { go: [20, 26], first: 'b' },
+      { go: [42, 26] },
       { go: [42, 44], first: 'b' },
     ],
   },
@@ -190,31 +189,31 @@ const PEOPLE: { look: Look; route: Step[]; start: [number, number] }[] = [
     route: [
       { act: 'type', face: 'NE', secs: 5 },
       { go: [33, 36], first: 'b' },
-      { go: [106, 36] },
-      { go: [106, 30], first: 'b' },
+      { go: [108, 36] },
       { act: 'think', face: 'NE', secs: 3, bubble: 'idea' },
-      { go: [106, 100], first: 'b' },
+      { go: [110, 36] },
+      { go: [110, 100], first: 'b' },
       { go: [128, 100] },
       { act: 'coffee', face: 'NW', secs: 6, bubble: 'chat' },
-      { go: [106, 100] },
-      { go: [106, 36], first: 'b' },
+      { go: [110, 100] },
+      { go: [110, 36], first: 'b' },
       { go: [33, 36] },
       { go: [33, 16], first: 'b' },
     ],
   },
   {
-    // Research: goes to Shiori with a question, then to the board.
+    // Research: goes to Shiori with a question, then back to the board.
     look: { skin: '#c98e66', hair: '#2a2a33', style: 'pony', shirt: GREEN },
     start: [22, 94],
     route: [
       { act: 'notes', face: 'NE', secs: 4 },
-      { go: [22, 102], first: 'b' },
-      { go: [72, 102] },
-      { go: [72, 107], first: 'b' },
+      { go: [22, 100], first: 'b' },
+      { go: [46, 100] },
+      { go: [46, 106], first: 'b' },
       { act: 'notes', face: 'NE', secs: 6, bubble: 'question' },
       { act: 'think', face: 'NE', secs: 3, bubble: 'idea' },
-      { go: [72, 102], first: 'b' },
-      { go: [22, 102] },
+      { go: [46, 100], first: 'b' },
+      { go: [22, 100] },
       { go: [22, 94], first: 'b' },
     ],
   },
@@ -373,7 +372,7 @@ export function makeScene(): Scene {
   const brain = makeBrain()
   const props = layout()
   const people = makePeople()
-  const DOME = 33
+  const DOME = 34
   return {
     room,
     brain,

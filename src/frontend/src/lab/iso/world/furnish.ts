@@ -248,9 +248,15 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
   }
   const block = (kind: ItemKind, a: number, b: number, flip: boolean) => {
     if (kind === 'corner') {
-      // An L: its two arms, not the corner between them, where its seat is.
-      rect(a, b, ...((flip ? [12, 30] : [30, 12]) as [number, number]))
-      rect(a, b, ...((flip ? [26, 12] : [12, 26]) as [number, number]))
+      // An L: its long arm at the front, its side arm at the back on the left; not the corner
+      // between them, where its seat is.
+      if (flip) {
+        rect(a + 14, b, 12, 30)
+        rect(a, b, 14, 12)
+      } else {
+        rect(a, b + 14, 30, 12)
+        rect(a, b, 12, 14)
+      }
       return
     }
     const [ua, ub] = FOOT[kind].units
@@ -346,36 +352,44 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
   // Desks in rows, each with a free row in front for the seats and a free tile around.
   const first: ItemKind = room.kind === 'lounge' ? 'sofa' : room.flavor === 'code' ? 'bench' : room.flavor === 'research' ? 'microscope' : 'corner'
   let toSeat = room.kind === 'lounge' ? 1 : n
-  // Facing +b first (people sit with their back to you); where that does not fit, along b; if
-  // the room's own kind of desk does not fit everyone, smaller lab benches take the rest.
+  // Desks face you: whoever works sits behind, facing the person looking at the lab. Each room
+  // leans one way (desks along a, people facing left; or along b, facing right) and takes the
+  // other where that fits better; if its own kind of desk does not fit everyone, lab benches
+  // take the rest.
+  const leans = hashOf(room.name, 7) > 0.5
   for (const [desk, flip] of [
-    [first, false],
-    [first, true],
-    ['microscope', false],
-    ['microscope', true],
+    [first, leans],
+    [first, !leans],
+    ['microscope', leans],
+    ['microscope', !leans],
   ] as [ItemKind, boolean][]) {
     if (room.kind === 'lounge' && desk !== 'sofa') continue
     const [dw, dh] = FOOT[desk].tiles
     const [w, h] = flip ? [dh, dw] : [dw, dh]
+    const sofa = desk === 'sofa'
+    // The desk with its seats' row (behind it) or the sofa with its row in front, and a free tile to pass.
+    const region = (a: number, b: number): [number, number, number, number] =>
+      sofa ? [a - 1, b, w + 2, h + 1] : desk === 'corner' ? [a - 1, b - 1, w + 2, h + 2] : flip ? [a - 1, b - 1, w + 1, h + 2] : [a - 1, b - 1, w + 2, h + 1]
     for (let b = room.b0 + 2; b + h + 1 <= room.b1 && toSeat > 0; b++) {
-      for (let a = room.a0 + 1; a + w + 1 <= room.a1 && toSeat > 0; a++) {
-        // The desk, its seat row in front, a free tile at its ends to pass.
-        if (!fits(a - 1, b, w + 2 + (flip ? 1 : 0), h + (flip ? 0 : 1))) continue
+      for (let a = room.a0 + 2; a + w + 1 <= room.a1 && toSeat > 0; a++) {
+        if (!fits(...region(a, b))) continue
         put(desk, a, b, flip)
-        mark(a - 1, b, w + 2 + (flip ? 1 : 0), h + (flip ? 0 : 1))
+        mark(...region(a, b))
         const ua = a * T
         const ub = b * T
-        // A seat in front of the desk: +b when it faces +b, +a when it is turned.
+        // A seat behind the desk: -b when it runs along a (facing you, to the left), -a when it runs along b (to the right).
         const seat = (along: number, out: number) =>
           spots.push(
-            flip
-              ? { a: ua + out, b: ub + along, face: 'NW', room: room.id, use: desk === 'sofa' ? 'sofa' : 'seat' }
-              : { a: ua + along, b: ub + out, face: 'NE', room: room.id, use: desk === 'sofa' ? 'sofa' : 'seat' },
+            sofa
+              ? { a: ua + along, b: ub + out, face: 'NE', room: room.id, use: 'sofa' }
+              : flip
+                ? { a: ua + out, b: ub + along, face: 'SE', room: room.id, use: 'seat' }
+                : { a: ua + along, b: ub + out, face: 'SW', room: room.id, use: 'seat' },
           )
-        if (desk === 'bench') for (let k = 0; k < 3 && toSeat > 0; k++, toSeat--) seat(8 + k * 13, 20)
-        else if (desk === 'microscope') for (let k = 0; k < 2 && toSeat > 0; k++, toSeat--) seat(8 + k * 14, 20)
+        if (desk === 'bench') for (let k = 0; k < 3 && toSeat > 0; k++, toSeat--) seat(8 + k * 13, -4)
+        else if (desk === 'microscope') for (let k = 0; k < 2 && toSeat > 0; k++, toSeat--) seat(8 + k * 14, -4)
         else if (desk === 'corner') {
-          seat(20, 18)
+          seat(20, 6)
           toSeat--
         } else {
           seat(12, 18)

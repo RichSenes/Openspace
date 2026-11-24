@@ -68,46 +68,41 @@ export function WorldLab() {
     return Math.max(1, Math.min(4, Math.floor(Math.min((vw * 0.92) / labW, (vh * 0.92) / labH))))
   }, [offices, vw, vh])
   // Never zoomed out past the world's edges: the view always fits in what is painted.
-  const least = Math.max(1, Math.ceil(Math.max(vw / WORLD_W, vh / WORLD_H)))
-  const scale = Math.min(6, Math.max(least, zoom || auto))
+  const least = Math.max(1, vw / WORLD_W, vh / WORLD_H)
   // Painted once per setup; the page's size only moves the window onto it.
   // With real offices the characters are the real ones: built once per setup, then moved by every change.
   const lab = useMemo(() => makeLab(offices, real ? { offices: [], waiting: [] } : undefined), [offices, real])
   useEffect(() => {
     if (real && world.data) lab.update(world.data)
   }, [lab, real, world.data])
-  const cw = Math.ceil(vw / scale)
-  const ch = Math.ceil(vh / scale)
   const ref = useRef<HTMLCanvasElement>(null)
-  // Where the view looks, in world pixels: the lab until it is moved.
-  const centre = useRef<[number, number] | null>(null)
-  const view = useRef({ scale, cw, ch, vw, vh })
+  // The camera: where it looks (world pixels, the lab until moved) and how close, gliding to
+  // where it is asked to be, as photos zoom; the point under the pointer stays put.
+  const cam = useRef({ centre: null as [number, number] | null, scale: 0, target: 0, anchor: [0, 0] as [number, number] })
+  const screen = useRef({ vw, vh, least, auto })
   useEffect(() => {
-    view.current = { scale, cw, ch, vw, vh }
-  }, [scale, cw, ch, vw, vh])
-  const clampCentre = (c: [number, number], w = view.current.cw, h = view.current.ch): [number, number] => [
-    Math.min(WORLD_W - w / 2, Math.max(w / 2, c[0])),
-    Math.min(WORLD_H - h / 2, Math.max(h / 2, c[1])),
-  ]
+    screen.current = { vw, vh, least, auto }
+    // A chosen zoom, or the lab's own; never past the world's edges.
+    cam.current.target = Math.min(6, Math.max(least, zoom || auto))
+    if (!cam.current.scale) cam.current.scale = cam.current.target
+  }, [vw, vh, least, auto, zoom])
+  const clampCentre = (c: [number, number], s: number): [number, number] => {
+    const { vw: w, vh: h } = screen.current
+    const cw = w / s
+    const ch = h / s
+    return [Math.min(WORLD_W - cw / 2, Math.max(cw / 2, c[0])), Math.min(WORLD_H - ch / 2, Math.max(ch / 2, c[1]))]
+  }
 
-  // The wheel (or a trackpad's pinch) zooms on the point under the pointer; dragging moves the view.
+  // The wheel (or a trackpad's pinch) zooms smoothly on the point under the pointer; dragging moves the view.
   useEffect(() => {
     const canvas = ref.current!
-    let lastWheel = 0
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      const now = performance.now()
-      if (now - lastWheel < 110 || Math.abs(e.deltaY) < 1) return
-      lastWheel = now
-      const { scale: s, vw: w, vh: h } = view.current
-      const next = Math.min(6, Math.max(Math.max(1, Math.ceil(Math.max(w / WORLD_W, h / WORLD_H))), s + (e.deltaY < 0 ? 1 : -1)))
-      if (next === s) return
-      const c = centre.current ?? [WORLD_W / 2, WORLD_H / 2]
-      const px = e.clientX - w / 2
-      const py = e.clientY - h / 2
-      const at: [number, number] = [c[0] + px / s, c[1] + py / s]
-      centre.current = clampCentre([at[0] - px / next, at[1] - py / next], Math.ceil(w / next), Math.ceil(h / next))
-      setZoom(next)
+      const c = cam.current
+      const { least: l } = screen.current
+      c.target = Math.min(6, Math.max(l, c.target * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016))))
+      c.anchor = [e.clientX, e.clientY]
+      setZoom(c.target)
     }
     let drag: { x: number; y: number } | null = null
     const onDown = (e: PointerEvent) => {
@@ -116,9 +111,9 @@ export function WorldLab() {
     }
     const onMove = (e: PointerEvent) => {
       if (!drag) return
-      const { scale: s } = view.current
-      const c = centre.current ?? [WORLD_W / 2, WORLD_H / 2]
-      centre.current = clampCentre([c[0] - (e.clientX - drag.x) / s, c[1] - (e.clientY - drag.y) / s])
+      const c = cam.current
+      const at = c.centre ?? [WORLD_W / 2, WORLD_H / 2]
+      c.centre = clampCentre([at[0] - (e.clientX - drag.x) / c.scale, at[1] - (e.clientY - drag.y) / c.scale], c.scale)
       drag = { x: e.clientX, y: e.clientY }
     }
     const onUp = () => (drag = null)
@@ -154,7 +149,27 @@ export function WorldLab() {
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      lab.draw(ctx, (now - start) / 1000, dt, when.current, ctx.canvas.width, ctx.canvas.height, centre.current ?? undefined)
+      // The zoom glides towards its target, keeping the point under the pointer where it is.
+      const c = cam.current
+      const { vw: w, vh: h } = screen.current
+      if (Math.abs(c.target - c.scale) > 0.002) {
+        const next = c.scale + (c.target - c.scale) * Math.min(1, dt * 12)
+        const at = c.centre ?? [WORLD_W / 2, WORLD_H / 2]
+        const px = c.anchor[0] - w / 2
+        const py = c.anchor[1] - h / 2
+        c.centre = clampCentre([at[0] + px / c.scale - px / next, at[1] + py / c.scale - py / next], next)
+        c.scale = next
+      }
+      // The canvas holds the view's world pixels; the page shows it at the zoom, pixels kept sharp.
+      const cw = Math.ceil(w / c.scale)
+      const ch = Math.ceil(h / c.scale)
+      if (ctx.canvas.width !== cw || ctx.canvas.height !== ch) {
+        ctx.canvas.width = cw
+        ctx.canvas.height = ch
+      }
+      ctx.canvas.style.width = `${cw * c.scale}px`
+      ctx.canvas.style.height = `${ch * c.scale}px`
+      lab.draw(ctx, (now - start) / 1000, dt, when.current, cw, ch, c.centre ?? undefined)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -169,10 +184,7 @@ export function WorldLab() {
     <main className="world-page">
       <canvas
         ref={ref}
-        width={cw}
-        height={ch}
         className="iso-canvas world-canvas"
-        style={{ width: cw * scale, height: ch * scale }}
         role="img"
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />
@@ -190,14 +202,24 @@ export function WorldLab() {
                 type="button"
                 aria-pressed={zoom === 0}
                 onClick={() => {
-                  centre.current = null
+                  cam.current.centre = null
+                  cam.current.anchor = [vw / 2, vh / 2]
                   setZoom(0)
                 }}
               >
-                Lab in view (×{Math.max(least, auto)})
+                Lab in view
               </button>
               {[1, 2, 3, 4].map((z) => (
-                <button key={z} type="button" aria-pressed={zoom === z} disabled={z < least} onClick={() => setZoom(z)}>
+                <button
+                  key={z}
+                  type="button"
+                  aria-pressed={Math.abs(zoom - z) < 0.05}
+                  disabled={z < least}
+                  onClick={() => {
+                    cam.current.anchor = [vw / 2, vh / 2]
+                    setZoom(z)
+                  }}
+                >
                   ×{z}
                 </button>
               ))}

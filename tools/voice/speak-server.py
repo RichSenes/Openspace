@@ -7,6 +7,9 @@ machine. Two engines:
   qwen    Qwen3-TTS Base (Apache-2.0): clones the voice in --voice (a folder with voice.wav and
           voice.txt, made by design-voice.py) and makes it speak Italian, English and Japanese,
           so Shiori has one voice in all three.
+  qwen-fast  the same voice through faster-qwen3-tts (MIT), which replays CUDA graphs: on an
+          RTX 3060 about twice as fast as speech, against 1.7 times slower for qwen. Wants
+          transformers 5.15 in its own environment (pip install faster-qwen3-tts transformers==5.15.1).
   kokoro  Kokoro-82M (Apache-2.0): tiny and quick, even on a processor, but each language has
           its own preset voice.
 
@@ -57,6 +60,24 @@ class Qwen:
         return wavs[0], sr
 
 
+class QwenFast(Qwen):
+    """Qwen3-TTS Base through faster-qwen3-tts: the same cloned voice, generated with CUDA graphs."""
+
+    def __init__(self, args):  # noqa: D107 - same voice folder as Qwen
+        from faster_qwen3_tts import FasterQwen3TTS
+
+        voice = Path(args.voice)
+        self.voice = voice.name
+        self.device = "cuda"
+        self.model = FasterQwen3TTS.from_pretrained(args.model)
+        self.ref = str(voice / "voice.wav")
+        self.ref_text = (voice / "voice.txt").read_text(encoding="utf-8").strip()
+
+    def speak(self, text, language):
+        wavs, sr = self.model.generate_voice_clone(text=text, language=NAMES[language], ref_audio=self.ref, ref_text=self.ref_text)
+        return wavs[0], sr
+
+
 class Kokoro:
     """Kokoro-82M: one preset voice per language."""
 
@@ -81,7 +102,7 @@ class Kokoro:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--engine", default="qwen", choices=["qwen", "kokoro"])
+    p.add_argument("--engine", default="qwen", choices=["qwen", "qwen-fast", "kokoro"])
     p.add_argument("--model", required=True, help="the model folder")
     p.add_argument("--voice", help="qwen: the folder with voice.wav and voice.txt (design-voice.py)")
     p.add_argument("--voices", default="it=if_sara,en=af_heart,ja=jf_alpha", help="kokoro: a preset voice per language")
@@ -89,10 +110,10 @@ def main():
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8177)
     args = p.parse_args()
-    if args.engine == "qwen" and not args.voice:
+    if args.engine.startswith("qwen") and not args.voice:
         raise SystemExit("speak-server: --voice is needed with qwen (make one with design-voice.py)")
 
-    engine = Qwen(args) if args.engine == "qwen" else Kokoro(args)
+    engine = {"qwen": Qwen, "qwen-fast": QwenFast, "kokoro": Kokoro}[args.engine](args)
     lock = threading.Lock()
     with lock:
         engine.speak("Ciao.", "it")  # warms up, so the first real sentence is not the slow one

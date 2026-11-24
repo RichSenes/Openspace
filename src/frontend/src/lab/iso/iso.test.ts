@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { box, iso, shades, YF } from './iso'
+import { scale2x } from './brain'
 import { Painter } from './px'
 import { advance, behind, KEEP_AWAY, makePeople, order, type Person } from './scene'
 import { CENTER } from './room'
@@ -147,5 +148,21 @@ describe('scene', () => {
       return closest
     })
     for (const d of near) expect(d).toBeGreaterThanOrEqual(KEEP_AWAY - 0.5)
+  })
+})
+
+describe('scale2x', () => {
+  it('doubles a picture and rounds its diagonal steps', () => {
+    const out = scale2x([
+      [1, null],
+      [1, 1],
+    ])
+    expect(out).toHaveLength(4)
+    expect(out[0]).toHaveLength(4)
+    // The empty corner's inner quarter is filled: the step becomes a diagonal.
+    expect(out[1][2]).toBe(1)
+    expect(out[0][3]).toBeNull()
+    // Outer corners round off too.
+    expect(out[3]).toEqual([null, 1, 1, 1])
   })
 })

@@ -147,14 +147,39 @@ const LOCAL = import.meta.glob<{ default: PixelPicture }>('./local/brain-referen
 export const REFERENCE: PixelPicture | null = Object.values(LOCAL)[0]?.default ?? null
 
 /**
- * The reference picture, each of its pixels drawn as 2×2, sunk in the liquid as the drawn one
- * is; its darkest reds are the furrows the signals run along.
+ * Scale2x: each pixel becomes four, and where two neighbours agree across a corner the corner
+ * takes their colour. Staircases become smooth diagonals, as if drawn at the doubled size.
+ */
+export function scale2x(rows: (number | null)[][]): (number | null)[][] {
+  const h = rows.length
+  const w = rows[0].length
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? null : rows[y][x])
+  const out: (number | null)[][] = Array.from({ length: h * 2 }, () => new Array<number | null>(w * 2).fill(null))
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const P = at(x, y)
+      const A = at(x, y - 1)
+      const B = at(x + 1, y)
+      const C = at(x - 1, y)
+      const D = at(x, y + 1)
+      out[2 * y][2 * x] = C === A && C !== D && A !== B ? A : P
+      out[2 * y][2 * x + 1] = A === B && A !== C && B !== D ? B : P
+      out[2 * y + 1][2 * x] = D === C && D !== B && C !== A ? C : P
+      out[2 * y + 1][2 * x + 1] = B === D && B !== A && D !== C ? D : P
+    }
+  }
+  return out
+}
+
+/**
+ * The reference picture, doubled with Scale2x so its edges are as fine as the room's, sunk in the
+ * liquid as the drawn one is; its darkest reds are the furrows the signals run along.
  */
 export function paintPicture(pic: PixelPicture): BrainArt {
-  const SC = 2
-  const w = pic.rows[0].length * SC
-  const h = pic.rows.length * SC
-  const above = Math.round(h * 0.4)
+  const rows = scale2x(pic.rows)
+  const w = rows[0].length
+  const h = rows.length
+  const above = Math.round(h * 0.5)
   const rx = w / 2 - 2
   const line = (x: number) => above + FRONT * Math.sqrt(Math.max(0, 1 - ((x + 0.5 - w / 2) / rx) ** 2))
   const dark = pic.palette.map((c) => {
@@ -165,7 +190,7 @@ export function paintPicture(pic: PixelPicture): BrainArt {
   const furrows = new Set<number>()
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const v = pic.rows[Math.floor(y / SC)][Math.floor(x / SC)]
+      const v = rows[y][x]
       if (v === null) continue
       let c = pic.palette[v]
       const under = line(x) - (y + 0.5)

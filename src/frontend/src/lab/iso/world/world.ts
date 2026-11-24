@@ -19,6 +19,9 @@ import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from
  * is laid over unlit, with a soft bloom. Things in front hide the light of things behind them.
  */
 
+/** What a click found: a character (real, or one of the demo's) or Shiori. */
+export type Picked = { kind: 'agent'; id: string; demo: boolean; name: string; room: string } | { kind: 'shiori' }
+
 export interface Conditions {
   hour: number
   weather: Weather
@@ -62,6 +65,10 @@ export interface Lab {
   world: World
   /** The real world changed: characters take their new places, interns come and go. */
   update(view: WorldView): void
+  /** Who or what is under a point of the view (canvas pixels): a character, Shiori, or nothing. */
+  hit(x: number, y: number): Picked | null
+  /** Marks a character as the one whose card is open; null for none. */
+  select(id: string | null): void
   /** Paints the view: a window of `viewW` × `viewH` world pixels, the lab in its middle. */
   draw(ctx: CanvasRenderingContext2D, t: number, dt: number, when: Conditions, viewW: number, viewH: number, centre?: [number, number]): void
 }
@@ -455,9 +462,35 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   }
   const drops = Array.from({ length: 520 }, () => ({ x: r(), y: r(), s: 0.6 + r() * 0.6 }))
 
+  let lastOx = 0
+  let lastOy = 0
+  let selected: string | null = null
+  const hit = (x: number, y: number): Picked | null => {
+    const wx = x + lastOx
+    const wy = y + lastOy
+    // The front-most character whose drawing is under the point; then Shiori's dome.
+    let best: Agent | null = null
+    for (const ag of agents) {
+      if (ag.away) continue
+      const [fx, fy] = screen(ag.a, ag.b)
+      if (wx >= fx - 9 && wx <= fx + 9 && wy >= fy - 48 && wy <= fy + 2 && (!best || ag.a + ag.b > best.a + best.b)) best = ag
+    }
+    if (best) {
+      const room = plan.spaces[best.room]
+      return { kind: 'agent', id: best.id ?? `demo-${best.seed}`, demo: !best.id, name: best.id ? '' : `${room.name} ${best.seed + 1}`, room: room.name }
+    }
+    const [cx, cy] = screen(world.centre[0], world.centre[1])
+    if (Math.hypot((wx - cx) / 92, (wy - cy + 40) / 90) < 1) return { kind: 'shiori' }
+    return null
+  }
+
   return {
     world,
     update,
+    hit,
+    select: (id) => {
+      selected = id
+    },
     draw(ctx, t, dt, when, viewW, viewH, centre) {
       fit(viewW, viewH)
       // Where the view sits on the world: its middle on the lab's, or where it was moved to,
@@ -465,6 +498,8 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       const [cx0, cy0] = centre ?? [width / 2, height / 2]
       const ox = vw >= width ? Math.round((width - vw) / 2) : Math.round(Math.min(width - vw, Math.max(0, cx0 - vw / 2)))
       const oy = vh >= height ? Math.round((height - vh) / 2) : Math.round(Math.min(height - vh, Math.max(0, cy0 - vh / 2)))
+      lastOx = ox
+      lastOy = oy
       const inWorld = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, -ox, -oy)
       const plain = (c: CanvasRenderingContext2D) => c.setTransform(1, 0, 0, 1, 0, 0)
       for (const ag of agents) step(ag, t, dt)
@@ -564,6 +599,14 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
             c.fillStyle = '#0b1220'
             c.fillRect(Math.round(x - 5), Math.round(y - 1), 11, 3)
             c.globalAlpha = 1
+            if ((ag.id ?? `demo-${ag.seed}`) === selected) {
+              // The one whose card is open: a ring on the floor round its feet.
+              c.strokeStyle = '#ffd27a'
+              c.lineWidth = 1
+              c.beginPath()
+              c.ellipse(Math.round(x) + 0.5, Math.round(y) + 0.5, 9, 6, 0, 0, Math.PI * 2)
+              c.stroke()
+            }
             c.drawImage(sprite, sx, sy)
           },
         })

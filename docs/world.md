@@ -60,7 +60,7 @@ this page records what was decided for turning it into the real thing.
    they wait for the person.
 2. *(Done: real characters at their seats, queuing at Shiori with an icon, free ones in the lounge; interns come and go.)* The lab built from that snapshot instead of the demo setup, characters moved by it: desk work,
    the queue at Shiori, failures.
-3. The character card and the queue at Shiori, with their actions.
+3. *(Done: click a character or Shiori; answers in the card.)* The character card and the queue at Shiori, with their actions.
 4. Talking to Shiori inside the world (her voice and subtitles reused).
 5. Social life with real small talk, rate-limited, on the local model.
 6. Meeting notes when work touches.

@@ -6,7 +6,8 @@ import { ACCENTS, specsOf } from './fromWorld'
 import { planLab } from './furnish'
 import type { Flavor, OfficeSpec } from './layout'
 import { hourNow, type Weather } from './sky'
-import { makeLab, WORLD_H, WORLD_W } from './world'
+import { Card } from './Cards'
+import { makeLab, WORLD_H, WORLD_W, type Picked } from './world'
 
 /**
  * `?lab=world`: the lab made from a setup, filling the screen, always in its middle. Change the
@@ -58,6 +59,8 @@ export function WorldLab() {
   const [lamps, setLamps] = useState(ASKED.get('lamps') !== 'off')
   const [zoom, setZoom] = useState(Number(ASKED.get('zoom')) || 0)
   const [open, setOpen] = useState(false)
+  // The card open over the lab: a character's or Shiori's.
+  const [picked, setPicked] = useState<Picked | null>(null)
   const [vw, vh] = useViewport()
   // The zoom that makes the lab fill most of the screen, unless one is chosen.
   const auto = useMemo(() => {
@@ -76,6 +79,13 @@ export function WorldLab() {
     if (real && world.data) lab.update(world.data)
   }, [lab, real, world.data])
   const ref = useRef<HTMLCanvasElement>(null)
+  const labRef = useRef(lab)
+  useEffect(() => {
+    labRef.current = lab
+  }, [lab])
+  useEffect(() => {
+    lab.select(picked?.kind === 'agent' ? picked.id : null)
+  }, [lab, picked])
   // The camera: where it looks (world pixels, the lab until moved) and how close, gliding to
   // where it is asked to be, as photos zoom; the point under the pointer stays put.
   const cam = useRef({ centre: null as [number, number] | null, scale: 0, target: 0, anchor: [0, 0] as [number, number] })
@@ -105,8 +115,10 @@ export function WorldLab() {
       setZoom(c.target)
     }
     let drag: { x: number; y: number } | null = null
+    let moved = 0
     const onDown = (e: PointerEvent) => {
       drag = { x: e.clientX, y: e.clientY }
+      moved = 0
       canvas.setPointerCapture(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
@@ -114,9 +126,17 @@ export function WorldLab() {
       const c = cam.current
       const at = c.centre ?? [WORLD_W / 2, WORLD_H / 2]
       c.centre = clampCentre([at[0] - (e.clientX - drag.x) / c.scale, at[1] - (e.clientY - drag.y) / c.scale], c.scale)
+      moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y)
       drag = { x: e.clientX, y: e.clientY }
     }
-    const onUp = () => (drag = null)
+    const onUp = (e: PointerEvent) => {
+      // A click, not a drag: whoever is under the pointer opens their card.
+      if (drag && moved < 5) {
+        const found = labRef.current.hit(e.clientX / cam.current.scale, e.clientY / cam.current.scale)
+        setPicked(found)
+      }
+      drag = null
+    }
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onDown)
     canvas.addEventListener('pointermove', onMove)
@@ -188,6 +208,7 @@ export function WorldLab() {
         role="img"
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />
+      {picked && <Card picked={picked} world={world.data} onClose={() => setPicked(null)} />}
       <aside className="world-panel" aria-label="Lab settings">
         <div className="world-panel-head">
           <h1>Lab</h1>

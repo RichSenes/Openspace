@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 from faster_whisper import WhisperModel
 
-from wake import called
+from wake import called, choose_language
 
 LANGUAGES = {"it", "en", "ja"}
 MAX_BYTES = 25 * 1024 * 1024
@@ -71,6 +71,7 @@ def main():
     p.add_argument("--download-root", default=None)
     p.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
     # Off by default: what is said near the mic is not written anywhere.
+    p.add_argument("--prefer", default="it", choices=sorted(LANGUAGES), help="the person's language, chosen unless another is clearly likelier")
     p.add_argument("--log-heard", action="store_true", help="print what each sentence was heard as, to tune the name")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8178)
@@ -87,10 +88,11 @@ def main():
     def transcribe(which, samples, language, **extra):
         with lock:
             # Shiori speaks three languages: left to itself, whisper hears a short Italian
-            # sentence as Portuguese or a name as Hindi. Pick the likeliest of the three.
+            # sentence as Portuguese, or English, or a name as Hindi. Of the three, the person's
+            # own language (--prefer) wins unless another is clearly likelier.
             if language is None:
                 _, _, likely = which.detect_language(samples, vad_filter=True)
-                language = max((p, l) for l, p in likely if l in LANGUAGES)[1]
+                language = choose_language(likely, args.prefer)
             segments, info = which.transcribe(samples, language=language, vad_filter=True, beam_size=5, **extra)
             return " ".join(s.text.strip() for s in segments).strip(), info.language
 

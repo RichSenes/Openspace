@@ -37,6 +37,7 @@ EARS_PYTHON="${OPENSPACE_EARS_PYTHON:-python3}"
 EARS_MODEL="${OPENSPACE_EARS_MODEL:-medium}"
 EARS_WAKE_MODEL="${OPENSPACE_EARS_WAKE_MODEL:-base}"
 EARS_DEVICE="${OPENSPACE_EARS_DEVICE:-auto}"
+EARS_PREFER="${OPENSPACE_EARS_PREFER:-it}"  # your language: short sentences are not mistaken for another
 EARS_MODELS="${OPENSPACE_EARS_MODELS:-$HOME/.local/share/openspace/whisper}"
 # Her voice: the Python with the engine, the engine, its model folder and (all but kokoro) her
 # voice; it loads when she is about to speak and frees the graphics card after IDLE quiet seconds.
@@ -123,7 +124,7 @@ start_one() {
       fi
       mkdir -p "$EARS_MODELS"
       launch ears "$ROOT/tools/voice" "$EARS_PYTHON" listen-server.py --port "$EARS_PORT" --model "$EARS_MODEL" \
-        --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS" ${OPENSPACE_EARS_LOG_HEARD:+--log-heard}
+        --wake-model "$EARS_WAKE_MODEL" --device "$EARS_DEVICE" --download-root "$EARS_MODELS" --prefer "$EARS_PREFER" ${OPENSPACE_EARS_LOG_HEARD:+--log-heard}
       # Loading the models takes from seconds to minutes (the first time they are downloaded):
       # the rest does not wait for them, and the page says when they are not ready yet.
       say "ears: starting in the background on port $port (scripts/openspace status, logs ears)"

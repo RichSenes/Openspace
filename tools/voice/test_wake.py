@@ -1,6 +1,6 @@
 import unittest
 
-from wake import called
+from wake import called, choose_language
 
 
 class CalledTests(unittest.TestCase):
@@ -35,6 +35,20 @@ class CalledTests(unittest.TestCase):
         self.assertEqual(called("ho visto Shiori ieri"), (False, ""))
         self.assertEqual(called("Shioriko is a different name"), (False, ""))
         self.assertEqual(called(""), (False, ""))
+
+
+class ChooseLanguageTests(unittest.TestCase):
+    def test_a_short_italian_sentence_heard_as_english_stays_italian(self):
+        self.assertEqual(choose_language([("en", 0.55), ("it", 0.30), ("pt", 0.1)]), "it")
+        self.assertEqual(choose_language([("en", 0.85), ("it", 0.25)]), "it")
+
+    def test_a_language_clearly_likelier_wins(self):
+        self.assertEqual(choose_language([("en", 0.93), ("it", 0.04)]), "en")
+        self.assertEqual(choose_language([("ja", 0.9), ("it", 0.05)]), "ja")
+
+    def test_only_her_languages(self):
+        self.assertEqual(choose_language([("pt", 0.9), ("it", 0.05)]), "it")
+        self.assertEqual(choose_language([("hi", 0.99)]), "it")
 
 
 if __name__ == "__main__":

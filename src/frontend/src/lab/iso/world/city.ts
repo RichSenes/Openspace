@@ -35,6 +35,8 @@ export interface CityThing {
   a: number
   b: number
   flip: number
+  /** A building: light from outside stops at it. */
+  solid?: boolean
 }
 
 export interface City {
@@ -312,7 +314,7 @@ export function makeCity(plan: Plan, seen: (a0: number, b0: number, a1: number, 
           : (['office', 'glass', 'home', 'stepped', 'warehouse', 'office', 'home'] as Kind[])[Math.floor(r() * 7)]
       const near = far < 1.3
       const storeys = kind === 'shop' || kind === 'warehouse' ? 0 : front ? 0 : near ? 1 + Math.floor(r() * 2) : Math.min(7, 1 + Math.floor(r() * (2 + far * 1.6)))
-      things.push({ prop: building(kind, da, db, storeys, Math.floor(r() * 1e6)), a: (a0 + ma) * T + 1, b: (b0 + mb) * T + 1, flip: 1 })
+      things.push({ prop: building(kind, da, db, storeys, Math.floor(r() * 1e6)), a: (a0 + ma) * T + 1, b: (b0 + mb) * T + 1, flip: 1, solid: true })
       // Round it, the rest of the plot is lawn: a tree may stand there.
       if (r() < 0.5) plantTree((a0 + w - 0.5) * T, (b0 + r() * h) * T, 10)
     }

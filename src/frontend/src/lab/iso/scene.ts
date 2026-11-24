@@ -16,7 +16,7 @@ interface Placed {
 }
 
 export type Step = { go: [number, number]; first?: 'a' | 'b' } | { act: Pose; face: Facing; secs: number; bubble?: Bubble }
-export type Bubble = 'question' | 'idea' | 'chat' | 'dots' | 'review' | 'failed'
+export type Bubble = 'question' | 'idea' | 'chat' | 'dots' | 'review' | 'failed' | 'angry' | 'laugh'
 
 export interface Person {
   look: Look
@@ -285,6 +285,26 @@ export function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, 
     px(-1, -7, '#5d6878')
     px(0, -7, '#5d6878')
     px(1, -7, '#5d6878')
+  } else if (kind === 'angry') {
+    // A scribble of temper.
+    for (let k = 0; k < 9; k++) px(-4 + k, -8 + (k % 2 ? -1 : 1), '#d23a3a')
+    px(-3, -11, '#d23a3a')
+    px(3, -11, '#d23a3a')
+  } else if (kind === 'laugh') {
+    for (const [dx, dy] of [
+      [-3, -9],
+      [-2, -10],
+      [-1, -9],
+      [1, -9],
+      [2, -10],
+      [3, -9],
+      [-2, -6],
+      [-1, -5],
+      [0, -5],
+      [1, -5],
+      [2, -6],
+    ])
+      px(dx, dy, '#e0a020')
   } else if (kind === 'review') {
     // A parcel: work handed in, to look at.
     for (let dy = -10; dy <= -6; dy++) for (let dx = -2; dx <= 2; dx++) px(dx, dy, dy === -10 ? '#e8c890' : '#c49a6c')

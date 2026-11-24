@@ -54,6 +54,17 @@ export function vehicle(make: Make, colour: string, view: 'front' | 'back' | 'pa
   for (let u = 2; u < 2 * db - 2; u++) if (u < 5 || u > 2 * db - 6 || make === 'saloon') onRightFace(p, at, da, 0, 2, u, 5, view === 'back' ? '#ff4a5a' : view === 'front' ? '#fff4c8' : '#c9d1da')
   p.emitting = false
   p.outline('#18202b')
-  const [lx, ly] = iso(da + 14, db / 2)
-  return { da, db, sprite: { canvas: p.canvas(), ax, ay, glow: p.glowCanvas() ?? undefined }, lights: view === 'front' ? [{ dx: lx, dy: ly, r: 24, color: '#fff0c0' }] : undefined }
+  // Two beams from the headlights along the road ahead: +a for a car coming towards you, -a for
+  // one driving away (its tail lights are what you see).
+  const ahead = view === 'back' ? -1 : 1
+  const [ux, uy] = iso(ahead, 0)
+  const n = Math.hypot(ux, uy)
+  const lights =
+    view === 'parked'
+      ? undefined
+      : [db * 0.25, db * 0.75].map((b) => {
+          const [dx, dy] = iso(view === 'back' ? 0 : da, b, 4)
+          return { dx, dy, r: 46, color: '#fff2c8', beam: [ux / n, uy / n] as [number, number] }
+        })
+  return { da, db, sprite: { canvas: p.canvas(), ax, ay, glow: p.glowCanvas() ?? undefined }, lights }
 }

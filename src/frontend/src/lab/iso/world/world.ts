@@ -49,6 +49,8 @@ interface Agent {
   need?: string
   /** Not in the lab: a routine switched off. */
   away?: boolean
+  /** The place it has taken (a game's end, a chat's spot): no one else takes it meanwhile. */
+  holding?: string
 }
 
 const SPEED = 15
@@ -139,12 +141,53 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
     return out
   }
 
-  // Where they queue at Shiori: round her dome, the front first.
-  const queueSpots = furnished.spots.filter((s) => s.use === 'shiori').sort((x, y) => y.a + y.b - (x.a + x.b))
+  // Where they queue at Shiori: a short line in front of her; whoever does not fit waits at the desk.
+  const queueSpots = furnished.spots.filter((s) => s.use === 'queue')
   const queued = new Map<string, number>()
+  const spotByKey = new Map(furnished.spots.map((sp) => [`${sp.a},${sp.b}`, sp]))
+  // Places taken: a game's ends, a chat's spots. One person each.
+  const taken = new Map<string, Agent>()
+  const keyOf = (s: Spot) => `${s.a},${s.b}`
+  const release = (ag: Agent) => {
+    if (ag.holding && taken.get(ag.holding) === ag) taken.delete(ag.holding)
+    ag.holding = undefined
+  }
+  const POSES: Partial<Record<Spot['use'], Pose>> = { pingpong: 'stand', foosball: 'type', arcade: 'type', vending: 'coffee', chat: 'stand', beanbag: 'stand', coffee: 'coffee', board: 'think' }
+
+  /**
+   * Free time: a game with someone (joining one already under way first), a chat in a circle, the
+   * coffee, the arcade, a beanbag, a board. Never the desk: at the desk means at work.
+   */
+  const social = (ag: Agent, t: number) => {
+    const open = (use: Spot['use']) => furnished.spots.filter((s) => s.use === use && !taken.has(keyOf(s)))
+    const groups = (use: Spot['use']) => {
+      const byGroup = new Map<number, Spot[]>()
+      for (const s of open(use)) byGroup.set(s.group ?? -1, [...(byGroup.get(s.group ?? -1) ?? []), s])
+      // Tables where someone already waits come first: a game needs two.
+      return [...byGroup.entries()].sort((x, y) => busy(y[0]) - busy(x[0]))
+    }
+    const busy = (group: number) => [...taken.values()].filter((x) => x.holding && furnished.spots.find((s) => keyOf(s) === x.holding)?.group === group).length
+    const roll = r()
+    const want: Spot['use'][] = roll < 0.4 ? ['pingpong', 'foosball'] : roll < 0.6 ? ['chat'] : roll < 0.72 ? ['coffee'] : roll < 0.84 ? ['arcade', 'vending'] : roll < 0.94 ? ['beanbag'] : ['board']
+    for (const use of [...want, 'chat', 'coffee', 'beanbag'] as Spot['use'][]) {
+      const candidates = use === 'pingpong' || use === 'foosball' || use === 'chat' ? groups(use).flatMap(([, list]) => list.slice(0, 1)) : open(use)
+      const spot = use === 'pingpong' || use === 'foosball' || use === 'chat' ? candidates[0] : candidates[Math.floor(r() * candidates.length)]
+      if (!spot) continue
+      const pose = POSES[use] ?? 'stand'
+      const bubble: Bubble | undefined = use === 'chat' || use === 'coffee' ? 'chat' : use === 'board' ? 'idea' : undefined
+      if (goTo(ag, spot, { pose, face: spot.face, secs: 25 + r() * 30, since: t, bubble })) {
+        ag.holding = keyOf(spot)
+        taken.set(ag.holding, ag)
+        return
+      }
+    }
+    ag.act = { pose: 'think', face: ag.facing, secs: 5, since: t }
+  }
 
   // Each office's name, floating over its far corner: easier than telling colours apart.
-  const names = plan.spaces.filter((s) => s.kind === 'office' || s.kind === 'lounge').map((s) => ({ canvas: label(s.name, s.accent), at: screen((s.a0 + 1.5) * T, (s.b0 + 1.5) * T, 46) }))
+  const names = plan.spaces
+    .filter((s) => s.kind === 'office' || s.kind === 'lounge' || s.kind === 'games')
+    .map((s) => ({ canvas: label(s.name, s.accent), at: screen((s.a0 + 1.5) * T, (s.b0 + 1.5) * T, 46) }))
   const tileOf = (a: number, b: number): [number, number] => [Math.floor(a / T), Math.floor(b / T)]
   const goTo = (ag: Agent, spot: Spot, act: Agent['act']) => {
     const path = findPath(plan, furnished.blocked, tileOf(ag.a, ag.b), tileOf(spot.a, spot.b))
@@ -167,17 +210,23 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       decideReal(ag, t)
       return
     }
+    // The demo: work at the desk for a while, then free time, now and then a question for Shiori.
     const atSeat = Math.hypot(ag.a - ag.seat.a, ag.b - ag.seat.b) < 1
-    if (!atSeat) {
-      goTo(ag, ag.seat, { pose: 'type', face: ag.seat.face, secs: 10 + r() * 18, since: t })
+    const roll = r()
+    if (!atSeat && roll < 0.5) {
+      goTo(ag, ag.seat, { pose: 'type', face: ag.seat.face, secs: 15 + r() * 20, since: t })
       return
     }
-    const roll = r()
-    const spot = roll < 0.25 ? pick('shiori') : roll < 0.45 ? pick('coffee') : roll < 0.6 ? pick('board', ag.room) : null
-    if (spot && spot.use === 'shiori' && goTo(ag, spot, { pose: 'notes', face: spot.face, secs: 6 + r() * 4, since: t, bubble: 'question' })) return
-    if (spot && spot.use === 'coffee' && goTo(ag, spot, { pose: 'coffee', face: spot.face, secs: 6 + r() * 6, since: t, bubble: 'chat' })) return
-    if (spot && spot.use === 'board' && goTo(ag, spot, { pose: 'think', face: spot.face, secs: 4 + r() * 4, since: t, bubble: r() > 0.5 ? 'idea' : 'dots' })) return
-    ag.act = { pose: 'type', face: ag.seat.face, secs: 8 + r() * 14, since: t }
+    if (roll < 0.1) {
+      const spot = pick('shiori')
+      if (spot && goTo(ag, spot, { pose: 'notes', face: spot.face, secs: 6 + r() * 4, since: t, bubble: 'question' })) return
+    }
+    if (roll < 0.55) {
+      social(ag, t)
+      return
+    }
+    if (atSeat) ag.act = { pose: 'type', face: ag.seat.face, secs: 10 + r() * 15, since: t }
+    else goTo(ag, ag.seat, { pose: 'type', face: ag.seat.face, secs: 15 + r() * 20, since: t })
   }
 
   /** A real character: where its state puts it, and there it stays until the state changes. */
@@ -196,27 +245,33 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       return
     }
     if (intent.where === 'queue') {
-      const spot = queueSpots[(queued.get(ag.id ?? '') ?? 0) % Math.max(1, queueSpots.length)]
-      const act = { pose: intent.pose, face: spot?.face ?? ag.facing, secs: FOREVER, since: t, bubble: intent.bubble }
-      if (!spot || !goTo(ag, spot, act)) {
+      const place = queued.get(ag.id ?? '') ?? 0
+      const spot = queueSpots[place]
+      if (!spot) {
+        // The line is full: it waits at its desk, its icon over it, until its turn.
+        const act = { pose: 'stand' as Pose, face: ag.seat.face, secs: FOREVER, since: t, bubble: intent.bubble }
+        if (!goTo(ag, ag.seat, act)) {
+          ag.act = act
+          ag.bubble = intent.bubble
+        }
+        return
+      }
+      // The first faces her with its notes; the others wait as people wait, looking about.
+      const pose: Pose = place === 0 ? intent.pose : (['stand', 'think', 'coffee', 'stand'] as Pose[])[place % 4]
+      const face: Facing = place === 0 ? 'NE' : (['SE', 'NE', 'SW', 'NE'] as Facing[])[place % 4]
+      const act = { pose, face, secs: FOREVER, since: t, bubble: intent.bubble }
+      if (!goTo(ag, spot, act)) {
         ag.act = act
         ag.bubble = intent.bubble
       }
       return
     }
-    // Free: the lounge, the coffee, the boards, or a moment at the desk doing nothing much.
-    const roll = r()
-    const spot = roll < 0.35 ? pick('coffee') : roll < 0.55 ? pick('board', ag.room) : roll < 0.7 ? pick('sofa') : null
-    if (spot && spot.use === 'coffee' && goTo(ag, spot, { pose: 'coffee', face: spot.face, secs: 8 + r() * 8, since: t, bubble: 'chat' })) return
-    if (spot && spot.use === 'board' && goTo(ag, spot, { pose: 'think', face: spot.face, secs: 5 + r() * 5, since: t, bubble: r() > 0.5 ? 'idea' : 'dots' })) return
-    if (spot && spot.use === 'sofa' && goTo(ag, spot, { pose: 'stand', face: spot.face, secs: 8 + r() * 10, since: t, bubble: 'chat' })) return
-    const atSeat = Math.hypot(ag.a - ag.seat.a, ag.b - ag.seat.b) < 1
-    if (!atSeat && goTo(ag, ag.seat, { pose: 'stand', face: ag.seat.face, secs: 6 + r() * 10, since: t })) return
-    ag.act = { pose: r() > 0.5 ? 'think' : 'stand', face: ag.seat.face, secs: 6 + r() * 10, since: t }
+    social(ag, t)
   }
 
   /** Starts again from where they are: their state changed. */
   const rethink = (ag: Agent) => {
+    release(ag)
     // Finish the step to the next tile centre, so they never stop between two tiles.
     ag.path = ag.path.slice(0, 1)
     ag.act = null
@@ -333,6 +388,7 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       return
     }
     ag.bubble = undefined
+    release(ag)
     decide(ag, t)
   }
 
@@ -349,12 +405,14 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   const gctx = glow.getContext('2d')!
   const rctx = rain.getContext('2d')!
   const tctx = tinted.getContext('2d')!
+  const outside = layer()
+  const octx = outside.getContext('2d')!
   const sctx = small.getContext('2d')!
   const fit = (w: number, h: number) => {
     if (w === vw && h === vh) return
     vw = w
     vh = h
-    for (const c of [light, glow, rain, tinted]) {
+    for (const c of [light, glow, rain, tinted, outside]) {
       c.width = w
       c.height = h
     }
@@ -373,6 +431,25 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
     ctx.fillStyle = g
     ctx.beginPath()
     ctx.arc(0, 0, rad, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+  /** A headlight's beam: a cone along the road, bright near the car, fading ahead and to the sides. */
+  const beam = (ctx: CanvasRenderingContext2D, x: number, y: number, ux: number, uy: number, length: number, colour: string) => {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(Math.atan2(uy, ux))
+    const g = ctx.createLinearGradient(0, 0, length, 0)
+    g.addColorStop(0, colour)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.globalAlpha = 0.75
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.moveTo(0, -1)
+    ctx.lineTo(length, -length * 0.32)
+    ctx.lineTo(length, length * 0.32)
+    ctx.lineTo(0, 1)
+    ctx.closePath()
     ctx.fill()
     ctx.restore()
   }
@@ -491,6 +568,47 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
           },
         })
       }
+      // Games under way: a ball across the ping-pong table; at the table football, now and then
+      // someone takes it badly and someone laughs.
+      const at = new Map<number, Agent[]>()
+      for (const [key, ag] of taken) {
+        const spot = spotByKey.get(key)
+        if (spot?.group === undefined || ag.path.length) continue
+        at.set(spot.group, [...(at.get(spot.group) ?? []), ag])
+      }
+      for (const [group, players] of at) {
+        const use = spotByKey.get(players[0].holding!)?.use
+        if (use === 'pingpong' && players.length >= 2) {
+          const [p, q] = players
+          const [x0, y0] = screen(p.a, p.b, 24)
+          const [x1, y1] = screen(q.a, q.b, 24)
+          const s = (t * 1.1 + group * 0.37) % 2
+          const k = s < 1 ? s : 2 - s
+          const bx = x0 + (x1 - x0) * k
+          const by = y0 + (y1 - y0) * k - Math.sin(Math.PI * (s % 1)) * 9
+          const ma = (p.a + q.a) / 2
+          const mb = (p.b + q.b) / 2
+          items.push({
+            a0: ma - 1,
+            b0: mb - 1,
+            a1: ma + 1,
+            b1: mb + 1,
+            box: [bx - 2, by - 2, bx + 2, by + 12],
+            draw: (c) => {
+              c.fillStyle = '#ffffff'
+              c.fillRect(Math.round(bx), Math.round(by), 2, 2)
+            },
+          })
+        }
+        if (use === 'foosball' && players.length >= 2) {
+          const round = Math.floor(t / 7 + group)
+          const into = t - (round - group) * 7
+          players.forEach((pl, i) => {
+            pl.bubble = into < 2.2 ? (i === round % players.length ? 'angry' : i === (round + 1) % players.length ? 'laugh' : undefined) : undefined
+          })
+        }
+      }
+
       // Only what is on screen.
       const sorted = order(items.filter((it) => it.box[2] > ox && it.box[0] < ox + vw && it.box[3] > oy && it.box[1] < oy + vh))
 
@@ -534,17 +652,52 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       tctx.fillRect(0, 0, vw, vh)
       lctx.drawImage(tinted, 0, 0)
       inWorld(lctx)
-      lctx.globalCompositeOperation = 'lighter'
+      // Inside: the lamps and what the furniture throws on the floor, kept inside the building.
+      plain(octx)
+      octx.globalCompositeOperation = 'source-over'
+      octx.clearRect(0, 0, vw, vh)
+      inWorld(octx)
+      octx.globalCompositeOperation = 'lighter'
       for (const pl of world.pools) {
         if (pl.kind === 'ceiling' && !lampsOn) continue
         const [x, y] = screen(pl.a, pl.b)
-        pool(lctx, x, y, pl.r * 2, pl.color, pl.strength)
+        pool(octx, x, y, pl.r * 2, pl.color, pl.strength)
       }
-      for (const p of [...world.props, ...cars.map((c) => ({ ...c, outdoor: true }))]) {
-        if (!p.prop.lights) continue
-        if (p.outdoor && !dark) continue
+      for (const p of world.props) {
+        if (!p.prop.lights || p.outdoor) continue
         const [x, y] = screen(p.a, p.b)
-        for (const l of p.prop.lights) pool(lctx, x + p.flip * l.dx, y + l.dy, l.r * 1.6, l.color, p.outdoor ? 0.9 : lampsOn ? 0.35 : 0.75)
+        for (const l of p.prop.lights) pool(octx, x + p.flip * l.dx, y + l.dy, l.r * 1.6, l.color, lampsOn ? 0.35 : 0.75)
+      }
+      plain(octx)
+      octx.globalCompositeOperation = 'destination-in'
+      octx.drawImage(world.indoor, ox, oy, vw, vh, 0, 0, vw, vh)
+      plain(lctx)
+      lctx.globalCompositeOperation = 'lighter'
+      lctx.drawImage(outside, 0, 0)
+      inWorld(lctx)
+      // Outside, at night: street lamps and headlights, on the ground only; the buildings and the
+      // lab's walls stop them.
+      if (dark) {
+        plain(octx)
+        octx.globalCompositeOperation = 'source-over'
+        octx.clearRect(0, 0, vw, vh)
+        inWorld(octx)
+        octx.globalCompositeOperation = 'lighter'
+        for (const p of [...world.props, ...cars.map((c) => ({ ...c, outdoor: true }))]) {
+          if (!p.prop.lights || !p.outdoor) continue
+          const [x, y] = screen(p.a, p.b)
+          for (const l of p.prop.lights) {
+            if (l.beam) beam(octx, x + p.flip * l.dx, y + l.dy, p.flip * l.beam[0], l.beam[1], l.r, l.color)
+            else pool(octx, x + p.flip * l.dx, y + l.dy, l.r * 1.6, l.color, 0.9)
+          }
+        }
+        plain(octx)
+        octx.globalCompositeOperation = 'destination-out'
+        octx.drawImage(world.solid, ox, oy, vw, vh, 0, 0, vw, vh)
+        plain(lctx)
+        lctx.globalCompositeOperation = 'lighter'
+        lctx.drawImage(outside, 0, 0)
+        inWorld(lctx)
       }
 
       plain(ctx)

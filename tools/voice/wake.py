@@ -44,3 +44,20 @@ def called(text: str) -> tuple[bool, str]:
             return False, ""
         rest = rest[word.end():]
     return False, ""
+
+
+def choose_language(likely, prefer="it", languages=("it", "en", "ja"), sure=0.8):
+    """Which of her languages a sentence is in, from whisper's (language, probability) guesses.
+
+    Short sentences fool whisper: "come va?" comes out as English ("are you warm?"). The person's
+    own language (`prefer`) wins unless another of hers is clearly likelier: at least `sure`
+    probable and four times as likely as `prefer`.
+    """
+    odds = {language: p for language, p in likely if language in languages}
+    if not odds:
+        return prefer
+    best = max(odds, key=odds.get)
+    if best == prefer or prefer not in languages:
+        return best
+    mine = odds.get(prefer, 0.0)
+    return best if odds[best] >= sure and odds[best] >= 4 * mine else prefer

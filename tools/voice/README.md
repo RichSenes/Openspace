@@ -31,6 +31,9 @@ Or by hand: `python tools/voice/listen-server.py --model medium --wake-model bas
   stays light; only a sentence that starts with "Shiori" goes on to `--model`. On a graphics card
   give it the same name as `--model` (`small`): one model, one pass, and her name is heard far
   more often than by `base`.
+- `--prefer it` (`OPENSPACE_EARS_PREFER`): your language. Whisper guesses the language of each
+  sentence, and short ones fool it ("come va?" heard as English); yours wins unless English or
+  Japanese is clearly likelier.
 - `--log-heard`: prints how each sentence was heard, to see how your voice gets her name written.
 - Graphics memory, int8 weights: `base` + `small` together take about 0.6 GB; `medium` about
   1.5 GB more. On a processor `small` takes a few seconds a sentence and `medium` several times

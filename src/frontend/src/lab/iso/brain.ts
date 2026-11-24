@@ -16,6 +16,8 @@ const C = Math.sqrt(1 - S * S)
 /** Sizes in pixels. */
 const WELL = 80
 const LIP = 6
+/** How far below the floor the glowing liquid stands. */
+const LIQUID = 4
 export const DOME_R = 92
 
 const W = 2 * DOME_R + 16
@@ -71,7 +73,9 @@ function trace(sx: number, sy: number): Sample | null {
     const K = o[0] ** 2 + o[1] ** 2 - WELL * WELL
     const t = (-B + Math.sqrt(B * B - 4 * A * K)) / (2 * A)
     const p = along(o, t)
-    return p[2] > -34 ? { kind: 'wall', p, n: [0, 0, 1], g: 0, depth: -p[2] } : { kind: 'well', p: floor, n: [0, 0, 1], g: 0, depth: 34 }
+    if (p[2] > -LIQUID) return { kind: 'wall', p, n: [0, 0, 1], g: 0, depth: -p[2] }
+    // The liquid, filled almost to the brim.
+    return { kind: 'well', p: along(o, (o[2] + LIQUID) / S), n: [0, 0, 1], g: 0, depth: LIQUID }
   }
   if (r < WELL + LIP) return { kind: 'lip', p: floor, n: [0, 0, 1], g: 0, depth: r - WELL }
   if (Math.abs(r - DOME_R) < 2.5) return { kind: 'rim', p: floor, n: [0, 0, 1], g: 0, depth: r - DOME_R }
@@ -90,11 +94,12 @@ function paintWell(): HTMLCanvasElement {
         // Ribs on the inside of the well, lit green from below.
         const ang = Math.atan2(s.p[1], s.p[0])
         const rib = Math.floor((ang / Math.PI) * 24) % 2 === 0
-        const k = s.depth / 34
-        p.set(x, y, mix(rib ? '#1b2a33' : '#24343e', GREEN, 0.15 + 0.6 * k * k))
+        p.set(x, y, mix(rib ? '#2a3a44' : '#34464f', GREEN, 0.35 + (0.4 * s.depth) / LIQUID))
       } else if (s.kind === 'well') {
+        // Glowing liquid: brightest round her, with caustic veins of light.
         const d = Math.hypot(s.p[0], s.p[1]) / WELL
-        p.set(x, y, d < 0.5 ? '#d9fff0' : d < 0.78 ? '#8cffd0' : GREEN)
+        const vein = Math.abs(noise(s.p[0] / 11, s.p[1] / 7, 61) - 0.5) < 0.035
+        p.set(x, y, vein ? '#d9fff0' : d < 0.62 ? '#8cffd0' : d < 0.86 ? GREEN : '#2fd894')
       } else if (s.kind === 'lip') {
         const ang = Math.atan2(s.p[1], s.p[0])
         const light = s.depth > 2 && s.depth < 3.5 && Math.floor(((ang + Math.PI) / Math.PI) * 36) % 3 === 0
@@ -107,179 +112,243 @@ function paintWell(): HTMLCanvasElement {
   return p.canvas()
 }
 
-/** The brain's size, and how far its top stands above the floor point. */
-const BW = 132
-const BH = 124
-const ABOVE = 96
-/** Half its width and height: the outline is a rounded shape, fuller at the top. */
-const RX = 64
-const RY_TOP = 50
-const RY_BOTTOM = 58
-const MID = 56
+/** The brain's size; the floor point is ABOVE pixels under its top, she sinks to about half. */
+const BW = 140
+const BH = 126
+const ABOVE = 44
+/** How far the waterline comes towards you in the middle (the liquid cuts her as a curve). */
+const FRONT = 27
+const RX = 66
 
 /** Coral tones, darkest first: outline, furrow, shade, base, light, highlight, shine. */
 const CORAL = ['#5e1124', '#8c2236', '#c9465a', '#ec6b7a', '#ff8f9c', '#ffb6be', '#ffe1e4']
+const DEEP = '#0f7a55'
 
 export interface BrainArt {
   canvas: HTMLCanvasElement
-  /** The furrow pixels, for the signals to run along. */
+  /** The furrow pixels above the liquid, for the signals to run along. */
   furrows: Set<number>
 }
 
+/** Where the liquid meets her, in her own pixels: a curve, lower in the middle. */
+export function waterline(x: number): number {
+  const dx = (x + 0.5 - BW / 2) / RX
+  return ABOVE + FRONT * Math.sqrt(Math.max(0, 1 - dx * dx))
+}
+
 /**
- * The brain, as in hand-made pixel art: a rounded outline split by the furrow between the halves,
- * folds as regions of a warped noise field whose borders are one-pixel furrow lines; each fold is
- * lit along its upper-left edge and shaded along its lower-right one, and the whole is shaded as a
- * ball lit from the upper left. Seen a little from above: the folds crowd towards the top. Where
- * it sinks into the well, it stops at the floor's curve and takes the green light.
+ * The brain, as in hand-made pixel art: not a ball but two lumpy halves with the temporal lobes
+ * bulging low at the sides, an outline that ripples where the folds meet it; furrows grown as
+ * wavy lines from the edge and from the middle, two pixels thick, with finer one-pixel ones in
+ * between; each fold shaded as a pillow (lit on its upper-left edge, dark on its lower-right).
+ * Below the waterline she fades into the green.
  */
 export function paintBrain(): BrainArt {
   const p = new Painter(BW, BH)
-  const inside = (x: number, y: number) => {
-    const dx = (x + 0.5 - BW / 2) / RX
-    const dy = (y + 0.5 - MID) / (y + 0.5 < MID ? RY_TOP : RY_BOTTOM)
-    // A little dip at the top in the middle, where the halves meet.
-    const notch = Math.abs(dx) < 0.06 && dy < -0.93
-    // Fuller at the top, a little narrower towards the bottom.
-    const r = Math.abs(dx) ** 2.3 * (dy > 0 ? 1 + dy * 0.25 : 1) + Math.abs(dy) ** 2.2
-    // Sunk in the well: nothing below the floor's front curve.
-    const floorCurve = ABOVE + 24 * Math.sqrt(Math.max(0, 1 - ((x + 0.5 - BW / 2) / 64) ** 2))
-    return r <= 1 && !notch && y + 0.5 < floorCurve
+  const cx = BW / 2
+  const e = (x: number, y: number, ex: number, ey: number, rx: number, ry: number, tilt = 0) => {
+    const dx = x - ex
+    const dy = y - ey
+    const u = dx * Math.cos(tilt) + dy * Math.sin(tilt)
+    const v = -dx * Math.sin(tilt) + dy * Math.cos(tilt)
+    return (u / rx) ** 2 + (v / ry) ** 2
+  }
+  const shape = (x: number, y: number) => {
+    const px = x + 0.5
+    const py = y + 0.5
+    // A ripple on the outline: little bulges where the folds reach the edge.
+    const bump = 1 + 0.09 * (noise(px / 5, py / 5, 71) - 0.5) + 0.05 * Math.sin(Math.atan2(py - 60, px - cx) * 14)
+    const halves = Math.min(e(px, py, cx - 30, 58, 38, 55, 0.12), e(px, py, cx + 31, 57, 37, 56, -0.1))
+    const lobes = Math.min(e(px, py, cx - 42, 88, 24, 22, 0.3), e(px, py, cx + 43, 87, 23, 22, -0.3))
+    return Math.min(halves, lobes) <= bump
   }
   const ins = new Uint8Array(BW * BH)
-  for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) if (inside(x, y)) ins[y * BW + x] = 1
-  const id = (x: number, y: number) => (x < 0 || y < 0 || x >= BW || y >= BH || !ins[y * BW + x] ? -1 : 0)
-  // The furrows are grown, not computed: winding lines that start at the edge or between folds,
-  // turn a little at each step, branch now and then, and stop before touching another line.
-  // What is left between them are the folds, of even width, as in a real brain.
+  for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) if (shape(x, y) && y < waterline(x) + 16) ins[y * BW + x] = 1
+  const isIn = (x: number, y: number) => x >= 0 && y >= 0 && x < BW && y < BH && ins[y * BW + x] === 1
+
+  // Furrows: wavy lines that keep their distance and join others when they meet.
   const furrow = new Uint8Array(BW * BH)
-  const owner = new Int32Array(BW * BH).fill(-1)
+  const fine = new Uint8Array(BW * BH)
   const rnd = rand(29)
-  const GAP = 5
-  const free = (x: number, y: number, me: number) => {
-    if (x < 1 || y < 1 || x >= BW - 1 || y >= BH - 1 || !ins[y * BW + x]) return false
-    // The halves stay apart: no line crosses the middle furrow.
-    if (Math.abs(x + 0.5 - BW / 2) < 3) return false
-    for (let dy = -GAP; dy <= GAP; dy++) {
-      for (let dx = -GAP; dx <= GAP; dx++) {
-        if (dx * dx + dy * dy > GAP * GAP + 1) continue
+  let recent = new Set<number>()
+  const free = (x: number, y: number, gap: number) => {
+    if (!isIn(x, y) || Math.abs(x + 0.5 - cx) < 3) return false
+    for (let dy = -gap; dy <= gap; dy++)
+      for (let dx = -gap; dx <= gap; dx++) {
+        if (dx * dx + dy * dy > gap * gap + 1) continue
         const k = (y + dy) * BW + x + dx
-        if (k < 0 || k >= BW * BH || !furrow[k]) continue
-        // Its own last few pixels do not count.
-        if (owner[k] === me && recent.has(k)) continue
-        return false
+        if (k >= 0 && k < BW * BH && furrow[k] && !recent.has(k)) return false
       }
-    }
     return true
   }
-  let recent = new Set<number>()
-  let walkers = 0
-  const grow = (x0: number, y0: number, angle: number, budget: number) => {
-    const me = walkers++
+  const grow = (x0: number, y0: number, angle: number, budget: number, gap: number, into: Uint8Array) => {
     let x = x0
     let y = y0
-    let th = angle
-    let turn = (rnd() - 0.5) * 0.25
+    const phase = rnd() * 6
+    const wave = 0.35 + rnd() * 0.35
+    let drift = (rnd() - 0.5) * 0.06
     recent = new Set<number>()
     const trail: number[] = []
     for (let step = 0; step < budget; step++) {
-      th += turn + (rnd() - 0.5) * 0.3
-      turn = Math.max(-0.35, Math.min(0.35, turn + (rnd() - 0.5) * 0.15))
+      drift += (rnd() - 0.5) * 0.02
+      // Small waves along the line, and a slow turn.
+      const th = angle + wave * Math.sin(phase + step * 0.55) + drift * step
       const nx = x + Math.cos(th)
       const ny = y + Math.sin(th)
       const px = Math.round(nx)
       const py = Math.round(ny)
       const k = py * BW + px
       if (k !== Math.round(y) * BW + Math.round(x)) {
-        if (!free(px, py, me)) {
-          // Blocked by another furrow: run on straight into it, so lines meet as they do in a brain.
+        if (!free(px, py, gap)) {
+          // Run on straight into the line that blocks it, so furrows meet.
           const path: number[] = []
           let jx = x
           let jy = y
-          for (let n = 0; n <= GAP + 1; n++) {
+          for (let n = 0; n <= gap + 1; n++) {
             jx += Math.cos(th)
             jy += Math.sin(th)
             const q = Math.round(jy) * BW + Math.round(jx)
             if (!ins[q]) break
             if (furrow[q] && !recent.has(q)) {
-              for (const m of path) furrow[m] = 1
+              for (const m of path) into[m] = 1
               break
             }
             path.push(q)
           }
           break
         }
-        furrow[k] = 1
-        owner[k] = me
+        into[k] = 1
         trail.push(k)
         recent.add(k)
-        if (trail.length > 9) recent.delete(trail[trail.length - 10])
+        if (into === furrow && trail.length > 10) recent.delete(trail[trail.length - 11])
       }
       x = nx
       y = ny
-      // Now and then a branch, off to one side.
-      if (step > 6 && rnd() < 0.05) {
-        const saved = recent
-        grow(x, y, th + (rnd() < 0.5 ? 1 : -1) * (1.2 + rnd() * 0.5), budget - step)
-        recent = saved
-      }
     }
   }
-  // From the edge inwards first, then from anywhere left open.
-  for (let k = 0; k < 140; k++) {
-    const a = rnd() * Math.PI * 2
-    let x = BW / 2 + Math.cos(a) * RX
-    let y = MID + Math.sin(a) * RY_TOP
-    for (let n = 0; n < 80 && !(ins[Math.round(y) * BW + Math.round(x)] ?? 0); n++) {
-      x += (BW / 2 - x) * 0.04
-      y += (MID - y) * 0.04
+  // From the outline inwards, every few pixels, roughly across the edge.
+  for (let a = 0; a < Math.PI * 2; a += 0.11 + rnd() * 0.05) {
+    let x = cx + Math.cos(a) * 80
+    let y = 60 + Math.sin(a) * 70
+    for (let n = 0; n < 200 && !isIn(Math.round(x), Math.round(y)); n++) {
+      x += (cx - x) * 0.02
+      y += (60 - y) * 0.02
     }
-    grow(x, y, Math.atan2(MID - y, BW / 2 - x) + (rnd() - 0.5) * 1.2, 14 + Math.floor(rnd() * 34))
+    grow(x, y, Math.atan2(60 - y, cx - x) + (rnd() - 0.5) * 0.9, 18 + Math.floor(rnd() * 30), 5, furrow)
   }
-  for (let k = 0; k < 2500; k++) {
+  // From the middle furrow outwards.
+  for (let y = 6; y < BH; y += 9 + Math.floor(rnd() * 5)) {
+    for (const side of [-1, 1]) grow(cx + side * 3, y, (side < 0 ? Math.PI : 0) + (rnd() - 0.5) * 0.8, 20 + Math.floor(rnd() * 25), 5, furrow)
+  }
+  // Then wherever there is room.
+  for (let k = 0; k < 3000; k++) {
     const x = 2 + Math.floor(rnd() * (BW - 4))
     const y = 2 + Math.floor(rnd() * (BH - 4))
     recent = new Set<number>()
-    if (free(x, y, -2)) grow(x, y, rnd() * Math.PI * 2, 12 + Math.floor(rnd() * 30))
+    if (free(x, y, 6)) grow(x, y, rnd() * Math.PI * 2, 14 + Math.floor(rnd() * 26), 5, furrow)
   }
-  // Two pixels thick, as the lines of hand-made pixel art at this size.
+  // Two pixels thick.
   const thin = furrow.slice()
   for (let y = 1; y < BH; y++) for (let x = 1; x < BW; x++) if (ins[y * BW + x] && (thin[y * BW + x - 1] || thin[(y - 1) * BW + x])) furrow[y * BW + x] = 1
-  const isFurrow = (x: number, y: number) => x >= 0 && y >= 0 && x < BW && y < BH && furrow[y * BW + x] === 1
+  // Finer, shallower furrows inside the wider folds: short dents, one pixel.
+  for (let k = 0; k < 900; k++) {
+    const x = 2 + Math.floor(rnd() * (BW - 4))
+    const y = 2 + Math.floor(rnd() * (BH - 4))
+    recent = new Set<number>()
+    if (free(x, y, 3)) {
+      const th = rnd() * Math.PI * 2
+      for (let s = 0; s < 4 + Math.floor(rnd() * 4); s++) {
+        const q = Math.round(y + Math.sin(th) * s + Math.sin(s) * 0.6) * BW + Math.round(x + Math.cos(th) * s)
+        if (ins[q] && !furrow[q]) fine[q] = 1
+      }
+    }
+  }
+
+  // How far each pixel is from a furrow, and which way: a fold is lit on the side away from
+  // the furrow above-left of it, shaded where a furrow lies below-right.
+  const near = new Int32Array(BW * BH).fill(-1)
+  const dist = new Float32Array(BW * BH).fill(99)
+  const queue: number[] = []
+  for (let k = 0; k < BW * BH; k++)
+    if (furrow[k]) {
+      near[k] = k
+      dist[k] = 0
+      queue.push(k)
+    }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const k = queue[qi]
+    const x = k % BW
+    const y = Math.floor(k / BW)
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx
+      const ny = y + dy
+      if (!isIn(nx, ny)) continue
+      const m = ny * BW + nx
+      if (near[m] >= 0) continue
+      near[m] = near[k]
+      const f = near[k]
+      dist[m] = Math.hypot(nx - (f % BW), ny - Math.floor(f / BW))
+      queue.push(m)
+    }
+  }
+
   const furrows = new Set<number>()
   for (let y = 0; y < BH; y++) {
     for (let x = 0; x < BW; x++) {
-      if (id(x, y) < 0) continue
-      const dx = (x + 0.5 - BW / 2) / RX
-      const dy = (y + 0.5 - MID) / RY_TOP
-      // The ball's light: brighter up and left, darker down and right, in whole tones.
-      const ball = Math.max(-1, Math.min(1, -0.55 * dx - 0.65 * dy + 0.35 * Math.sqrt(Math.max(0, 1 - dx * dx - dy * dy))))
-      let tone = 3 + Math.round(ball * 1.1)
-      if (Math.abs(x + 0.5 - BW / 2) < 1.5) {
+      const k = y * BW + x
+      if (!ins[k]) continue
+      const dx = (x + 0.5 - cx) / RX
+      const dy = (y + 0.5 - 56) / 62
+      // The whole is lit from the upper left, darker low down: in whole tones.
+      const ball = Math.max(-1, Math.min(1, -0.5 * dx - 0.75 * dy + 0.3))
+      let tone = 3 + Math.round(ball * 1.2)
+      if (Math.abs(x + 0.5 - cx) < 1.5 && y < 100) tone = 1
+      else if (furrow[k]) {
         tone = 1
-      } else if (isFurrow(x, y)) {
-        tone = 1
-        if (thin[y * BW + x]) furrows.add(y * BW + x)
+        if (thin[k] && y < waterline(x)) furrows.add(k)
       } else {
-        // The fold's own relief: lit just below or right of a furrow above-left, shaded just above one below-right.
-        const litEdge = isFurrow(x, y - 1) || isFurrow(x - 1, y) || isFurrow(x, y - 2) || isFurrow(x - 2, y)
-        const darkEdge = isFurrow(x, y + 1) || isFurrow(x + 1, y)
-        if (litEdge && !darkEdge) tone += 1
-        if (darkEdge && !litEdge) tone -= 1
+        const f = near[k]
+        const vx = x - (f % BW)
+        const vy = y - Math.floor(f / BW)
+        const d = dist[k]
+        // Below-right of a furrow: the fold's lit edge. Above-left of one: its shaded edge.
+        if (d <= 2.2 && vx + vy > 0) tone += 1
+        else if (d <= 1.5 && vx + vy < 0) tone -= 1
+        // The fold's crown, a little brighter.
+        if (d >= 3.5 && vx + vy > 0) tone += 1
+        if (fine[k]) tone -= 1
         tone = Math.max(2, Math.min(5, tone))
       }
       let c = CORAL[tone]
-      // A glint on the brightest folds.
-      if (tone === 5 && ball > 0.55 && noise(x / 3, y / 3, 41) > 0.72) c = CORAL[6]
-      // Green light from the well on what is near the floor.
-      const floorCurve = ABOVE + 24 * Math.sqrt(Math.max(0, 1 - ((x + 0.5 - BW / 2) / 64) ** 2))
-      const near = floorCurve - (y + 0.5)
-      if (near < 4) c = mix(c, GREEN, 0.55)
-      else if (near < 9) c = mix(c, GREEN, 0.25)
+      if (tone === 5 && ball > 0.5 && dist[k] >= 3 && noise(x / 3, y / 3, 41) > 0.7) c = CORAL[6]
+      // The green light from below, and under the liquid: fading into it.
+      const w = waterline(x) - (y + 0.5)
+      if (w < 0) {
+        const k2 = Math.min(1, -w / 16)
+        p.set(x, y, mix(mix(c, GREEN, 0.6), DEEP, 0.3 + k2 * 0.4), 0.55 * (1 - k2))
+        continue
+      }
+      if (w < 1.5) c = mix(c, '#d9fff0', 0.55)
+      else if (w < 8) c = mix(c, GREEN, 0.4)
+      else if (w < 15) c = mix(c, GREEN, 0.18)
       p.set(x, y, c)
     }
   }
-  p.outline(CORAL[0])
+  // The outline, only above the liquid.
+  const solid = new Painter(BW, BH)
+  solid.data.set(p.data)
+  solid.outline(CORAL[0], 250)
+  for (let y = 0; y < BH; y++)
+    for (let x = 0; x < BW; x++) {
+      if (y + 0.5 > waterline(x) - 1) continue
+      const i = (y * BW + x) * 4
+      if (p.data[i + 3] === 0 && solid.data[i + 3] > 0) p.set(x, y, CORAL[0])
+    }
   return { canvas: p.canvas(), furrows }
 }
 
@@ -389,7 +458,17 @@ export function makeBrain(): Brain {
       ctx.drawImage(well, ox, oy)
       // The light of the well, breathing, behind and under her.
       glow(ctx, x, y + 6, 76, GREEN, 0.32 + 0.08 * Math.sin(t * 1.6))
+      // Slow rings on the liquid, spreading from her; their back halves pass behind her.
+      const rings = (front: boolean) => {
+        for (let k = 0; k < 3; k++) {
+          const ph = (t * 0.22 + k / 3) % 1
+          const rx = RX + 4 + ph * (WELL - RX - 6)
+          for (let a = front ? 0 : Math.PI; a < (front ? Math.PI : Math.PI * 2); a += 1.6 / rx) dot(ctx, x + Math.cos(a) * rx, y + LIQUID * C + Math.sin(a) * rx * S, '#e6fff4', 0.45 * (1 - ph))
+        }
+      }
+      rings(false)
       ctx.drawImage(brain, bx, by)
+      rings(true)
       // Signals: a bright point with a short tail, a little flash where one starts.
       for (const s of signals) {
         s.carry += dt * 34

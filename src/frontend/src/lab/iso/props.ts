@@ -23,9 +23,9 @@ export interface Light {
   color: string
 }
 
-/** A light at a point of a prop, given in its own floor units. */
-function lamp(a: number, b: number, z: number, r: number, color: string): Light {
-  const [dx, dy] = iso(a, b, z)
+/** The light a prop throws on the floor: a pool centred at (a, b) of its own floor units. */
+function lamp(a: number, b: number, r: number, color: string): Light {
+  const [dx, dy] = iso(a, b)
   return { dx, dy, r, color }
 }
 
@@ -48,7 +48,7 @@ function paint(da: number, db: number, top: number, draw: (p: Painter, at: At, a
   }
   draw(p, at, ax, ay)
   p.outline(OUTLINE)
-  return { sprite: { canvas: p.canvas(), ax, ay }, ax, ay }
+  return { sprite: { canvas: p.canvas(), ax, ay, glow: p.glowCanvas() ?? undefined }, ax, ay }
 }
 
 /** A soft shadow on the floor around a footprint, toward the front (light comes from the back left). */
@@ -97,8 +97,10 @@ function monitor(p: Painter, at: At, a: number, b: number, z: number, wide: numb
   box(p, at, a + wide / 2 - 3, b - 1, z, 6, 4, 1, shades('#4a5466'))
   box(p, at, a, b, z + 4, wide, 1, high, shades(DARK))
   // The screen, inset by a pixel, glowing.
+  p.emitting = true
   for (let u = 1; u < wide * 2 - 1; u++) for (let v = 1; v < high - 1; v++) onLeftFace(p, at, a, b + 1, z + 4, u, v, '#0d2433')
   codeLines(p, at, a, b + 1, z + 4, wide * 2, high, [accent, '#7fd6ff', '#5f7d96', '#cfe9ff'], seed)
+  p.emitting = false
 }
 
 /** A long bench desk with three screens: engineering's. */
@@ -130,7 +132,7 @@ export function benchDesk(accent: string, seed = 1): Prop {
     sprite,
     da,
     db,
-    lights: [0, 1, 2].map((k) => lamp(8 + k * 13, 6, 30, 22, '#5fc8ff')),
+    lights: [0, 1, 2].map((k) => lamp(8 + k * 13, 15, 26, '#5fc8ff')),
     anim(ctx, x, y, t, flip) {
       // A blinking cursor.
       if (Math.floor(t * 2) % 2 === 0) dot(ctx, x + flip * cx, y + cy, '#cfe9ff', 1, 2)
@@ -171,7 +173,7 @@ export function cornerDesk(accent: string, seed = 2): Prop {
     sprite,
     da,
     db,
-    lights: [lamp(20, 8, 30, 30, '#7fc8ff'), lamp(9, 19, 36, 26, '#ffd9a0')],
+    lights: [lamp(20, 16, 30, '#7fc8ff'), lamp(9, 20, 30, '#ffd9a0')],
   }
 }
 
@@ -184,11 +186,13 @@ export function holoTable(accent: string): Prop {
     p.ellipse(cx + 2, cy + 1, 26, 26 * SQUASH, '#0b1220', 0.16)
     cylinder(p, cx, cy, 6, 14, '#5b6677')
     cylinder(p, cx, cy - 14, 24, 3, '#2b3443', '#1b2533')
+    p.emitting = true
     p.ellipse(cx, cy - 17, 20, 20 * SQUASH, '#13202c')
     for (let k = 0; k < 40; k++) {
       const th = (k / 40) * Math.PI * 2
       p.set(cx + Math.cos(th) * 22, cy - 17 + Math.sin(th) * 22 * SQUASH, k % 4 === 0 ? '#9ff3ff' : accent)
     }
+    p.emitting = false
     cylinder(p, cx, cy - 17, 4, 2, '#7a8696', '#bfe9ff')
   })
   const [hx, hy] = iso(9, 9)
@@ -196,7 +200,7 @@ export function holoTable(accent: string): Prop {
     sprite,
     da,
     db,
-    lights: [lamp(9, 9, 34, 46, accent)],
+    lights: [lamp(9, 9, 46, accent)],
     anim(ctx, x, y, t) {
       const cx = x + hx
       const cy = y + hy - 40
@@ -243,14 +247,16 @@ export function microscopeBench(accent: string): Prop {
     // The beaker.
     const [bx, by] = at(26, 8, 22)
     cylinder(p, bx, by, 4, 9, '#cfeaff', '#e8f6ff', 0.55)
+    p.emitting = true
     cylinder(p, bx, by, 4, 5, accent, mix(accent, '#ffffff', 0.4), 0.8)
+    p.emitting = false
   })
   const [bx, by] = iso(26, 8, 22)
   return {
     sprite,
     da,
     db,
-    lights: [lamp(26, 8, 26, 18, accent), lamp(8, 5, 36, 16, '#e8f6ff')],
+    lights: [lamp(26, 14, 18, accent)],
     anim(ctx, x, y, t, flip) {
       const cx = x + flip * bx
       for (let k = 0; k < 4; k++) {
@@ -273,6 +279,7 @@ export function capsule(liquid: string, seed = 3): Prop {
     const [cx, cy] = at(6, 6)
     p.ellipse(cx + 3, cy + 2, R + 6, (R + 6) * SQUASH, '#0b1220', 0.18)
     cylinder(p, cx, cy, R + 2, BASE, '#465062', '#5d687a')
+    p.emitting = true
     for (let k = 0; k < 9; k++) {
       const th = Math.PI * (0.1 + (k / 8) * 0.8)
       p.set(cx + Math.cos(th) * (R + 1), cy - 4 + Math.sin(th) * (R + 1) * SQUASH, k % 2 ? '#7ff0ff' : '#3cc7e0')
@@ -298,6 +305,7 @@ export function capsule(liquid: string, seed = 3): Prop {
         p.set(x, y, edge ? '#bff3ff' : '#d9fbff', edge ? 0.5 : 0.08)
       }
       p.set(cx - R + 3, y, '#ffffff', 0.55)
+      if (y === cy - BASE - 1) p.emitting = false
       p.set(cx - R + 4, y, '#ffffff', 0.3)
       p.set(cx + R - 4, y, '#ffffff', 0.18)
     }
@@ -309,11 +317,13 @@ export function capsule(liquid: string, seed = 3): Prop {
     p.rect(cx - 9, cy - BASE - TUBE - 32, 1, 22, '#5d687a')
     p.rect(cx + 5, cy - BASE - TUBE - 32, 4, 24, '#2e3644')
     p.rect(cx + 5, cy - BASE - TUBE - 32, 1, 24, '#4d586a')
+    p.emitting = true
     p.rect(cx - 2, cy - BASE - TUBE - 6, 4, 2, '#ff5468')
+    p.emitting = false
   })
   const [cx, cy] = iso(6, 6)
   const r = rand(seed * 13)
-  const capsuleLight = lamp(6, 6, BASE + 30, 60, liquid)
+  const capsuleLight = lamp(6, 8, 44, liquid)
   const bubbles = Array.from({ length: 16 }, () => ({
     x: (r() * 2 - 1) * (R - 4),
     speed: 0.15 + r() * 0.3,
@@ -376,7 +386,7 @@ export function rack(seed = 4): Prop {
     sprite,
     da,
     db,
-    lights: [lamp(5, 10, 25, 22, '#5dff9a')],
+    lights: [lamp(5, 14, 18, '#5dff9a')],
     anim(ctx, x, y, t, flip) {
       for (const l of live) if (Math.sin(t * (2 + l.ph) + l.ph) > -0.2) dot(ctx, x + flip * l.x, y + l.y, l.color)
     },
@@ -477,8 +487,10 @@ export function coffeeCounter(accent: string): Prop {
     box(p, at, 0, 0, 20, da, db, 2, shades('#3a4352'))
     box(p, at, 3, 1, 22, 8, 7, 14, shades('#2e3644'))
     box(p, at, 4, 7, 26, 6, 1, 3, shades('#1a202b'))
+    p.emitting = true
     for (let u = 2; u < 9; u++) onLeftFace(p, at, 3, 8, 22, u, 11, accent)
     onLeftFace(p, at, 3, 8, 22, 12, 11, '#ff5468')
+    p.emitting = false
     for (let k = 0; k < 3; k++) cylinder(p, ...at(15 + k * 3, 5, 22), 1.5, 3, '#f2f2f0')
     // The water cooler at the end.
     cylinder(p, ...at(23, 4, 22), 3.5, 8, '#d0d8e0')
@@ -489,7 +501,7 @@ export function coffeeCounter(accent: string): Prop {
     sprite,
     da,
     db,
-    lights: [lamp(6, 9, 32, 22, accent), lamp(23, 4, 34, 14, '#8fd8ff')],
+    lights: [lamp(7, 14, 20, accent)],
     anim(ctx, x, y, t, flip) {
       // Steam from the machine.
       for (let k = 0; k < 5; k++) {
@@ -582,7 +594,7 @@ export function totem(accent: string): Prop {
     sprite,
     da,
     db,
-    lights: [lamp(4, 6, 36, 34, accent)],
+    lights: [lamp(9, 6, 30, accent)],
     anim(ctx, x, y, t, flip) {
       const [x0, y0] = iso(da, 0, 18)
       for (let u = 2; u < db * 2 - 1; u++) {
@@ -607,10 +619,21 @@ export function mirrored(prop: Prop): Prop {
   ctx.translate(c.width, 0)
   ctx.scale(-1, 1)
   ctx.drawImage(c, 0, 0)
+  const flip = (src?: HTMLCanvasElement) => {
+    if (!src) return undefined
+    const out = document.createElement('canvas')
+    out.width = src.width
+    out.height = src.height
+    const g = out.getContext('2d')!
+    g.translate(src.width, 0)
+    g.scale(-1, 1)
+    g.drawImage(src, 0, 0)
+    return out
+  }
   return {
     ...prop,
     da: prop.db,
     db: prop.da,
-    sprite: { canvas: m, ax: c.width - 1 - prop.sprite.ax, ay: prop.sprite.ay },
+    sprite: { canvas: m, ax: c.width - 1 - prop.sprite.ax, ay: prop.sprite.ay, glow: flip(prop.sprite.glow) },
   }
 }

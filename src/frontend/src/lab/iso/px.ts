@@ -58,6 +58,10 @@ export type Point = [number, number]
 
 export class Painter {
   readonly data: Uint8ClampedArray
+  /** While true, what is painted also goes to the light layer: screens, liquids, lamps. */
+  emitting = false
+  /** The pixels that give light, if any were painted. */
+  glow: Uint8ClampedArray | null = null
 
   readonly w: number
   readonly h: number
@@ -87,12 +91,22 @@ export class Painter {
       d[i + 2] = b
       d[i + 3] = Math.max(d[i + 3], Math.round(Math.min(1, a) * 255))
       if (a >= 1) d[i + 3] = 255
-      return
+    } else {
+      d[i] = d[i] + (r - d[i]) * a
+      d[i + 1] = d[i + 1] + (g - d[i + 1]) * a
+      d[i + 2] = d[i + 2] + (b - d[i + 2]) * a
+      d[i + 3] = Math.max(d[i + 3], Math.round(a * 255))
     }
-    d[i] = d[i] + (r - d[i]) * a
-    d[i + 1] = d[i + 1] + (g - d[i + 1]) * a
-    d[i + 2] = d[i + 2] + (b - d[i + 2]) * a
-    d[i + 3] = Math.max(d[i + 3], Math.round(a * 255))
+    if (this.emitting) {
+      this.glow ??= new Uint8ClampedArray(this.w * this.h * 4)
+      for (let k = 0; k < 4; k++) this.glow[i + k] = d[i + k]
+    }
+  }
+
+  /** The light layer as a canvas, or null when nothing here gives light. */
+  glowCanvas(): HTMLCanvasElement | null {
+    if (!this.glow) return null
+    return toCanvas(this.glow, this.w, this.h)
   }
 
   rect(x: number, y: number, w: number, h: number, color: string, a = 1) {
@@ -184,15 +198,19 @@ export class Painter {
   }
 
   canvas(): HTMLCanvasElement {
-    const c = document.createElement('canvas')
-    c.width = this.w
-    c.height = this.h
-    const ctx = c.getContext('2d')!
-    const image = ctx.createImageData(this.w, this.h)
-    image.data.set(this.data)
-    ctx.putImageData(image, 0, 0)
-    return c
+    return toCanvas(this.data, this.w, this.h)
   }
+}
+
+export function toCanvas(data: Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const ctx = c.getContext('2d')!
+  const image = ctx.createImageData(w, h)
+  image.data.set(data)
+  ctx.putImageData(image, 0, 0)
+  return c
 }
 
 export function inside(points: Point[], x: number, y: number): boolean {

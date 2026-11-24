@@ -22,6 +22,8 @@ export interface Sprite {
   canvas: HTMLCanvasElement
   ax: number
   ay: number
+  /** Its pixels that give light, drawn unlit over the dark. */
+  glow?: HTMLCanvasElement
 }
 
 /**

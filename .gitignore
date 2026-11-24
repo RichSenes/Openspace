@@ -30,6 +30,7 @@ worktrees/
 
 # Local fan pack: faithful copies of artwork we do not own, never published
 src/frontend/src/art/fanpack/
+src/frontend/src/lab/iso/local/
 
 # Python
 __pycache__/

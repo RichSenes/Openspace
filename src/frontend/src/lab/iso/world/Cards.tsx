@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ArrowUpRight, Brain, Check, MessageCircle, RotateCcw, SquareKanban, Trash2, Undo2, X } from 'lucide-react'
 import { useAnswerPermission, useApproveTask, useDecideProposal, useSendBack, useTaskCommand, useTaskLog } from '../../../api/hooks'
 import type { WorldCharacter, WorldView, WorldWaiting } from '../../../api/types'
 import { openPage } from './pages'
@@ -50,10 +51,10 @@ function Answers({ need }: { need: WorldWaiting }) {
       return (
         <div className="card-actions">
           <button type="button" disabled={busy} onClick={() => permission.mutate({ taskId: need.id, allow: true })}>
-            Allow
+            <Check size={16} aria-hidden /> Allow
           </button>
           <button type="button" disabled={busy} onClick={() => permission.mutate({ taskId: need.id, allow: false })}>
-            Deny
+            <X size={16} aria-hidden /> Deny
           </button>
         </div>
       )
@@ -71,7 +72,7 @@ function Answers({ need }: { need: WorldWaiting }) {
           </label>
           <input id={`fb-${need.id}`} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What to change" />
           <button type="submit" disabled={busy || !feedback.trim()}>
-            Send back
+            <Undo2 size={16} aria-hidden /> Send back
           </button>
           <button type="button" onClick={() => setWriting(false)}>
             Cancel
@@ -80,10 +81,10 @@ function Answers({ need }: { need: WorldWaiting }) {
       ) : (
         <div className="card-actions">
           <button type="button" disabled={busy} onClick={() => command.mutate({ taskId: need.id, command: 'accept' })}>
-            Accept
+            <Check size={16} aria-hidden /> Accept
           </button>
           <button type="button" disabled={busy} onClick={() => setWriting(true)}>
-            Send back…
+            <Undo2 size={16} aria-hidden /> Send back…
           </button>
         </div>
       )
@@ -91,10 +92,10 @@ function Answers({ need }: { need: WorldWaiting }) {
       return (
         <div className="card-actions">
           <button type="button" disabled={busy} onClick={() => approve.mutate({ taskId: need.id, deskId: need.characterId })}>
-            Approve
+            <Check size={16} aria-hidden /> Approve
           </button>
           <button type="button" disabled={busy} onClick={() => command.mutate({ taskId: need.id, command: 'discard' })}>
-            Discard
+            <Trash2 size={16} aria-hidden /> Discard
           </button>
         </div>
       )
@@ -102,10 +103,10 @@ function Answers({ need }: { need: WorldWaiting }) {
       return (
         <div className="card-actions">
           <button type="button" disabled={busy} onClick={() => command.mutate({ taskId: need.id, command: 'retry' })}>
-            Try again
+            <RotateCcw size={16} aria-hidden /> Try again
           </button>
           <button type="button" disabled={busy} onClick={() => command.mutate({ taskId: need.id, command: 'discard' })}>
-            Let it go
+            <X size={16} aria-hidden /> Let it go
           </button>
         </div>
       )
@@ -113,10 +114,10 @@ function Answers({ need }: { need: WorldWaiting }) {
       return (
         <div className="card-actions">
           <button type="button" disabled={busy} onClick={() => proposal.mutate({ id: need.id, approve: true })}>
-            Accept
+            <Check size={16} aria-hidden /> Accept
           </button>
           <button type="button" disabled={busy} onClick={() => proposal.mutate({ id: need.id, approve: false })}>
-            Reject
+            <X size={16} aria-hidden /> Reject
           </button>
         </div>
       )
@@ -124,7 +125,7 @@ function Answers({ need }: { need: WorldWaiting }) {
       return (
         <div className="card-actions">
           <button type="button" onClick={() => openPage(need.kind.startsWith('Decision') ? 'brain' : need.kind === 'RoutineFailed' ? 'routines' : 'board')}>
-            Open
+            <ArrowUpRight size={16} aria-hidden /> Open
           </button>
         </div>
       )
@@ -162,7 +163,7 @@ export function Card({ picked, world, onClose }: { picked: Picked; world: WorldV
   return (
     <aside className="world-card" aria-label={picked.kind === 'shiori' ? 'Shiori' : 'Character'}>
       <button type="button" className="card-close" onClick={onClose} aria-label="Close">
-        ×
+        <X size={18} aria-hidden />
       </button>
       {picked.kind === 'shiori' ? <ShioriCard world={world} /> : <CharacterCard picked={picked} world={world} />}
     </aside>
@@ -211,7 +212,7 @@ function CharacterCard({ picked, world }: { picked: Extract<Picked, { kind: 'age
           </p>
           {meeting.notePath && (
             <button type="button" className="card-link" onClick={() => openPage('brain')}>
-              Read the note in the brain
+              <Brain size={16} aria-hidden /> Read the note in the brain
             </button>
           )}
         </section>
@@ -233,8 +234,9 @@ function CharacterCard({ picked, world }: { picked: Extract<Picked, { kind: 'age
           </ul>
         </section>
       )}
-      <button type="button" className="card-link" onClick={() => openPage('board')}>
-        Open the board
+      <button type="button" className="card-link" onClick={() => openPage('board', { officeId: office.id, taskId: who.taskId ?? undefined })}>
+        <SquareKanban size={16} aria-hidden />
+        {who.taskId ? 'Open the task on the board' : 'Open the board'}
       </button>
     </>
   )
@@ -246,7 +248,7 @@ function ShioriCard({ world }: { world: WorldView | undefined }) {
       <h2>Shiori</h2>
       <p className="card-sub">The lab's mind</p>
       <button type="button" className="card-link is-primary" onClick={() => openPage('shiori')}>
-        Talk to her
+        <MessageCircle size={16} aria-hidden /> Talk to her
       </button>
       <Queue world={world} />
     </>

@@ -1,0 +1,221 @@
+/* The home: the lab fills the window, the bar over it, a page slides in over both. */
+.shell.home {
+  display: block;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.shell.home > .top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* Under the bar: what the lab puts on screen starts below it. */
+.home-world {
+  position: absolute;
+  inset: 0;
+}
+
+.sheet-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(4 3 9 / 0.55);
+  opacity: 0;
+  transition: opacity 0.22s ease-out;
+}
+
+.sheet-shade.is-open {
+  opacity: 1;
+}
+
+.sheet {
+  position: fixed;
+  top: var(--bar-h);
+  right: 0;
+  bottom: 0;
+  z-index: 11;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1320px, calc(100vw - 56px));
+  border-left: 1px solid var(--edge);
+  background: var(--bg);
+  box-shadow: -18px 0 48px rgb(0 0 0 / 0.55);
+  transform: translateX(calc(100% + 24px));
+  transition: transform 0.22s cubic-bezier(0.3, 0.7, 0.2, 1);
+  outline: none;
+}
+
+.sheet.is-open {
+  transform: none;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--chrome);
+}
+
+.sheet-icon {
+  flex: none;
+  color: var(--accent);
+}
+
+.sheet-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.sheet-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--mute);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.sheet-close:hover {
+  border-color: var(--edge);
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* The page itself, as it was in the app: the office list beside it when it is about one office. */
+.sheet-body {
+  display: grid;
+  min-height: 0;
+  animation: sheet-page-in 0.2s ease-out both;
+}
+
+.sheet-body > .body {
+  min-height: 0;
+}
+
+.sheet-body > .body.is-alone {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@keyframes sheet-page-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Narrow windows: the page takes the whole width, the lab still behind the bar. */
+@media (max-width: 760px) {
+  .sheet {
+    width: 100vw;
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet.is-open,
+  .sheet-shade,
+  .sheet-body {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* The lab under the bar: its panels start below it, Shiori's included. */
+.world-page.is-home .world-shiori {
+  top: var(--bar-h);
+  height: calc(100% - var(--bar-h));
+}
+
+.world-page.is-home .world-shiori.is-folded {
+  height: var(--sc-folded, 260px);
+}
+
+.world-page.is-home .world-card {
+  top: calc(var(--bar-h) + 12px);
+  max-height: calc(100% - var(--bar-h) - 24px);
+}
+
+/* With Shiori open the card sits beside her, while there is room for both. */
+@media (min-width: 820px) {
+  .world-page.has-shiori .world-card {
+    right: calc(min(400px, 100vw) + 12px);
+  }
+}
+
+@media (max-width: 819px) {
+  .world-page.has-shiori .world-card {
+    z-index: 4;
+  }
+}
+
+/* The lab's own settings go to the bottom left, out of the bar's way. */
+.world-page.is-home .world-panel {
+  top: auto;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(100% - var(--bar-h) - 24px);
+}
+
+.world-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The demo lab says it is one, and how to get yours. */
+.world-demo {
+  position: absolute;
+  top: calc(var(--bar-h) + 12px);
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--attention);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+}
+
+.world-demo p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.world-demo button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--edge-hi);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}

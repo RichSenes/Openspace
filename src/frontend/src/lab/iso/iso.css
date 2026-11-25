@@ -154,6 +154,9 @@
 }
 
 .world-panel-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -226,6 +229,8 @@
   position: absolute;
   top: 8px;
   right: 8px;
+  display: grid;
+  place-items: center;
   width: 32px;
   height: 32px;
   border: 0;
@@ -322,6 +327,9 @@
 
 .card-actions button,
 .card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -334,6 +342,16 @@
 
 .card-link {
   justify-self: start;
+}
+
+.card-actions svg,
+.card-link svg {
+  flex: none;
+  color: var(--mute);
+}
+
+.card-link.is-primary svg {
+  color: inherit;
 }
 
 .card-link.is-primary {
@@ -798,6 +816,9 @@
 
 .sc-link {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);

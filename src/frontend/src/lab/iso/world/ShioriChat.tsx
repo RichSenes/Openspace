@@ -1,4 +1,4 @@
-import { ChevronsDown, ChevronsUp, Ear, Mic, Send } from 'lucide-react'
+import { ArrowUpRight, ChevronsDown, ChevronsUp, Ear, Mic, Send, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useCreateShioriSession, useSendShioriMessage, useSetShioriMode, useShioriSession, useShioriSessions } from '../../../api/hooks'
 import type { ShioriMode, WorldView } from '../../../api/types'
@@ -45,9 +45,11 @@ interface Props {
   onByName: (on: boolean) => void
   folded: boolean
   onFold: (folded: boolean) => void
+  /** A page is open over the lab: she stops listening for her name until it closes. */
+  paused?: boolean
 }
 
-export function ShioriChat({ world, pending, onPendingTaken, onClose, byName, onByName, folded, onFold }: Props) {
+export function ShioriChat({ world, pending, onPendingTaken, onClose, byName, onByName, folded, onFold, paused = false }: Props) {
   const [tab, setTab] = useState<Tab>('chat')
   const [from, setFrom] = useState<'left' | 'right'>('right')
   const sessions = useShioriSessions()
@@ -152,7 +154,7 @@ export function ShioriChat({ world, pending, onPendingTaken, onClose, byName, on
   }, [busy])
   const ears = useEars(onHeard, (m) => setProblem(m))
   // Listening for her name, as on her page: "Shiori…" starts talking, a goodbye ends it.
-  const { wake, end: endTalk } = useWake(byName && !ended, ears.ears === 'recording' || ears.ears === 'asking' || mouth.speaking, onHeard, (m) => setProblem(m))
+  const { wake, end: endTalk } = useWake(byName && !ended && !paused, ears.ears === 'recording' || ears.ears === 'asking' || mouth.speaking, onHeard, (m) => setProblem(m))
   const byNameShown = wake !== 'off' && ears.ears === 'idle'
   const { warm } = mouth
   useEffect(() => {
@@ -236,7 +238,7 @@ export function ShioriChat({ world, pending, onPendingTaken, onClose, byName, on
             {folded ? <ChevronsDown size={16} aria-hidden="true" /> : <ChevronsUp size={16} aria-hidden="true" />}
           </button>
           <button type="button" className="sc-icon" onClick={onClose} aria-label="Close" title="Close">
-            ×
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <div className="sc-who">
@@ -347,7 +349,7 @@ export function ShioriChat({ world, pending, onPendingTaken, onClose, byName, on
               </label>
               <p className="pr-muted">The same look as on her page, kept in this browser only. Her world, hour and weather are set there.</p>
               <button type="button" className="sc-link" onClick={() => openPage('shiori')}>
-                Open her page
+                <ArrowUpRight size={16} aria-hidden="true" /> Open her page
               </button>
             </div>
           )}

@@ -5,6 +5,10 @@
   height: 100%;
   background: var(--bg);
   accent-color: var(--accent);
+  /* The bar's line, and its whole height (two lines when the status wraps under it, measured
+     by the bar) for what sits under it: the lab's panels, the page open over it. */
+  --bar-line: 44px;
+  --bar-h: 44px;
 }
 
 /* The accent follows the view: the building's amber for the world, violet for the work,
@@ -25,176 +29,237 @@
   --accent: var(--blue);
 }
 
+/* The bar: one thin line, over the lab; its height (measured) is shared with what sits under it. */
+.top {
+  position: relative;
+  z-index: 20;
+}
+
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 24px;
-  padding: 0 16px;
-  height: 52px;
-  border-bottom: 1px solid var(--edge);
-  background: var(--chrome);
+  gap: 12px;
+  height: var(--bar-line);
+  padding: 0 12px;
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: content-box;
+  border-bottom: 1px solid var(--line);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
 }
 
 .wordmark {
   flex: none;
-  font-size: 16px;
-  letter-spacing: 0.18em;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  font-family: var(--pixel);
+  font-size: 15px;
+  letter-spacing: 0.16em;
   color: var(--accent);
   text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+  cursor: pointer;
 }
 
-/* The tabs take the room left in the bar; the ones that do not fit go behind More (TopBar). */
-.tabs {
+.wordmark:hover {
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+/* The menu of pages: the button names the page open, or "Pages" over the lab. */
+.pages {
   position: relative;
-  flex: 1 1 0;
-  display: flex;
-  gap: 4px;
-  height: 100%;
-  min-width: 0;
 }
 
-/* A hidden copy of every tab, only to measure them: in a box of no size, so the page never
-   grows sideways because of it. The tabs inside keep their own width. */
-.tabs-measure {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  gap: 4px;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.tabs-more {
-  position: relative;
-  flex: none;
-  height: 100%;
-}
-
-/* Opens towards the left, from the More button's right edge, so it stays on the screen. */
-.tabs-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 40;
-  display: grid;
-  min-width: 160px;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
+.pages-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 10px;
   border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  background: var(--glass);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow);
-  animation: panel-in 200ms var(--steps) both;
-}
-
-.tabs-menu button {
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: var(--radius);
-  background: none;
+  background: var(--panel);
+  color: var(--ink);
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.pages-button svg {
+  color: var(--accent);
+}
+
+.pages-button:hover,
+.pages-button[aria-expanded='true'] {
+  border-color: var(--edge-hi);
+  background: var(--raised);
+}
+
+.pages-chevron {
+  color: var(--mute) !important;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pages-button[aria-expanded='true'] .pages-chevron {
+  transform: rotate(180deg);
+}
+
+.pages-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+  width: min(600px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--bar-h) - 24px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--edge);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow);
+  transform-origin: top left;
+  animation: pages-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes pages-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.pages-group h2 {
+  margin: 4px 8px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.pages-group ul {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.pages-group button {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 
-.tabs-menu button:hover,
-.tabs-menu button:focus-visible {
-  background: var(--raised);
+.pages-icon {
+  grid-row: span 2;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
   color: var(--accent);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
-.tabs-menu button:focus-visible {
+.pages-label {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.pages-hint {
+  overflow: hidden;
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pages-group button:hover,
+.pages-group button:focus-visible {
+  background: var(--raised);
+}
+
+.pages-group button:hover .pages-icon,
+.pages-group button:focus-visible .pages-icon {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--edge));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+}
+
+.pages-group button:focus-visible {
   outline-offset: -2px;
 }
 
-.tab {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 100%;
-  white-space: nowrap;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--mute);
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
+/* The page open: a lit edge in the accent. */
+.pages-group button[aria-current='page'] {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--edge));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
-.tab:hover {
-  color: var(--ink);
+@media (max-width: 560px) {
+  .pages-menu {
+    position: fixed;
+    top: calc(var(--bar-h) + 8px);
+    left: 12px;
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-.tab:focus-visible {
-  outline-offset: -4px;
-}
-
-/* The current view: its words in the accent, a lit bar under it and a pixel before it. */
-.tab[aria-current='page'] {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-  background: linear-gradient(to top, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
-}
-
-.tab[aria-current='page']::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  margin-right: 4px;
-  background: currentColor;
-  box-shadow: 0 0 6px currentColor;
+@media (prefers-reduced-motion: reduce) {
+  .pages-menu,
+  .pages-chevron {
+    animation: none;
+    transition: none;
+  }
 }
 
 .topbar-end {
-  flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* Narrow windows keep the views in sight: the sound and connection words become their icons. */
-@media (max-width: 1100px) {
-  .topbar .wide-only {
-    display: none;
-  }
-
-  .topbar {
-    gap: 12px;
-  }
-}
-
-/* What the accounts and the graphics card are up to: under the views, wrapping when narrow. */
+/* What the accounts and the graphics card are up to, between the menu and the end; each line
+   cut short with its whole text in its title. */
 .statusbar {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 6px 8px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--line);
-  background: var(--chrome);
-}
-
-.statusbar:empty {
-  display: none;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .statusbar .claude-meter {
-  max-width: 100%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -204,15 +269,62 @@
   text-overflow: ellipsis;
 }
 
+.statusbar .claude-meter > svg {
+  flex: none;
+}
+
+/* Narrow: the status goes to a second line under the bar, wrapping, only when it says something. */
+@media (max-width: 860px) {
+  .topbar {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-rows: var(--bar-line) auto;
+    height: auto;
+    min-height: var(--bar-line);
+    row-gap: 0;
+  }
+
+  .topbar-end {
+    justify-content: flex-end;
+  }
+
+  .statusbar {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .statusbar:empty {
+    display: none;
+  }
+
+  .topbar .wide-only {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .wordmark {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    padding: 0 2px;
+  }
+}
+
+/* Narrow: the menu button keeps its icon, the page's name is in the sheet. */
+@media (max-width: 560px) {
+  .pages-button > span {
+    display: none;
+  }
+}
+
+/* The connection: a lit square, its word for screen readers and in its title. */
 .link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--mute);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 32px;
 }
 
 .link::before {
@@ -438,11 +550,5 @@
     box-shadow: var(--shadow);
     clip-path: polygon(0 0, 100% 0, 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
     animation: panel-in 200ms var(--steps) both;
-  }
-}
-
-@media (max-width: 760px) {
-  .wordmark {
-    display: none;
   }
 }

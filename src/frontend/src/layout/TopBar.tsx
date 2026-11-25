@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as KeyEvent } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, LayoutGrid } from 'lucide-react'
 import { SupervisorStatus } from '../supervisor/SupervisorStatus'
 import { SetupCheck } from '../setup/SetupCheck'
 import { NeedsYou } from '../activity/NeedsYou'
@@ -9,25 +9,10 @@ import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
 import type { NeedsYouTarget } from '../activity/needs'
 import { useDismiss } from '../ui/useDismiss'
-import { fitTabs, type TabSplit } from './tabFit'
+import { GROUPS, pageInfo, type View } from './pageList'
 import './layout.css'
 
-export type View = 'building' | 'shiori' | 'brain' | 'board' | 'rooms' | 'routines' | 'reports' | 'characters' | 'security' | 'office' | 'agents' | 'settings'
-
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'building', label: 'Building' },
-  { id: 'shiori', label: 'Shiori' },
-  { id: 'brain', label: 'Brain' },
-  { id: 'board', label: 'Board' },
-  { id: 'rooms', label: 'Rooms' },
-  { id: 'routines', label: 'Routines' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'characters', label: 'Characters' },
-  { id: 'security', label: 'Security' },
-  { id: 'office', label: 'Office' },
-  { id: 'agents', label: 'Agents' },
-  { id: 'settings', label: 'Settings' },
-]
+export type { View } from './pageList'
 
 const LINK_LABEL: Record<LinkState, string> = {
   connecting: 'Connecting',
@@ -36,155 +21,133 @@ const LINK_LABEL: Record<LinkState, string> = {
 }
 
 interface Props {
-  view: View
-  onView: (view: View) => void
+  /** The page open over the world, or none. */
+  page: View | null
+  onPage: (view: View) => void
+  /** Back to the world: closes the page. */
+  onHome: () => void
   link: LinkState
   /** Opens what waits for the person where it is decided: its office, its view, its task. */
   onOpen: (target: NeedsYouTarget) => void
 }
 
 /**
- * Navigation on one line, and under it a strip of what the accounts and the graphics card
- * are up to. The strip shows only when one of them has something to say, and wraps on
- * narrow windows instead of pushing the views out of sight.
+ * One thin line over the world: the name (back to the world), the menu of pages, what the
+ * accounts and the graphics card are up to when they have something to say, what waits for
+ * the person, the sound and the connection. On narrow windows the status goes to a second line.
  */
-export function TopBar({ view, onView, link, onOpen }: Props) {
+export function TopBar({ page, onPage, onHome, link, onOpen }: Props) {
+  // The bar's whole height, shared with what sits under it: one line, or two when the status wraps.
+  const top = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const bar = top.current?.querySelector<HTMLElement>('.topbar')
+    const shell = top.current?.parentElement
+    if (!bar || !shell) return
+    const set = () => shell.style.setProperty('--bar-h', `${bar.getBoundingClientRect().height}px`)
+    set()
+    const watch = new ResizeObserver(set)
+    watch.observe(bar)
+    return () => watch.disconnect()
+  }, [])
   return (
-    <div className="top">
+    <div className="top" ref={top}>
       <header className="topbar">
-        <span className="wordmark pixel">Openspace</span>
-        <Tabs view={view} onView={onView} />
+        <button type="button" className="wordmark pixel" onClick={onHome} aria-label="Openspace: back to the lab" title="Back to the lab">
+          Openspace
+        </button>
+        <PagesMenu page={page} onPage={onPage} />
+        <div className="statusbar" aria-label="Engines, accounts and graphics card">
+          <SetupCheck onOpen={() => onPage('settings')} />
+          <LimitPauses onOpen={() => onPage('board')} />
+          <GpuStatus onOpen={() => onPage('board')} />
+          <SupervisorStatus onOpen={() => onPage('board')} />
+          <ClaudeMeter onOpen={() => onPage('settings')} />
+        </div>
         <div className="topbar-end">
           <NeedsYou onOpen={onOpen} />
           <MuteButton />
-          <span className={`link link-${link}`} title={`Connection to the Openspace server: ${LINK_LABEL[link]}`}>
-            <span className="wide-only">{LINK_LABEL[link]}</span>
+          <span className={`link link-${link}`} role="status" title={`Connection to the Openspace server: ${LINK_LABEL[link]}`}>
+            <span className="sr-only">{LINK_LABEL[link]}</span>
           </span>
         </div>
       </header>
-      <div className="statusbar" aria-label="Engines, accounts and graphics card">
-        <SetupCheck onOpen={() => onView('settings')} />
-        <LimitPauses onOpen={() => onView('board')} />
-        <GpuStatus onOpen={() => onView('board')} />
-        <SupervisorStatus onOpen={() => onView('board')} />
-        <ClaudeMeter onOpen={() => onView('settings')} />
-      </div>
       <ReleaseBanner />
     </div>
   )
 }
 
-/**
- * The views as tabs, as many as the bar has room for; the others behind a More button, never
- * cut off. The current view always keeps its tab. The widths come from a hidden copy of every
- * tab, so a tab that went behind More is still measured when the window grows again.
- */
-function Tabs({ view, onView }: { view: View; onView: (view: View) => void }) {
-  const nav = useRef<HTMLElement>(null)
-  const measure = useRef<HTMLDivElement>(null)
-  const [split, setSplit] = useState<TabSplit>({ shown: VIEWS.map((_, i) => i), more: [] })
-  const current = VIEWS.findIndex((v) => v.id === view)
-
-  useLayoutEffect(() => {
-    const bar = nav.current
-    const copies = measure.current
-    if (!bar || !copies) return
-    const fit = () => {
-      const gap = parseFloat(getComputedStyle(bar).columnGap) || 0
-      const widths = [...copies.children].map((c) => (c as HTMLElement).offsetWidth + gap)
-      const more = widths.pop() ?? 0
-      const next = fitTabs(widths, bar.clientWidth + gap, more, current)
-      setSplit((was) => (sameSplit(was, next) ? was : next))
-    }
-    fit()
-    const watch = new ResizeObserver(fit)
-    watch.observe(bar)
-    // The copies change size once the fonts have loaded.
-    watch.observe(copies)
-    return () => watch.disconnect()
-  }, [current])
-
-  return (
-    <nav className="tabs" aria-label="Views" ref={nav}>
-      {split.shown.map((i) => (
-        <Tab key={VIEWS[i].id} label={VIEWS[i].label} current={view === VIEWS[i].id} onClick={() => onView(VIEWS[i].id)} />
-      ))}
-      {split.more.length > 0 && <MoreTabs views={split.more.map((i) => VIEWS[i])} onView={onView} />}
-      <div className="tabs-measure" ref={measure} aria-hidden>
-        {VIEWS.map((v) => (
-          <span key={v.id} className="tab">
-            {v.label}
-          </span>
-        ))}
-        <span className="tab">
-          More <ChevronDown size={14} />
-        </span>
-      </div>
-    </nav>
-  )
-}
-
-const sameSplit = (a: TabSplit, b: TabSplit) => a.shown.join() === b.shown.join() && a.more.join() === b.more.join()
-
-function Tab({ label, current, onClick }: { label: string; current: boolean; onClick: () => void }) {
-  return (
-    <button type="button" className="tab" aria-current={current ? 'page' : undefined} onClick={onClick}>
-      {label}
-    </button>
-  )
-}
-
-/** The views that did not fit, in a list under the More button. Arrows move between them. */
-function MoreTabs({ views, onView }: { views: { id: View; label: string }[]; onView: (view: View) => void }) {
+/** Every page, in groups, under one button; arrows move between them, Escape closes. */
+function PagesMenu({ page, onPage }: { page: View | null; onPage: (view: View) => void }) {
   const [open, setOpen] = useState(false)
+  // Opened from the keyboard, the focus goes into the menu; from the pointer it stays put.
+  const [byKey, setByKey] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
-  const list = useRef<HTMLUListElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setOpen(false), [])
   useDismiss(open, close, box, button)
+  const current = page ? pageInfo(page) : null
+  const Icon = current?.icon ?? LayoutGrid
 
-  // Opening moves the focus to the first view, so the arrows and Enter work at once.
+  // Opening moves the focus to the current page (or the first), so the arrows and Enter work at once.
   useLayoutEffect(() => {
-    if (open) list.current?.querySelector('button')?.focus()
-  }, [open])
+    if (!open || !byKey) return
+    const items = panel.current?.querySelectorAll<HTMLButtonElement>('button') ?? []
+    ;([...items].find((b) => b.getAttribute('aria-current') === 'page') ?? items[0])?.focus()
+  }, [open, byKey])
 
   const onKey = (e: KeyEvent) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
     e.preventDefault()
-    const items = [...(list.current?.querySelectorAll('button') ?? [])]
+    const items = [...(panel.current?.querySelectorAll('button') ?? [])]
     const at = items.indexOf(document.activeElement as HTMLButtonElement)
-    const step = e.key === 'ArrowDown' ? 1 : -1
-    items[(at + step + items.length) % items.length]?.focus()
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
+    items[next]?.focus()
   }
 
   return (
-    <div className="tabs-more" ref={box}>
+    <div className="pages" ref={box}>
       <button
         ref={button}
         type="button"
-        className="tab"
+        className="pages-button"
         aria-expanded={open}
-        aria-controls="more-views"
-        onClick={() => setOpen(!open)}
+        aria-controls="pages-menu"
+        onClick={(e) => {
+          setByKey(e.detail === 0)
+          setOpen(!open)
+        }}
       >
-        More <ChevronDown size={14} aria-hidden />
+        <Icon size={16} aria-hidden />
+        <span>{current?.label ?? 'Pages'}</span>
+        <ChevronDown size={14} aria-hidden className="pages-chevron" />
       </button>
       {open && (
-        <ul id="more-views" className="tabs-menu" ref={list} onKeyDown={onKey}>
-          {views.map((v) => (
-            <li key={v.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  onView(v.id)
-                }}
-              >
-                {v.label}
-              </button>
-            </li>
+        <div id="pages-menu" className="pages-menu" ref={panel} onKeyDown={onKey}>
+          {GROUPS.map((g) => (
+            <section key={g.label} className="pages-group" aria-labelledby={`pages-${g.label}`}>
+              <h2 id={`pages-${g.label}`}>{g.label}</h2>
+              <ul>
+                {g.pages.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      aria-current={p.id === page ? 'page' : undefined}
+                      onClick={() => {
+                        setOpen(false)
+                        onPage(p.id)
+                      }}
+                    >
+                      <p.icon size={18} aria-hidden className="pages-icon" />
+                      <span className="pages-label">{p.label}</span>
+                      <span className="pages-hint">{p.hint}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )

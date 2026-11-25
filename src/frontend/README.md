@@ -228,10 +228,19 @@ the Telegram bot from the ones set up, with a link to *Settings › Connections*
 
 Across every view:
 
-- Under the views, a strip shows what accounts and the graphics card are up to (a
-  provider over its limits, who uses the local model, the Claude account), only
-  when there is something to say; it wraps on narrow windows, where the sound and
-  connection words become icons.
+- The app opens on the lab: your offices in the isometric world, Shiori's compact chat
+  beside it (open or closed as you left it). Over it, one thin bar: the name (back to the
+  lab), a *Pages* menu with every page in four groups (Mind, Work, People and places,
+  System), each with its icon and one line on what it is for, then the status, "Needs you",
+  the sound and the connection. A page opens in a sheet that slides in over the lab, which
+  stays alive and dimmed behind it: the ×, Escape, a click on the lab or the browser's back
+  close it. Each page has its address (`/#board`, `/#brain`…), so it can be bookmarked.
+  The lab opens pages too: a character's card opens its task on the Board, Shiori's chat
+  her full page. While a page is open the lab stops listening for her name. Without a
+  server or offices the lab is the demo one, and says so.
+- In the bar, what accounts and the graphics card are up to (a provider over its limits,
+  who uses the local model, the Claude account), only when there is something to say;
+  below 860 px it goes to a second line under the bar.
 - When a newer release is out, a banner says so with what changed, a link and
   "Remind me tomorrow" (remembered in this browser for that version). Openspace
   never updates itself.
@@ -245,15 +254,15 @@ Across every view:
   routines change; on a phone the list takes the screen's width.
 - Below 1100 px the layout changes instead of shrinking. The office list folds into one
   line with the current office and a "Switch office" button that opens the list over the
-  view. The tabs that do not fit go behind a "More" button (Escape or a click elsewhere
-  closes it, the arrows move inside it); the current view always keeps its tab. The Board
+  view (inside the sheet, for the pages about one office). Below 760 px a page takes the
+  whole width, and below 560 px the menu button keeps only its icon. The Board
   puts the columns that need you first (Review, Failed, Proposed), and on phones stacks
   them so the page scrolls down, never sideways. The building's toolbar wraps, with its
   hint on a line of its own, and the hint goes away on phones.
 - Without offices, the page is a short path to the first one: an engine, the office,
   rooms and desks, the repository, a first task, each with its button. A new office
   (no tasks, no routines) keeps the path in a corner of the building until it is
-  hidden. The strip under the views warns when an engine the desks use is missing.
+  hidden. The bar warns when an engine the desks use is missing.
 - Confirmations are short toasts at the bottom; errors stay next to the form that
   caused them, with the server's reason.
 - Dates and times have one format: "today at 15:30", "yesterday at 23:05", else

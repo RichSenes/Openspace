@@ -18,6 +18,7 @@ export function ShioriPanel({
   onPendingTaken,
   byName,
   onByName,
+  paused = false,
 }: {
   open: boolean
   onClose: () => void
@@ -26,6 +27,8 @@ export function ShioriPanel({
   onPendingTaken: () => void
   byName: boolean
   onByName: (on: boolean) => void
+  /** A page is open over the lab: Escape is the page's, and she stops listening. */
+  paused?: boolean
 }) {
   // Folded: only her card, her last words and the box, the lab in view; remembered.
   const [fold, setFold] = usePersistentState<'open' | 'folded'>('openspace.lab.shiori-fold', 'open')
@@ -39,13 +42,13 @@ export function ShioriPanel({
     return () => clearTimeout(id)
   }, [open])
   useEffect(() => {
-    if (!open) return
+    if (!open || paused) return
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement)) onClose()
+      if (e.key === 'Escape' && !e.defaultPrevented && !(e.target instanceof HTMLInputElement)) onClose()
     }
     addEventListener('keydown', key)
     return () => removeEventListener('keydown', key)
-  }, [open, onClose])
+  }, [open, paused, onClose])
   if (!shown && !open) return null
   return (
     <aside className={`world-shiori${open ? ' is-open' : ''}${folded ? ' is-folded' : ''}`} aria-label="Shiori">
@@ -61,6 +64,7 @@ export function ShioriPanel({
         }}
         folded={folded}
         onFold={(f) => setFold(f ? 'folded' : 'open')}
+        paused={paused}
       />
     </aside>
   )

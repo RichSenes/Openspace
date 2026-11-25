@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
 import '../../lab.css'
 import '../iso.css'
 import { useWorld } from '../../../api/hooks'
@@ -11,6 +12,8 @@ import { ShioriPanel, WakeListener } from './ShioriPanel'
 import type { Heard } from '../../../shiori/voice'
 import { loadByName } from '../../../shiori/wake'
 import { makeLab, WORLD_H, WORLD_W, type Picked } from './world'
+import { usePersistentState } from '../../../usePersistentState'
+import { openPage } from './pages'
 
 /**
  * `?lab=world`: the lab made from a setup, filling the screen, always in its middle. Change the
@@ -47,13 +50,37 @@ function useViewport() {
   return size
 }
 
+/** `?lab=world`: the lab to try things on, demo offices first. */
 export function WorldLab() {
+  return <Lab />
+}
+
+/**
+ * The app's home: the lab of the real offices, under the bar; pages open over it (paused, it
+ * stops listening for Shiori's name). Without a server or offices it shows the demo lab and says so.
+ */
+export function WorldHome({ paused }: { paused: boolean }) {
+  const world = useWorld()
+  if (world.isPending) {
+    return (
+      <div className="world-page is-home">
+        <p className="world-loading" role="status">
+          Opening the lab…
+        </p>
+      </div>
+    )
+  }
+  const none = !world.data || world.data.offices.length === 0
+  return <Lab home paused={paused} demoBecause={world.error ? 'unreachable' : none ? 'empty' : undefined} />
+}
+
+function Lab({ home = false, paused = false, demoBecause }: { home?: boolean; paused?: boolean; demoBecause?: 'unreachable' | 'empty' }) {
   const [demo, setDemo] = useState(DEMO)
-  // The real offices, when Openspace's API answers and the page is asked for them (?lab=world&real).
-  const [real, setReal] = useState(ASKED.has('real'))
+  // The real offices, when Openspace's API answers and the page is asked for them (?lab=world&real); always on the home.
+  const [real, setReal] = useState(home || ASKED.has('real'))
   const world = useWorld()
   // The lab follows the setup, not every change of state: rebuilt when offices or their seats change.
-  const realKey = world.data ? JSON.stringify(specsOf(world.data)) : ''
+  const realKey = world.data?.offices.length ? JSON.stringify(specsOf(world.data)) : ''
   const offices = useMemo(() => (real && realKey ? (JSON.parse(realKey) as OfficeSpec[]) : demo), [real, realKey, demo])
   const setOffices = setDemo
   const [live, setLive] = useState(!ASKED.has('hour'))
@@ -65,7 +92,11 @@ export function WorldLab() {
   // The card open over the lab: a character's or Shiori's.
   const [picked, setPicked] = useState<Picked | null>(null)
   // Shiori's panel, and what was said to her by name before it opened.
-  const [shiori, setShiori] = useState(false)
+  // On the home her panel starts open and stays as it was left; in the lab it opens when she is clicked.
+  const [kept, setKept] = usePersistentState<'open' | 'closed'>('openspace.home.shiori', 'open')
+  const [inLab, setInLab] = useState(false)
+  const shiori = home ? kept === 'open' : inLab
+  const setShiori = (on: boolean) => (home ? setKept(on ? 'open' : 'closed') : setInLab(on))
   const [said, setSaid] = useState<Heard | null>(null)
   // Listening for her name, shared by the lab (panel closed) and her panel (open).
   const [byName, setByName] = useState(loadByName)
@@ -82,10 +113,11 @@ export function WorldLab() {
   const least = Math.max(1, vw / WORLD_W, vh / WORLD_H)
   // Painted once per setup; the page's size only moves the window onto it.
   // With real offices the characters are the real ones: built once per setup, then moved by every change.
-  const lab = useMemo(() => makeLab(offices, real ? { offices: [], waiting: [] } : undefined), [offices, real])
+  const peopled = real && Boolean(realKey)
+  const lab = useMemo(() => makeLab(offices, peopled ? { offices: [], waiting: [] } : undefined), [offices, peopled])
   useEffect(() => {
-    if (real && world.data) lab.update(world.data)
-  }, [lab, real, world.data])
+    if (peopled && world.data) lab.update(world.data)
+  }, [lab, peopled, world.data])
   const ref = useRef<HTMLCanvasElement>(null)
   const labRef = useRef(lab)
   useEffect(() => {
@@ -208,11 +240,12 @@ export function WorldLab() {
   }, [lab])
 
   const setOffice = (i: number, patch: Partial<OfficeSpec>) => setOffices((list) => list.map((o, k) => (k === i ? { ...o, ...patch } : o)))
+  const Root = home ? 'div' : 'main'
   const hh = Math.floor(hour)
   const mm = Math.floor((hour - hh) * 60)
 
   return (
-    <main className="world-page">
+    <Root className={`world-page${home ? ' is-home' : ''}${shiori ? ' has-shiori' : ''}`}>
       <canvas
         ref={ref}
         className="iso-canvas world-canvas"
@@ -220,10 +253,24 @@ export function WorldLab() {
         aria-label="The lab made from the offices, in the middle of a city: Shiori's area at its heart, an area for each office round her, a lounge"
       />
       {picked && <Card picked={picked} world={world.data} onClose={() => setPicked(null)} />}
-      <ShioriPanel open={shiori} onClose={() => setShiori(false)} world={world.data} pending={said} onPendingTaken={() => setSaid(null)} byName={byName} onByName={setByName} />
+      <ShioriPanel open={shiori} onClose={() => setShiori(false)} world={world.data} pending={said} onPendingTaken={() => setSaid(null)} byName={byName} onByName={setByName} paused={paused} />
+      {demoBecause && (
+        <aside className="world-demo" role="status">
+          {demoBecause === 'unreachable' ? (
+            <p>The server does not answer: this is a demo lab, not yours.</p>
+          ) : (
+            <>
+              <p>No offices yet: this is a demo lab. Yours appears here once you set one up.</p>
+              <button type="button" onClick={() => openPage('office')}>
+                Set up an office
+              </button>
+            </>
+          )}
+        </aside>
+      )}
       {!shiori && (
         <WakeListener
-          on={byName}
+          on={byName && !paused}
           onCalled={(heard) => {
             setSaid(heard)
             setPicked(null)
@@ -235,6 +282,7 @@ export function WorldLab() {
         <div className="world-panel-head">
           <h1>Lab</h1>
           <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            <SlidersHorizontal size={16} aria-hidden />
             {open ? 'Hide' : 'Settings'}
           </button>
         </div>
@@ -266,7 +314,7 @@ export function WorldLab() {
                   ×{z}
                 </button>
               ))}
-              {world.data && (
+              {world.data && !home && (
                 <button type="button" aria-pressed={real} onClick={() => setReal((r) => !r)}>
                   Real offices
                 </button>
@@ -303,7 +351,7 @@ export function WorldLab() {
                 </select>
               </label>
             </div>
-            {real ? (
+            {home ? null : real ? (
               <p className="world-note">The offices set up in Openspace: an area per office, a seat for each desk and each routine.</p>
             ) : (
               <div className="world-offices">
@@ -356,6 +404,6 @@ export function WorldLab() {
           </>
         )}
       </aside>
-    </main>
+    </Root>
   )
 }

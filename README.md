@@ -202,6 +202,9 @@ scripts/openspace restart
 
 More of what it does, in short:
 
+- It opens on the lab: your offices as an isometric pixel-art world round Shiori, the
+  characters moved by what really happens. One thin bar with a menu of every page;
+  pages open over the lab, each with its own address.
 - Rooms drawn by hand or laid out on their own, moods per room, doors, windows
   with your town's real weather, a minimap and a live activity feed.
 - Claude Code sessions you start yourself in a terminal show up as guests, in the

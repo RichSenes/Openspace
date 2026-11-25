@@ -68,8 +68,8 @@ this page records what was decided for turning it into the real thing.
 4. *(Done: a compact chat slides in from the side: her, small, in a card in the corner, the chat under it, tabs for her sessions, her look and who waits; listening for her name; folded, only her card, her last words and the box stay; calling her by name in the lab opens it.)* Talking to Shiori inside the world (her voice and subtitles reused).
 5. Social life with real small talk, rate-limited, on the local model.
 6. *(Done: agreements and hand-overs between desks show as meetings, the two meet in Shiori's area and talk in turns; the card says with whom and about what and opens the note; hand-overs write their note to `Handovers/` without a model.)* Meeting notes when work touches.
-7. The world as the home page, with a thin bar on top and a way to every other page; then the
-   pages are reviewed one by one.
+7. *(First part done: the lab is the home, one thin bar over it with a menu of the pages in four groups, each with its icon; pages open in a sheet over the lab, with their own address.)* The world as the home page, with a thin bar on top and a way to every other page; then the
+   pages are reviewed one by one (still to do: which ones stay, move or merge).
 
 Still to come, independent of the steps above: Shiori's brain drawn for the repository (the study
 can use a local reference picture that is not published), and the characters' sprites, once their

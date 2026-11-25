@@ -14,6 +14,8 @@ export function useDismiss(
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      // Taken: whatever is under it (a page over the lab, say) stays open.
+      e.preventDefault()
       close()
       trigger?.current?.focus()
     }

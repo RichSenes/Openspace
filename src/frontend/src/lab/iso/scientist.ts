@@ -8,7 +8,7 @@ import { mix, Painter } from './px'
  */
 
 export type HairStyle = 'short' | 'bun' | 'long' | 'pony' | 'curly'
-export type Pose = 'stand' | 'walk' | 'notes' | 'think' | 'coffee' | 'type'
+export type Pose = 'stand' | 'walk' | 'notes' | 'think' | 'coffee' | 'type' | 'phone' | 'book' | 'stretch'
 /** Screen directions: SE and SW face the viewer, NE and NW turn their back. */
 export type Facing = 'SE' | 'SW' | 'NE' | 'NW'
 
@@ -40,6 +40,9 @@ export const FRAMES: Record<Pose, number> = {
   think: 1,
   coffee: 2,
   type: 2,
+  phone: 2,
+  book: 2,
+  stretch: 2,
 }
 
 export function paintScientist(look: Look, back: boolean, pose: Pose, frame: number): Painter {
@@ -117,7 +120,7 @@ export function paintScientist(look: Look, back: boolean, pose: Pose, frame: num
     p.rect(x, y + y0, 3, 2, look.skin)
     p.set(x + 2, y + 1 + y0, skinShade)
   }
-  const reach = !back ? pose : pose === 'walk' || pose === 'stand' ? pose : 'reach'
+  const reach = !back || pose === 'walk' || pose === 'stand' || pose === 'stretch' ? pose : 'reach'
   if (reach === 'walk' || reach === 'stand') {
     const s = reach === 'walk' ? walk : 0
     sleeve(8, 24, 35 - s, false)
@@ -159,6 +162,40 @@ export function paintScientist(look: Look, back: boolean, pose: Pose, frame: num
     p.rect(18, 28 - up + y0, 4, 1, look.shirt)
     p.rect(21, 27 - up + y0, 1, 3, '#cfd3d8')
     hand(17, 30 - up)
+  } else if (reach === 'phone') {
+    // Looking at the phone, held low in one hand; the thumb scrolls and the screen changes.
+    sleeve(8, 24, 35, false)
+    hand(8, 35)
+    sleeve(21, 24, 30, true)
+    p.rect(18, 29 + y0, 4, 2, COAT_SHADE)
+    p.rect(16, 26 + y0, 3, 5, '#1c2230')
+    p.rect(17, 27 + y0, 1, 3, frame % 2 ? '#9fe0ff' : '#5fb4e6')
+    hand(16, 30)
+  } else if (reach === 'book') {
+    // An open book held in both hands; now and then a page turns.
+    sleeve(8, 24, 31, false)
+    sleeve(21, 24, 31, true)
+    p.rect(10, 30 + y0, 3, 2, COAT)
+    p.rect(19, 30 + y0, 3, 2, COAT_SHADE)
+    p.rect(10, 27 + y0, 12, 7, mix(look.shirt, '#3a2030', 0.45))
+    p.rect(11, 28 + y0, 5, 5, '#f3f0e6')
+    p.rect(16, 28 + y0, 5, 5, '#e6e1d4')
+    for (let k = 0; k < 2; k++) {
+      p.rect(12, 29 + k * 2 + y0, 3, 1, '#a9adb6')
+      p.rect(17, 29 + k * 2 + y0, 3, 1, '#a9adb6')
+    }
+    if (frame % 2) p.rect(15, 27 + y0, 2, 6, '#fbf9f2')
+    hand(9, 32)
+    hand(20, 32)
+  } else if (reach === 'stretch') {
+    // Arms up over the head, a long stretch after sitting; then they come down a little.
+    const down = frame % 2 ? 2 : 0
+    sleeve(8, 22, 25, false)
+    sleeve(21, 22, 25, true)
+    sleeve(6, 11 + down, 23, false)
+    sleeve(23, 11 + down, 23, true)
+    hand(6, 9 + down)
+    hand(23, 9 + down)
   } else if (reach === 'type') {
     sleeve(8, 24, 31, false)
     sleeve(21, 24, 31, true)

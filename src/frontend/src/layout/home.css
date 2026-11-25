@@ -219,3 +219,45 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* The world's pages before what they hold: what they will do, and the one world there is. */
+.world-soon-icon {
+  color: var(--accent);
+}
+
+.world-kinds {
+  display: grid;
+  gap: 8px;
+  width: min(360px, 100%);
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.world-kinds li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  text-align: left;
+}
+
+.world-kinds li[aria-current='true'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--edge));
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.world-kinds strong {
+  font-weight: 500;
+}
+
+.world-kinds span {
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

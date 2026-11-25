@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as KeyEvent } from 'react'
-import { ChevronDown, LayoutGrid } from 'lucide-react'
+import { ChevronDown, LayoutGrid, type LucideIcon } from 'lucide-react'
 import { SupervisorStatus } from '../supervisor/SupervisorStatus'
 import { SetupCheck } from '../setup/SetupCheck'
 import { NeedsYou } from '../activity/NeedsYou'
@@ -9,7 +9,7 @@ import { ClaudeMeter, GpuStatus, LimitPauses } from '../engines/ClaudeUsage'
 import type { LinkState } from '../realtime/useBuildingHub'
 import type { NeedsYouTarget } from '../activity/needs'
 import { useDismiss } from '../ui/useDismiss'
-import { GROUPS, pageInfo, type View } from './pageList'
+import { GROUPS, NAV, pageInfo, type PageGroup, type View } from './pageList'
 import './layout.css'
 
 export type { View } from './pageList'
@@ -55,7 +55,7 @@ export function TopBar({ page, onPage, onHome, link, onOpen }: Props) {
         <button type="button" className="wordmark pixel" onClick={onHome} aria-label="Openspace: back to the lab" title="Back to the lab">
           Openspace
         </button>
-        <PagesMenu page={page} onPage={onPage} />
+        <Nav page={page} onPage={onPage} />
         <div className="statusbar" aria-label="Engines, accounts and graphics card">
           <SetupCheck onOpen={() => onPage('settings')} />
           <LimitPauses onOpen={() => onPage('board')} />
@@ -76,8 +76,46 @@ export function TopBar({ page, onPage, onHome, link, onOpen }: Props) {
   )
 }
 
-/** Every page, in groups, under one button; arrows move between them, Escape closes. */
-function PagesMenu({ page, onPage }: { page: View | null; onPage: (view: View) => void }) {
+/**
+ * The pages in the bar: Shiori and Brain as buttons of their own, the other groups as menus.
+ * On narrow windows they all go under one Pages menu instead.
+ */
+function Nav({ page, onPage }: { page: View | null; onPage: (view: View) => void }) {
+  const current = page ? pageInfo(page) : null
+  return (
+    <div className="nav-wrap">
+      <nav className="nav" aria-label="Pages">
+        {NAV.map((n) =>
+          'page' in n ? (
+            <button key={n.page.id} type="button" className="nav-button" aria-current={n.page.id === page ? 'page' : undefined} onClick={() => onPage(n.page.id)}>
+              <n.page.icon size={16} aria-hidden />
+              <span>{n.page.label}</span>
+            </button>
+          ) : (
+            <Menu key={n.group.label} id={`menu-${n.group.label.toLowerCase()}`} label={n.group.label} icon={n.group.icon} groups={[n.group]} page={page} onPage={onPage} />
+          ),
+        )}
+      </nav>
+      <div className="nav-narrow">
+        <Menu id="menu-pages" label={current?.label ?? 'Pages'} icon={current?.icon ?? LayoutGrid} groups={GROUPS} page={page} onPage={onPage} wide />
+      </div>
+    </div>
+  )
+}
+
+interface MenuProps {
+  id: string
+  label: string
+  icon: LucideIcon
+  groups: PageGroup[]
+  page: View | null
+  onPage: (view: View) => void
+  /** Every group, in two columns, headed by their names. */
+  wide?: boolean
+}
+
+/** A button and its list of pages; arrows move between them, Escape or a click elsewhere closes. */
+function Menu({ id, label, icon: Icon, groups, page, onPage, wide = false }: MenuProps) {
   const [open, setOpen] = useState(false)
   // Opened from the keyboard, the focus goes into the menu; from the pointer it stays put.
   const [byKey, setByKey] = useState(false)
@@ -86,8 +124,7 @@ function PagesMenu({ page, onPage }: { page: View | null; onPage: (view: View) =
   const panel = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setOpen(false), [])
   useDismiss(open, close, box, button)
-  const current = page ? pageInfo(page) : null
-  const Icon = current?.icon ?? LayoutGrid
+  const holds = groups.some((g) => g.pages.some((p) => p.id === page))
 
   // Opening moves the focus to the current page (or the first), so the arrows and Enter work at once.
   useLayoutEffect(() => {
@@ -110,23 +147,23 @@ function PagesMenu({ page, onPage }: { page: View | null; onPage: (view: View) =
       <button
         ref={button}
         type="button"
-        className="pages-button"
+        className={`nav-button${holds ? ' is-current' : ''}`}
         aria-expanded={open}
-        aria-controls="pages-menu"
+        aria-controls={id}
         onClick={(e) => {
           setByKey(e.detail === 0)
           setOpen(!open)
         }}
       >
         <Icon size={16} aria-hidden />
-        <span>{current?.label ?? 'Pages'}</span>
+        <span>{label}</span>
         <ChevronDown size={14} aria-hidden className="pages-chevron" />
       </button>
       {open && (
-        <div id="pages-menu" className="pages-menu" ref={panel} onKeyDown={onKey}>
-          {GROUPS.map((g) => (
-            <section key={g.label} className="pages-group" aria-labelledby={`pages-${g.label}`}>
-              <h2 id={`pages-${g.label}`}>{g.label}</h2>
+        <div id={id} className={`pages-menu${wide ? ' is-wide' : ''}`} ref={panel} onKeyDown={onKey}>
+          {groups.map((g) => (
+            <section key={g.label} className="pages-group" aria-label={g.label}>
+              {wide && <h2>{g.label}</h2>}
               <ul>
                 {g.pages.map((p) => (
                   <li key={p.id}>

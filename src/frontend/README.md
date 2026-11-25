@@ -230,9 +230,11 @@ Across every view:
 
 - The app opens on the lab: your offices in the isometric world, Shiori's compact chat
   beside it (open or closed as you left it). Over it, one thin bar: the name (back to the
-  lab), a *Pages* menu with every page in four groups (Mind, Work, People and places,
-  System), each with its icon and one line on what it is for, then the status, "Needs you",
-  the sound and the connection. A page opens in a sheet that slides in over the lab, which
+  lab), *Shiori* and *Brain* as buttons of their own, then a menu for each group (*Work*,
+  *Offices*, *World*, *System*), each page with its icon and one line on what it is for, then
+  the status, "Needs you", the sound and the connection. Below 980 px the pages all go under
+  one *Pages* menu. *World* holds two pages still to fill: editing the lab (adding, removing,
+  moving and dressing things) and choosing the kind of world; they say what they will do. A page opens in a sheet that slides in over the lab, which
   stays alive and dimmed behind it: the ×, Escape, a click on the lab or the browser's back
   close it. Each page has its address (`/#board`, `/#brain`…), so it can be bookmarked.
   The lab opens pages too: a character's card opens its task on the Board, Shiori's chat

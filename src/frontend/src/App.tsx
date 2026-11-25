@@ -25,6 +25,7 @@ import { FirstSteps } from './setup/FirstSteps'
 import { onOpenSettings, requestSettingsSection } from './settings/sections'
 import { usePersistentState } from './usePersistentState'
 import { WorldHome } from './lab/iso/world/WorldLab'
+import { LabEditPage, WorldsPage } from './lab/iso/world/WorldPages'
 import { setPageOpener, type PageAt } from './lab/iso/world/pages'
 import './layout/layout.css'
 
@@ -96,6 +97,8 @@ function Page({ view, office, offices, focusTask, open, onSelect }: PageProps) {
   if (view === 'settings') return <SettingsPanel />
   if (view === 'shiori') return <ShioriPage onOpenSettings={toSettings} />
   if (view === 'brain') return <BrainPage />
+  if (view === 'lab-edit') return <LabEditPage />
+  if (view === 'worlds') return <WorldsPage />
   if (offices.isPending) {
     return (
       <div className="empty">

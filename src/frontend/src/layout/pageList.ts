@@ -1,11 +1,31 @@
-import { Bot, Brain, Building2, Contact, DoorOpen, Map, MessageCircle, Repeat, ScrollText, Settings, ShieldCheck, SquareKanban, type LucideIcon } from 'lucide-react'
+import {
+  Bot,
+  Brain,
+  Briefcase,
+  Building2,
+  Contact,
+  DoorOpen,
+  Earth,
+  FolderCog,
+  Grid3x3,
+  MessageCircle,
+  MonitorCog,
+  PencilRuler,
+  Repeat,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  SquareKanban,
+  type LucideIcon,
+} from 'lucide-react'
 
 /**
- * Openspace's pages, opened over the world from the menu in the bar. Grouped for now; which
- * ones stay, move or merge is decided when they are reviewed one by one.
+ * Openspace's pages, opened over the world from the bar: Shiori and her brain on their own,
+ * the rest in menus by group. Which pages stay, move or merge is decided when they are
+ * reviewed one by one.
  */
 
-export type View = 'building' | 'shiori' | 'brain' | 'board' | 'rooms' | 'routines' | 'reports' | 'characters' | 'security' | 'office' | 'agents' | 'settings'
+export type View = 'shiori' | 'brain' | 'board' | 'routines' | 'reports' | 'characters' | 'agents' | 'rooms' | 'office' | 'building' | 'lab-edit' | 'worlds' | 'security' | 'settings'
 
 export interface PageInfo {
   id: View
@@ -19,43 +39,60 @@ export interface PageInfo {
 
 export interface PageGroup {
   label: string
+  icon: LucideIcon
   pages: PageInfo[]
 }
 
-export const GROUPS: PageGroup[] = [
+/** One place in the bar: a page of its own, or a group's menu. */
+export type NavItem = { page: PageInfo } | { group: PageGroup }
+
+const page = (id: View, label: string, hint: string, icon: LucideIcon, perOffice = false): PageInfo => ({ id, label, hint, icon, perOffice })
+
+export const NAV: NavItem[] = [
+  { page: page('shiori', 'Shiori', 'Talk to her, her sessions and her look', MessageCircle) },
+  { page: page('brain', 'Brain', 'The notes she keeps and how they link', Brain) },
   {
-    label: 'Mind',
-    pages: [
-      { id: 'shiori', label: 'Shiori', hint: 'Talk to her, her sessions and her look', icon: MessageCircle, perOffice: false },
-      { id: 'brain', label: 'Brain', hint: 'The notes she keeps and how they link', icon: Brain, perOffice: false },
-    ],
+    group: {
+      label: 'Work',
+      icon: Briefcase,
+      pages: [
+        page('board', 'Board', 'Every task, from proposed to done', SquareKanban, true),
+        page('routines', 'Routines', 'Recurring jobs and their runs', Repeat, true),
+        page('reports', 'Reports', 'A day, an epic, a changelog', ScrollText, true),
+      ],
+    },
   },
   {
-    label: 'Work',
-    pages: [
-      { id: 'board', label: 'Board', hint: 'Every task, from proposed to done', icon: SquareKanban, perOffice: true },
-      { id: 'routines', label: 'Routines', hint: 'Recurring jobs and their runs', icon: Repeat, perOffice: true },
-      { id: 'reports', label: 'Reports', hint: 'A day, an epic, a changelog', icon: ScrollText, perOffice: true },
-    ],
+    group: {
+      label: 'Offices',
+      icon: Building2,
+      pages: [
+        page('characters', 'Characters', 'Who they are, mood, agenda', Contact, true),
+        page('agents', 'Agents', 'The roles desks can take', Bot),
+        page('rooms', 'Rooms', 'Rooms and their desks', DoorOpen, true),
+        page('office', 'Office', 'Project, files, models, limits', FolderCog, true),
+        page('building', 'Building', 'The old view of one office', Grid3x3, true),
+      ],
+    },
   },
   {
-    label: 'People and places',
-    pages: [
-      { id: 'characters', label: 'Characters', hint: 'Who they are, mood, agenda', icon: Contact, perOffice: true },
-      { id: 'agents', label: 'Agents', hint: 'The roles desks can take', icon: Bot, perOffice: false },
-      { id: 'rooms', label: 'Rooms', hint: 'Rooms and their desks', icon: DoorOpen, perOffice: true },
-      { id: 'office', label: 'Office', hint: 'Project, files, models, limits', icon: Building2, perOffice: true },
-      { id: 'building', label: 'Building', hint: 'The old view of one office', icon: Map, perOffice: true },
-    ],
+    group: {
+      label: 'World',
+      icon: Earth,
+      pages: [page('lab-edit', 'Edit the lab', 'Add, remove, move and dress things', PencilRuler), page('worlds', 'Worlds', 'The kind of world the lab lives in', Earth)],
+    },
   },
   {
-    label: 'System',
-    pages: [
-      { id: 'security', label: 'Security', hint: 'Audits of the code', icon: ShieldCheck, perOffice: true },
-      { id: 'settings', label: 'Settings', hint: 'Engines, accounts, voice, everything else', icon: Settings, perOffice: false },
-    ],
+    group: {
+      label: 'System',
+      icon: MonitorCog,
+      pages: [page('security', 'Security', 'Audits of the code', ShieldCheck, true), page('settings', 'Settings', 'Engines, accounts, voice, everything else', Settings)],
+    },
   },
 ]
+
+/** Every page, in the bar's order, each in one group (Shiori and Brain together as Mind). */
+export const GROUPS: PageGroup[] = [{ label: 'Mind', icon: MessageCircle, pages: NAV.flatMap((n) => ('page' in n ? [n.page] : [])) }, ...NAV.flatMap((n) => ('group' in n ? [n.group] : []))]
 
 export const PAGES: PageInfo[] = GROUPS.flatMap((g) => g.pages)
 

@@ -67,49 +67,106 @@
   text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
-/* The menu of pages: the button names the page open, or "Pages" over the lab. */
-.pages {
-  position: relative;
+/* The pages: Shiori and Brain as buttons, the other groups as menus; the page open (or the
+   menu holding it) lit in the accent with a bar under it. */
+.nav-wrap {
+  display: flex;
+  height: 100%;
+  min-width: 0;
 }
 
-.pages-button {
+.nav {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 100%;
+}
+
+.nav-narrow {
+  display: none;
+  align-items: center;
+}
+
+.pages {
+  position: relative;
+  display: flex;
+}
+
+.nav-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 10px 0 10px;
-  border: 1px solid var(--edge);
-  background: var(--panel);
-  color: var(--ink);
+  gap: 7px;
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--mute);
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
-.pages-button svg {
+.nav-button:hover,
+.nav-button[aria-expanded='true'] {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.nav-button:focus-visible {
+  outline-offset: -4px;
+}
+
+.nav-button[aria-current='page'],
+.nav-button.is-current {
   color: var(--accent);
-}
-
-.pages-button:hover,
-.pages-button[aria-expanded='true'] {
-  border-color: var(--edge-hi);
-  background: var(--raised);
+  border-bottom-color: var(--accent);
+  background: linear-gradient(to top, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%);
 }
 
 .pages-chevron {
-  color: var(--mute) !important;
+  opacity: 0.7;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.pages-button[aria-expanded='true'] .pages-chevron {
+.nav-button[aria-expanded='true'] .pages-chevron {
   transform: rotate(180deg);
+}
+
+/* Narrow: one Pages menu, framed, naming the page open. */
+.nav-narrow .nav-button {
+  height: 32px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
+.nav-narrow .nav-button svg:first-child {
+  color: var(--accent);
+}
+
+@media (max-width: 980px) {
+  .nav {
+    display: none;
+  }
+
+  .nav-narrow {
+    display: flex;
+  }
+}
+
+@media (max-width: 1200px) {
+  .topbar .wide-only {
+    display: none;
+  }
 }
 
 .pages-menu {
@@ -118,9 +175,8 @@
   left: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px 16px;
-  width: min(600px, calc(100vw - 24px));
+  width: min(320px, calc(100vw - 24px));
   max-height: calc(100dvh - var(--bar-h) - 24px);
   overflow: auto;
   padding: 12px;
@@ -137,6 +193,15 @@
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
   }
+}
+
+.pages-menu:not(.is-wide) .pages-group ul {
+  margin: 0;
+}
+
+.pages-menu.is-wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(600px, calc(100vw - 24px));
 }
 
 .pages-group h2 {
@@ -223,7 +288,8 @@
 }
 
 @media (max-width: 560px) {
-  .pages-menu {
+  .pages-menu,
+  .pages-menu.is-wide {
     position: fixed;
     top: calc(var(--bar-h) + 8px);
     left: 12px;
@@ -314,7 +380,7 @@
 
 /* Narrow: the menu button keeps its icon, the page's name is in the sheet. */
 @media (max-width: 560px) {
-  .pages-button > span {
+  .nav-narrow .nav-button > span {
     display: none;
   }
 }

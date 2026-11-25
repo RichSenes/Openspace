@@ -1,4 +1,6 @@
+import type { Pose } from '../scientist'
 import { DECOR_FOOT, type DecorKind } from './decor'
+import { comfortsFor, type Comfort } from './leisure'
 import { hashOf, makePlan, wallBetween, type OfficeSpec, type Plan, type Space } from './layout'
 
 /**
@@ -31,9 +33,11 @@ export interface Spot {
   b: number
   face: 'NE' | 'NW' | 'SE' | 'SW'
   room: number
-  use: 'seat' | 'board' | 'coffee' | 'sofa' | 'shiori' | 'queue' | 'pingpong' | 'foosball' | 'arcade' | 'vending' | 'beanbag' | 'chat'
+  use: 'seat' | 'board' | 'coffee' | 'sofa' | 'shiori' | 'queue' | 'pingpong' | 'foosball' | 'arcade' | 'vending' | 'beanbag' | 'chat' | 'nook'
   /** Places that go together: the ends of a table, the circle of a chat. */
   group?: number
+  /** In a comfort corner: what one does there. */
+  does?: Pose
 }
 
 /** Footprints in tiles (along a, along b) when not mirrored, and in floor units. */
@@ -410,6 +414,8 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
       }
     }
   }
+  if (room.kind === 'office') for (const kind of comfortsFor(room.name, room.flavor)) comfortCorner(plan, room, kind, items, spots, used, blocked, seed, fits, mark, put, rect)
+
   // The small things of a lived-in place, along the walls and partitions: shelves and
   // cabinets against them, bins, boxes, lamps, a coat stand, an armchair here and there.
   const along: DecorKind[] =
@@ -452,6 +458,131 @@ function furnishRoom(plan: Plan, room: Space, items: Item[], spots: Spot[], used
       put('plant', a, b)
       mark(a, b, 1, 1)
     }
+  }
+}
+
+/** Each comfort corner: what it holds (tile offsets), where people go in it and what they do there. */
+const CORNERS: Record<Comfort, { w: number; h: number; things: [ItemKind | DecorKind, number, number][]; places: [number, number, Spot['face'], Pose][] }> = {
+  reading: {
+    w: 3,
+    h: 3,
+    things: [
+      ['armchair', 0, 0],
+      ['lamp', 1, 0],
+      ['armchair', 2, 0],
+    ],
+    places: [
+      [0, 1, 'NE', 'book'],
+      [2, 1, 'NE', 'book'],
+    ],
+  },
+  sofa: {
+    w: 4,
+    h: 4,
+    things: [['sofa', 0, 0]],
+    places: [
+      [1, 2, 'NE', 'phone'],
+      [2, 2, 'NE', 'book'],
+    ],
+  },
+  beanbags: {
+    w: 3,
+    h: 3,
+    things: [
+      ['beanbag', 0, 0],
+      ['plant', 1, 0],
+      ['beanbag', 2, 0],
+    ],
+    places: [
+      [0, 1, 'NE', 'phone'],
+      [2, 1, 'NE', 'book'],
+    ],
+  },
+  cooler: {
+    w: 2,
+    h: 3,
+    things: [
+      ['cooler', 0, 0],
+      ['plant', 1, 0],
+    ],
+    places: [
+      [0, 1, 'SE', 'coffee'],
+      [1, 1, 'NW', 'coffee'],
+    ],
+  },
+  kitchen: {
+    w: 4,
+    h: 4,
+    things: [['coffee', 0, 0]],
+    places: [
+      [1, 2, 'NE', 'coffee'],
+      [2, 2, 'NW', 'coffee'],
+    ],
+  },
+  aquarium: {
+    w: 2,
+    h: 3,
+    things: [['aquarium', 0, 0]],
+    places: [
+      [0, 1, 'NE', 'stand'],
+      [1, 1, 'NE', 'think'],
+    ],
+  },
+}
+
+const DECORS = new Set<string>(Object.keys(DECOR_FOOT))
+
+/**
+ * A comfort corner in an office, where it fits: against the back wall when it can, then anywhere
+ * free. Tried and taken back if it would cut anyone off from their desk.
+ */
+function comfortCorner(
+  plan: Plan,
+  room: Space,
+  kind: Comfort,
+  items: Item[],
+  spots: Spot[],
+  used: Uint8Array,
+  blocked: Uint8Array,
+  seed: number,
+  fits: (a0: number, b0: number, w: number, h: number) => boolean,
+  mark: (a0: number, b0: number, w: number, h: number) => void,
+  put: (kind: ItemKind, ta: number, tb: number) => void,
+  rect: (a: number, b: number, da: number, db: number) => void,
+) {
+  const c = CORNERS[kind]
+  const tries: [number, number][] = []
+  for (let b = room.b0; b + c.h <= room.b1; b++) for (let a = room.a0; a + c.w <= room.a1; a++) tries.push([a, b])
+  // Against the back wall first (where its front is seen), then against any side, last in the
+  // open; among equals, by the room's own order.
+  const edge = ([a, b]: [number, number]) => (b === room.b0 && room.side !== '+b' ? 0 : (a === room.a0 && room.side !== '+a') || a + c.w === room.a1 ? 1 : b + c.h === room.b1 ? 2 : 3)
+  tries.sort((x, y) => edge(x) - edge(y) || hashOf(room.name + kind, x[0] * 97 + x[1]) - hashOf(room.name + kind, y[0] * 97 + y[1]))
+  const midA = Math.floor((room.a0 + room.a1) / 2)
+  const midB = Math.floor((room.b0 + room.b1) / 2)
+  for (const [a, b] of tries) {
+    if (!fits(a, b, c.w, c.h)) continue
+    const keep = { items: items.length, spots: spots.length, blocked: blocked.slice(), used: used.slice() }
+    for (const [thing, da, db] of c.things) {
+      if (DECORS.has(thing)) {
+        const d = thing as DecorKind
+        const pa = (a + da) * T + 1
+        const pb = (b + db) * T + 1
+        items.push({ kind: 'decor', a: pa, b: pb, flip: false, room: room.id, accent: room.accent, seed: seed + items.length * 7, variant: d })
+        rect(pa, pb, ...DECOR_FOOT[d])
+      } else put(thing as ItemKind, a + da, b + db)
+    }
+    mark(a, b, c.w, c.h)
+    const g = 5000 + room.id * 10 + Object.keys(CORNERS).indexOf(kind)
+    for (const [da, db, face, does] of c.places) spots.push({ a: (a + da) * T + 4, b: (b + db) * T + 4, face, room: room.id, use: 'nook', group: g, does })
+    // Everyone still reaches their desk and the corner's places.
+    const reach = reachable(plan, blocked, [midA, midB])
+    const tileOf = (p: Spot) => Math.floor(p.b / T) * plan.w + Math.floor(p.a / T)
+    const mine = spots.filter((p) => p.room === room.id && (p.use === 'seat' || p.use === 'nook'))
+    if (!blocked[midB * plan.w + midA] && mine.every((p) => reach.has(tileOf(p)))) return
+    items.length = keep.items
+    spots.length = keep.spots
+    blocked.set(keep.blocked)
+    used.set(keep.used)
   }
 }
 

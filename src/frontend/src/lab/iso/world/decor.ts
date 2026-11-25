@@ -27,7 +27,7 @@ function make(da: number, db: number, top: number, draw: (p: Painter, at: At) =>
 
 const shadow = (p: Painter, at: At, da: number, db: number) => p.poly([at(0, 0), at(da + 2, 0), at(da + 2, db + 2), at(0, db + 2)], '#0b1220', 0.16)
 
-export type DecorKind = 'shelf' | 'cabinet' | 'bin' | 'printer' | 'boxes' | 'lamp' | 'cooler' | 'armchair' | 'coats'
+export type DecorKind = 'shelf' | 'cabinet' | 'bin' | 'printer' | 'boxes' | 'lamp' | 'cooler' | 'armchair' | 'coats' | 'aquarium'
 
 export const DECOR_FOOT: Record<DecorKind, [number, number]> = {
   shelf: [14, 5],
@@ -39,12 +39,14 @@ export const DECOR_FOOT: Record<DecorKind, [number, number]> = {
   cooler: [5, 5],
   armchair: [7, 7],
   coats: [4, 4],
+  aquarium: [14, 5],
 }
 
 export function decor(kind: DecorKind, accent: string, seed: number): Prop {
   const r = rand(seed)
   const [da, db] = DECOR_FOOT[kind]
   let lights: Prop['lights']
+  let anim: Prop['anim']
   const sprite = make(da, db, 50, (p, at) => {
     shadow(p, at, da, db)
     switch (kind) {
@@ -116,6 +118,48 @@ export function decor(kind: DecorKind, accent: string, seed: number): Prop {
         box(p, at, 2, 2, 6, da - 4, db - 2, 1, shades(mix(c, '#ffffff', 0.15)), false)
         break
       }
+      case 'aquarium': {
+        // A long tank on a low cabinet: lit water, weed, pebbles; fish swim across its front.
+        box(p, at, 0, 0, 0, da, db, 12, shades('#3a4352'))
+        for (let u = 2; u < 2 * da - 2; u += 6) onLeftFace(p, at, 0, db, 4, u, 0, '#6b7787')
+        box(p, at, 0, 0, 12, da, db, 16, shades('#2b6f8a'))
+        p.emitting = true
+        const tank: [number, number][] = []
+        for (let u = 1; u < 2 * da - 1; u++)
+          for (let v = 1; v < 15; v++) {
+            const pebble = v < 3
+            const weed = !pebble && (u % 9 === 3 || u % 13 === 7) && v < 4 + ((u * 7) % 9)
+            onLeftFace(p, at, 0, db, 12, u, v, pebble ? ['#c9b79a', '#9a8466', '#e0d2b4'][u % 3] : weed ? '#3f9a5a' : v > 12 ? '#7fe0f0' : '#2fa8c8')
+            if (!pebble && !weed && v < 12) {
+              const [x0, y0] = at(0, db, 12)
+              tank.push([x0 + u, y0 + Math.floor((u * YF) / 2) - v])
+            }
+          }
+        p.emitting = false
+        box(p, at, 0, 0, 28, da, db, 1, shades('#5d6878'), false)
+        lights = [{ dx: iso(da / 2, db + 4)[0], dy: iso(da / 2, db + 4)[1], r: 22, color: '#7fe0f0' }]
+        const extra = 8
+        const ax = 2 * db + extra
+        const ay = 50 + extra
+        const fish = Array.from({ length: 4 }, (_, k) => ({ k, speed: 0.08 + r() * 0.1, row: 0.2 + r() * 0.6, colour: ['#ff8a3d', '#ffd24a', '#ff5a8a', '#e8f4ff'][k] }))
+        anim = (ctx, x, y, t, flip) => {
+          if (!tank.length) return
+          for (const f of fish) {
+            // Back and forth along the tank, at its own depth.
+            const s = (t * f.speed + f.k * 0.31) % 2
+            const along = s < 1 ? s : 2 - s
+            const i = Math.floor(along * (tank.length - 1))
+            const [tx0] = tank[0]
+            const [tx1] = tank[tank.length - 1]
+            const tx = tx0 + (tx1 - tx0) * along
+            const col = tank.filter(([px]) => Math.abs(px - tx) < 0.5)
+            const pick = col.length ? col[Math.min(col.length - 1, Math.floor(f.row * col.length))] : tank[i]
+            ctx.fillStyle = f.colour
+            ctx.fillRect(Math.round(x + flip * (pick[0] - ax)), Math.round(y + pick[1] - ay), 2, 1)
+          }
+        }
+        break
+      }
       case 'coats': {
         const [x, y] = at(2, 2)
         p.ellipse(x, y, 3, 1.5, '#3a4352')
@@ -131,7 +175,7 @@ export function decor(kind: DecorKind, accent: string, seed: number): Prop {
       }
     }
   })
-  return { da, db, sprite, lights }
+  return { da, db, sprite, lights, anim }
 }
 
 // A pixel font, four by five, capitals and digits.

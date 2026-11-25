@@ -9,6 +9,7 @@ import { hashOf, type OfficeSpec } from './layout'
 import { label } from './decor'
 import type { CharacterKind, CharacterState, WorldView } from '../../../api/types'
 import { intentOf, lookOf, queueOf } from './intent'
+import { aloneAct, choosePastime } from './leisure'
 import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from './sky'
 
 /**
@@ -54,6 +55,8 @@ interface Agent {
   away?: boolean
   /** The place it has taken (a game's end, a chat's spot): no one else takes it meanwhile. */
   holding?: string
+  /** Its character: how it likes to spend free time. */
+  traits?: string[]
 }
 
 const SPEED = 15
@@ -142,6 +145,7 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
           kind: c.kind,
           id: c.id,
           state: c.state,
+          traits: c.traits,
         })
       })
     }
@@ -191,6 +195,80 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
     ag.act = { pose: 'think', face: ag.facing, secs: 5, since: t }
   }
 
+  /**
+   * Free time, by character: a game or the break room; a look round an office (often not its
+   * own) at someone's work; a chat with a colleague at their desk; the office's comfort corner;
+   * or something alone wherever it is: the phone, a book, a coffee, a stretch.
+   */
+  const leisure = (ag: Agent, t: number) => {
+    const pastime = choosePastime(ag.traits ?? [], r())
+    if (pastime === 'tour' && tour(ag, t)) return
+    if (pastime === 'visit' && visit(ag, t)) return
+    if (pastime === 'nook' && nook(ag, t)) return
+    if (pastime === 'alone' && alone(ag, t)) return
+    social(ag, t)
+  }
+  const areas = plan.spaces.filter((s) => s.kind === 'office')
+  const working = (x: Agent) => !x.path.length && Math.hypot(x.a - x.seat.a, x.b - x.seat.b) < 1 && (x.kind === 'Demo' ? x.pose === 'type' : x.state === 'Working')
+  const facingTo = (from: Spot, to: { a: number; b: number }): Facing => facingOf(to.a - from.a, to.b - from.b)
+  /** Takes a place for the agent and walks there to do something; false if it cannot get there. */
+  const take = (ag: Agent, spot: Spot, act: NonNullable<Agent['act']>) => {
+    if (taken.has(keyOf(spot)) || !goTo(ag, spot, act)) return false
+    ag.holding = keyOf(spot)
+    taken.set(ag.holding, ag)
+    return true
+  }
+  /** A free floor tile in an area, nobody's seat or place. */
+  const freeTile = (room: number): Spot | null => {
+    const s = plan.spaces[room]
+    const seatTiles = new Set(furnished.spots.map((p) => keyOf({ ...p, a: Math.floor(p.a / T) * T + 4, b: Math.floor(p.b / T) * T + 4 })))
+    for (let k = 0; k < 24; k++) {
+      const ta = s.a0 + Math.floor(r() * (s.a1 - s.a0))
+      const tb = s.b0 + Math.floor(r() * (s.b1 - s.b0))
+      if (plan.cells[tb * plan.w + ta] !== room || furnished.blocked[tb * plan.w + ta]) continue
+      const spot: Spot = { a: ta * T + 4, b: tb * T + 4, face: 'SE', room, use: 'chat' }
+      if (seatTiles.has(keyOf(spot)) || taken.has(keyOf(spot))) continue
+      return spot
+    }
+    return null
+  }
+  const tour = (ag: Agent, t: number) => {
+    const others = areas.filter((o) => o.id !== ag.room)
+    const room = (others.length && r() < 0.7 ? others[Math.floor(r() * others.length)] : plan.spaces[ag.room]).id
+    // Over someone's shoulder, when someone works there; otherwise just a look round.
+    const at = agents.filter((x) => x !== ag && x.room === room && working(x))
+    const host = at[Math.floor(r() * at.length)]
+    const spot = host ? besideOf(host.seat) : freeTile(room)
+    if (!spot) return false
+    const face = host ? facingTo(spot, host) : (['SE', 'SW', 'NE', 'NW'] as Facing[])[Math.floor(r() * 4)]
+    return take(ag, spot, { pose: host ? 'think' : 'stand', face, secs: 8 + r() * 12, since: t })
+  }
+  const visit = (ag: Agent, t: number) => {
+    const mates = agents.filter((x) => x !== ag && x.room === ag.room && working(x))
+    const mate = mates[Math.floor(r() * mates.length)]
+    const spot = mate && besideOf(mate.seat)
+    if (!spot) return false
+    return take(ag, spot, { pose: 'stand', face: facingTo(spot, mate), secs: 12 + r() * 14, since: t, bubble: 'chat' })
+  }
+  const nook = (ag: Agent, t: number) => {
+    const open = furnished.spots.filter((s) => s.use === 'nook' && !taken.has(keyOf(s)))
+    // Its own office's corner most of the time.
+    const own = open.filter((s) => s.room === ag.room)
+    const list = own.length && r() < 0.75 ? own : open
+    const spot = list[Math.floor(r() * list.length)]
+    if (!spot) return false
+    // Two at the water cooler talk.
+    const company = [...taken.entries()].some(([k, x]) => x !== ag && spotByKey.get(k)?.group === spot.group && spot.does === 'coffee')
+    return take(ag, spot, { pose: spot.does ?? 'stand', face: spot.face, secs: 25 + r() * 25, since: t, bubble: company ? 'chat' : undefined })
+  }
+  const alone = (ag: Agent, t: number) => {
+    const spot = freeTile(r() < 0.75 ? ag.room : plan.hall.id)
+    if (!spot) return false
+    const act = aloneAct(r())
+    const face = (['SE', 'SW', 'SE', 'NE'] as Facing[])[Math.floor(r() * 4)]
+    return take(ag, spot, { pose: act.pose, face, secs: act.secs[0] + r() * (act.secs[1] - act.secs[0]), since: t })
+  }
+
   // Each office's name, floating over its far corner: easier than telling colours apart.
   const names = plan.spaces
     .filter((s) => s.kind === 'office' || s.kind === 'lounge' || s.kind === 'games')
@@ -229,7 +307,7 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       if (spot && goTo(ag, spot, { pose: 'notes', face: spot.face, secs: 6 + r() * 4, since: t, bubble: 'question' })) return
     }
     if (roll < 0.55) {
-      social(ag, t)
+      leisure(ag, t)
       return
     }
     if (atSeat) ag.act = { pose: 'type', face: ag.seat.face, secs: 10 + r() * 15, since: t }
@@ -273,7 +351,7 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       }
       return
     }
-    social(ag, t)
+    leisure(ag, t)
   }
 
   /** Starts again from where they are: their state changed. */

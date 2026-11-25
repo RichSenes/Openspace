@@ -67,9 +67,9 @@ export function hashOf(text: string, salt = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-/** An area's size in tiles: more agents, more room; its proportions come from its name. */
+/** An area's size in tiles: more agents, more room (and a little for a comfort corner); its proportions come from its name. */
 export function roomSize(spec: OfficeSpec, more = 0): [number, number] {
-  const area = more + 36 + (spec.flavor === 'research' ? 16 : 20) * Math.max(1, spec.agents)
+  const area = more + 48 + (spec.flavor === 'research' ? 16 : 20) * Math.max(1, spec.agents)
   const aspect = 0.75 + hashOf(spec.name, 1) * 0.7
   let along = Math.round(Math.sqrt(area * aspect))
   let out = Math.round(area / along)

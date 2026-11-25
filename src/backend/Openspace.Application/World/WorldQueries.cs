@@ -1,6 +1,7 @@
 using Openspace.Application.Abstractions;
 using Openspace.Application.Agents;
 using Openspace.Application.Attention;
+using Openspace.Application.Characters;
 using Openspace.Domain.Offices;
 using Openspace.Domain.Routines;
 using Openspace.Domain.Work;
@@ -55,7 +56,14 @@ public sealed record WorldOffice(Guid Id, string Name, IReadOnlyList<WorldCharac
 /// <param name="Kind">The kind of need, as the needs-you list names it; for an agent's live wait, "Permission" (allow or deny) or "Question" (something to do or decide).</param>
 public sealed record WorldWaiting(string Kind, Guid OfficeId, Guid? CharacterId, Guid Id, string Title, string Detail, DateTimeOffset Since);
 
-public sealed record WorldView(IReadOnlyList<WorldOffice> Offices, IReadOnlyList<WorldWaiting> Waiting);
+/// <summary>
+/// Two characters whose work touches, meeting about it for a while: an agreement on who goes
+/// first ("Agreement"), or a task one finished that the other's builds on ("Handover").
+/// </summary>
+/// <param name="NotePath">The note in the brain about it: the agreement's minutes, the hand-over's note.</param>
+public sealed record WorldMeeting(string Kind, Guid Id, Guid FirstCharacterId, Guid SecondCharacterId, string Subject, string? NotePath, DateTimeOffset Since);
+
+public sealed record WorldView(IReadOnlyList<WorldOffice> Offices, IReadOnlyList<WorldWaiting> Waiting, IReadOnlyList<WorldMeeting> Meetings);
 
 /// <summary>
 /// The world as it is now, in one look, for the lab to draw itself from: every office with its
@@ -68,7 +76,9 @@ public sealed class WorldQueries(
     IRoutineRepository routines,
     ActivityBoard activity,
     InternBoard interns,
-    NeedsYouQueries needs)
+    NeedsYouQueries needs,
+    TimeProvider clock,
+    IAgreementRepository? agreements = null)
 {
     public async Task<WorldView> GetAsync(CancellationToken cancellationToken)
     {
@@ -157,7 +167,46 @@ public sealed class WorldQueries(
             waiting.Add(new WorldWaiting(question.PermissionId is not null && !question.Question ? "Permission" : "Question", question.OfficeId, question.DeskId, question.TaskId, question.Detail ?? question.Doing ?? "A question", question.Step ?? string.Empty, question.At));
         }
 
-        return new WorldView(result, [.. waiting.OrderBy(w => w.Since)]);
+        return new WorldView(result, [.. waiting.OrderBy(w => w.Since)], await MeetingsAsync(all, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>Who meets whom now: agreements opened and hand-overs made in the last minutes.</summary>
+    private async Task<IReadOnlyList<WorldMeeting>> MeetingsAsync(IReadOnlyList<Office> all, CancellationToken cancellationToken)
+    {
+        var now = clock.GetUtcNow();
+        var meetings = new List<WorldMeeting>();
+        var byId = all.ToDictionary(o => o.Id);
+        if (agreements is not null)
+        {
+            foreach (var agreement in await agreements.ListAsync(null, cancellationToken).ConfigureAwait(false))
+            {
+                if (agreement.Status != AgreementStatus.Dropped && now - agreement.OpenedAt <= Handovers.Fresh && agreement.OpenedAt <= now)
+                {
+                    meetings.Add(new WorldMeeting("Agreement", agreement.Id.Value, agreement.FirstDesk.Value, agreement.SecondDesk.Value, agreement.Subject,
+                        agreement.MinutesPath is { Length: > 0 } minutes ? minutes : null, agreement.OpenedAt));
+                }
+            }
+        }
+
+        var waiting = new List<WorkTask>();
+        foreach (var status in new[] { WorkTaskStatus.Queued, WorkTaskStatus.Running })
+        {
+            waiting.AddRange(await tasks.ListAsync(null, status, cancellationToken).ConfigureAwait(false));
+        }
+
+        foreach (var handover in await HandoverKeeper.FindAsync(tasks, waiting, now, cancellationToken).ConfigureAwait(false))
+        {
+            if (!byId.TryGetValue(handover.Next.OfficeId, out var office) || !office.HasDesk(handover.Done.DeskId!.Value) || !office.HasDesk(handover.Next.DeskId!.Value))
+            {
+                continue;
+            }
+
+            var (from, to) = (office.Locate(handover.Done.DeskId!.Value).Desk.Name, office.Locate(handover.Next.DeskId!.Value).Desk.Name);
+            meetings.Add(new WorldMeeting("Handover", handover.Next.Id.Value, handover.Done.DeskId!.Value.Value, handover.Next.DeskId!.Value.Value,
+                $"“{handover.Done.Title}” is done: “{handover.Next.Title}” can go ahead", Handovers.PathFor(handover, from, to, clock.LocalTimeZone), handover.Done.StatusChangedAt));
+        }
+
+        return [.. meetings.OrderBy(m => m.Since)];
     }
 
     private static WorldCharacter DeskCharacter(Desk desk, DeskActivity? live, WorkTask? task)

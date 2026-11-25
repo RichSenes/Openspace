@@ -1,4 +1,4 @@
-import type { CharacterKind, CharacterState, WorldView } from '../../../api/types'
+import type { CharacterKind, CharacterState, WorldMeeting, WorldView } from '../../../api/types'
 import type { Bubble } from '../scene'
 import type { Look, Pose } from '../scientist'
 
@@ -43,6 +43,28 @@ export function queueOf(view: WorldView, present: Set<string>): { id: string; ne
     if (!w.characterId || !present.has(w.characterId) || seen.has(w.characterId)) continue
     seen.add(w.characterId)
     out.push({ id: w.characterId, need: w.kind })
+  }
+  return out
+}
+
+/** A meeting as one of the two sees it: with whom, and whether it leads (stands where they meet first). */
+export interface Meeting {
+  meeting: WorldMeeting
+  with: string
+  lead: boolean
+}
+
+/**
+ * Who meets whom now: both in the lab and both free (at work or in the queue, the meeting waits);
+ * each character in one meeting at a time, the oldest first.
+ */
+export function meetingsOf(view: WorldView, free: Set<string>): Map<string, Meeting> {
+  const out = new Map<string, Meeting>()
+  for (const m of [...(view.meetings ?? [])].sort((x, y) => x.since.localeCompare(y.since))) {
+    const [a, b] = [m.firstCharacterId, m.secondCharacterId]
+    if (a === b || !free.has(a) || !free.has(b) || out.has(a) || out.has(b)) continue
+    out.set(a, { meeting: m, with: b, lead: true })
+    out.set(b, { meeting: m, with: a, lead: false })
   }
   return out
 }

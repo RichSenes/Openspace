@@ -8,7 +8,7 @@ import { findPath, type Spot } from './furnish'
 import { hashOf, type OfficeSpec } from './layout'
 import { label } from './decor'
 import type { CharacterKind, CharacterState, WorldView } from '../../../api/types'
-import { intentOf, lookOf, queueOf } from './intent'
+import { intentOf, lookOf, meetingsOf, queueOf, type Meeting } from './intent'
 import { aloneAct, choosePastime } from './leisure'
 import { cityBurns, groundLight, isDark, skyColour, stormAt, type Weather } from './sky'
 
@@ -39,7 +39,7 @@ interface Agent {
   pose: Pose
   path: [number, number][]
   /** What they do once there: for `secs` from arrival (`since`). */
-  act: { pose: Pose; face: Facing; secs: number; since: number; bubble?: Bubble } | null
+  act: { pose: Pose; face: Facing; secs: number; since: number; bubble?: Bubble; meeting?: string } | null
   seat: Spot
   room: number
   seed: number
@@ -57,6 +57,10 @@ interface Agent {
   holding?: string
   /** Its character: how it likes to spend free time. */
   traits?: string[]
+  /** Someone its work touches, to meet now: an agreement, a hand-over. */
+  meet?: Meeting
+  /** The meetings it has already had: once is enough. */
+  met?: Set<string>
 }
 
 const SPEED = 15
@@ -160,7 +164,8 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   const taken = new Map<string, Agent>()
   const keyOf = (s: Spot) => `${s.a},${s.b}`
   const release = (ag: Agent) => {
-    if (ag.holding && taken.get(ag.holding) === ag) taken.delete(ag.holding)
+    // What it holds, and any place kept for it (a meeting it never got to).
+    for (const [k, x] of taken) if (x === ag) taken.delete(k)
     ag.holding = undefined
   }
   const POSES: Partial<Record<Spot['use'], Pose>> = { pingpong: 'stand', foosball: 'type', arcade: 'type', vending: 'coffee', chat: 'stand', beanbag: 'stand', coffee: 'coffee', board: 'think' }
@@ -213,7 +218,8 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   const facingTo = (from: Spot, to: { a: number; b: number }): Facing => facingOf(to.a - from.a, to.b - from.b)
   /** Takes a place for the agent and walks there to do something; false if it cannot get there. */
   const take = (ag: Agent, spot: Spot, act: NonNullable<Agent['act']>) => {
-    if (taken.has(keyOf(spot)) || !goTo(ag, spot, act)) return false
+    const holder = taken.get(keyOf(spot))
+    if ((holder && holder !== ag) || !goTo(ag, spot, act)) return false
     ag.holding = keyOf(spot)
     taken.set(ag.holding, ag)
     return true
@@ -269,6 +275,70 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
     return take(ag, spot, { pose: act.pose, face, secs: act.secs[0] + r() * (act.secs[1] - act.secs[0]), since: t })
   }
 
+  /**
+   * Meeting someone its work touches: the two go to a corner of Shiori's area (or two free tiles
+   * there), face each other and talk it through for a couple of minutes; the one who leads holds
+   * the notes. The first of the two to get there picks the place for both.
+   */
+  const places = new Map<string, [Spot, Spot]>()
+  const placeFor = (lead: Agent, other: Agent | undefined, id: string): [Spot, Spot] | null => {
+    const known = places.get(id)
+    if (known) return known
+    const free = (s: Spot) => !taken.has(keyOf(s))
+    const byGroup = new Map<number, Spot[]>()
+    for (const s of furnished.spots) if (s.use === 'chat' && s.group !== undefined && free(s)) byGroup.set(s.group, [...(byGroup.get(s.group) ?? []), s])
+    let pair = [...byGroup.values()].find((list) => list.length >= 2)?.slice(0, 2) as [Spot, Spot] | undefined
+    if (!pair) {
+      const a = freeTile(plan.hall.id)
+      const b = a && freeTile(plan.hall.id)
+      if (!a || !b) return null
+      pair = [a, b]
+    }
+    places.set(id, pair)
+    // Kept for both: nobody else takes them meanwhile.
+    taken.set(keyOf(pair[0]), lead)
+    if (other) taken.set(keyOf(pair[1]), other)
+    return pair
+  }
+  const meetUp = (ag: Agent, t: number) => {
+    const m = ag.meet!
+    const other = agents.find((x) => x.id === m.with || (x.kind === 'Demo' && `demo-${x.seed}` === m.with))
+    const lead = m.lead ? ag : other
+    const place = placeFor(lead ?? ag, m.lead ? other : ag, m.meeting.id)
+    if (!place) {
+      ag.meet = undefined
+      leisure(ag, t)
+      return
+    }
+    const [mine, theirs] = m.lead ? place : [place[1], place[0]]
+    const pose: Pose = m.lead && m.meeting.kind === 'Handover' ? 'notes' : m.lead ? 'think' : 'stand'
+    const act = { pose, face: facingTo(mine, theirs), secs: 90 + r() * 60, since: t, bubble: 'chat' as Bubble, meeting: m.meeting.id }
+    if (take(ag, mine, act)) return
+    ag.meet = undefined
+    leisure(ag, t)
+  }
+  /** In the demo, now and then two people of different areas meet, as real work would make them. */
+  const demoMeeting = (ag: Agent, t: number) => {
+    const others = agents.filter((x) => x !== ag && x.kind === 'Demo' && x.room !== ag.room && !x.meet && !x.path.length)
+    const other = others[Math.floor(r() * others.length)]
+    if (!other) return false
+    const id = `demo-meeting-${Math.floor(t * 1000)}-${ag.seed}`
+    const meeting = {
+      kind: r() < 0.5 ? ('Agreement' as const) : ('Handover' as const),
+      id,
+      firstCharacterId: `demo-${ag.seed}`,
+      secondCharacterId: `demo-${other.seed}`,
+      subject: '',
+      notePath: null,
+      since: '',
+    }
+    ag.meet = { meeting, with: `demo-${other.seed}`, lead: true }
+    other.meet = { meeting, with: `demo-${ag.seed}`, lead: false }
+    rethink(other)
+    meetUp(ag, t)
+    return true
+  }
+
   // Each office's name, floating over its far corner: easier than telling colours apart.
   const names = plan.spaces
     .filter((s) => s.kind === 'office' || s.kind === 'lounge' || s.kind === 'games')
@@ -291,6 +361,11 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
   }
 
   const decide = (ag: Agent, t: number) => {
+    if (ag.meet && (ag.kind === 'Demo' || intentOf(ag.state ?? 'Free', ag.need).where === 'social')) {
+      meetUp(ag, t)
+      return
+    }
+    if (ag.kind === 'Demo' && r() < 0.03 && demoMeeting(ag, t)) return
     if (ag.kind !== 'Demo') {
       decideReal(ag, t)
       return
@@ -381,6 +456,17 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       ag.state = c.state
       ag.need = needs.get(ag.id)
       if (changed) rethink(ag)
+    }
+    // Meetings: two free characters whose work touches meet once about it.
+    const free = new Set(agents.filter((a) => a.id && a.state === 'Free' && !a.away).map((a) => a.id!))
+    const meets = meetingsOf(view, free)
+    for (const ag of agents) {
+      if (!ag.id) continue
+      const m = meets.get(ag.id)
+      const next = m && !ag.met?.has(m.meeting.id) ? m : undefined
+      if (next?.meeting.id === ag.meet?.meeting.id) continue
+      ag.meet = next
+      rethink(ag)
     }
     // Interns: they come in beside the desk they help, and leave when it is done.
     const interns = view.offices.flatMap((o) => o.characters.filter((c) => c.kind === 'Intern'))
@@ -473,6 +559,12 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       return
     }
     ag.bubble = undefined
+    if (ag.act?.meeting) {
+      // Talked it through: once is enough.
+      ;(ag.met ??= new Set()).add(ag.act.meeting)
+      places.delete(ag.act.meeting)
+      ag.meet = undefined
+    }
     release(ag)
     decide(ag, t)
   }
@@ -868,6 +960,8 @@ export function makeLab(offices: OfficeSpec[], live?: WorldView): Lab {
       for (const n of names) ctx.drawImage(n.canvas, Math.round(n.at[0] - n.canvas.width / 2), Math.round(n.at[1]))
       for (const ag of agents) {
         if (!ag.bubble || ag.path.length || ag.away) continue
+        // In a meeting they take turns to talk.
+        if (ag.act?.meeting && Math.floor(t / 2.5 + (ag.meet?.lead ? 0 : 1)) % 2) continue
         const [x, y] = screen(ag.a, ag.b)
         drawBubble(ctx, x + 6, y - 50, ag.bubble, t, ag.seed)
       }

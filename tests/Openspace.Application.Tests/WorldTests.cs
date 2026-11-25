@@ -20,7 +20,9 @@ public sealed class WorldTests
         _interns = new InternBoard(_h.Publisher);
     }
 
-    private WorldQueries World() => new(_h.Offices, _h.Tasks, _h.Routines, _activity, _interns, new NeedsYouQueries(_h.Offices, _h.Tasks, _h.Routines, new InMemoryVault(), _h.Clock));
+    private readonly InMemoryAgreements _agreements = new();
+
+    private WorldQueries World() => new(_h.Offices, _h.Tasks, _h.Routines, _activity, _interns, new NeedsYouQueries(_h.Offices, _h.Tasks, _h.Routines, new InMemoryVault(), _h.Clock), _h.Clock, _agreements);
 
     private Routine AddRoutine(string name, bool enabled = true)
     {

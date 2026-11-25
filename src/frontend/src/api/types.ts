@@ -1031,8 +1031,24 @@ export interface WorldWaiting {
   since: string
 }
 
-/** The world in one look: every office's characters and the queue at Shiori. */
+/**
+ * Two characters whose work touches, meeting about it for a while: an agreement on who goes
+ * first, or a task one finished that the other's builds on.
+ */
+export interface WorldMeeting {
+  kind: 'Agreement' | 'Handover'
+  id: string
+  firstCharacterId: string
+  secondCharacterId: string
+  subject: string
+  /** The note in the brain about it. */
+  notePath: string | null
+  since: string
+}
+
+/** The world in one look: every office's characters, the queue at Shiori, who meets whom. */
 export interface WorldView {
   offices: WorldOffice[]
   waiting: WorldWaiting[]
+  meetings?: WorldMeeting[]
 }

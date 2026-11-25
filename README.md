@@ -234,8 +234,9 @@ More of what it does, in short:
   shows them all with their history, the office's agenda for the next days and the
   agreements: when two desks plan to change the same files at the same time, code settles
   who goes first under the constitution (seniority, priority, age) and writes the minutes
-  to `Agreements/`; what the rules do not settle is one question for you. Agents never see
-  the numbers.
+  to `Agreements/`; what the rules do not settle is one question for you. When a desk's
+  finished work unblocks another desk's task, a hand-over note goes to `Handovers/`,
+  written from the two tasks without a model. Agents never see the numbers.
   A daily chronicle of office life is written every night to `Chronicle/`, printed in
   the morning paper and rounded up in the weekly digest.
 

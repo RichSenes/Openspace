@@ -55,6 +55,8 @@ src/
               Shiori's chat, face and whiteboard in three directions: ?lab=shiori
               Shiori at the centre of four worlds, three bodies, pixel or smooth: ?lab=presence
               Shiori's face alive and her six expressions: ?lab=portrait
+              The isometric lab in its city, from your offices with &real: ?lab=world
+              (free time by character, comfort corners, meetings, Shiori's compact chat)
   ui/         Toasts, dialogs, status pills, the one format for dates and times
 ```
 

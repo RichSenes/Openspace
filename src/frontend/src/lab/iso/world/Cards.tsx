@@ -182,6 +182,8 @@ function CharacterCard({ picked, world }: { picked: Extract<Picked, { kind: 'age
     )
   }
   const needs = (world?.waiting ?? []).filter((w) => w.characterId === who.id)
+  const meeting = (world?.meetings ?? []).find((m) => m.firstCharacterId === who.id || m.secondCharacterId === who.id)
+  const partner = meeting && world?.offices.flatMap((o) => o.characters).find((c) => c.id === (meeting.firstCharacterId === who.id ? meeting.secondCharacterId : meeting.firstCharacterId))
   const helper = who.forDesk ? office.characters.find((c) => c.id === who.forDesk) : undefined
   return (
     <>
@@ -199,6 +201,19 @@ function CharacterCard({ picked, world }: { picked: Extract<Picked, { kind: 'age
           <h3>Task</h3>
           <p>{who.taskTitle}</p>
           {who.taskId && <Log taskId={who.taskId} />}
+        </section>
+      )}
+      {meeting && (
+        <section className="card-task">
+          <h3>{meeting.kind === 'Handover' ? 'Handing work over' : 'Agreeing who goes first'}</h3>
+          <p>
+            With {partner?.name ?? 'another desk'}: {meeting.kind === 'Agreement' ? `both change ${meeting.subject}` : meeting.subject}.
+          </p>
+          {meeting.notePath && (
+            <button type="button" className="card-link" onClick={() => openPage('brain')}>
+              Read the note in the brain
+            </button>
+          )}
         </section>
       )}
       {who.traits.length > 0 && (

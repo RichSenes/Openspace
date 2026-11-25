@@ -23,7 +23,8 @@ public sealed class QueueDispatcher(
     IUnitOfWork unitOfWork,
     IOptionsMonitor<QueueOptions> options,
     TimeProvider clock,
-    Characters.AgreementKeeper? agreements = null)
+    Characters.AgreementKeeper? agreements = null,
+    Characters.HandoverKeeper? handovers = null)
 {
     /// <returns>The tasks that just started and now need an agent.</returns>
     /// <remarks>Every queued task that does not start gets the reason it waits, for the board.</remarks>
@@ -37,6 +38,20 @@ public sealed class QueueDispatcher(
         IReadOnlyDictionary<Guid, string> agreed = queued.Count > 0 && agreements is not null
             ? (await agreements.RoundAsync(cancellationToken).ConfigureAwait(false)).Hold
             : new Dictionary<Guid, string>();
+
+        // Work that another desk's queued task waits for, just finished: the hand-over gets its note.
+        if (handovers is not null && queued.Any(t => t.DependsOn.Count > 0))
+        {
+            try
+            {
+                await handovers.RoundAsync(queued, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A vault that cannot be written never holds the queue up.
+            }
+        }
+
         var freeSeats = seats - running.Count;
         var reasons = new Dictionary<Guid, string>();
         var seatsTaken = $"Waits for a free seat: {seats} {(seats == 1 ? "agent works" : "agents work")} at a time.";
